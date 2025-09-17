@@ -1,3 +1,24 @@
+// --------------------------------------------------------------
+// BeebPerf - A BBC Micro Profiler
+//
+// Copyright (C) 2025  Mark John Leece
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public
+// License along with this program; if not, write to the Free
+// Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+// Boston, MA  02110-1301, USA.
+// --------------------------------------------------------------
+
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -282,15 +303,23 @@ namespace BeebPerf
                 // destination address
                 if (opcode == 0x20/*JSR abs*/ || opcode == 0x4C/*JMP abs*/)
                 {
-                    // jsr/jmp return address
+                    // JSR/JMP return address
                     instruction.DestinationAddress = ToCanonicalAddress(model, operand);
                 }
                 else if (opcode == 0x60/*RTS*/ || opcode == 0x40/*RTI*/ ||
                          opcode == 0x6C/*JMP ind*/ || (opcode == 0x7C/*JMP (abs,X)*/ && model.CPU == CPUType._65C02))
                 {
-                    // rts/rti/jmp destination address
+                    // RTS/RTI/JMP destination address
                     ushort destinationAddress = ReadShort(dataStream);
                     instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
+                }
+                else if (_OpcodeBranch[opcode] != 0)
+                {
+                    // branch destination
+                    int destinationAddress = opcodeAddress + 2;
+                    if (cycleCount > 2)
+                        destinationAddress = unchecked(destinationAddress + (sbyte)instruction.Operand);
+                    instruction.DestinationAddress = ToCanonicalAddress(model, (ushort)destinationAddress);
                 }
                 else
                 {
@@ -540,6 +569,26 @@ namespace BeebPerf
 
         private void PopulateOpcodeTables(CPUType cpu)
         {
+            _OpcodeBranch = [
+             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 9
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
+                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
+            ];
+
             byte[] sizeTable6502 = [
              // 0 1 2 3 4 5 6 7 8 9 a b c d e f
                 1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3, // 0
@@ -732,6 +781,7 @@ namespace BeebPerf
             return (byte)ms.ReadByte();
         }
 
+        private byte[] _OpcodeBranch = new byte[0];
         private byte[] _OpcodeSize = new byte[0];
         private byte[] _OpcodeMemoryAccess = new byte[0];
         private byte[] _OpcodeAddressMode = new byte[0];
