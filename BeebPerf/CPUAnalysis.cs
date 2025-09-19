@@ -23,9 +23,9 @@ using System.Diagnostics;
 
 namespace BeebPerf
 {
-    public class Analysis
+    public class CPUAnalysis
     {
-        public Analysis(Model model)
+        public CPUAnalysis(Model model)
         {
             _Instructions = model.Instructions;
             _Labels = model.Labels;
@@ -53,15 +53,15 @@ namespace BeebPerf
                 _BranchOrJumpOpcodeTable[0x7C] = 1; // add JMP (abs,X)
         }
 
-        public void StaticCPUAnalysis()
+        public void StaticAnalysis()
         {
             IdentifyRoutines();
             IdentifyStackFrames();
         }
 
-        public void DynamicCPUAnalysis(int startCycleCount, int endCycleCount)
+        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
-            CalculateCPUMetrics(startCycleCount, endCycleCount);
+            CalculateMetrics(startCycleCount, endCycleCount);
             PopulateHotRoutines();
             PopulateProgramCallTree();
             PopulateNonMaskableInterruptCallTree();
@@ -113,7 +113,7 @@ namespace BeebPerf
             public int InclusiveCycleCount;
         }
 
-        private CPUMetricResults CalculateCPUMetrics(StackFrame stackFrame, int startCycleCount, int endCycleCount)
+        private CPUMetricResults CalculateMetrics(StackFrame stackFrame, int startCycleCount, int endCycleCount)
         {
             if (startCycleCount > stackFrame.EndCycleCount || endCycleCount < stackFrame.StartCycleCount)
             {
@@ -136,7 +136,7 @@ namespace BeebPerf
 
             foreach (var childStackFrame in stackFrame.Children)
             {
-                var childCPUMetrics = CalculateCPUMetrics(childStackFrame, startCycleCount, endCycleCount);
+                var childCPUMetrics = CalculateMetrics(childStackFrame, startCycleCount, endCycleCount);
                 excludedCycleCount += childCPUMetrics.ExcludedCycleCount;
                 childElapsedCycleCount += childCPUMetrics.ElapsedCycleCount;
                 if (childStackFrame.Type != CallType.ISR)
@@ -465,7 +465,7 @@ namespace BeebPerf
             }
         }
 
-        private void CalculateCPUMetrics(int startCycleCount, int endCycleCount)
+        private void CalculateMetrics(int startCycleCount, int endCycleCount)
         {
             if (startCycleCount < StartCycleCount)
                 startCycleCount = StartCycleCount;
@@ -479,7 +479,7 @@ namespace BeebPerf
                 routine.AggregateCPUMetrics.Clear();
             }
 
-            CalculateCPUMetrics(_RootStackFrame, startCycleCount, endCycleCount);
+            CalculateMetrics(_RootStackFrame, startCycleCount, endCycleCount);
         }
 
         private void PopulateHotRoutines()

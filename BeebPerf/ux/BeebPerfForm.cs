@@ -22,9 +22,9 @@ namespace BeebPerf.ux
                 Model? model = perfReader.ReadFile("C:\\Users\\markl\\BeebEm\\marks.perf");
                 if (model != null)
                 {
-                    var analysis = new Analysis((Model)model);
-                    analysis.StaticCPUAnalysis();
-                    analysis.DynamicCPUAnalysis(startCycleCount: 0, endCycleCount: int.MaxValue);
+                    var analysis = new CPUAnalysis((Model)model);
+                    analysis.StaticAnalysis();
+                    analysis.DynamicAnalysis(startCycleCount: 0, endCycleCount: int.MaxValue);
                 }
             }
             catch (Exception ex)
