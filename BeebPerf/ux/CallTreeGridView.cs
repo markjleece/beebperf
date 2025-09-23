@@ -19,9 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Data.Common;
-using System.Windows.Forms;
-
 namespace BeebPerf.ux
 {
     internal class CallTreeGridView : DataGridView
@@ -74,15 +71,14 @@ namespace BeebPerf.ux
             if (e.Value == null)
                 return;
 
-            var dataGrid = (DataGridView)sender!;
             var treeNode = (CallTreeNode)e.Value;
 
-            switch (dataGrid.Columns[e.ColumnIndex].Name)
+            switch (Columns[e.ColumnIndex].Name)
             {
                 case "Routine":
                     e.Value = $"{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
                     e.FormattingApplied = true;
-                    int indent = treeNode.Context.Depth * dataGrid.Rows[e.RowIndex].Cells[0].Size.Height;
+                    int indent = treeNode.Context.Depth * Rows[e.RowIndex].Cells[0].Size.Height;
                     e.CellStyle.Padding = new Padding(e.CellStyle.Padding.Left + indent, e.CellStyle.Padding.Top, e.CellStyle.Padding.Right, e.CellStyle.Padding.Bottom);
                     break;
 
@@ -130,9 +126,7 @@ namespace BeebPerf.ux
             if (e.RowIndex < 0 || e.ColumnIndex != 0)
                 return;
 
-            var dataGrid = (DataGridView)sender!;
-
-            var cell = dataGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+            var cell = Rows[e.RowIndex].Cells[e.ColumnIndex];
             var treeNode = (CallTreeNode)cell.Value!;
 
             if ((e.X >= treeNode.Depth * cell.Size.Height) &&
@@ -142,21 +136,19 @@ namespace BeebPerf.ux
                 {
                     if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
                     {
-                        treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
-                        ShowTreeNode(dataGrid, e.RowIndex + 1, treeNode);
+                        OpenTreeNode(e.RowIndex, treeNode);
                     }
                     else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     {
-                        treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
-                        HideTreeNode(dataGrid, e.RowIndex + 1, treeNode);
+                        CloseTreeNode(e.RowIndex, treeNode);
                     }
                 }
             }
         }
 
-        private int ShowTreeNode(DataGridView dataGrid, int index, CallTreeNode treeNode)
+        private void OpenTreeNode(int rowIndex, CallTreeNode treeNode)
         {
-            foreach (DataGridViewColumn column in dataGrid.Columns)
+            foreach (DataGridViewColumn column in Columns)
             {
                 SortOrder sortOrder = column.HeaderCell.SortGlyphDirection;
                 if (sortOrder != SortOrder.None)
@@ -174,26 +166,38 @@ namespace BeebPerf.ux
                 }
             }
 
-            foreach (var child in treeNode.Children)
+            treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
+            AddChildRows(rowIndex + 1, treeNode);
+        }
+
+        private void CloseTreeNode(int rowIndex, CallTreeNode treeNode)
+        {
+            RemoveChildRows(rowIndex + 1, treeNode);
+            treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
+        }
+
+        private int AddChildRows(int index, CallTreeNode treeNode)
+        {
+            if (treeNode.HasChildren && treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
             {
-                dataGrid.Rows.Insert(index, child, child, child, child, child);
-                index++;
-
-                if (child.HasChildren && child.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
-                    index += ShowTreeNode(dataGrid, index, child);
+                foreach (var childNode in treeNode.Children)
+                {
+                    Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode);
+                    index = AddChildRows(index, childNode);
+                }
             }
-
             return index;
         }
 
-        private void HideTreeNode(DataGridView dataGrid, int index, CallTreeNode treeNode)
+        private void RemoveChildRows(int index, CallTreeNode treeNode)
         {
-            foreach (var child in treeNode.Children)
+            if (treeNode.HasChildren && treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
             {
-                dataGrid.Rows.RemoveAt(index);
-
-                if (child.HasChildren && child.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
-                    HideTreeNode(dataGrid, index, child);
+                foreach (var childNode in treeNode.Children)
+                {
+                    Rows.RemoveAt(index);
+                    RemoveChildRows(index, childNode);
+                }
             }
         }
 
