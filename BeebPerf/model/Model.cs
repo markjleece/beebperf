@@ -23,6 +23,10 @@ namespace BeebPerf
 {
     public class Model
     {
+        public Model() 
+        {
+        }
+
         public Model(BBCModelType bbcModel, int executionCount)
         {
             BBCModel = bbcModel;
@@ -39,6 +43,26 @@ namespace BeebPerf
 
             Instructions = new Instruction[executionCount];
         }
+        public Model Clone()
+        {
+            return new Model()
+            {
+                BBCModel = BBCModel,
+                CPU = CPU,
+                Snapshot = Snapshot.Clone(),
+                Instructions = (Instruction[])Instructions.Clone(),
+                Labels = new(Labels)
+            };
+        }
+
+        public void Set(Model other)
+        {
+            BBCModel = other.BBCModel;
+            CPU = other.CPU;
+            Snapshot = other.Snapshot;
+            Instructions = other.Instructions;
+            Labels = other.Labels;
+        }
 
         public enum CPUType
         {
@@ -48,11 +72,11 @@ namespace BeebPerf
 
         public enum BBCModelType
         {
-            B = 0,       
+            B = 0,
             IntegraB = 1,
-            BPlus = 2,   
+            BPlus = 2,
             Master128 = 3,
-            MasterET = 4 
+            MasterET = 4
         }
 
         // memory
@@ -67,23 +91,39 @@ namespace BeebPerf
             Count = 21
         }
 
-        public struct SnapshotType
+        public class SnapshotType
         {
-            public byte[][] Memory;
-            public bool[] MemoryReadOnly;
+            public SnapshotType Clone()
+            {
+                return new SnapshotType()
+                {
+                    Memory = (byte[][])Memory.Clone(),
+                    MemoryReadOnly = (bool[])MemoryReadOnly.Clone(),
+                    StackPointer = StackPointer,
+                    RomPagingRegister = RomPagingRegister,
+                    AccessControlRegister = AccessControlRegister,
+                    HiddenRamAddress = HiddenRamAddress,
+                    VideoULARegister = VideoULARegister,
+                    VideoULAPalette = (byte[])VideoULAPalette.Clone(),
+                    VideoCtrlRegisters = (byte[])VideoCtrlRegisters.Clone(),
+                };
+            }
+
+            public byte[][] Memory = [];
+            public bool[] MemoryReadOnly = [];
             public byte StackPointer;
             public byte RomPagingRegister;
             public byte AccessControlRegister;
             public byte HiddenRamAddress;
             public byte VideoULARegister;
-            public byte[] VideoULAPalette;
-            public byte[] VideoCtrlRegisters;
+            public byte[] VideoULAPalette = [];
+            public byte[] VideoCtrlRegisters = [];
         }
 
         public BBCModelType BBCModel;
         public CPUType CPU;
         public SnapshotType Snapshot = new();
-        public Instruction[] Instructions;
-        public Dictionary<ushort, string> Labels;
+        public Instruction[] Instructions = [];
+        public Dictionary<ushort, string> Labels = [];
     }
 }

@@ -23,6 +23,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using static BeebPerf.Model;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace BeebPerf
 {
@@ -424,41 +425,37 @@ namespace BeebPerf
 
         private CanonicalAddress ToCanonicalAddress(Model model, ushort address)
         {
-            byte page;
+            Model.MemoryPage page;
 
             switch (model.BBCModel)
             {
                 case BBCModelType.B:
                     if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (byte)(_RomPagingRegister & 0x0F);
-                        address -= 0x8000;
+                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
-                        page = (byte)MemoryPage.WholeRam;
+                        page = MemoryPage.WholeRam;
                     }
                     break;
 
                 case BBCModelType.BPlus:
                     if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
                     {
-                        page = (byte)MemoryPage.ShadowRam;
-                        address -= 0x3000;
+                        page = MemoryPage.ShadowRam;
                     }
                     else if (address >= 0x8000 && address < 0xB000 && _PrivateRamSelected)
                     {
-                        page = (byte)MemoryPage.PrivateRam;
-                        address -= 0x8000;
+                        page = MemoryPage.PrivateRam;
                     }
                     else if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (byte)(_RomPagingRegister & 0x0F);
-                        address -= 0x8000;
+                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
-                        page = (byte)MemoryPage.WholeRam;
+                        page = MemoryPage.WholeRam;
                     }
                     break;
                     
@@ -467,12 +464,11 @@ namespace BeebPerf
                     {
                         if (address >= 0x3000 && _ShadowRamEnabled && !_ShadowRamSelected)
                         {
-                            page = (byte)MemoryPage.ShadowRam;
-                            address -= 0x3000;
+                            page = MemoryPage.ShadowRam;
                         }
                         else
                         {
-                            page = (byte)MemoryPage.WholeRam;
+                            page = MemoryPage.WholeRam;
                         }
                     }
                     else if (_PrivateRamSelected && (
@@ -480,17 +476,15 @@ namespace BeebPerf
                         (_PrivateRam4kArea && address < 0x9000) ||
                         (_PrivateRam1kArea && address >= 0x9000 && address < 0xB000)))
                     {
-                        page = (byte)MemoryPage.PrivateRam;
-                        address -= 0x8000;
+                        page = MemoryPage.PrivateRam;
                     }
                     else if (address < 0xC000)
                     {
-                        page = (byte)(_RomPagingRegister & 0x0F);
-                        address -= 0x8000;
+                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
-                        page = (byte)MemoryPage.WholeRam;
+                        page = MemoryPage.WholeRam;
                     }
                     break;
 
@@ -498,27 +492,23 @@ namespace BeebPerf
                 case BBCModelType.MasterET:
                     if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
                     {
-                        page = (byte)MemoryPage.ShadowRam;
-                        address -= 0x3000;
+                        page = MemoryPage.ShadowRam;
                     }
                     else if (address >= 0x8000 && address < 0x9000 && _PrivateRamSelected)
                     {
-                        page = (byte)MemoryPage.PrivateRam;
-                        address -= 0x8000;
+                        page = MemoryPage.PrivateRam;
                     }
                     else if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (byte)(_RomPagingRegister & 0x0F);
-                        address -= 0x8000;
+                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else if (address >= 0xC000 && address < 0xE000)
                     {
-                        page = (byte)MemoryPage.FilingSystemRam;
-                        address -= 0xC000;
+                        page = MemoryPage.FilingSystemRam;
                     }
                     else
                     {
-                        page = (byte)MemoryPage.WholeRam;
+                        page = MemoryPage.WholeRam;
                     }
                     break;
 

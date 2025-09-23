@@ -20,12 +20,30 @@
 // --------------------------------------------------------------
 
 using System.Diagnostics;
+using System.Net;
 
 namespace BeebPerf
 {
     public class CPUAnalysis
     {
-        public CPUAnalysis(Model model)
+        public void StaticAnalysis(Model model)
+        {
+            Preamble(model);
+            IdentifyRoutines();
+            IdentifyStackFrames();
+        }
+
+        public void DynamicAnalysis(Model model, int startCycleCount, int endCycleCount)
+        {
+            Preamble(model);
+            CalculateMetrics(startCycleCount, endCycleCount);
+            PopulateHotRoutines();
+            PopulateProgramCallTree();
+            PopulateNonMaskableInterruptCallTree();
+            PopulateMaskableInterruptCallTree();
+        }
+
+        private void Preamble(Model model)
         {
             _Instructions = model.Instructions;
             _Labels = model.Labels;
@@ -51,21 +69,6 @@ namespace BeebPerf
 
             if (model.CPU == Model.CPUType._6502)
                 _BranchOrJumpOpcodeTable[0x7C] = 1; // add JMP (abs,X)
-        }
-
-        public void StaticAnalysis()
-        {
-            IdentifyRoutines();
-            IdentifyStackFrames();
-        }
-
-        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
-        {
-            CalculateMetrics(startCycleCount, endCycleCount);
-            PopulateHotRoutines();
-            PopulateProgramCallTree();
-            PopulateNonMaskableInterruptCallTree();
-            PopulateMaskableInterruptCallTree();
         }
 
         private int CalculatedExcludedCycles(StackFrame stackFrame, int startCycleCount, int endCycleCount)
@@ -310,7 +313,7 @@ namespace BeebPerf
             _RoutinesByAddress.Add(address, routine);
             _SortedRoutineAddresses.Add(address);
 
-            Debug.WriteLine($"CreateRoutine( 0x{address.Page:X2}{address.Address:X2}{label}, {routineType.ToString()} )");
+            Debug.WriteLine($"CreateRoutine( {address.ToString()} {routine.Label}, {routineType.ToString()} )");
 
             return routine;
         }
@@ -345,6 +348,13 @@ namespace BeebPerf
 
                 if (instruction.IsInstruction)
                 {
+                    // extend unknown stack frames to include backward branch/jump destinations that don't resolve
+                    if (currentStackFrame.Type == CallType.Unknown &&
+                        _BranchOrJumpOpcodeTable[instruction.Opcode] != 0 &&
+                        instruction.DestinationAddress.CompareTo(instruction.OpcodeAddress) < 0 &&
+                        _SortedRoutineAddresses.Find(instruction.DestinationAddress).Address == 0)
+                        ExtendStackFrame(currentStackFrame, instruction.DestinationAddress);
+
                     // is first instruction of a routine?
                     if (_RoutinesByAddress.TryGetValue(instruction.OpcodeAddress, out Routine? routine) && !isFirstInstruction)
                         if (routine != currentStackFrame.Routine) // fall through?
@@ -373,7 +383,7 @@ namespace BeebPerf
                     }
                     else if (instruction.Opcode == 0x60/*RTS*/ || instruction.Opcode == 0x40/*RTI*/)
                     {
-                        // unwind any tail-calls
+                        // unwind any tail or fall-through calls
                         while (true)
                         {
                             currentStackFrame.EndCycleCount = postCycleCount;
@@ -387,11 +397,17 @@ namespace BeebPerf
                             currentStackFrame = currentStackFrame.Parent;
                         }
 
-                        // unwind routine
-                        if (currentStackFrame.Parent is null)
+                        if (IsRTSTailCall(ref instruction, currentStackFrame))
+                        {
+                            // create new stack frame for tail call
+                            Debug.Assert(_RoutinesByAddress.ContainsKey(instruction.DestinationAddress));
+                            var returnRoutine = _RoutinesByAddress[instruction.DestinationAddress];
+                            currentStackFrame = CreateStackFrame(CallType.TailCall, _RoutinesByAddress[instruction.DestinationAddress], postCycleCount, parent: currentStackFrame);
+                        }
+                        else if (currentStackFrame.Parent is null)
                         {
                             // create new root stack frame
-                            Routine rootRoutine = GetRoutine(instruction.DestinationAddress);
+                            Routine rootRoutine = GetRoutine(instruction.DestinationAddress.Offset(-3));
                             StackFrame newRoot = new(rootRoutine, CallType.Unknown, parent: null);
                             newRoot.StartCycleCount = 0;
                             newRoot.Children.Add(currentStackFrame);
@@ -431,13 +447,48 @@ namespace BeebPerf
 
             _RootStackFrame = currentStackFrame;
         }
+
         private StackFrame CreateStackFrame(CallType type, Routine routine, int startCycleCount, StackFrame? parent)
         {
+            Debug.Assert(parent is null || type != CallType.Unknown);
             StackFrame stackFrame = new(routine, type, parent);
             stackFrame.StartCycleCount = startCycleCount;
             if (parent != null)
                 parent.Children.Add(stackFrame);
             return stackFrame;
+        }
+
+        private void ExtendStackFrame(StackFrame stackFrame, CanonicalAddress newAddress)
+        {
+            Debug.Assert(stackFrame.Type == CallType.Unknown);
+
+            CanonicalAddress oldAddress = stackFrame.CanonicalAddress;
+            
+            stackFrame.CanonicalAddress = newAddress;
+            stackFrame.Routine.StartAddress = newAddress;
+            stackFrame.Routine.Label = _Labels.TryGetValue(newAddress.Address, out var lbl) ? lbl : string.Empty;
+
+            _RoutinesByAddress.Remove(oldAddress);
+            _RoutinesByAddress.Add(newAddress, stackFrame.Routine);
+
+            _SortedRoutineAddresses.Remove(oldAddress);
+            _SortedRoutineAddresses.Add(newAddress);
+        }
+
+        private bool IsRTSTailCall(ref Instruction instruction, StackFrame stackFrame)
+        {
+            if (instruction.Opcode != 0x60/*RTS*/)
+                return false;
+
+            if (stackFrame.Type == CallType.ISR)
+                return true; // RTS from an ISR must perform a tail call to invoke RTI
+
+            if (stackFrame.Type != CallType.JSR)
+                return false;
+
+            // does RTS destination match the parent's JSR instruction?
+            ref Instruction jsrInstruction = ref _Instructions[stackFrame.Parent!.LastInstructionIndex];
+            return (instruction.DestinationAddress.CompareTo(jsrInstruction.OpcodeAddress.Offset(3)) != 0);
         }
 
         private void ValidateStackFrame(StackFrame stackFrame)
@@ -504,7 +555,7 @@ namespace BeebPerf
                 foreach (var callStack in routine.CPUMetricsByStack.Keys)
                     PopulateProgramCallTree(callStack, ProgramCallTree, treeNodesByStack);
 
-            SortTree(ProgramCallTree);
+            ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
 
             Debug.WriteLine("Program stack:");
             DebugPrintTree(ProgramCallTree, depth: 0);
@@ -527,7 +578,7 @@ namespace BeebPerf
                 if (parentTreeNode is null)
                     return null;
 
-                parentTreeNode.Children.Add(newTreeNode);
+                parentTreeNode.AddChild(newTreeNode);
             }
 
             treeNodesByStack[callStack] = newTreeNode;
@@ -550,7 +601,7 @@ namespace BeebPerf
                 foreach (var callStack in routine.CPUMetricsByStack.Keys)
                     PopulateInterruptCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
 
-            SortTree(NonMaskableInterruptCallTree);
+            NonMaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
 
             Debug.WriteLine("Non Maskable Interrupt stack:");
             DebugPrintTree(NonMaskableInterruptCallTree, depth: 0);
@@ -571,7 +622,7 @@ namespace BeebPerf
                 foreach (var callStack in routine.CPUMetricsByStack.Keys)
                     PopulateInterruptCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
 
-            SortTree(MaskableInterruptCallTree);
+            MaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
 
             Debug.WriteLine("Maskable Interrupt stack:");
             DebugPrintTree(MaskableInterruptCallTree, depth: 0);
@@ -595,20 +646,12 @@ namespace BeebPerf
                 if (parentTreeNode is null)
                     return null;
 
-                parentTreeNode.Children.Add(newTreeNode);
+                parentTreeNode.AddChild(newTreeNode);
             }
 
             treeNodesByStack[callStack] = newTreeNode;
 
             return newTreeNode;
-        }
-
-        private static void SortTree(CallTreeNode treeNode)
-        {
-            treeNode.Children.Sort((a, b) => b.CPUMetrics.InclusiveCycleCount.CompareTo(a.CPUMetrics.InclusiveCycleCount));
-
-            foreach (var childNode in treeNode.Children)
-                SortTree(childNode);
         }
 
         private static void DebugPrintTree(CallTreeNode treeNode, int depth)
@@ -621,9 +664,12 @@ namespace BeebPerf
 
         private static void DebugPrintLine(int indent, Routine routine, CPUMetrics metrics)
         {
+            indent -= 1515;
+            indent = int.Max(0, indent);
+
             Debug.WriteLine(
                 $"{"".PadLeft(indent)}" +
-                $"0x{routine.StartAddress.Page:X2}:{routine.StartAddress.Address:X4}{routine.Label}, " +
+                $"{routine.StartAddress.ToString()} {routine.Label}, " +
                 $"self: {metrics.SelfCycleCount}, " +
                 $"inclusive: {metrics.InclusiveCycleCount}, " +
                 $"elapsed: {metrics.ElapsedCycleCount}, " +
@@ -642,8 +688,8 @@ namespace BeebPerf
         private StackFrame _RootStackFrame = new();
         private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
-        private byte[] _BranchOrJumpOpcodeTable;
-        private Instruction[] _Instructions;
-        private Dictionary<ushort, string> _Labels;
+        private byte[] _BranchOrJumpOpcodeTable = [];
+        private Instruction[] _Instructions = [];
+        private Dictionary<ushort, string> _Labels = [];
     }
 }

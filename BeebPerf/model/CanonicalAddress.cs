@@ -19,13 +19,16 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Diagnostics;
+using static BeebPerf.Model;
+
 namespace BeebPerf
 {
     public struct CanonicalAddress : IComparable<CanonicalAddress>, IEquatable<CanonicalAddress>
     {
-        public CanonicalAddress(ushort address, byte page)
+        public CanonicalAddress(ushort address, Model.MemoryPage page)
         {
-            _PageAddress = (page << 16) | address;
+            _PageAddress = ((int)page << 16) | address;
         }
 
         public CanonicalAddress Offset(int addressOffset)
@@ -48,14 +51,48 @@ namespace BeebPerf
             return _PageAddress;
         }
 
+        public override string ToString()
+        {
+            int address = (_PageAddress & 0xFFFF);
+            return $"&{address:X4}";
+        }
+
         public ushort Address 
         {
             get => (ushort)_PageAddress;
         }
 
-        public byte Page
+        public Model.MemoryPage Page
         {
-            get => (byte)(_PageAddress >> 16);
+            get => (Model.MemoryPage)(_PageAddress >> 16);
+        }
+
+        public ushort PageOffset
+        {
+            get
+            {
+                int address = (_PageAddress & 0xFFFF);
+                int page = (_PageAddress >> 16);
+                switch ((MemoryPage)page)
+                {
+                    case Model.MemoryPage.WholeRam:
+                    case Model.MemoryPage.HiddenRam:
+                        return (ushort)address;
+
+                    case Model.MemoryPage.ShadowRam:
+                        return (ushort)(address - 0x3000);
+
+                    case Model.MemoryPage.PrivateRam:
+                        return (ushort)(address - 0x8000);
+
+                    case Model.MemoryPage.FilingSystemRam:
+                        return (ushort)(address - 0xC000);
+
+                    default:
+                        Debug.Assert(page < 16);
+                        return (ushort)(address - 0x8000);
+                }
+            }
         }
 
         private int _PageAddress;

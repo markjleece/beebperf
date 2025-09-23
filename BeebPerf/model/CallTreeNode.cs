@@ -19,9 +19,11 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Windows.Forms;
+
 namespace BeebPerf
 {
-    public class CallTreeNode
+    public class CallTreeNode : TreeNode<CallTreeNode>
     {
         public CallTreeNode(CallStack callStack)
         {
@@ -30,9 +32,53 @@ namespace BeebPerf
             CPUMetrics = callStack.Routine.CPUMetricsByStack[callStack];
         }
 
+        public enum SortField
+        {
+            SelfCPU,
+            InclusiveCPU,
+            ElapsedCPU,
+            Count
+        };
+
+        public void Sort(SortField sortField, SortOrder sortOrder)
+        {
+            switch (sortField)
+            {
+                case SortField.SelfCPU:
+                    if (sortOrder == SortOrder.Ascending)
+                        Sort((a, b) => a.CPUMetrics.SelfCycleCount.CompareTo(b.CPUMetrics.SelfCycleCount));
+                    else if (sortOrder == SortOrder.Descending)
+                        Sort((a, b) => b.CPUMetrics.SelfCycleCount.CompareTo(a.CPUMetrics.SelfCycleCount));
+                    break;
+
+                case SortField.InclusiveCPU:
+                    if (sortOrder == SortOrder.Ascending)
+                        Sort((a, b) => a.CPUMetrics.InclusiveCycleCount.CompareTo(b.CPUMetrics.InclusiveCycleCount));
+                    else if (sortOrder == SortOrder.Descending)
+                        Sort((a, b) => b.CPUMetrics.InclusiveCycleCount.CompareTo(a.CPUMetrics.InclusiveCycleCount));
+                    break;
+
+                case SortField.ElapsedCPU:
+                    if (sortOrder == SortOrder.Ascending)
+                        Sort((a, b) => a.CPUMetrics.ElapsedCycleCount.CompareTo(b.CPUMetrics.ElapsedCycleCount));
+                    else if (sortOrder == SortOrder.Descending)
+                        Sort((a, b) => b.CPUMetrics.ElapsedCycleCount.CompareTo(a.CPUMetrics.ElapsedCycleCount));
+                    break;
+
+                case SortField.Count:
+                    if (sortOrder == SortOrder.Ascending)
+                        Sort((a, b) => a.CPUMetrics.Count.CompareTo(b.CPUMetrics.Count));
+                    else if (sortOrder == SortOrder.Descending)
+                        Sort((a, b) => b.CPUMetrics.Count.CompareTo(a.CPUMetrics.Count));
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
         public readonly Routine Routine;
         public readonly CallStack Context;
         public readonly CPUMetrics CPUMetrics;
-        public List<CallTreeNode> Children = new();
     }
 }

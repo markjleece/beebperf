@@ -75,13 +75,13 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInterrupt);
-                return new CanonicalAddress(_ISRAddress, _ISRAddressPage);
+                return new CanonicalAddress(_ISRAddress, (Model.MemoryPage)_ISRAddressPage);
             }
             set
             {
                 Debug.Assert(IsInterrupt);
                 _ISRAddress = value.Address;
-                _ISRAddressPage = value.Page;
+                _ISRAddressPage = (byte)value.Page;
             }
         }
 
@@ -90,13 +90,13 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInterrupt);
-                return new CanonicalAddress(_InterruptedAddress, _InterruptedAddressPage);
+                return new CanonicalAddress(_InterruptedAddress, (Model.MemoryPage)_InterruptedAddressPage);
             }
             set
             {
                 Debug.Assert(IsInterrupt);
                 _InterruptedAddress = value.Address;
-                _InterruptedAddressPage = value.Page;
+                _InterruptedAddressPage = (byte)value.Page;
             }
         }
 
@@ -133,13 +133,13 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_OpcodeAddress, _OpcodeAddressPage);
+                return new CanonicalAddress(_OpcodeAddress, (Model.MemoryPage)_OpcodeAddressPage);
             }
             set
             {
                 Debug.Assert(IsInstruction);
                 _OpcodeAddress = value.Address;
-                _OpcodeAddressPage = value.Page;
+                _OpcodeAddressPage = (byte)value.Page;
             }
         }
 
@@ -148,13 +148,13 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_DestinationAddress, _DestinationAddressPage);
+                return new CanonicalAddress(_DestinationAddress, (Model.MemoryPage)_DestinationAddressPage);
             }
             set
             {
                 Debug.Assert(IsInstruction);
                 _DestinationAddress = value.Address;
-                _DestinationAddressPage = value.Page;
+                _DestinationAddressPage = (byte)value.Page;
             }
         }
 
@@ -163,13 +163,13 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_MemoryAddress, _MemoryAddressPage);
+                return new CanonicalAddress(_MemoryAddress, (Model.MemoryPage)_MemoryAddressPage);
             }
             set
             {
                 Debug.Assert(IsInstruction);
                 _MemoryAddress = value.Address;
-                _MemoryAddressPage = value.Page;
+                _MemoryAddressPage = (byte)value.Page;
             }
         }
 

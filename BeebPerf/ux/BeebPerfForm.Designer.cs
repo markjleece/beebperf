@@ -1,4 +1,6 @@
-﻿namespace BeebPerf.ux
+﻿using System.Windows.Forms;
+
+namespace BeebPerf.ux
 {
     partial class BeebPerfForm
     {
@@ -29,6 +31,7 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             toolStrip = new ToolStrip();
             openButton = new ToolStripButton();
             toolStripSeparator1 = new ToolStripSeparator();
@@ -44,9 +47,12 @@
             splitContainer = new SplitContainer();
             tabControl = new TabControl();
             hotRoutinesTabPage = new TabPage();
+            hotRoutinesDataGrid = new RoutineGridView();
             callTreeTabPage = new TabPage();
+            callTreeControl = new CallTreeGridView();
             callerCalleeTabPage = new TabPage();
             routinesTabPage = new TabPage();
+            routinesDataGrid = new RoutineGridView();
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
             toolStrip.SuspendLayout();
@@ -54,6 +60,10 @@
             splitContainer.Panel1.SuspendLayout();
             splitContainer.SuspendLayout();
             tabControl.SuspendLayout();
+            hotRoutinesTabPage.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)routinesDataGrid).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)callTreeControl).BeginInit();
             SuspendLayout();
             // 
             // toolStrip
@@ -196,6 +206,7 @@
             // 
             // hotRoutinesTabPage
             // 
+            hotRoutinesTabPage.Controls.Add(hotRoutinesDataGrid);
             hotRoutinesTabPage.Location = new Point(4, 34);
             hotRoutinesTabPage.Name = "hotRoutinesTabPage";
             hotRoutinesTabPage.Padding = new Padding(3);
@@ -204,8 +215,29 @@
             hotRoutinesTabPage.Text = "Hot Routines";
             hotRoutinesTabPage.UseVisualStyleBackColor = true;
             // 
+            // hotRoutinesDataGrid
+            // 
+            hotRoutinesDataGrid.ColumnHeadersHeight = 34;
+            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = SystemColors.Window;
+            dataGridViewCellStyle1.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle1.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle1.Format = "N2";
+            dataGridViewCellStyle1.NullValue = null;
+            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
+            hotRoutinesDataGrid.DefaultCellStyle = dataGridViewCellStyle1;
+            hotRoutinesDataGrid.Dock = DockStyle.Fill;
+            hotRoutinesDataGrid.Location = new Point(3, 3);
+            hotRoutinesDataGrid.Name = "hotRoutinesDataGrid";
+            hotRoutinesDataGrid.RowHeadersWidth = 62;
+            hotRoutinesDataGrid.Size = new Size(1731, 442);
+            hotRoutinesDataGrid.TabIndex = 0;
+            // 
             // callTreeTabPage
             // 
+            callTreeTabPage.Controls.Add(callTreeControl);
             callTreeTabPage.Location = new Point(4, 34);
             callTreeTabPage.Name = "callTreeTabPage";
             callTreeTabPage.Padding = new Padding(3);
@@ -213,6 +245,17 @@
             callTreeTabPage.TabIndex = 1;
             callTreeTabPage.Text = "Call Tree";
             callTreeTabPage.UseVisualStyleBackColor = true;
+            // 
+            // routinesDataGrid
+            // 
+            callTreeControl.ColumnHeadersHeight = 34;
+            callTreeControl.DefaultCellStyle = dataGridViewCellStyle1;
+            callTreeControl.Dock = DockStyle.Fill;
+            callTreeControl.Location = new Point(3, 3);
+            callTreeControl.Name = "hotRoutinesDataGrid";
+            callTreeControl.RowHeadersWidth = 62;
+            callTreeControl.Size = new Size(1731, 442);
+            callTreeControl.TabIndex = 0;
             // 
             // callerCalleeTabPage
             // 
@@ -226,6 +269,7 @@
             // 
             // routinesTabPage
             // 
+            routinesTabPage.Controls.Add(routinesDataGrid);
             routinesTabPage.Location = new Point(4, 34);
             routinesTabPage.Name = "routinesTabPage";
             routinesTabPage.Padding = new Padding(3);
@@ -233,6 +277,17 @@
             routinesTabPage.TabIndex = 3;
             routinesTabPage.Text = "Routines";
             routinesTabPage.UseVisualStyleBackColor = true;
+            // 
+            // routinesDataGrid
+            // 
+            routinesDataGrid.ColumnHeadersHeight = 34;
+            routinesDataGrid.DefaultCellStyle = dataGridViewCellStyle1;
+            routinesDataGrid.Dock = DockStyle.Fill;
+            routinesDataGrid.Location = new Point(3, 3);
+            routinesDataGrid.Name = "hotRoutinesDataGrid";
+            routinesDataGrid.RowHeadersWidth = 62;
+            routinesDataGrid.Size = new Size(1731, 442);
+            routinesDataGrid.TabIndex = 0;
             // 
             // hotGraphTabPage
             // 
@@ -271,6 +326,8 @@
             ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
             splitContainer.ResumeLayout(false);
             tabControl.ResumeLayout(false);
+            hotRoutinesTabPage.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -297,5 +354,8 @@
         private TabPage routinesTabPage;
         private TabPage hotGraphTabPage;
         private TabPage interruptsTabPage;
+        private RoutineGridView hotRoutinesDataGrid;
+        private RoutineGridView routinesDataGrid;
+        private CallTreeGridView callTreeControl;
     }
 }

@@ -25,10 +25,10 @@ namespace BeebPerf
 {
     class AppSettings
     {
-        static internal readonly AppSettings Instance = new();
+        static public readonly AppSettings Instance = new();
 
         // Settings...
-        internal string RecentFilePathName
+        public string RecentFilePathName
         {
             get { return Get(RecentFilePathName_PropertyName, string.Empty/*defaultValue*/); }
             set { Set(RecentFilePathName_PropertyName, value); }

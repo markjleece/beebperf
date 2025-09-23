@@ -45,6 +45,15 @@ namespace BeebPerf
             }
         }
 
+        public void Remove(CanonicalAddress value)
+        {
+            int index = _List.BinarySearch(value);
+            if (index >= 0)
+            {
+                _List.RemoveAt(index);
+            }
+        }
+
         public bool Contains(CanonicalAddress value)
         {
             return _List.BinarySearch(value) >= 0;
@@ -55,6 +64,10 @@ namespace BeebPerf
             if (_List.Count > 0)
             {
                 int index = _List.BinarySearch(value);
+                if (index >= 0 && index < _List.Count)
+                {
+                    return _List[index];
+                }
 
                 index = ~index;
 

@@ -79,9 +79,24 @@ namespace BeebPerf
             return hashCode;
         }
 
+        public int Depth
+        {
+            get
+            {
+                int depth = 0;
+                for (var callStack = this; callStack != null; callStack = callStack.Parent)
+                {
+                    depth++;
+                    if (callStack.Type == CallType.ISR)
+                        break;
+                }
+                return depth;
+            }
+        }
+
         public CallType Type;
-        public readonly Routine Routine;
-        public readonly CanonicalAddress CanonicalAddress;
+        public Routine Routine;
+        public CanonicalAddress CanonicalAddress;
         public StackFrame? Parent;
     }
 }
