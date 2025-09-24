@@ -31,6 +31,28 @@ namespace BeebPerf
         {
         }
 
+        public StackFrame GetFirstStackFrame()
+        {
+            if (Children.Count > 0)
+            {
+                var firstChild = Children.First().GetFirstStackFrame();
+                if (firstChild.FirstInstructionIndex < FirstInstructionIndex)
+                    return firstChild;
+            }
+            return this;
+        }
+
+        public StackFrame GetLastStackFrame()
+        {
+            if (Children.Count > 0)
+            {
+                var lastChild = Children.Last().GetLastStackFrame();
+                if (lastChild.LastInstructionIndex > LastInstructionIndex)
+                    return lastChild;
+            }
+            return this;
+        }
+
         public List<StackFrame> Children = new();
         public int FirstInstructionIndex;
         public int LastInstructionIndex;

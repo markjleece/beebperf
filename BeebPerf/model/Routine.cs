@@ -53,5 +53,6 @@ namespace BeebPerf
         public CanonicalAddress EndAddress;
         public Dictionary<CallStack, CPUMetrics> CPUMetricsByStack = new();
         public CPUMetrics AggregateCPUMetrics = new();
+        public List<StackFrame> StackFrames = new();
     }
 }

@@ -30,7 +30,7 @@ namespace BeebPerf.ux
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             BackgroundColor = SystemColors.Control;
             CellFormatting += CellFormattingFunc;
-            CellMouseClick += CellMouseClickFunc;
+            KeyDown += KeyDownFunc;
             MultiSelect = false;
             ReadOnly = true;
             RowHeadersVisible = false;
@@ -85,28 +85,28 @@ namespace BeebPerf.ux
                 case "SelfCPU":
                     treeNode = (CallTreeNode)e.Value;
                     CPUMetrics cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.SelfCycleCount);
+                    e.Value = FormatCPUMetric(cpuMetrics.SelfCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "TotalCPU":
                     treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.InclusiveCycleCount);
+                    e.Value = FormatCPUMetric(cpuMetrics.InclusiveCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ElapsedCPU":
                     treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.ElapsedCycleCount);
+                    e.Value = FormatCPUMetric(cpuMetrics.ElapsedCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "Count":
                     treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
-                    e.Value = $"{cpuMetrics.Count:N0}";
+                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{cpuMetrics.Count:N0}";
                     e.FormattingApplied = true;
                     break;
 
@@ -115,35 +115,68 @@ namespace BeebPerf.ux
             }
         }
 
-        private string FormatCPUMetric(int value)
+        private string FormatCPUMetric(int value, int indent)
         {
             var percentage = (double)value * 100.0 / TotalCycleCount;
-            return $"{value:N0} ({percentage:F2}%)";
+            return $"{"".PadLeft(2*indent)}{value:N0} ({percentage:F2}%)";
         }
 
-        private void CellMouseClickFunc(object? sender, DataGridViewCellMouseEventArgs e)
+        private void KeyDownFunc(object? sender, KeyEventArgs e)
         {
-            if (e.RowIndex < 0 || e.ColumnIndex != 0)
+            if (SelectedRows.Count != 1)
                 return;
-
-            var cell = Rows[e.RowIndex].Cells[e.ColumnIndex];
-            var treeNode = (CallTreeNode)cell.Value!;
-
-            if ((e.X >= treeNode.Depth * cell.Size.Height) &&
-                (e.X <= (treeNode.Depth + 1) * cell.Size.Height))
+            if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right ||
+                e.KeyCode == Keys.Add || e.KeyCode == Keys.Subtract || 
+                e.KeyCode == Keys.Space)
             {
+                var cell = SelectedRows[0].Cells[0];
+                var treeNode = (CallTreeNode)cell.Value!;
                 if (treeNode.HasChildren)
                 {
-                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                    if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Add || e.KeyCode == Keys.Space) &&
+                        treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
                     {
-                        OpenTreeNode(e.RowIndex, treeNode);
+                        OpenTreeNode(cell.RowIndex, treeNode);
                     }
-                    else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                    else if ((e.KeyCode == Keys.Left || e.KeyCode == Keys.Subtract || e.KeyCode == Keys.Space) &&
+                        treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     {
-                        CloseTreeNode(e.RowIndex, treeNode);
+                        CloseTreeNode(cell.RowIndex, treeNode);
+                    }
+                }
+                e.Handled = true;
+            }
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            HitTestInfo hti = HitTest(e.X, e.Y);
+            if (e.Button == MouseButtons.Left &&
+                hti.Type == DataGridViewHitTestType.Cell &&
+                hti.ColumnIndex == 0 &&
+                hti.RowIndex >= 0)
+            {
+                var cell = Rows[hti.RowIndex].Cells[hti.ColumnIndex];
+                var treeNode = (CallTreeNode)cell.Value!;
+                if (treeNode.HasChildren)
+                {
+                    int cellX = e.X - hti.ColumnX;
+                    if ((cellX >= treeNode.Depth * cell.Size.Height) &&
+                        (cellX <= (treeNode.Depth + 1) * cell.Size.Height))
+                    {
+                        if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                        {
+                            OpenTreeNode(hti.RowIndex, treeNode);
+                        }
+                        else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                        {
+                            CloseTreeNode(hti.RowIndex, treeNode);
+                        }
+                        return; // we don't want the selection to change)
                     }
                 }
             }
+            base.OnMouseDown(e);
         }
 
         private void OpenTreeNode(int rowIndex, CallTreeNode treeNode)

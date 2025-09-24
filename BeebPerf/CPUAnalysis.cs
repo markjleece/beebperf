@@ -36,6 +36,7 @@ namespace BeebPerf
         public void DynamicAnalysis(Model model, int startCycleCount, int endCycleCount)
         {
             Preamble(model);
+            CalculateInstructionRange(startCycleCount, endCycleCount);
             CalculateMetrics(startCycleCount, endCycleCount);
             PopulateHotRoutines();
             PopulateProgramCallTree();
@@ -71,6 +72,40 @@ namespace BeebPerf
                 _BranchOrJumpOpcodeTable[0x7C] = 1; // add JMP (abs,X)
         }
 
+        private void CalculateInstructionRange(int startCycleCount, int endCycleCount)
+        {
+            int cycleCount = 0;
+            int instructionIndex = 0;
+
+            if (startCycleCount <= StartCycleCount)
+            {
+                FirstInstructionIndex = 0;
+            }
+            else while (instructionIndex < _Instructions.Length)
+            {
+                if (cycleCount >= startCycleCount)
+                {
+                    FirstInstructionIndex = instructionIndex;
+                    break;
+                }
+                cycleCount += _Instructions[instructionIndex++].CycleCount;
+            }
+
+            if (endCycleCount >= EndCycleCount)
+            {
+                LastInstructionIndex = _Instructions.Length - 1;
+            }
+            else while (instructionIndex < _Instructions.Length)
+            {
+                if (cycleCount >= endCycleCount)
+                {
+                    LastInstructionIndex = instructionIndex;
+                    break;
+                }
+                cycleCount += _Instructions[instructionIndex++].CycleCount;
+            }
+        }
+
         private int CalculatedExcludedCycles(StackFrame stackFrame, int startCycleCount, int endCycleCount)
         {
             Debug.Assert(
@@ -84,12 +119,12 @@ namespace BeebPerf
 
             StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
-            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= stackFrame.LastInstructionIndex)
+            while (cycleCount <= stackFrame.EndCycleCount)
             {
-                if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
+                if (childStackFrame is not null && cycleCount == childStackFrame.GetFirstStackFrame().StartCycleCount)
                 {
-                    // skip over child stack frame
-                    instructionIndex = childStackFrame.LastInstructionIndex + 1;
+                    // skip over child stack frames
+                    instructionIndex = childStackFrame.GetLastStackFrame().LastInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
@@ -455,6 +490,7 @@ namespace BeebPerf
             stackFrame.StartCycleCount = startCycleCount;
             if (parent != null)
                 parent.Children.Add(stackFrame);
+            routine.StackFrames.Add(stackFrame);
             return stackFrame;
         }
 
@@ -680,6 +716,8 @@ namespace BeebPerf
         public CallTreeNode? ProgramCallTree;
         public CallTreeNode? NonMaskableInterruptCallTree;
         public CallTreeNode? MaskableInterruptCallTree;
+        public int FirstInstructionIndex;
+        public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
 
@@ -691,5 +729,20 @@ namespace BeebPerf
         private byte[] _BranchOrJumpOpcodeTable = [];
         private Instruction[] _Instructions = [];
         private Dictionary<ushort, string> _Labels = [];
+
+        struct InstructionMetric
+        {
+            Instruction Instruction;
+            int SelfCycleCount;
+            int InclusiveCycleCount;
+            int ExecutionCount;
+        }
+
+        private void CalculateInstructionMetrics(Routine routine, int startCycleCount, int endCycleCount)
+        {
+            foreach (var stackFrame in routine.StackFrames)
+            {
+            }
+        }
     }
 }
