@@ -29,7 +29,7 @@ namespace BeebPerf
         {
             Context = callStack;
             Routine = callStack.Routine;
-            CPUMetrics = callStack.Routine.CPUMetricsByStack[callStack];
+            CPUMetrics = callStack.Routine.MetricsByStack[callStack];
         }
 
         public enum SortField
@@ -67,9 +67,9 @@ namespace BeebPerf
 
                 case SortField.Count:
                     if (sortOrder == SortOrder.Ascending)
-                        Sort((a, b) => a.CPUMetrics.Count.CompareTo(b.CPUMetrics.Count));
+                        Sort((a, b) => a.CPUMetrics.ExecutionCount.CompareTo(b.CPUMetrics.ExecutionCount));
                     else if (sortOrder == SortOrder.Descending)
-                        Sort((a, b) => b.CPUMetrics.Count.CompareTo(a.CPUMetrics.Count));
+                        Sort((a, b) => b.CPUMetrics.ExecutionCount.CompareTo(a.CPUMetrics.ExecutionCount));
                     break;
 
                 default:
@@ -79,6 +79,6 @@ namespace BeebPerf
 
         public readonly Routine Routine;
         public readonly CallStack Context;
-        public readonly CPUMetrics CPUMetrics;
+        public readonly RoutineMetrics CPUMetrics;
     }
 }

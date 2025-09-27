@@ -49,7 +49,7 @@ namespace BeebPerf.ux
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
-            Columns.Add("Count", "Execution count");
+            Columns.Add("ExecutionCount", "Execution count");
 
             Sort(Columns["TotalCPU"]!, System.ComponentModel.ListSortDirection.Descending);
         }
@@ -84,29 +84,29 @@ namespace BeebPerf.ux
 
                 case "SelfCPU":
                     treeNode = (CallTreeNode)e.Value;
-                    CPUMetrics cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
+                    RoutineMetrics cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.SelfCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "TotalCPU":
                     treeNode = (CallTreeNode)e.Value;
-                    cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
+                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.InclusiveCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ElapsedCPU":
                     treeNode = (CallTreeNode)e.Value;
-                    cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
+                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.ElapsedCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
-                case "Count":
+                case "ExecutionCount":
                     treeNode = (CallTreeNode)e.Value;
-                    cpuMetrics = treeNode.Routine.CPUMetricsByStack[treeNode.Context];
-                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{cpuMetrics.Count:N0}";
+                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
+                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{cpuMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
                     break;
 
@@ -191,7 +191,7 @@ namespace BeebPerf.ux
                         "SelfCPU" => CallTreeNode.SortField.SelfCPU,
                         "TotalCPU" => CallTreeNode.SortField.InclusiveCPU,
                         "ElapsedCPU" => CallTreeNode.SortField.ElapsedCPU,
-                        "Count" => CallTreeNode.SortField.Count,
+                        "ExecutionCount" => CallTreeNode.SortField.Count,
                         _ => 0
                     };
                     treeNode.Sort(sortField, sortOrder);
@@ -240,13 +240,13 @@ namespace BeebPerf.ux
 
             for (var node = treeNode; node != null; node = node.Parent)
             {
-                var cpuMetrics = node.Routine.CPUMetricsByStack[node.Context];
+                var cpuMetrics = node.Routine.MetricsByStack[node.Context];
                 var metric = columnName switch
                 {
                     "SelfCPU" => cpuMetrics.SelfCycleCount,
                     "TotalCPU" => cpuMetrics.InclusiveCycleCount,
                     "ElapsedCPU" => cpuMetrics.ElapsedCycleCount,
-                    "Count" => cpuMetrics.Count,
+                    "ExecutionCount" => cpuMetrics.ExecutionCount,
                     _ => 0
                 };
                 sortKey.Push(metric);

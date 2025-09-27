@@ -21,39 +21,38 @@
 
 namespace BeebPerf
 {
-    public class CPUMetrics
+    public class InstructionMetrics : IComparable<InstructionMetrics>, IEquatable<InstructionMetrics>
     {
-        public CPUMetrics()
+        public InstructionMetrics(CoreInstruction instruction, int ordinal)
         {
+            Instruction = instruction;
+            Ordinal = ordinal;
         }
 
-        public CPUMetrics(CPUMetrics other)
+        public int CompareTo(InstructionMetrics? other)
         {
-            Count = other.SelfCycleCount;
-            SelfCycleCount = other.SelfCycleCount;
-            InclusiveCycleCount = other.InclusiveCycleCount;
-            ElapsedCycleCount = other.ElapsedCycleCount;
+            int result = Instruction.OpcodeAddress.CompareTo(other!.Instruction.OpcodeAddress);
+            if (result != 0) return result;
+
+            result = Ordinal.CompareTo(other.Ordinal);
+            if (result != 0) return result;
+
+            result = Instruction.Opcode.CompareTo(other!.Instruction.Opcode);
+            if (result != 0) return result;
+
+            return Instruction.Operand.CompareTo(other!.Instruction.Operand);
         }
 
-        public void Clear()
+        public bool Equals(InstructionMetrics? other)
         {
-            Count = 0;
-            SelfCycleCount = 0;
-            InclusiveCycleCount = 0;
-            ElapsedCycleCount = 0;
+            return (Instruction.Equals(other!.Instruction) &&
+                Ordinal.Equals(other!.Ordinal));
         }
 
-        public void Add(CPUMetrics other)
-        {
-            Count += other.Count;
-            SelfCycleCount += other.SelfCycleCount;
-            InclusiveCycleCount += other.InclusiveCycleCount;
-            ElapsedCycleCount += other.ElapsedCycleCount;
-        }
-
-        public int Count;
-        public int SelfCycleCount;
+        public CoreInstruction Instruction;
+        public int Ordinal;
+        public int ExecutionCount;
         public int InclusiveCycleCount;
-        public int ElapsedCycleCount;
+        public int AlternateIndex;
     }
 }

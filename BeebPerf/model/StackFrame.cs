@@ -29,28 +29,33 @@ namespace BeebPerf
 
         public StackFrame(Routine routine, CallType type, StackFrame? parent) : base(routine, type, parent) 
         {
+            routine.StackFrames.Add(this);
         }
 
-        public StackFrame GetFirstStackFrame()
+        public StackFrame GetFirstInstructionStackFrame()
         {
-            if (Children.Count > 0)
+            var current = this;
+            while (current.Children.Count > 0)
             {
-                var firstChild = Children.First().GetFirstStackFrame();
-                if (firstChild.FirstInstructionIndex < FirstInstructionIndex)
-                    return firstChild;
+                var firstChild = current.Children[0];
+                if (firstChild.FirstInstructionIndex >= current.FirstInstructionIndex)
+                    break;
+                current = firstChild;
             }
-            return this;
+            return current;
         }
 
-        public StackFrame GetLastStackFrame()
+        public StackFrame GetLastInstructionStackFrame()
         {
-            if (Children.Count > 0)
+            var current = this;
+            while (current.Children.Count > 0)
             {
-                var lastChild = Children.Last().GetLastStackFrame();
-                if (lastChild.LastInstructionIndex > LastInstructionIndex)
-                    return lastChild;
+                var lastChild = current.Children[^1];
+                if (lastChild.LastInstructionIndex <= current.LastInstructionIndex)
+                    break;
+                current = lastChild;
             }
-            return this;
+            return current;
         }
 
         public List<StackFrame> Children = new();

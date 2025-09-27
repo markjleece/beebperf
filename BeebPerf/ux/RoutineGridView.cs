@@ -43,7 +43,7 @@ namespace BeebPerf.ux
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
-            Columns.Add("Count", "Execution count");
+            Columns.Add("ExecutionCount", "Execution count");
 
             Sort(Columns["SelfCPU"]!, System.ComponentModel.ListSortDirection.Descending);
         }
@@ -76,22 +76,22 @@ namespace BeebPerf.ux
                     break;
 
                 case "SelfCPU":
-                    e.Value = FormatCPUMetric(routine.AggregateCPUMetrics.SelfCycleCount);
+                    e.Value = FormatCPUMetric(routine.AggregateMetrics.SelfCycleCount);
                     e.FormattingApplied = true;
                     break;
 
                 case "TotalCPU":
-                    e.Value = FormatCPUMetric(routine.AggregateCPUMetrics.InclusiveCycleCount);
+                    e.Value = FormatCPUMetric(routine.AggregateMetrics.InclusiveCycleCount);
                     e.FormattingApplied = true;
                     break;
 
                 case "ElapsedCPU":
-                    e.Value = FormatCPUMetric(routine.AggregateCPUMetrics.ElapsedCycleCount);
+                    e.Value = FormatCPUMetric(routine.AggregateMetrics.ElapsedCycleCount);
                     e.FormattingApplied = true;
                     break;
 
-                case "Count":
-                    e.Value = $"{routine.AggregateCPUMetrics.Count:N0}";
+                case "ExecutionCount":
+                    e.Value = $"{routine.AggregateMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
                     break;
 
@@ -113,22 +113,22 @@ namespace BeebPerf.ux
                     break;
 
                 case "SelfCPU":
-                    e.SortResult = a.AggregateCPUMetrics.SelfCycleCount - b.AggregateCPUMetrics.SelfCycleCount;
+                    e.SortResult = a.AggregateMetrics.SelfCycleCount - b.AggregateMetrics.SelfCycleCount;
                     e.Handled = true;
                     break;
 
                 case "TotalCPU":
-                    e.SortResult = a.AggregateCPUMetrics.InclusiveCycleCount - b.AggregateCPUMetrics.InclusiveCycleCount;
+                    e.SortResult = a.AggregateMetrics.InclusiveCycleCount - b.AggregateMetrics.InclusiveCycleCount;
                     e.Handled = true;
                     break;
 
                 case "ElapsedCPU":
-                    e.SortResult = a.AggregateCPUMetrics.ElapsedCycleCount - b.AggregateCPUMetrics.ElapsedCycleCount;
+                    e.SortResult = a.AggregateMetrics.ElapsedCycleCount - b.AggregateMetrics.ElapsedCycleCount;
                     e.Handled = true;
                     break;
 
-                case "Count":
-                    e.SortResult = a.AggregateCPUMetrics.Count - b.AggregateCPUMetrics.Count;
+                case "ExecutionCount":
+                    e.SortResult = a.AggregateMetrics.ExecutionCount - b.AggregateMetrics.ExecutionCount;
                     e.Handled = true;
                     break;
 

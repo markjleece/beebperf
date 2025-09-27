@@ -21,38 +21,39 @@
 
 namespace BeebPerf
 {
-    public enum RoutineType
+    public class RoutineMetrics
     {
-        MaskableISR,
-        NonMaskableISR,
-        JSR,
-        Pseudo,
-        Unknown
-    }
-
-    public class Routine
-    {
-        public Routine()
+        public RoutineMetrics()
         {
-            StartAddress = new CanonicalAddress();
-            EndAddress = new CanonicalAddress();
-            Label = String.Empty;
         }
 
-        public Routine(CanonicalAddress address, RoutineType routineType, string label)
+        public RoutineMetrics(RoutineMetrics other)
         {
-            Label = label;
-            RoutineType = routineType;
-            StartAddress = address;
-            EndAddress = address;
+            ExecutionCount = other.SelfCycleCount;
+            SelfCycleCount = other.SelfCycleCount;
+            InclusiveCycleCount = other.InclusiveCycleCount;
+            ElapsedCycleCount = other.ElapsedCycleCount;
         }
 
-        public string Label;
-        public RoutineType RoutineType;
-        public CanonicalAddress StartAddress;
-        public CanonicalAddress EndAddress;
-        public Dictionary<CallStack, RoutineMetrics> MetricsByStack = new();
-        public RoutineMetrics AggregateMetrics = new();
-        public List<StackFrame> StackFrames = new();
+        public void Clear()
+        {
+            ExecutionCount = 0;
+            SelfCycleCount = 0;
+            InclusiveCycleCount = 0;
+            ElapsedCycleCount = 0;
+        }
+
+        public void Add(RoutineMetrics other)
+        {
+            ExecutionCount += other.ExecutionCount;
+            SelfCycleCount += other.SelfCycleCount;
+            InclusiveCycleCount += other.InclusiveCycleCount;
+            ElapsedCycleCount += other.ElapsedCycleCount;
+        }
+
+        public int ExecutionCount;
+        public int SelfCycleCount;
+        public int InclusiveCycleCount;
+        public int ElapsedCycleCount;
     }
 }

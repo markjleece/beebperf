@@ -31,7 +31,7 @@ namespace BeebPerf.ux
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle = new DataGridViewCellStyle();
             toolStrip = new ToolStrip();
             openButton = new ToolStripButton();
             toolStripSeparator1 = new ToolStripSeparator();
@@ -55,15 +55,19 @@ namespace BeebPerf.ux
             routinesDataGrid = new RoutineGridView();
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
+            codePanel = new CodeView();
             toolStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
+            splitContainer.Panel2.SuspendLayout();
             splitContainer.SuspendLayout();
             tabControl.SuspendLayout();
             hotRoutinesTabPage.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)routinesDataGrid).BeginInit();
+            callTreeTabPage.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)callTreeControl).BeginInit();
+            routinesTabPage.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)routinesDataGrid).BeginInit();
             SuspendLayout();
             // 
             // toolStrip
@@ -184,6 +188,10 @@ namespace BeebPerf.ux
             // splitContainer.Panel1
             // 
             splitContainer.Panel1.Controls.Add(tabControl);
+            // 
+            // splitContainer.Panel2
+            // 
+            splitContainer.Panel2.Controls.Add(codePanel);
             splitContainer.Size = new Size(1745, 977);
             splitContainer.SplitterDistance = 486;
             splitContainer.TabIndex = 2;
@@ -218,16 +226,16 @@ namespace BeebPerf.ux
             // hotRoutinesDataGrid
             // 
             hotRoutinesDataGrid.ColumnHeadersHeight = 34;
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle1.BackColor = SystemColors.Window;
-            dataGridViewCellStyle1.Font = new Font("Segoe UI", 9F);
-            dataGridViewCellStyle1.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle1.Format = "N2";
-            dataGridViewCellStyle1.NullValue = null;
-            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
-            hotRoutinesDataGrid.DefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle.BackColor = SystemColors.Window;
+            dataGridViewCellStyle.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle.Format = "N2";
+            dataGridViewCellStyle.NullValue = null;
+            dataGridViewCellStyle.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle.WrapMode = DataGridViewTriState.False;
+            hotRoutinesDataGrid.DefaultCellStyle = dataGridViewCellStyle;
             hotRoutinesDataGrid.Dock = DockStyle.Fill;
             hotRoutinesDataGrid.Location = new Point(3, 3);
             hotRoutinesDataGrid.Name = "hotRoutinesDataGrid";
@@ -246,13 +254,13 @@ namespace BeebPerf.ux
             callTreeTabPage.Text = "Call Tree";
             callTreeTabPage.UseVisualStyleBackColor = true;
             // 
-            // routinesDataGrid
+            // callTreeControl
             // 
             callTreeControl.ColumnHeadersHeight = 34;
-            callTreeControl.DefaultCellStyle = dataGridViewCellStyle1;
+            callTreeControl.DefaultCellStyle = dataGridViewCellStyle;
             callTreeControl.Dock = DockStyle.Fill;
             callTreeControl.Location = new Point(3, 3);
-            callTreeControl.Name = "hotRoutinesDataGrid";
+            callTreeControl.Name = "callTreeControl";
             callTreeControl.RowHeadersWidth = 62;
             callTreeControl.Size = new Size(1731, 442);
             callTreeControl.TabIndex = 0;
@@ -281,10 +289,10 @@ namespace BeebPerf.ux
             // routinesDataGrid
             // 
             routinesDataGrid.ColumnHeadersHeight = 34;
-            routinesDataGrid.DefaultCellStyle = dataGridViewCellStyle1;
+            routinesDataGrid.DefaultCellStyle = dataGridViewCellStyle;
             routinesDataGrid.Dock = DockStyle.Fill;
             routinesDataGrid.Location = new Point(3, 3);
-            routinesDataGrid.Name = "hotRoutinesDataGrid";
+            routinesDataGrid.Name = "routinesDataGrid";
             routinesDataGrid.RowHeadersWidth = 62;
             routinesDataGrid.Size = new Size(1731, 442);
             routinesDataGrid.TabIndex = 0;
@@ -309,6 +317,14 @@ namespace BeebPerf.ux
             interruptsTabPage.Text = "Interrupts";
             interruptsTabPage.UseVisualStyleBackColor = true;
             // 
+            // codePanel
+            // 
+            codePanel.Dock = DockStyle.Fill;
+            codePanel.Location = new Point(0, 0);
+            codePanel.Name = "codePanel";
+            codePanel.Size = new Size(1745, 487);
+            codePanel.TabIndex = 0;
+            // 
             // BeebPerfForm
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -323,11 +339,16 @@ namespace BeebPerf.ux
             toolStrip.ResumeLayout(false);
             toolStrip.PerformLayout();
             splitContainer.Panel1.ResumeLayout(false);
+            splitContainer.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
             splitContainer.ResumeLayout(false);
             tabControl.ResumeLayout(false);
             hotRoutinesTabPage.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).EndInit();
+            callTreeTabPage.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)callTreeControl).EndInit();
+            routinesTabPage.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)routinesDataGrid).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -357,5 +378,6 @@ namespace BeebPerf.ux
         private RoutineGridView hotRoutinesDataGrid;
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
+        private Panel codePanel;
     }
 }
