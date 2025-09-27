@@ -21,7 +21,7 @@
 
 using System.Windows.Forms;
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     public class CallTreeNode : TreeNode<CallTreeNode>
     {

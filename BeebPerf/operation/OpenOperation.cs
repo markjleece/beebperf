@@ -19,10 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Diagnostics;
-using System.Reflection;
+using BeebPerf.model;
 
-namespace BeebPerf
+namespace BeebPerf.operation
 {
     class OpenOperation : Operation
     {

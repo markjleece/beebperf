@@ -1,8 +1,27 @@
-﻿using System.Diagnostics;
-using System.Drawing;
-using System.Runtime.Intrinsics.X86;
-using System.Windows.Forms;
-using System.Windows.Forms.VisualStyles;
+﻿// --------------------------------------------------------------
+// BeebPerf - A BBC Micro Profiler
+//
+// Copyright (C) 2025  Mark John Leece
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public
+// License along with this program; if not, write to the Free
+// Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+// Boston, MA  02110-1301, USA.
+// --------------------------------------------------------------
+
+using BeebPerf.model;
+using BeebPerf.operation;
+using System.Collections.Generic;
 
 namespace BeebPerf.ux
 {
@@ -123,5 +142,23 @@ namespace BeebPerf.ux
         private UndoRedoHistory _UndoRedoHistory = new();
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
+
+        public void SetSelectedRoutine(Routine routine, CallStack callStack)
+        {
+            _SelectedRoutine = routine;
+            _SelectedCallStack = callStack;
+
+            List<InstructionMetrics> instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
+            codeView.SetCode(routine, instructionMetrics, _Model.Labels);
+        }
+
+        public void ClearSelectedRoutine()
+        {
+            _SelectedRoutine = null;
+            _SelectedCallStack = null;
+        }
+
+        private Routine? _SelectedRoutine;
+        private CallStack? _SelectedCallStack;
     }
 }

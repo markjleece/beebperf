@@ -19,6 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.model;
+
 namespace BeebPerf.ux
 {
     internal class CallTreeGridView : DataGridView
@@ -37,6 +39,7 @@ namespace BeebPerf.ux
             RowTemplate.DefaultCellStyle.NullValue = null;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
+            SelectionChanged += SelectionChangedFunc;
 
             Columns.Add(new DataGridViewColumn()
             {
@@ -52,6 +55,30 @@ namespace BeebPerf.ux
             Columns.Add("ExecutionCount", "Execution count");
 
             Sort(Columns["TotalCPU"]!, System.ComponentModel.ListSortDirection.Descending);
+        }
+
+        private Form GetParentForm()
+        {
+            Control control = this;
+            while (control is not Form)
+            {
+                control = control!.Parent!;
+            }
+            return (Form)control;
+        }
+
+        private void SelectionChangedFunc(object? sender, EventArgs e)
+        {
+            BeebPerfForm form = (BeebPerfForm)GetParentForm();
+            if (SelectedRows.Count == 1)
+            {
+                var selectedRow = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
+                form.SetSelectedRoutine(selectedRow.Routine, selectedRow.Context);
+            }
+            else
+            {
+                form.ClearSelectedRoutine();
+            }
         }
 
         public void Clear()

@@ -21,7 +21,7 @@
 
 using System.Configuration;
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     class AppSettings
     {

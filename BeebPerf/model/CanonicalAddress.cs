@@ -20,13 +20,12 @@
 // --------------------------------------------------------------
 
 using System.Diagnostics;
-using static BeebPerf.Model;
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     public struct CanonicalAddress : IComparable<CanonicalAddress>, IEquatable<CanonicalAddress>
     {
-        public CanonicalAddress(ushort address, Model.MemoryPage page)
+        public CanonicalAddress(ushort address, MemoryPage page)
         {
             _PageAddress = ((int)page << 16) | address;
         }
@@ -62,9 +61,9 @@ namespace BeebPerf
             get => (ushort)_PageAddress;
         }
 
-        public Model.MemoryPage Page
+        public MemoryPage Page
         {
-            get => (Model.MemoryPage)(_PageAddress >> 16);
+            get => (MemoryPage)(_PageAddress >> 16);
         }
 
         public ushort PageOffset
@@ -75,17 +74,17 @@ namespace BeebPerf
                 int page = (_PageAddress >> 16);
                 switch ((MemoryPage)page)
                 {
-                    case Model.MemoryPage.WholeRam:
-                    case Model.MemoryPage.HiddenRam:
+                    case MemoryPage.WholeRam:
+                    case MemoryPage.HiddenRam:
                         return (ushort)address;
 
-                    case Model.MemoryPage.ShadowRam:
+                    case MemoryPage.ShadowRam:
                         return (ushort)(address - 0x3000);
 
-                    case Model.MemoryPage.PrivateRam:
+                    case MemoryPage.PrivateRam:
                         return (ushort)(address - 0x8000);
 
-                    case Model.MemoryPage.FilingSystemRam:
+                    case MemoryPage.FilingSystemRam:
                         return (ushort)(address - 0xC000);
 
                     default:

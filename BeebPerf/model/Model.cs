@@ -19,7 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     public class Model
     {
@@ -62,33 +62,6 @@ namespace BeebPerf
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
             Labels = other.Labels;
-        }
-
-        public enum CPUType
-        {
-            _6502 = 0,
-            _65C02 = 1,
-        }
-
-        public enum BBCModelType
-        {
-            B = 0,
-            IntegraB = 1,
-            BPlus = 2,
-            Master128 = 3,
-            MasterET = 4
-        }
-
-        // memory
-        public enum MemoryPage
-        {
-            PagedRom = 0,
-            WholeRam = 16,
-            ShadowRam = 17,
-            PrivateRam = 18,
-            FilingSystemRam = 19,
-            HiddenRam = 20,
-            Count = 21
         }
 
         public class SnapshotType

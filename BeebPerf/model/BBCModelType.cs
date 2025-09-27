@@ -21,38 +21,12 @@
 
 namespace BeebPerf.model
 {
-    public enum RoutineType
+    public enum BBCModelType
     {
-        MaskableISR,
-        NonMaskableISR,
-        JSR,
-        Pseudo,
-        Unknown
-    }
-
-    public class Routine
-    {
-        public Routine()
-        {
-            StartAddress = new CanonicalAddress();
-            EndAddress = new CanonicalAddress();
-            Label = String.Empty;
-        }
-
-        public Routine(CanonicalAddress address, RoutineType routineType, string label)
-        {
-            Label = label;
-            RoutineType = routineType;
-            StartAddress = address;
-            EndAddress = address;
-        }
-
-        public string Label;
-        public RoutineType RoutineType;
-        public CanonicalAddress StartAddress;
-        public CanonicalAddress EndAddress;
-        public Dictionary<CallStack, RoutineMetrics> MetricsByStack = new();
-        public RoutineMetrics AggregateMetrics = new();
-        public List<StackFrame> StackFrames = new();
+        B = 0,
+        IntegraB = 1,
+        BPlus = 2,
+        Master128 = 3,
+        MasterET = 4
     }
 }

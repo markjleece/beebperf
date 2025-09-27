@@ -19,7 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     public struct CoreInstruction : IEquatable<CoreInstruction>, IComparable<CoreInstruction>
     {

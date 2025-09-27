@@ -19,11 +19,10 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using static BeebPerf.Model;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.Diagnostics;
+using BeebPerf.model;
 
 namespace BeebPerf
 {
@@ -425,14 +424,14 @@ namespace BeebPerf
 
         private CanonicalAddress ToCanonicalAddress(Model model, ushort address)
         {
-            Model.MemoryPage page;
+            MemoryPage page;
 
             switch (model.BBCModel)
             {
                 case BBCModelType.B:
                     if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
@@ -451,7 +450,7 @@ namespace BeebPerf
                     }
                     else if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
@@ -480,7 +479,7 @@ namespace BeebPerf
                     }
                     else if (address < 0xC000)
                     {
-                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else
                     {
@@ -500,7 +499,7 @@ namespace BeebPerf
                     }
                     else if (address >= 0x8000 && address < 0xC000)
                     {
-                        page = (Model.MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
                     }
                     else if (address >= 0xC000 && address < 0xE000)
                     {

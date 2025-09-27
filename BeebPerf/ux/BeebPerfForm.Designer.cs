@@ -55,7 +55,7 @@ namespace BeebPerf.ux
             routinesDataGrid = new RoutineGridView();
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
-            codePanel = new CodeView();
+            codeView = new CodeView();
             toolStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
@@ -191,7 +191,7 @@ namespace BeebPerf.ux
             // 
             // splitContainer.Panel2
             // 
-            splitContainer.Panel2.Controls.Add(codePanel);
+            splitContainer.Panel2.Controls.Add(codeView);
             splitContainer.Size = new Size(1745, 977);
             splitContainer.SplitterDistance = 486;
             splitContainer.TabIndex = 2;
@@ -317,13 +317,13 @@ namespace BeebPerf.ux
             interruptsTabPage.Text = "Interrupts";
             interruptsTabPage.UseVisualStyleBackColor = true;
             // 
-            // codePanel
+            // codeView
             // 
-            codePanel.Dock = DockStyle.Fill;
-            codePanel.Location = new Point(0, 0);
-            codePanel.Name = "codePanel";
-            codePanel.Size = new Size(1745, 487);
-            codePanel.TabIndex = 0;
+            codeView.Dock = DockStyle.Fill;
+            codeView.Location = new Point(0, 0);
+            codeView.Name = "codeView";
+            codeView.Size = new Size(1745, 487);
+            codeView.TabIndex = 0;
             // 
             // BeebPerfForm
             // 
@@ -378,6 +378,6 @@ namespace BeebPerf.ux
         private RoutineGridView hotRoutinesDataGrid;
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
-        private Panel codePanel;
+        private CodeView codeView;
     }
 }

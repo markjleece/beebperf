@@ -22,7 +22,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace BeebPerf
+namespace BeebPerf.model
 {
     [StructLayout(LayoutKind.Explicit)]
     public struct Instruction
@@ -75,7 +75,7 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInterrupt);
-                return new CanonicalAddress(_ISRAddress, (Model.MemoryPage)_ISRAddressPage);
+                return new CanonicalAddress(_ISRAddress, (MemoryPage)_ISRAddressPage);
             }
             set
             {
@@ -90,7 +90,7 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInterrupt);
-                return new CanonicalAddress(_InterruptedAddress, (Model.MemoryPage)_InterruptedAddressPage);
+                return new CanonicalAddress(_InterruptedAddress, (MemoryPage)_InterruptedAddressPage);
             }
             set
             {
@@ -133,7 +133,7 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_OpcodeAddress, (Model.MemoryPage)_OpcodeAddressPage);
+                return new CanonicalAddress(_OpcodeAddress, (MemoryPage)_OpcodeAddressPage);
             }
             set
             {
@@ -148,7 +148,7 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_DestinationAddress, (Model.MemoryPage)_DestinationAddressPage);
+                return new CanonicalAddress(_DestinationAddress, (MemoryPage)_DestinationAddressPage);
             }
             set
             {
@@ -163,7 +163,7 @@ namespace BeebPerf
             get
             {
                 Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_MemoryAddress, (Model.MemoryPage)_MemoryAddressPage);
+                return new CanonicalAddress(_MemoryAddress, (MemoryPage)_MemoryAddressPage);
             }
             set
             {

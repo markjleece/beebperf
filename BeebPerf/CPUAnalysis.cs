@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using System.Diagnostics;
+using BeebPerf.model;
 
 namespace BeebPerf
 {
@@ -41,8 +42,6 @@ namespace BeebPerf
             PopulateProgramCallTree();
             PopulateNonMaskableInterruptCallTree();
             PopulateMaskableInterruptCallTree();
-
-            CalculateInstructionMetrics(_RootStackFrame.Routine, _RootStackFrame, startCycleCount, endCycleCount);
         }
 
         private void Preamble(Model model)
@@ -69,7 +68,7 @@ namespace BeebPerf
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
                 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];// f
 
-            if (model.CPU == Model.CPUType._6502)
+            if (model.CPU == CPUType._6502)
                 _BranchOrJumpOpcodeTable[0x7C] = 1; // add JMP (abs,X)
         }
 
@@ -107,7 +106,7 @@ namespace BeebPerf
                 }
         }
 
-        private int CalculatedExcludedCycles(StackFrame stackFrame, int startCycleCount, int endCycleCount)
+        private int CalculatedExcludedCycles(model.StackFrame stackFrame, int startCycleCount, int endCycleCount)
         {
             Debug.Assert(
                 (startCycleCount > stackFrame.StartCycleCount && startCycleCount <= stackFrame.EndCycleCount) ||
@@ -118,7 +117,7 @@ namespace BeebPerf
             int instructionIndex = stackFrame.FirstInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
 
-            StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+            model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
             while (cycleCount <= stackFrame.EndCycleCount)
             {
@@ -152,7 +151,7 @@ namespace BeebPerf
             public int InclusiveCycleCount;
         }
 
-        private CPUMetricResults CalculateMetrics(StackFrame stackFrame, int startCycleCount, int endCycleCount)
+        private CPUMetricResults CalculateMetrics(model.StackFrame stackFrame, int startCycleCount, int endCycleCount)
         {
             if (startCycleCount > stackFrame.EndCycleCount || endCycleCount < stackFrame.StartCycleCount)
             {
@@ -370,7 +369,7 @@ namespace BeebPerf
             // create initial stack frame
             ref Instruction firstInstruction = ref _Instructions[0];
             Routine firstRoutine = GetRoutine(firstInstruction.OpcodeAddress);
-            StackFrame currentStackFrame = CreateStackFrame(CallType.Unknown, firstRoutine, startCycleCount: 0, parent: null);
+            model.StackFrame currentStackFrame = CreateStackFrame(CallType.Unknown, firstRoutine, startCycleCount: 0, parent: null);
 
             // for every instruction...
             for (int instructionIndex = 0; instructionIndex < _Instructions.Length; instructionIndex++)
@@ -443,8 +442,8 @@ namespace BeebPerf
                         else if (currentStackFrame.Parent is null)
                         {
                             // create new root stack frame
-                            Routine rootRoutine = GetRoutine(instruction.DestinationAddress.Offset(-3));
-                            StackFrame newRoot = new(rootRoutine, CallType.Unknown, parent: null);
+                            var rootRoutine = GetRoutine(instruction.DestinationAddress.Offset(-3));
+                            var newRoot = new model.StackFrame(rootRoutine, CallType.Unknown, parent: null);
                             newRoot.StartCycleCount = 0;
                             newRoot.Children.Add(currentStackFrame);
 
@@ -484,17 +483,17 @@ namespace BeebPerf
             _RootStackFrame = currentStackFrame;
         }
 
-        private StackFrame CreateStackFrame(CallType type, Routine routine, int startCycleCount, StackFrame? parent)
+        private model.StackFrame CreateStackFrame(CallType type, Routine routine, int startCycleCount, model.StackFrame? parent)
         {
             Debug.Assert(parent is null || type != CallType.Unknown);
-            StackFrame stackFrame = new(routine, type, parent);
+            model.StackFrame stackFrame = new(routine, type, parent);
             stackFrame.StartCycleCount = startCycleCount;
             if (parent != null)
                 parent.Children.Add(stackFrame);
             return stackFrame;
         }
 
-        private void ExtendStackFrame(StackFrame stackFrame, CanonicalAddress newAddress)
+        private void ExtendStackFrame(model.StackFrame stackFrame, CanonicalAddress newAddress)
         {
             Debug.Assert(stackFrame.Type == CallType.Unknown);
 
@@ -511,7 +510,7 @@ namespace BeebPerf
             _SortedRoutineAddresses.Add(newAddress);
         }
 
-        private bool IsRTSTailCall(ref Instruction instruction, StackFrame stackFrame)
+        private bool IsRTSTailCall(ref Instruction instruction, model.StackFrame stackFrame)
         {
             if (instruction.Opcode != 0x60/*RTS*/)
                 return false;
@@ -527,15 +526,15 @@ namespace BeebPerf
             return (instruction.DestinationAddress.CompareTo(jsrInstruction.OpcodeAddress.Offset(3)) != 0);
         }
 
-        private void ValidateStackFrame(StackFrame stackFrame)
+        private void ValidateStackFrame(model.StackFrame stackFrame)
         {
             Debug.Assert(stackFrame.StartCycleCount == 0 || stackFrame.FirstInstructionIndex > 0);
             Debug.Assert(stackFrame.LastInstructionIndex > 0);
             Debug.Assert(stackFrame.StartCycleCount <= stackFrame.EndCycleCount);
             Debug.Assert(stackFrame.FirstInstructionIndex <= stackFrame.LastInstructionIndex);
 
-            StackFrame? lastChildStackFrame = null;
-            foreach (StackFrame childStackFrame in stackFrame.Children)
+            model.StackFrame? lastChildStackFrame = null;
+            foreach (var childStackFrame in stackFrame.Children)
             {
                 ValidateStackFrame(childStackFrame);
 
@@ -723,14 +722,14 @@ namespace BeebPerf
 
         private Routine? _MaskableISR = null;
         private Routine? _NonMaskableISR = null;
-        private StackFrame _RootStackFrame = new();
+        private model.StackFrame _RootStackFrame = new();
         private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
         private byte[] _BranchOrJumpOpcodeTable = [];
         private Instruction[] _Instructions = [];
         private Dictionary<ushort, string> _Labels = [];
 
-        private void CalculateInstructionMetrics(Routine routine, CallStack callStack, int startCycleCount, int endCycleCount)
+        public List<InstructionMetrics> CalculateInstructionMetrics(Routine routine, CallStack callStack)
         {
             Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics = new();
 
@@ -738,7 +737,7 @@ namespace BeebPerf
 
             foreach (var stackFrame in routine.StackFrames)
             {
-                if (startCycleCount > stackFrame.EndCycleCount || endCycleCount < stackFrame.StartCycleCount)
+                if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
                     continue;
 
                 if (!stackFrame.Equals(callStack))
@@ -751,7 +750,7 @@ namespace BeebPerf
                 int previousInstructionIndex = instructionIndex;
                 int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
 
-                StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+                model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
                 while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
                 {
@@ -762,11 +761,14 @@ namespace BeebPerf
                             childStackFrame.Type == CallType.FallThrough)
                         {
                             // we need to get the cycle count
-                            var lastInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
-                            if (instructionMetrics.TryGetValue(lastInstruction, out var metrics))
+                            if (_Instructions[previousInstructionIndex].IsInstruction)
                             {
-                                var childMetrics = CalculateMetrics(childStackFrame, startCycleCount, endCycleCount);
-                                metrics.InclusiveCycleCount += childMetrics.InclusiveCycleCount;
+                                var lastInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
+                                if (instructionMetrics.TryGetValue(lastInstruction, out var metrics))
+                                {
+                                    var childMetrics = CalculateMetrics(childStackFrame, StartCycleCount, EndCycleCount);
+                                    metrics.InclusiveCycleCount += childMetrics.InclusiveCycleCount;
+                                }
                             }
                         }
 
@@ -782,7 +784,7 @@ namespace BeebPerf
                     ref Instruction instruction = ref _Instructions[instructionIndex];
                     int instructionCycleCount = instruction.CycleCount;
                     if (instruction.IsInstruction && 
-                        cycleCount >= startCycleCount && cycleCount <= endCycleCount)
+                        cycleCount >= StartCycleCount && cycleCount <= EndCycleCount)
                     {
                         InstructionMetrics? metrics;
                         var coreInstruction = new CoreInstruction(ref instruction);
@@ -805,9 +807,7 @@ namespace BeebPerf
             var instructionMetricsList = instructionMetrics.Values.ToList();
             instructionMetricsList.Sort();
 
-            // disassemble code
-            var disassembler = new Disassembler();
-            disassembler.Disassemble(routine, instructionMetricsList, _Labels);
+            return instructionMetricsList;
         }
     }
 }
