@@ -30,7 +30,8 @@ namespace BeebPerf.ux
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            BackgroundColor = SystemColors.Control;
+            BackgroundColor = DefaultCellStyle.BackColor;
+            CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellFormatting += CellFormattingFunc;
             KeyDown += KeyDownFunc;
             MultiSelect = false;
@@ -40,6 +41,7 @@ namespace BeebPerf.ux
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
             SelectionChanged += SelectionChangedFunc;
+
 
             Columns.Add(new DataGridViewColumn()
             {
@@ -110,28 +112,24 @@ namespace BeebPerf.ux
                     break;
 
                 case "SelfCPU":
-                    treeNode = (CallTreeNode)e.Value;
                     RoutineMetrics cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.SelfCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "TotalCPU":
-                    treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.InclusiveCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ElapsedCPU":
-                    treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = FormatCPUMetric(cpuMetrics.ElapsedCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ExecutionCount":
-                    treeNode = (CallTreeNode)e.Value;
                     cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
                     e.Value = $"{"".PadLeft(2*treeNode.Depth)}{cpuMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;

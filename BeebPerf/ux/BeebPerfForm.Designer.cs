@@ -55,7 +55,7 @@ namespace BeebPerf.ux
             routinesDataGrid = new RoutineGridView();
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
-            codeView = new CodeView();
+            codeView = new CodeGridView();
             toolStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
@@ -378,6 +378,6 @@ namespace BeebPerf.ux
         private RoutineGridView hotRoutinesDataGrid;
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
-        private CodeView codeView;
+        private CodeGridView codeView;
     }
 }

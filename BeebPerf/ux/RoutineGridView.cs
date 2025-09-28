@@ -30,7 +30,8 @@ namespace BeebPerf.ux
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            BackgroundColor = SystemColors.Control;
+            BackgroundColor = DefaultCellStyle.BackColor;
+            CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellFormatting += CellFormattingFunc;
             MultiSelect = false;
             ReadOnly = true;
