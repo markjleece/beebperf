@@ -150,7 +150,7 @@ namespace BeebPerf.ux
             _SelectedCallStack = callStack;
 
             List<InstructionMetrics> instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
-            codeView.SetCode(_InstructionSet!, routine, instructionMetrics, _Model.Labels);
+            codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
         }
 
         public void ClearSelectedRoutine()

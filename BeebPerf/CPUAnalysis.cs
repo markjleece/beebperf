@@ -170,7 +170,7 @@ namespace BeebPerf
 
         private void IdentifyRoutines()
         {
-            _RoutinesByAddress = new();
+            RoutinesByAddress = new();
             _SortedRoutineAddresses = new();
 
             // create routines for all interrupt and JSR destinations. Also collect JSR and
@@ -235,7 +235,7 @@ namespace BeebPerf
             }
 
             // create routines for every branch or jump destination that lies within another routine
-            var allRoutines = _RoutinesByAddress.Keys.ToList<CanonicalAddress>();
+            var allRoutines = RoutinesByAddress.Keys.ToList<CanonicalAddress>();
             Stack<CanonicalAddress> pendingRoutines = new(allRoutines);
 
             while (pendingRoutines.Count > 0)
@@ -249,7 +249,7 @@ namespace BeebPerf
                 foreach (var routineBranchOrJump in routineBranchesAndJumps)
                 {
                     CanonicalAddress destinationAddress = routineBranchOrJump.SecondCanonicalAddress;
-                    if (_RoutinesByAddress.ContainsKey(destinationAddress))
+                    if (RoutinesByAddress.ContainsKey(destinationAddress))
                         continue; // branch/jump destination matches and existing routine, so nothing to do
 
                     CanonicalAddress destinationRoutine = _SortedRoutineAddresses.Find(destinationAddress);
@@ -293,7 +293,7 @@ namespace BeebPerf
 
         private Routine CreateRoutine(CanonicalAddress address, RoutineType routineType)
         {
-            if (_RoutinesByAddress.TryGetValue(address, out Routine? routine))
+            if (RoutinesByAddress.TryGetValue(address, out Routine? routine))
                 return routine;
 
             string label = _Labels.TryGetValue(address.Address, out var lbl) ? lbl : string.Empty;
@@ -304,7 +304,7 @@ namespace BeebPerf
             else if (routineType == RoutineType.MaskableISR)
                 _MaskableISR = routine;
 
-            _RoutinesByAddress.Add(address, routine);
+            RoutinesByAddress.Add(address, routine);
             _SortedRoutineAddresses.Add(address);
 
             Debug.WriteLine($"CreateRoutine( {address.ToString()} {routine.Label}, {routineType.ToString()} )");
@@ -315,7 +315,7 @@ namespace BeebPerf
         private Routine GetRoutine(CanonicalAddress address)
         {
             CanonicalAddress routineAddress = _SortedRoutineAddresses.Find(address);
-            if (_RoutinesByAddress.TryGetValue(routineAddress, out Routine? routine))
+            if (RoutinesByAddress.TryGetValue(routineAddress, out Routine? routine))
                 return routine;
 
             return CreateRoutine(address, RoutineType.Unknown);
@@ -351,7 +351,7 @@ namespace BeebPerf
                         ExtendStackFrame(currentStackFrame, instruction.DestinationAddress);
 
                     // is first instruction of a routine?
-                    if (_RoutinesByAddress.TryGetValue(instruction.OpcodeAddress, out Routine? routine) && !isFirstInstruction)
+                    if (RoutinesByAddress.TryGetValue(instruction.OpcodeAddress, out Routine? routine) && !isFirstInstruction)
                         if (routine != currentStackFrame.Routine) // fall through?
                             currentStackFrame = CreateStackFrame(CallType.FallThrough, routine, cycleCount, parent: currentStackFrame);
 
@@ -365,15 +365,15 @@ namespace BeebPerf
                     if (instruction.Opcode == 0x20/*JSR*/ && !isLastInstruction)
                     {
                         // create new stack frame for routine
-                        Routine jsrRoutine = _RoutinesByAddress[instruction.DestinationAddress];
+                        Routine jsrRoutine = RoutinesByAddress[instruction.DestinationAddress];
                         currentStackFrame = CreateStackFrame(CallType.JSR, jsrRoutine, postCycleCount, parent: currentStackFrame);
                     }
                     else if (instructionSet.IsBranchOrJump(instruction.Opcode) && instruction.CycleCount > 2 &&
-                             _RoutinesByAddress.TryGetValue(instruction.DestinationAddress, out Routine? destinationRoutine) &&
+                             RoutinesByAddress.TryGetValue(instruction.DestinationAddress, out Routine? destinationRoutine) &&
                              destinationRoutine != currentStackFrame.Routine)
                     {
                         // create new stack frame for tail call
-                        Routine jsrRoutine = _RoutinesByAddress[instruction.DestinationAddress];
+                        Routine jsrRoutine = RoutinesByAddress[instruction.DestinationAddress];
                         currentStackFrame = CreateStackFrame(CallType.TailCall, jsrRoutine, postCycleCount, parent: currentStackFrame);
                     }
                     else if (instruction.Opcode == 0x60/*RTS*/ || instruction.Opcode == 0x40/*RTI*/)
@@ -395,9 +395,9 @@ namespace BeebPerf
                         if (IsRTSTailCall(ref instruction, currentStackFrame))
                         {
                             // create new stack frame for tail call
-                            Debug.Assert(_RoutinesByAddress.ContainsKey(instruction.DestinationAddress));
-                            var returnRoutine = _RoutinesByAddress[instruction.DestinationAddress];
-                            currentStackFrame = CreateStackFrame(CallType.TailCall, _RoutinesByAddress[instruction.DestinationAddress], postCycleCount, parent: currentStackFrame);
+                            Debug.Assert(RoutinesByAddress.ContainsKey(instruction.DestinationAddress));
+                            var returnRoutine = RoutinesByAddress[instruction.DestinationAddress];
+                            currentStackFrame = CreateStackFrame(CallType.TailCall, RoutinesByAddress[instruction.DestinationAddress], postCycleCount, parent: currentStackFrame);
                         }
                         else if (currentStackFrame.Parent is null)
                         {
@@ -424,7 +424,7 @@ namespace BeebPerf
                         currentStackFrame.LastInstructionIndex = instructionIndex;
 
                     // create new stack frame for interrupt service routine
-                    Routine isrRoutine = _RoutinesByAddress[instruction.ISRAddress];
+                    Routine isrRoutine = RoutinesByAddress[instruction.ISRAddress];
                     currentStackFrame = CreateStackFrame(CallType.ISR, isrRoutine, postCycleCount, parent: currentStackFrame);
                 }
 
@@ -470,8 +470,8 @@ namespace BeebPerf
             stackFrame.Routine.StartAddress = newAddress;
             stackFrame.Routine.Label = _Labels.TryGetValue(newAddress.Address, out var lbl) ? lbl : string.Empty;
 
-            _RoutinesByAddress.Remove(oldAddress);
-            _RoutinesByAddress.Add(newAddress, stackFrame.Routine);
+            RoutinesByAddress.Remove(oldAddress);
+            RoutinesByAddress.Add(newAddress, stackFrame.Routine);
 
             _SortedRoutineAddresses.Remove(oldAddress);
             _SortedRoutineAddresses.Add(newAddress);
@@ -528,7 +528,7 @@ namespace BeebPerf
 
             _RootStackFrame.ClearMetrics();
 
-            foreach (var routine in _RoutinesByAddress.Values)
+            foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
             CalculateMetrics(_RootStackFrame, startCycleCount, endCycleCount);
@@ -537,7 +537,7 @@ namespace BeebPerf
         private void PopulateHotRoutines()
         {
             HotRoutines.Clear();
-            foreach (var routine in _RoutinesByAddress.Values)
+            foreach (var routine in RoutinesByAddress.Values)
                 HotRoutines.Add(routine);
             HotRoutines.Sort((a, b) => -a.AggregateMetrics.SelfCycleCount.CompareTo(b.AggregateMetrics.SelfCycleCount));
 
@@ -552,7 +552,7 @@ namespace BeebPerf
             ProgramCallTree = new CallTreeNode(_RootStackFrame);
             treeNodesByStack.Add(_RootStackFrame, ProgramCallTree);
 
-            foreach (var routine in _RoutinesByAddress.Values)
+            foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
                     PopulateProgramCallTree(callStack, ProgramCallTree, treeNodesByStack);
 
@@ -598,7 +598,7 @@ namespace BeebPerf
             NonMaskableInterruptCallTree = new CallTreeNode(stack);
             interruptTreeNodesByStack.Add(stack, NonMaskableInterruptCallTree);
 
-            foreach (var routine in _RoutinesByAddress.Values)
+            foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
                     PopulateInterruptCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
 
@@ -619,7 +619,7 @@ namespace BeebPerf
             MaskableInterruptCallTree = new CallTreeNode(stack);
             interruptTreeNodesByStack.Add(stack, MaskableInterruptCallTree);
 
-            foreach (var routine in _RoutinesByAddress.Values)
+            foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
                     PopulateInterruptCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
 
@@ -684,82 +684,80 @@ namespace BeebPerf
             int instructionOrdinal = 0;
 
             foreach (var stackFrame in routine.StackFrames)
-            {
-                if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
-                    continue;
+                if (StartCycleCount <= stackFrame.EndCycleCount && EndCycleCount >= stackFrame.StartCycleCount &&
+                    (callStack == null || stackFrame.Equals(callStack)))
+                    CalculateStackFrameMetrics(stackFrame, ref instructionOrdinal, instructionMetrics);
 
-                if (callStack != null && !stackFrame.Equals(callStack))
-                    continue;
-
-                int childIndex = 0;
-                int instructionIndex = stackFrame.FirstInstructionIndex;
-                int cycleCount = stackFrame.StartCycleCount;
-
-                int previousInstructionIndex = instructionIndex;
-                int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
-
-                model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
-
-                while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
-                {
-                    if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
-                    {
-                        if (childStackFrame.Type == CallType.JSR ||
-                            childStackFrame.Type == CallType.TailCall)
-                        {
-                            // we need to get the cycle count
-                            var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
-                            if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
-                                metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
-                        }
-
-                        if (childStackFrame.Type == CallType.FallThrough)
-                        {
-                            //ref Instruction previousInstruction = ref _Instructions[previousInstructionIndex];
-                            //metrics.InclusiveCycleCount += instructionCycleCount;
-                            //metrics.ExecutionCount += 1;
-                        }
-
-                        // skip over child stack frames
-                        instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
-                        cycleCount = childStackFrame.EndCycleCount;
-
-                        childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
-                        continue;
-                    }
-
-                    // update cycle counts
-                    ref Instruction instruction = ref _Instructions[instructionIndex];
-                    int instructionCycleCount = instruction.CycleCount;
-                    if (instruction.IsInstruction &&
-                        cycleCount >= StartCycleCount && cycleCount <= EndCycleCount)
-                    {
-                        InstructionMetrics? metrics;
-                        var coreInstruction = new CoreInstruction(ref instruction);
-                        if (!instructionMetrics.TryGetValue(coreInstruction, out metrics))
-                        {
-                            metrics = new InstructionMetrics(coreInstruction, instructionOrdinal++);
-                            instructionMetrics.Add(coreInstruction, metrics);
-                        }
-
-                        metrics.InclusiveCycleCount += instructionCycleCount;
-                        metrics.ExecutionCount += 1;
-
-                        previousInstructionIndex = instructionIndex;
-                    }
-
-                    cycleCount += instructionCycleCount;
-                    instructionIndex++;
-                }
-            }
-
-            // create sorted list, by canonical address and ordinal
             var instructionMetricsList = instructionMetrics.Values.ToList();
             instructionMetricsList.Sort();
 
             return instructionMetricsList;
         }
 
+        private void CalculateStackFrameMetrics(
+            model.StackFrame stackFrame,
+            ref int instructionOrdinal,
+            Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics)
+        {
+            int childIndex = 0;
+            int instructionIndex = stackFrame.FirstInstructionIndex;
+            int cycleCount = stackFrame.StartCycleCount;
+
+            int previousInstructionIndex = instructionIndex;
+            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+
+            model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+
+            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
+            {
+                if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
+                {
+                    if (childStackFrame.Type == CallType.JSR ||
+                        childStackFrame.Type == CallType.TailCall)
+                    {
+                        // we need to get the cycle count
+                        var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
+                        if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
+                            metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                    }
+
+                    if (childStackFrame.Type == CallType.FallThrough)
+                        CalculateStackFrameMetrics(childStackFrame, ref instructionOrdinal, instructionMetrics);
+
+                    // skip over child stack frames
+                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
+                    cycleCount = childStackFrame.EndCycleCount;
+
+                    childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
+                    continue;
+                }
+
+                // update cycle counts
+                ref Instruction instruction = ref _Instructions[instructionIndex];
+                int instructionCycleCount = instruction.CycleCount;
+                if (instruction.IsInstruction &&
+                    cycleCount >= StartCycleCount && cycleCount <= EndCycleCount)
+                {
+                    InstructionMetrics? metrics;
+                    var coreInstruction = new CoreInstruction(ref instruction);
+                    if (!instructionMetrics.TryGetValue(coreInstruction, out metrics))
+                    {
+                        metrics = new InstructionMetrics(coreInstruction, instructionOrdinal++);
+                        instructionMetrics.Add(coreInstruction, metrics);
+                    }
+
+                    metrics.InclusiveCycleCount += instructionCycleCount;
+                    metrics.ExecutionCount += 1;
+
+                    previousInstructionIndex = instructionIndex;
+                }
+
+                cycleCount += instructionCycleCount;
+                instructionIndex++;
+            }
+        }
+
+        public Dictionary<CanonicalAddress, Routine> RoutinesByAddress = new();
         public List<Routine> HotRoutines = new();
         public CallTreeNode? ProgramCallTree;
         public CallTreeNode? NonMaskableInterruptCallTree;
@@ -772,7 +770,6 @@ namespace BeebPerf
         private Routine? _MaskableISR = null;
         private Routine? _NonMaskableISR = null;
         private model.StackFrame _RootStackFrame = new();
-        private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
         private Instruction[] _Instructions = [];
         private Dictionary<ushort, string> _Labels = [];

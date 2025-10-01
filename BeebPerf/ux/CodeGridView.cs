@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
 {
@@ -44,17 +45,14 @@ namespace BeebPerf.ux
 
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
-            Columns.Add(new DataGridViewColumn()
-            {
-                Name = "Instruction",
-                HeaderText = "Instruction",
-                CellTemplate = new CallTreeCellRenderer(),
-            });
+            Columns.Add("Instruction", "Instruction");
             Columns.Add("TotalCPU", "Total CPU [#cycles]");
             Columns.Add("ExecutionCount", "Execution count");
 
+            var cellRenderer = new CallTreeCellRenderer();
             foreach (DataGridViewColumn column in Columns)
             {
+                column.CellTemplate = cellRenderer;
                 column.SortMode = DataGridViewColumnSortMode.NotSortable;
             }
 
@@ -80,21 +78,39 @@ namespace BeebPerf.ux
             ClearSelection();
         }
 
-        public void SetCode(InstructionSet instructionSet, Routine routine, List<InstructionMetrics> instructionMetrics, Dictionary<ushort, string> labels)
-        {
-            var missing = new InstructionMetrics(new CoreInstruction(), ordinal:-1);
+        class Ellipses {};
+        class FallThrough {};
 
-            _InstructionSet = instructionSet;
+        public void SetCode(
+            Routine routine,
+            List<InstructionMetrics> instructionMetrics,
+            Dictionary<CanonicalAddress, Routine> routinesByAddress,
+            Dictionary<ushort, string> labels,
+            InstructionSet instructionSet)
+        {
             _Routine = routine;
             _Labels = labels;
+            _InstructionSet = instructionSet;
+
             Rows.Clear();
             if (instructionMetrics.Count > 0)
             {
+                var ellipses = new Ellipses();
+                var fallThrough = new FallThrough();
+
                 CanonicalAddress nextAddress = instructionMetrics[0].Instruction.OpcodeAddress;
                 foreach (var obj in instructionMetrics)
                 {
+                    // add ellipses
                     if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        Rows.Add(missing, missing, missing, missing, missing);
+                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses);
+
+                    // add fall-through
+                    if (routinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
+                        if (routine_ != routine)
+                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
+
+                    // add instruction metrics
                     Rows.Add(obj, obj, obj, obj, obj);
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet.Size(obj.Instruction.Opcode));
                 }
@@ -103,7 +119,6 @@ namespace BeebPerf.ux
 
         public void Clear()
         {
-            _Routine = null;
             _Labels = null;
             Rows.Clear();
             Invalidate();
@@ -114,13 +129,15 @@ namespace BeebPerf.ux
             if (e.Value == null)
                 return;
 
-            var instructionMetrics = (InstructionMetrics)e.Value;
-            if (instructionMetrics.Ordinal == -1)
+            if (e.Value is not InstructionMetrics)
             {
                 e.Value = string.Empty;
                 e.FormattingApplied = true;
+                return;
             }
-            else switch (Columns[e.ColumnIndex].Name)
+
+            var instructionMetrics = (InstructionMetrics)e.Value;
+            switch (Columns[e.ColumnIndex].Name)
             {
                 case "Address":
                     e.Value = instructionMetrics.Instruction.OpcodeAddress.ToString();
@@ -234,20 +251,41 @@ namespace BeebPerf.ux
                                           DataGridViewAdvancedBorderStyle advancedBorderStyle,
                                           DataGridViewPaintParts paintParts)
             {
+                var codeGridView = (CodeGridView)DataGridView!;
+                bool isInstructionColumn = (codeGridView.Columns[ColumnIndex].Name == "Instruction");
+
                 base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
-                           value:null, formattedValue:null, errorText:null, 
-                           cellStyle, advancedBorderStyle, paintParts);
+                            !isInstructionColumn ? value : null,
+                            !isInstructionColumn ? formattedValue : null,
+                            !isInstructionColumn ? errorText : null,
+                            cellStyle, advancedBorderStyle, paintParts);
 
-                var instructionMetrics = (InstructionMetrics)value!;
-                if (instructionMetrics.Ordinal == -1)
+                if (value! is InstructionMetrics)
                 {
-                    graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
-                    return;
+                    if (isInstructionColumn)
+                        PaintInstruction(graphics, cellBounds, value, cellStyle);
                 }
+                else if (value! is Ellipses)
+                {
+                    if (isInstructionColumn)
+                        PaintEllipses(graphics, cellBounds, cellStyle);
+                }
+                else if (value! is FallThrough)
+                {
+                    PaintFallThrough(graphics, rowIndex, cellStyle);
+                }
+            }
 
+            private void PaintInstruction(
+                Graphics graphics,
+                Rectangle cellBounds,
+                object? value,
+                DataGridViewCellStyle cellStyle)
+            {
                 var codeGridView = (CodeGridView)DataGridView!;
                 var instructionSet = codeGridView._InstructionSet!;
 
+                var instructionMetrics = (InstructionMetrics)value!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
                 string mnemonic = instructionSet.Mnemonic(opcode);
@@ -330,7 +368,7 @@ namespace BeebPerf.ux
                 foreach (var segment in segments)
                 {
                     Size measure = TextRenderer.MeasureText(
-                        segment.Text, 
+                        segment.Text,
                         cellStyle.Font,
                         new Size(int.MaxValue, int.MaxValue),
                         TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
@@ -342,6 +380,53 @@ namespace BeebPerf.ux
                     xPos += measure.Width;
                 }
             }
+            private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
+            {
+                graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
+            }
+
+            private void PaintFallThrough(Graphics graphics, int rowIndex, DataGridViewCellStyle cellStyle)
+            {
+                var codeGridView = (CodeGridView)DataGridView!;
+
+                int lastColumnIndex = codeGridView.Columns[^1].Index;
+                var lastCellBounds = codeGridView.GetCellDisplayRectangle(lastColumnIndex, rowIndex, cutOverflow: false);
+                var rowBounds = new Rectangle(0, lastCellBounds.Y, lastCellBounds.Right, lastCellBounds.Height);
+                if (rowBounds.IsEmpty)
+                    rowBounds = codeGridView.GetRowDisplayRectangle(rowIndex, cutOverflow: false);
+
+                using var font = new Font(cellStyle.Font, FontStyle.Italic);
+                var text = "fall-through";
+                Size measure = TextRenderer.MeasureText(
+                    text, font,
+                    new Size(int.MaxValue, int.MaxValue),
+                    TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+
+                StringFormat textFormat = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,    // Horizontal
+                    LineAlignment = StringAlignment.Center // Vertical
+                };
+                using var brush = new SolidBrush(cellStyle.ForeColor);
+                graphics.DrawString(text, font, brush, rowBounds, textFormat);
+
+                int padding = rowBounds.Height / 4;
+                int textWidth = measure.Width + (2 * padding);
+                rowBounds.Inflate(-padding, 0);
+
+                int lineLength = (rowBounds.Width - textWidth) / 2;
+                if (lineLength > 0)
+                {
+                    using Pen dashedPen = new Pen(cellStyle.ForeColor);
+                    dashedPen.DashStyle = DashStyle.Custom;
+                    dashedPen.DashPattern = new float[] { 6, 3 };
+
+                    int y = (rowBounds.Top + rowBounds.Bottom) / 2;
+                    graphics.DrawLine(dashedPen, rowBounds.Left, y, rowBounds.Left + lineLength, y);
+                    graphics.DrawLine(dashedPen, rowBounds.Right - lineLength, y, rowBounds.Right, y);
+                }
+            }
+
             private struct Segment
             {
                 public string Text;
@@ -359,8 +444,7 @@ namespace BeebPerf.ux
 
         private Routine? _Routine;
         private Dictionary<ushort, string>? _Labels;
-        private InstructionColors _InstructionStyle;
         private InstructionSet? _InstructionSet;
-
+        private InstructionColors _InstructionStyle;
     }
 }
