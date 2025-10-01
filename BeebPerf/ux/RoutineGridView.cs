@@ -37,6 +37,7 @@ namespace BeebPerf.ux
             ReadOnly = true;
             RowHeadersVisible = false;
             RowTemplate.DefaultCellStyle.NullValue = null;
+            SelectionChanged += SelectionChangedFunc;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
 
@@ -60,6 +61,30 @@ namespace BeebPerf.ux
         }
 
         public int TotalCycleCount;
+
+        private Form GetParentForm()
+        {
+            Control control = this;
+            while (control is not Form)
+            {
+                control = control!.Parent!;
+            }
+            return (Form)control;
+        }
+
+        private void SelectionChangedFunc(object? sender, EventArgs e)
+        {
+            BeebPerfForm form = (BeebPerfForm)GetParentForm();
+            if (SelectedRows.Count == 1)
+            {
+                var routine = (Routine)SelectedRows[0].Cells[0].Value!;
+                form.SetSelectedRoutine(routine, callStack:null);
+            }
+            else
+            {
+                form.ClearSelectedRoutine();
+            }
+        }
 
         private void CellFormattingFunc(object? sender, DataGridViewCellFormattingEventArgs e)
         {

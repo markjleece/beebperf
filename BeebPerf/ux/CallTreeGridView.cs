@@ -38,10 +38,9 @@ namespace BeebPerf.ux
             ReadOnly = true;
             RowHeadersVisible = false;
             RowTemplate.DefaultCellStyle.NullValue = null;
+            SelectionChanged += SelectionChangedFunc;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
-            SelectionChanged += SelectionChangedFunc;
-
 
             Columns.Add(new DataGridViewColumn()
             {
@@ -74,8 +73,8 @@ namespace BeebPerf.ux
             BeebPerfForm form = (BeebPerfForm)GetParentForm();
             if (SelectedRows.Count == 1)
             {
-                var selectedRow = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(selectedRow.Routine, selectedRow.Context);
+                var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
+                form.SetSelectedRoutine(treeNode.Routine, treeNode.Context);
             }
             else
             {
@@ -112,26 +111,22 @@ namespace BeebPerf.ux
                     break;
 
                 case "SelfCPU":
-                    RoutineMetrics cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.SelfCycleCount, treeNode.Depth);
+                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.SelfCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "TotalCPU":
-                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.InclusiveCycleCount, treeNode.Depth);
+                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.InclusiveCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ElapsedCPU":
-                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
-                    e.Value = FormatCPUMetric(cpuMetrics.ElapsedCycleCount, treeNode.Depth);
+                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.ElapsedCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
                 case "ExecutionCount":
-                    cpuMetrics = treeNode.Routine.MetricsByStack[treeNode.Context];
-                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{cpuMetrics.ExecutionCount:N0}";
+                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{treeNode.CPUMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
                     break;
 
@@ -265,7 +260,7 @@ namespace BeebPerf.ux
 
             for (var node = treeNode; node != null; node = node.Parent)
             {
-                var cpuMetrics = node.Routine.MetricsByStack[node.Context];
+                var cpuMetrics = treeNode.CPUMetrics;
                 var metric = columnName switch
                 {
                     "SelfCPU" => cpuMetrics.SelfCycleCount,
@@ -343,35 +338,42 @@ namespace BeebPerf.ux
                     var foreColor = selected ? cellStyle.SelectionForeColor : cellStyle.ForeColor;
                     var backColor = selected ? cellStyle.SelectionBackColor : cellStyle.BackColor;
 
+                    PointF[]? points = null;
+
                     if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
                     {
                         float halfHeight = cellHeight / 5;
                         float quarterHeight = halfHeight / 2;
 
-                        var points = new[]
+                        points = new[]
                         {
                             new PointF(centerX - quarterHeight, centerY - halfHeight),
                             new PointF(centerX + quarterHeight, centerY),
                             new PointF(centerX - quarterHeight, centerY + halfHeight),
                         };
-
-                        graphics.FillPolygon(new SolidBrush(backColor), points);
-                        graphics.DrawPolygon(new Pen(foreColor), points);
                     }
                     else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     {
                         float hypotenuse = cellHeight / 5 * (float)Math.Sqrt(2.0);
                         float halfHypotenuse = hypotenuse / 2;
 
-                        var points = new[]
+                        points = new[]
                         {
                             new PointF(centerX - halfHypotenuse, centerY + halfHypotenuse),
                             new PointF(centerX + halfHypotenuse, centerY - halfHypotenuse),
                             new PointF(centerX + halfHypotenuse, centerY + halfHypotenuse)
                         };
 
-                        graphics.FillPolygon(new SolidBrush(foreColor), points);
-                        graphics.DrawPolygon(new Pen(foreColor), points);
+                        backColor = foreColor;
+                    }
+
+                    if (points != null)
+                    {
+                        using var brush = new SolidBrush(backColor);
+                        graphics.FillPolygon(brush, points);
+
+                        using var pen = new Pen(foreColor);
+                        graphics.DrawPolygon(pen, points);
                     }
                 }
             }

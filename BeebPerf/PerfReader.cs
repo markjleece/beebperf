@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
 using BeebPerf.model;
+using System.Net.Http.Headers;
 
 namespace BeebPerf
 {
@@ -91,11 +92,8 @@ namespace BeebPerf
 
             BBCModelType bbcModel = (BBCModelType)ReadByte(dataStream);
             int totalExecutionCount = ReadInt(dataStream);
-
             Model model = new Model(bbcModel, totalExecutionCount);
-
-            PopulateOpcodeTables(model.CPU);
-
+            _InstructionSet = model.InstructionSet;
             return model;
         }
 
@@ -283,7 +281,8 @@ namespace BeebPerf
                 // operand
                 ushort operand = 0;
 
-                int size = _OpcodeSize[opcode];
+                var instructionSet = _InstructionSet!;
+                int size = instructionSet.Size(opcode);
                 if (size == 2)
                     operand = ReadByte(dataStream);
                 else if (size == 3)
@@ -297,7 +296,7 @@ namespace BeebPerf
                 instruction.CycleCount = cycleCount;
 
                 // stack pointer
-                if (_OpcodeStack[opcode] != 0)
+                if (instructionSet.ModifiesStackPointer(opcode))
                     instruction.StackPointer = ReadByte(dataStream);
 
                 // destination address
@@ -307,13 +306,13 @@ namespace BeebPerf
                     instruction.DestinationAddress = ToCanonicalAddress(model, operand);
                 }
                 else if (opcode == 0x60/*RTS*/ || opcode == 0x40/*RTI*/ ||
-                         opcode == 0x6C/*JMP ind*/ || (opcode == 0x7C/*JMP (abs,X)*/ && model.CPU == CPUType._65C02))
+                         opcode == 0x6C/*JMP ind*/ || (opcode == 0x7C/*JMP (abs,X)*/ && model.InstructionSet!.CPU == CPUType._65C02))
                 {
                     // RTS/RTI/JMP destination address
                     ushort destinationAddress = ReadShort(dataStream);
                     instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
                 }
-                else if (_OpcodeBranch[opcode] != 0)
+                else if (instructionSet.IsBranch(opcode))
                 {
                     // branch destination
                     int destinationAddress = opcodeAddress + 2;
@@ -324,11 +323,11 @@ namespace BeebPerf
                 else
                 {
                     // memory access address
-                    byte memoryAccess = _OpcodeMemoryAccess[opcode];
+                    byte memoryAccess = instructionSet.MemoryAccess(opcode);
                     if (memoryAccess != 0x0)
                     {
                         ushort memoryAddress;
-                        if (_OpcodeAddressMode[opcode] != 0/*complex addressing*/)
+                        if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressMode.Complex)
                             memoryAddress = ReadShort(dataStream);
                         else
                             memoryAddress = opcode;
@@ -556,205 +555,6 @@ namespace BeebPerf
             return new MemoryStream(uncompressedData);
         }
 
-        private void PopulateOpcodeTables(CPUType cpu)
-        {
-            _OpcodeBranch = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 9
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
-            ];
-
-            byte[] sizeTable6502 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3, // 0
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // 1
-                3,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3, // 2
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // 3
-                1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3, // 4
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // 5
-                1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3, // 6
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // 7
-                2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3, // 8
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // 9
-                2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3, // a
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // b
-                2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3, // c
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3, // d
-                2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3, // e
-                2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3  // f
-            ];
-
-            byte[] sizeTable65C02 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                1,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // 0
-                2,2,2,1,2,2,2,1,1,3,1,1,3,3,3,1, // 1
-                3,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // 2
-                2,2,2,1,2,2,2,1,1,3,1,1,3,3,3,1, // 3
-                1,2,1,1,1,2,2,1,1,2,1,1,3,3,3,1, // 4
-                2,2,2,1,1,2,2,1,1,3,1,1,1,3,3,1, // 5
-                1,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // 6
-                2,2,2,1,2,2,2,1,1,3,1,1,3,3,3,1, // 7
-                2,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // 8
-                2,2,2,1,2,2,2,1,1,3,1,1,3,3,3,1, // 9
-                2,2,2,1,2,2,2,1,1,2,1,1,3,3,3,1, // a
-                2,2,2,1,2,2,2,1,1,3,1,1,3,3,3,1, // b
-                2,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // c
-                2,2,2,1,1,2,2,1,1,3,1,1,1,3,3,1, // d
-                2,2,1,1,2,2,2,1,1,2,1,1,3,3,3,1, // e
-                2,2,2,1,1,2,2,1,1,3,1,1,1,3,3,1  // f
-            ];
-
-            byte[] memoryAccessTable6502 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 0 none
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 1 memory read
-                0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // 2 memory write
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 3 memory read & write
-                0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 4 
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 5 
-                0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 6
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 7
-                0,2,0,2,2,2,2,2,0,0,0,0,2,2,2,2, // 8
-                0,2,0,2,2,2,2,2,0,2,0,2,2,2,2,2, // 9
-                0,1,0,1,1,1,1,1,0,0,0,0,1,1,1,1, // a
-                0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1, // b
-                0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // c
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // d
-                0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // e
-                0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3  // f
-            ];
-
-            byte[] memoryAccessTable65C02 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,1,0,0,3,1,3,0,0,0,0,0,3,1,3,0, // 0 none
-                0,1,1,0,3,1,3,0,0,1,0,0,3,1,3,0, // 1 memory read
-                0,1,0,0,1,1,3,0,0,0,0,0,1,1,3,0, // 2 memory write
-                0,1,1,0,1,1,3,0,0,1,0,0,1,1,3,0, // 3 memory read & write
-                0,1,0,0,0,1,3,0,0,0,0,0,0,1,3,0, // 4 
-                0,1,1,0,0,1,3,0,0,1,0,0,0,1,3,0, // 5 
-                0,1,0,0,2,1,3,0,0,0,0,0,0,1,3,0, // 6
-                0,1,1,0,2,1,3,0,0,1,0,0,0,1,3,0, // 7
-                0,2,0,0,2,2,2,0,0,0,0,0,2,2,2,0, // 8
-                0,2,2,0,2,2,2,0,0,2,0,0,2,2,2,0, // 9
-                0,1,0,0,1,1,1,0,0,0,0,0,1,1,1,0, // a
-                0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // b
-                0,1,0,0,1,1,3,0,0,0,0,0,1,1,3,0, // c
-                0,1,1,0,0,1,3,0,0,1,0,0,0,1,3,0, // d
-                0,1,0,0,1,1,3,0,0,0,0,0,1,1,3,0, // e
-                0,1,1,0,0,1,3,0,0,1,0,0,0,1,3,0  // f
-            ];
-
-            byte[] addressModeTable6502 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 0 simple addressing (implied, immediate, relative, absolute, or zero-page)
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 1 complex addressing (indexed, indirect addressing)
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 2
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 3 
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 4 
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 5 
-                0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0, // 6
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 7
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1, // 9
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1, // b
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // d
-                0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1  // f
-            ];
-
-            byte[] addressModeTable65C02 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 simple addressing (implied, immediate, relative, absolute, or zero-page)
-                0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0, // 1 complex addressing (indexed, indirect addressing)
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
-                0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // 3 
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 
-                0,1,1,0,0,0,1,0,0,1,0,0,0,1,1,0, // 5 
-                0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0, // 6
-                0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // 7
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,1,1,0,1,1,1,0,0,1,0,0,0,1,1,0, // 9
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // b
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0, // d
-                0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0  // f
-            ];
-
-            byte[] modifiesStackPointerTable6502 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 false
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 true
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0, // 9
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
-            ];
-
-            byte[] modifiesStackPointerTable65C02 = [
-             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 false
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 true
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 5
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 7
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 9
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // d
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0  // f
-            ];
-
-            if (cpu == CPUType._6502)
-            {
-                _OpcodeSize = sizeTable6502;
-                _OpcodeMemoryAccess = memoryAccessTable6502;
-                _OpcodeAddressMode = addressModeTable6502;
-                _OpcodeStack = modifiesStackPointerTable6502;
-            }
-            else
-            {
-                Debug.Assert(cpu == CPUType._65C02);
-                _OpcodeSize = sizeTable65C02;
-                _OpcodeMemoryAccess = memoryAccessTable65C02;
-                _OpcodeAddressMode = addressModeTable65C02;
-                _OpcodeStack = modifiesStackPointerTable65C02;
-            }
-        }
-
         private static int ReadInt(Stream ms)
         {
             return ms.ReadByte() | (ms.ReadByte() << 8) | (ms.ReadByte() << 16) | (ms.ReadByte() << 24);
@@ -770,11 +570,8 @@ namespace BeebPerf
             return (byte)ms.ReadByte();
         }
 
-        private byte[] _OpcodeBranch = new byte[0];
-        private byte[] _OpcodeSize = new byte[0];
-        private byte[] _OpcodeMemoryAccess = new byte[0];
-        private byte[] _OpcodeAddressMode = new byte[0];
-        private byte[] _OpcodeStack = new byte[0];
+        private InstructionSet? _InstructionSet;
+
         private ushort _LastOpcodeAddress = 0;
         private int _InstructionCount = 0;
 

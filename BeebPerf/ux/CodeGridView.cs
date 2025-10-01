@@ -20,9 +20,6 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System.Reflection.Emit;
-using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace BeebPerf.ux
 {
@@ -64,7 +61,7 @@ namespace BeebPerf.ux
             DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
             DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
 
-            InstructionStyle = new InstructionColors()
+            _InstructionStyle = new InstructionColors()
             {
                 MnemonicColor = Color.DarkGreen,
                 AddressColor = Color.CadetBlue,
@@ -83,10 +80,11 @@ namespace BeebPerf.ux
             ClearSelection();
         }
 
-        public void SetCode(Routine routine, List<InstructionMetrics> instructionMetrics, Dictionary<ushort, string> labels)
+        public void SetCode(InstructionSet instructionSet, Routine routine, List<InstructionMetrics> instructionMetrics, Dictionary<ushort, string> labels)
         {
-            var unknown = new InstructionMetrics(new CoreInstruction(), ordinal:-1);
+            var missing = new InstructionMetrics(new CoreInstruction(), ordinal:-1);
 
+            _InstructionSet = instructionSet;
             _Routine = routine;
             _Labels = labels;
             Rows.Clear();
@@ -96,9 +94,9 @@ namespace BeebPerf.ux
                 foreach (var obj in instructionMetrics)
                 {
                     if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        Rows.Add(unknown, unknown, unknown, unknown, unknown);
+                        Rows.Add(missing, missing, missing, missing, missing);
                     Rows.Add(obj, obj, obj, obj, obj);
-                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_SizeTable[obj.Instruction.Opcode]);
+                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet.Size(obj.Instruction.Opcode));
                 }
             }
         }
@@ -137,7 +135,7 @@ namespace BeebPerf.ux
                     break;
 
                 case "Instruction":
-                    e.Value = InstructionFormatString(instructionMetrics.Instruction);
+                    e.Value = FormatInstruction(instructionMetrics.Instruction);
                     e.FormattingApplied = true;
                     break;
 
@@ -156,20 +154,22 @@ namespace BeebPerf.ux
             }
         }
 
-        private string InstructionFormatString(CoreInstruction instruction)
+        private string FormatInstruction(CoreInstruction instruction)
         {
             byte opcode = instruction.Opcode;
             ushort operand = instruction.Operand;
 
-            AddressMode addressMode = (AddressMode)_AddressModeTable[opcode];
-            if (addressMode == AddressMode.Relative)
+            var instructionSet = _InstructionSet!;
+
+            InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
+            if (addressMode == InstructionSet.AddressMode.Relative)
             {
                 int branchAddress = instruction.OpcodeAddress.Address;
                 operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
             }
 
-            string formattedOperand= string.Empty;
-            byte opSize = _SizeTable[opcode];
+            string formattedOperand = string.Empty;
+            int opSize = instructionSet.Size(opcode);
             if (opSize > 1)
             {
                 if (opSize == 2)
@@ -177,62 +177,48 @@ namespace BeebPerf.ux
                 else if (opSize == 3)
                     formattedOperand = $"&{operand:X4}";
 
-                if (addressMode != AddressMode.Immediate && _Labels!.TryGetValue(operand, out var label))
+                if (addressMode != InstructionSet.AddressMode.Immediate && _Labels!.TryGetValue(operand, out var label))
                     formattedOperand = $"{label} ({formattedOperand})";
             }
 
-            string mnemonic = _MnemonicTable[opcode];
-
+            string mnemonic = instructionSet.Mnemonic(opcode);
             switch (addressMode)
             {
-                case AddressMode.Implied:
+                case InstructionSet.AddressMode.Implied:
                     return $"{mnemonic}";
 
-                case AddressMode.Accumulator:
+                case InstructionSet.AddressMode.Accumulator:
                     return $"{mnemonic} A";
 
-                case AddressMode.Immediate:
+                case InstructionSet.AddressMode.Immediate:
                     return $"{mnemonic} #{formattedOperand}";
 
-                case AddressMode.ZeroPage:
-                case AddressMode.Relative:
-                case AddressMode.Absolute:
+                case InstructionSet.AddressMode.ZeroPage:
+                case InstructionSet.AddressMode.Relative:
+                case InstructionSet.AddressMode.Absolute:
                     return $"{mnemonic} {formattedOperand}";
 
-                case AddressMode.ZeroPageX:
-                case AddressMode.AbsoluteX:
+                case InstructionSet.AddressMode.ZeroPageX:
+                case InstructionSet.AddressMode.AbsoluteX:
                     return $"{mnemonic} {formattedOperand},X";
 
-                case AddressMode.ZeroPageY:
-                case AddressMode.AbsoluteY:
+                case InstructionSet.AddressMode.ZeroPageY:
+                case InstructionSet.AddressMode.AbsoluteY:
                     return $"{mnemonic} {formattedOperand},Y";
 
-                case AddressMode.Indirect:
+                case InstructionSet.AddressMode.Indirect:
                     return $"{mnemonic} ({formattedOperand})";
 
-                case AddressMode.IndirectX:
+                case InstructionSet.AddressMode.IndirectX:
                     return $"{mnemonic} ({formattedOperand},X)";
 
-                case AddressMode.IndirectY:
+                case InstructionSet.AddressMode.IndirectY:
                     return $"{mnemonic} ({formattedOperand}),Y";
 
                 default:
                     return "???";
             }
         }
-
-        private Routine? _Routine;
-        private Dictionary<ushort, string>? _Labels;
-
-        public class InstructionColors
-        {
-            public Color MnemonicColor;
-            public Color AddressColor;
-            public Color LabelColor;
-            public Color PunctuationColor;
-        }
-
-        private InstructionColors InstructionStyle;
 
         public class CallTreeCellRenderer : DataGridViewTextBoxCell
         {
@@ -259,13 +245,16 @@ namespace BeebPerf.ux
                     return;
                 }
 
+                var codeGridView = (CodeGridView)DataGridView!;
+                var instructionSet = codeGridView._InstructionSet!;
+
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
-                string mnemonic = _MnemonicTable[opcode];
-                byte opSize = _SizeTable[opcode];
-                AddressMode addressMode = (AddressMode)_AddressModeTable[opcode];
+                string mnemonic = instructionSet.Mnemonic(opcode);
+                int opSize = instructionSet.Size(opcode);
+                InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
 
-                if (addressMode == AddressMode.Relative)
+                if (addressMode == InstructionSet.AddressMode.Relative)
                 {
                     int branchAddress = instructionMetrics.Instruction.OpcodeAddress.Address;
                     operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
@@ -273,10 +262,8 @@ namespace BeebPerf.ux
 
                 var format = new StringFormat { LineAlignment = StringAlignment.Center };
 
-                var codeGridView = (CodeGridView)DataGridView!;
-
                 List<Segment> segments = new();
-                var colors = codeGridView.InstructionStyle;
+                var colors = codeGridView._InstructionStyle;
 
                 segments.Add(new Segment() { Text = mnemonic.PadRight(5), Color = colors.MnemonicColor });
 
@@ -290,7 +277,7 @@ namespace BeebPerf.ux
 
                     segments.Add(new Segment() { Text = hexOperand, Color = colors.AddressColor });
 
-                    if (addressMode != AddressMode.Immediate &&
+                    if (addressMode != InstructionSet.AddressMode.Immediate &&
                         codeGridView!._Labels!.TryGetValue(operand, out var label))
                     {
                         segments.Insert(1, new Segment() { Text = label, Color = colors.LabelColor });
@@ -301,35 +288,35 @@ namespace BeebPerf.ux
 
                 switch (addressMode)
                 {
-                    case AddressMode.Accumulator:
+                    case InstructionSet.AddressMode.Accumulator:
                         segments.Add(new Segment() { Text = "A", Color = colors.MnemonicColor });
                         break;
 
-                    case AddressMode.Immediate:
+                    case InstructionSet.AddressMode.Immediate:
                         segments.Insert(1, new Segment() { Text = "#", Color = colors.PunctuationColor });
                         break;
 
-                    case AddressMode.ZeroPageX:
-                    case AddressMode.AbsoluteX:
+                    case InstructionSet.AddressMode.ZeroPageX:
+                    case InstructionSet.AddressMode.AbsoluteX:
                         segments.Add(new Segment() { Text = ",X", Color = colors.PunctuationColor });
                         break;
 
-                    case AddressMode.ZeroPageY:
-                    case AddressMode.AbsoluteY:
+                    case InstructionSet.AddressMode.ZeroPageY:
+                    case InstructionSet.AddressMode.AbsoluteY:
                         segments.Add(new Segment() { Text = ",X", Color = colors.PunctuationColor });
                         break;
 
-                    case AddressMode.Indirect:
+                    case InstructionSet.AddressMode.Indirect:
                         segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
                         segments.Add(new Segment() { Text = ")", Color = colors.PunctuationColor });
                         break;
 
-                    case AddressMode.IndirectX:
+                    case InstructionSet.AddressMode.IndirectX:
                         segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
                         segments.Add(new Segment() { Text = ",X)", Color = colors.PunctuationColor });
                         break;
 
-                    case AddressMode.IndirectY:
+                    case InstructionSet.AddressMode.IndirectY:
                         segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
                         segments.Add(new Segment() { Text = "),Y", Color = colors.PunctuationColor });
                         break;
@@ -337,24 +324,22 @@ namespace BeebPerf.ux
                         break;
                 }
 
-                int x = cellBounds.X;
-                int y = cellBounds.Y;
+                int xPos = cellBounds.X;
+                int yPos = cellBounds.Y;
 
                 foreach (var segment in segments)
                 {
-                    format = StringFormat.GenericTypographic;
-
-                    Size size = TextRenderer.MeasureText(segment.Text, 
+                    Size measure = TextRenderer.MeasureText(
+                        segment.Text, 
                         cellStyle.Font,
                         new Size(int.MaxValue, int.MaxValue),
                         TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-                    using (Brush brush = new SolidBrush(segment.Color))
-                    {
-                        int heightAdjust = (cellBounds.Height - size.Height) / 2;
-                        graphics.DrawString(segment.Text, cellStyle.Font, brush, x, y + heightAdjust);
-                    }
 
-                    x += size.Width;
+                    using var brush = new SolidBrush(segment.Color);
+                    int heightAdjust = (cellBounds.Height - measure.Height) / 2;
+                    graphics.DrawString(segment.Text, cellStyle.Font, brush, xPos, yPos + heightAdjust);
+
+                    xPos += measure.Width;
                 }
             }
             private struct Segment
@@ -364,76 +349,18 @@ namespace BeebPerf.ux
             };
         }
 
-        public enum AddressMode : byte
+        private class InstructionColors
         {
-            Implied = 0,
-            Accumulator = 1,
-            Immediate = 2,
-            ZeroPage = 3,
-            ZeroPageX = 4,
-            ZeroPageY = 5,
-            Relative = 6,
-            Absolute = 7,
-            AbsoluteX = 8,
-            AbsoluteY = 9,
-            Indirect = 10,
-            IndirectX = 11,
-            IndirectY = 12,
-            Invalid = 13
+            public Color MnemonicColor;
+            public Color AddressColor;
+            public Color LabelColor;
+            public Color PunctuationColor;
         }
 
-        private static readonly byte[] _AddressModeTable = [
-            0,11,13,11,3,3,3,3,0,2,1,2,7,7,7,7,
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            7,11,13,11,3,3,3,3,0,2,1,2,7,7,7,7,
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            0,11,13,11,3,3,3,3,0,2,1,2,7,7,7,7,
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            0,11,13,11,3,3,3,3,0,2,1,2,10,7,7,7,
-            6,12,13,12,4,4,4,4,0,9,0,9,10,8,8,8,
-            2,11,2,11,3,3,3,3,0,2,1,2,7,7,7,7, 
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            2,11,2,11,3,3,3,3,0,2,1,2,7,7,7,7, 
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            2,11,2,11,3,3,3,3,0,2,1,2,7,7,7,7, 
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8,
-            2,11,2,11,3,3,3,3,0,2,1,2,7,7,7,7, 
-            6,12,13,12,4,4,4,4,0,9,0,9,8,8,8,8 ];
+        private Routine? _Routine;
+        private Dictionary<ushort, string>? _Labels;
+        private InstructionColors _InstructionStyle;
+        private InstructionSet? _InstructionSet;
 
-        private static readonly byte[] _SizeTable = [
-            1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            3,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            1,2,1,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3,
-            2,2,2,2,2,2,2,2,1,2,1,2,3,3,3,3,
-            2,2,1,2,2,2,2,2,1,3,1,3,3,3,3,3 ];
-
-        private static readonly string[] _MnemonicTable = [
-            "BRK","ORA","KIL","SLO","NOP","ORA","ASL","SLO","PHP","ORA","ASL","ANC","NOP","ORA","ASL","SLO",
-            "BPL","ORA","KIL","SLO","NOP","ORA","ASL","SLO","CLC","ORA","NOP","SLO","NOP","ORA","ASL","SLO",
-            "JSR","AND","KIL","RLA","BIT","AND","ROL","RLA","PLP","AND","ROL","ANC","BIT","AND","ROL","RLA",
-            "BMI","AND","KIL","RLA","NOP","AND","ROL","RLA","SEC","AND","NOP","RLA","NOP","AND","ROL","RLA",
-            "RTI","EOR","KIL","SRE","NOP","EOR","LSR","SRE","PHA","EOR","LSR","ALR","JMP","EOR","LSR","SRE",
-            "BVC","EOR","KIL","SRE","NOP","EOR","LSR","SRE","CLI","EOR","NOP","SRE","NOP","EOR","LSR","SRE",
-            "RTS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","PLA","ADC","ROR","ARR","JMP","ADC","ROR","RRA",
-            "BVS","ADC","KIL","RRA","NOP","ADC","ROR","RRA","SEI","ADC","NOP","RRA","NOP","ADC","ROR","RRA",
-            "NOP","STA","NOP","SAX","STY","STA","STX","SAX","DEY","NOP","TXA","XAA","STY","STA","STX","SAX",
-            "BCC","STA","KIL","AHX","STY","STA","STX","SAX","TYA","STA","TXS","TAS","SHY","STA","SHX","AHX",
-            "LDY","LDA","LDX","LAX","LDY","LDA","LDX","LAX","TAY","LDA","TAX","LAX","LDY","LDA","LDX","LAX",
-            "BCS","LDA","KIL","LAX","LDY","LDA","LDX","LAX","CLV","LDA","TSX","LAS","LDY","LDA","LDX","LAX",
-            "CPY","CMP","NOP","DCP","CPY","CMP","DEC","DCP","INY","CMP","DEX","AXS","CPY","CMP","DEC","DCP",
-            "BNE","CMP","KIL","DCP","NOP","CMP","DEC","DCP","CLD","CMP","NOP","DCP","NOP","CMP","DEC","DCP",
-            "CPX","SBC","NOP","ISB","CPX","SBC","INC","ISB","INX","SBC","NOP","SBC","CPX","SBC","INC","ISB",
-            "BEQ","SBC","KIL","ISB","NOP","SBC","INC","ISB","SED","SBC","NOP","ISB","NOP","SBC","INC","ISB" ];
     }
 }

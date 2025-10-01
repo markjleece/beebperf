@@ -63,6 +63,8 @@ namespace BeebPerf.ux
             var openOperation = new OpenOperation(filePathName, _Model);
             if (_UndoRedoHistory.Execute(openOperation))
             {
+                _InstructionSet = _Model.InstructionSet;
+
                 _CPUAnalysis.StaticAnalysis(_Model);
                 _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount:0, endCycleCount: Int32.MaxValue);
                 UpdateState();
@@ -142,13 +144,13 @@ namespace BeebPerf.ux
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
 
-        public void SetSelectedRoutine(Routine routine, CallStack callStack)
+        public void SetSelectedRoutine(Routine routine, CallStack? callStack)
         {
             _SelectedRoutine = routine;
             _SelectedCallStack = callStack;
 
             List<InstructionMetrics> instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
-            codeView.SetCode(routine, instructionMetrics, _Model.Labels);
+            codeView.SetCode(_InstructionSet!, routine, instructionMetrics, _Model.Labels);
         }
 
         public void ClearSelectedRoutine()
@@ -157,6 +159,7 @@ namespace BeebPerf.ux
             _SelectedCallStack = null;
         }
 
+        public InstructionSet? _InstructionSet;
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
     }

@@ -47,12 +47,18 @@ namespace BeebPerf.model
             EndAddress = address;
         }
 
+        public void ClearMetrics()
+        {
+            MetricsByStack.Clear();
+            AggregateMetrics.Clear();
+        }
+
         public string Label;
         public RoutineType RoutineType;
         public CanonicalAddress StartAddress;
         public CanonicalAddress EndAddress;
-        public Dictionary<CallStack, RoutineMetrics> MetricsByStack = new();
-        public RoutineMetrics AggregateMetrics = new();
+        public Dictionary<CallStack, CPUMetrics> MetricsByStack = new();
+        public CPUMetrics AggregateMetrics = new();
         public List<StackFrame> StackFrames = new();
     }
 }

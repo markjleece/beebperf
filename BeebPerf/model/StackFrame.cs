@@ -58,10 +58,18 @@ namespace BeebPerf.model
             return current;
         }
 
-        public List<StackFrame> Children = new();
+        public void ClearMetrics()
+        {
+            CPUMetrics.Clear();
+            foreach (var child in Children)
+                child.ClearMetrics();
+        }
+
         public int FirstInstructionIndex;
         public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
+        public CPUMetrics CPUMetrics = new();
+        public List<StackFrame> Children = new();
     }
 }

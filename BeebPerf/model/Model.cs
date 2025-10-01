@@ -30,17 +30,16 @@ namespace BeebPerf.model
         public Model(BBCModelType bbcModel, int executionCount)
         {
             BBCModel = bbcModel;
-            
-            CPU = bbcModel switch {
+            InstructionSet = new InstructionSet(bbcModel switch
+            {
                 BBCModelType.Master128 => CPUType._65C02,
                 BBCModelType.MasterET => CPUType._65C02,
                 BBCModelType.B => CPUType._6502,
                 BBCModelType.IntegraB => CPUType._6502,
                 BBCModelType.BPlus => CPUType._6502,
-                _ => CPUType._6502 };
-
+                _ => CPUType._6502
+            });
             Labels = new();
-
             Instructions = new Instruction[executionCount];
         }
         public Model Clone()
@@ -48,7 +47,7 @@ namespace BeebPerf.model
             return new Model()
             {
                 BBCModel = BBCModel,
-                CPU = CPU,
+                InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
                 Labels = new(Labels)
@@ -58,7 +57,7 @@ namespace BeebPerf.model
         public void Set(Model other)
         {
             BBCModel = other.BBCModel;
-            CPU = other.CPU;
+            InstructionSet = other.InstructionSet;
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
             Labels = other.Labels;
@@ -94,7 +93,7 @@ namespace BeebPerf.model
         }
 
         public BBCModelType BBCModel;
-        public CPUType CPU;
+        public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
         public Dictionary<ushort, string> Labels = [];

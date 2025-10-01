@@ -19,6 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Diagnostics;
+
 namespace BeebPerf.model
 {
     public struct CoreInstruction : IEquatable<CoreInstruction>, IComparable<CoreInstruction>
@@ -28,6 +30,13 @@ namespace BeebPerf.model
             OpcodeAddress = instruction.OpcodeAddress;
             Opcode = instruction.Opcode;
             Operand = instruction.Operand;
+        }
+
+        public CoreInstruction(CanonicalAddress opcodeAddress, byte opcode, ushort operand)
+        {
+            OpcodeAddress = opcodeAddress;
+            Opcode = opcode;
+            Operand = operand;
         }
 
         public bool Equals(CoreInstruction other)

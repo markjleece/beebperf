@@ -79,6 +79,6 @@ namespace BeebPerf.model
 
         public readonly Routine Routine;
         public readonly CallStack Context;
-        public readonly RoutineMetrics CPUMetrics;
+        public readonly CPUMetrics CPUMetrics;
     }
 }

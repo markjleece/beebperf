@@ -21,18 +21,21 @@
 
 namespace BeebPerf.model
 {
-    public class RoutineMetrics
+    public class CPUMetrics
     {
-        public RoutineMetrics()
+        public CPUMetrics()
         {
         }
 
-        public RoutineMetrics(RoutineMetrics other)
+        public CPUMetrics Clone()
         {
-            ExecutionCount = other.SelfCycleCount;
-            SelfCycleCount = other.SelfCycleCount;
-            InclusiveCycleCount = other.InclusiveCycleCount;
-            ElapsedCycleCount = other.ElapsedCycleCount;
+            return new CPUMetrics()
+            {
+                ExecutionCount = ExecutionCount,
+                SelfCycleCount = SelfCycleCount,
+                InclusiveCycleCount = InclusiveCycleCount,
+                ElapsedCycleCount = ElapsedCycleCount
+            };
         }
 
         public void Clear()
@@ -43,7 +46,7 @@ namespace BeebPerf.model
             ElapsedCycleCount = 0;
         }
 
-        public void Add(RoutineMetrics other)
+        public void Add(CPUMetrics other)
         {
             ExecutionCount += other.ExecutionCount;
             SelfCycleCount += other.SelfCycleCount;
