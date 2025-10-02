@@ -90,6 +90,31 @@ namespace BeebPerf.ux
         public void AddCallTree(CallTreeNode treeNode)
         {
             Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode);
+            OpenHotPaths(Rows.Count - 1, treeNode);
+        }
+
+        public void OpenHotPaths(int rowIndex, CallTreeNode treeNode)
+        {
+            if (treeNode.HotPath && treeNode.HasChildren)
+            {
+                bool hotChild = false;
+                foreach (var childNode in treeNode.Children)
+                    hotChild |= childNode.HotPath;
+
+                if (hotChild)
+                {
+                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                        OpenTreeNode(rowIndex, treeNode);
+
+                    int childRowIndex = rowIndex + 1;
+                    foreach (var childNode in treeNode.Children)
+                    {
+                        while (Rows[childRowIndex].Cells[0].Value != childNode)
+                            childRowIndex++;
+                        OpenHotPaths(childRowIndex, childNode);
+                    }
+                }
+            }
         }
 
         public int TotalCycleCount;
@@ -104,7 +129,8 @@ namespace BeebPerf.ux
             switch (Columns[e.ColumnIndex].Name)
             {
                 case "Routine":
-                    e.Value = $"{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
+                    int padding = treeNode.HotPath ? 4 : 0;
+                    e.Value = $"{"".PadLeft(padding)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
                     e.FormattingApplied = true;
                     int indent = treeNode.Context.Depth * Rows[e.RowIndex].Cells[0].Size.Height;
                     e.CellStyle.Padding = new Padding(e.CellStyle.Padding.Left + indent, e.CellStyle.Padding.Top, e.CellStyle.Padding.Right, e.CellStyle.Padding.Bottom);
@@ -324,15 +350,17 @@ namespace BeebPerf.ux
                            cellState, value, formattedValue, errorText,
                            cellStyle, advancedBorderStyle, paintParts);
 
-                // draw triangle
+
+                // paint expand/close triangle
                 var treeNode = (CallTreeNode)value!;
+
+                int cellHeight = cellBounds.Height;
+                float centerX = cellBounds.Left + cellHeight / 2;
+                centerX += (treeNode.Depth * cellHeight);
+
                 if (treeNode.HasChildren)
                 {
-                    int cellHeight = cellBounds.Height;
-                    float centerX = cellBounds.Left + cellHeight / 2;
                     float centerY = cellBounds.Top + cellHeight / 2;
-
-                    centerX += (treeNode.Depth * cellHeight);
 
                     bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
                     var foreColor = selected ? cellStyle.SelectionForeColor : cellStyle.ForeColor;
@@ -375,6 +403,19 @@ namespace BeebPerf.ux
                         using var pen = new Pen(foreColor);
                         graphics.DrawPolygon(pen, points);
                     }
+                }
+
+                // paint flame icon
+                if (treeNode.HotPath)
+                {
+                    int size = cellBounds.Height / 2;
+                    int inset = cellBounds.Height / 4;
+                    int indent = (int)centerX + cellHeight / 2;
+                    var rect = new Rectangle(indent + inset / 2, cellBounds.Top + inset, size, size);
+
+                    var control = (CallTreeGridView)DataGridView!;
+                    BeebPerfForm form = (BeebPerfForm)control.GetParentForm();
+                    graphics.DrawImage(form.FlameImage, rect);
                 }
             }
         }

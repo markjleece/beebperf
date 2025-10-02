@@ -80,5 +80,6 @@ namespace BeebPerf.model
         public readonly Routine Routine;
         public readonly CallStack Context;
         public readonly CPUMetrics CPUMetrics;
+        public bool HotPath;
     }
 }

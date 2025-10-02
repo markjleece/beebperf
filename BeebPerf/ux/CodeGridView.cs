@@ -136,39 +136,32 @@ namespace BeebPerf.ux
                 return;
             }
 
-            var instructionMetrics = (InstructionMetrics)e.Value;
-            switch (Columns[e.ColumnIndex].Name)
+            string columnName = Columns[e.ColumnIndex].Name;
+            var instructionMetrics = (InstructionMetrics)e.Value!;
+            if (e.RowIndex > 0 && (columnName == "Address" || columnName == "Label"))
             {
-                case "Address":
-                    e.Value = instructionMetrics.Instruction.OpcodeAddress.ToString();
-                    e.FormattingApplied = true;
-                    break;
-
-                case "Label":
-                    var label = string.Empty;
-                    _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out label);
-                    e.Value = label;
-                    e.FormattingApplied = true;
-                    break;
-
-                case "Instruction":
-                    e.Value = FormatInstruction(instructionMetrics.Instruction);
-                    e.FormattingApplied = true;
-                    break;
-
-                case "TotalCPU":
-                    e.Value = $"{instructionMetrics.InclusiveCycleCount:N0}";
-                    e.FormattingApplied = true;
-                    break;
-
-                case "ExecutionCount":
-                    e.Value = $"{instructionMetrics.ExecutionCount:N0}";
-                    e.FormattingApplied = true;
-                    break;
-
-                default:
-                    break;
+                // is duplicate?
+                var valueAbove = Rows[e.RowIndex - 1].Cells[e.ColumnIndex].Value;
+                if (valueAbove is InstructionMetrics)
+                {
+                    var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
+                    if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
+                    {
+                        e.Value = string.Empty;
+                        e.FormattingApplied = true;
+                        return;
+                    }
+                }
             }
+
+            e.Value = columnName switch {
+                "Address"        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
+                "Label"          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
+                "Instruction"    => FormatInstruction(instructionMetrics.Instruction),
+                "TotalCPU"       => $"{instructionMetrics.InclusiveCycleCount:N0}",
+                "ExecutionCount" => $"{instructionMetrics.ExecutionCount:N0}",
+                _                => string.Empty };
+            e.FormattingApplied = true;
         }
 
         private string FormatInstruction(CoreInstruction instruction)
@@ -342,7 +335,7 @@ namespace BeebPerf.ux
 
                     case InstructionSet.AddressMode.ZeroPageY:
                     case InstructionSet.AddressMode.AbsoluteY:
-                        segments.Add(new Segment() { Text = ",X", Color = colors.PunctuationColor });
+                        segments.Add(new Segment() { Text = ",Y", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.Indirect:

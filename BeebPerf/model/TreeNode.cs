@@ -39,6 +39,17 @@ namespace BeebPerf.model
             get => _Depth;
         }
 
+        public int Count
+        {
+            get
+            {
+                int count = 1;
+                foreach (var childNode in _Children)
+                    count += childNode.Count;
+                return count;
+            }
+        }
+
         public bool HasChildren
         {
             get => Children.Count > 0;

@@ -21,6 +21,8 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using BeebPerf.Properties;
+using System.Resources;
 
 namespace BeebPerf.ux
 {
@@ -30,6 +32,9 @@ namespace BeebPerf.ux
         {
             InitializeComponent();
             UpdateState();
+
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+            FlameImage = (Image)resources.GetObject("flame.Image")!;
         }
 
         private void BeebPerfForm_Load(object sender, EventArgs e)
@@ -63,7 +68,7 @@ namespace BeebPerf.ux
             var openOperation = new OpenOperation(filePathName, _Model);
             if (_UndoRedoHistory.Execute(openOperation))
             {
-                _InstructionSet = _Model.InstructionSet;
+                InstructionSet = _Model.InstructionSet;
 
                 _CPUAnalysis.StaticAnalysis(_Model);
                 _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount:0, endCycleCount: Int32.MaxValue);
@@ -159,7 +164,8 @@ namespace BeebPerf.ux
             _SelectedCallStack = null;
         }
 
-        public InstructionSet? _InstructionSet;
+        public Image FlameImage;
+        public InstructionSet? InstructionSet;
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
     }

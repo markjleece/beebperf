@@ -220,7 +220,7 @@ namespace BeebPerf.ux
             hotRoutinesTabPage.Padding = new Padding(3);
             hotRoutinesTabPage.Size = new Size(1737, 448);
             hotRoutinesTabPage.TabIndex = 0;
-            hotRoutinesTabPage.Text = "Hot Routines";
+            hotRoutinesTabPage.Text = "HotPath Routines";
             hotRoutinesTabPage.UseVisualStyleBackColor = true;
             // 
             // hotRoutinesDataGrid
@@ -304,7 +304,7 @@ namespace BeebPerf.ux
             hotGraphTabPage.Padding = new Padding(3);
             hotGraphTabPage.Size = new Size(1737, 448);
             hotGraphTabPage.TabIndex = 4;
-            hotGraphTabPage.Text = "Hot Graph";
+            hotGraphTabPage.Text = "HotPath Graph";
             hotGraphTabPage.UseVisualStyleBackColor = true;
             // 
             // interruptsTabPage
@@ -334,7 +334,7 @@ namespace BeebPerf.ux
             Controls.Add(timelinePanel);
             Controls.Add(toolStrip);
             Name = "BeebPerfForm";
-            Text = "WinPerfForm";
+            Text = "BeebPerf";
             Load += BeebPerfForm_Load;
             toolStrip.ResumeLayout(false);
             toolStrip.PerformLayout();

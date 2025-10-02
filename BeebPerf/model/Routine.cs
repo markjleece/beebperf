@@ -53,6 +53,7 @@ namespace BeebPerf.model
             AggregateMetrics.Clear();
         }
 
+        public bool HotRoutine;
         public string Label;
         public RoutineType RoutineType;
         public CanonicalAddress StartAddress;

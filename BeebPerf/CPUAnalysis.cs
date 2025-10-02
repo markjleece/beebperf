@@ -19,8 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Diagnostics;
 using BeebPerf.model;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace BeebPerf
 {
@@ -42,6 +43,7 @@ namespace BeebPerf
             PopulateProgramCallTree();
             PopulateNonMaskableInterruptCallTree();
             PopulateMaskableInterruptCallTree();
+            MarkHotPaths();
         }
 
         private void Preamble(Model model)
@@ -541,9 +543,20 @@ namespace BeebPerf
                 HotRoutines.Add(routine);
             HotRoutines.Sort((a, b) => -a.AggregateMetrics.SelfCycleCount.CompareTo(b.AggregateMetrics.SelfCycleCount));
 
-            Debug.WriteLine("Hot routines:");
+            int hotRoutineCount = int.Min(HotRoutines.Count, (int)float.Ceiling(0.05f * HotRoutines.Count)); 
+            for (int i = 0; i < hotRoutineCount; i++)
+                HotRoutines[i].HotRoutine = true;
+
+            Debug.WriteLine("HotPath routines:");
             foreach (var routine in HotRoutines)
                 DebugPrintLine(indent: 0, routine, routine.AggregateMetrics);
+        }
+
+        private void PopulateCallTreeNodeList(CallTreeNode treeNode, List<CallTreeNode> treeNodeList)
+        {
+            treeNodeList.Add(treeNode);
+            foreach (var child in treeNode.Children)
+                PopulateCallTreeNodeList(child, treeNodeList);
         }
 
         private void PopulateProgramCallTree()
@@ -560,6 +573,15 @@ namespace BeebPerf
 
             Debug.WriteLine("Program stack:");
             DebugPrintTree(ProgramCallTree, depth: 0);
+        }
+
+        private bool SetHotPaths(CallTreeNode treeNode)
+        {
+            bool hotChild = false;
+            foreach (var child in treeNode.Children)
+                hotChild |= SetHotPaths(child);
+            treeNode.HotPath = (hotChild || treeNode.Routine.HotRoutine);
+            return treeNode.HotPath;
         }
 
         private static CallTreeNode? PopulateProgramCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
@@ -653,6 +675,31 @@ namespace BeebPerf
             treeNodesByStack[callStack] = newTreeNode;
 
             return newTreeNode;
+        }
+
+        private void MarkHotPaths()
+        {
+            int count = 0;
+            if (ProgramCallTree != null)
+                count += ProgramCallTree.Count;
+            if (NonMaskableInterruptCallTree != null)
+                count += NonMaskableInterruptCallTree.Count;
+            if (MaskableInterruptCallTree != null)
+                count += MaskableInterruptCallTree.Count;
+
+            var treeNodes = new List<CallTreeNode>(count);
+            if (ProgramCallTree != null)
+                PopulateCallTreeNodeList(ProgramCallTree, treeNodes);
+            if (NonMaskableInterruptCallTree != null)
+                PopulateCallTreeNodeList(NonMaskableInterruptCallTree, treeNodes);
+            if (MaskableInterruptCallTree != null)
+                PopulateCallTreeNodeList(MaskableInterruptCallTree, treeNodes);
+
+            treeNodes.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
+
+            int hotPathCount = int.Min(treeNodes.Count, (int)float.Ceiling(0.03f * treeNodes.Count));
+            for (int i = 0; i < hotPathCount; i++)
+                treeNodes[i].HotPath = true;
         }
 
         private static void DebugPrintTree(CallTreeNode treeNode, int depth)

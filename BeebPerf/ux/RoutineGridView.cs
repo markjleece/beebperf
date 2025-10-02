@@ -47,6 +47,8 @@ namespace BeebPerf.ux
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
+            Columns["Routine"]!.CellTemplate = new CellTemplate();
+
             Sort(Columns["SelfCPU"]!, System.ComponentModel.ListSortDirection.Descending);
         }
 
@@ -78,7 +80,7 @@ namespace BeebPerf.ux
             if (SelectedRows.Count == 1)
             {
                 var routine = (Routine)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(routine, callStack:null);
+                form.SetSelectedRoutine(routine, callStack: null);
             }
             else
             {
@@ -97,8 +99,8 @@ namespace BeebPerf.ux
             switch (dataGrid.Columns[e.ColumnIndex].Name)
             {
                 case "Routine":
-                    e.Value = $"{routine.StartAddress} {routine.Label}";
-                    e.FormattingApplied = true;
+                    int padding = routine.HotRoutine ? 4 : 0;
+                    e.Value = $"{"".PadLeft(padding)}{routine.StartAddress} {routine.Label}";
                     break;
 
                 case "SelfCPU":
@@ -168,6 +170,38 @@ namespace BeebPerf.ux
         {
             var percentage = (double)value * 100.0 / TotalCycleCount;
             return $"{value:N0} ({percentage:F2}%)";
+        }
+
+        public class CellTemplate : DataGridViewTextBoxCell
+        {
+            protected override void Paint(Graphics graphics,
+                                          Rectangle clipBounds,
+                                          Rectangle cellBounds,
+                                          int rowIndex,
+                                          DataGridViewElementStates cellState,
+                                          object? value,
+                                          object? formattedValue,
+                                          string? errorText,
+                                          DataGridViewCellStyle cellStyle,
+                                          DataGridViewAdvancedBorderStyle advancedBorderStyle,
+                                          DataGridViewPaintParts paintParts)
+            {
+                base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
+                            value, formattedValue, errorText,
+                            cellStyle, advancedBorderStyle, paintParts);
+
+                // paint flame icon
+                var routineGridView = (RoutineGridView)DataGridView!;
+                var routine = (Routine)value!;
+                if (routine.HotRoutine)
+                {
+                    int size = cellBounds.Height / 2;
+                    int inset = cellBounds.Height / 4;
+                    var rect = new Rectangle(cellBounds.Left + inset / 2, cellBounds.Top + inset, size, size);
+                    BeebPerfForm form = (BeebPerfForm)routineGridView.GetParentForm();
+                    graphics.DrawImage(form.FlameImage, rect);
+                }
+            }
         }
     }
 }
