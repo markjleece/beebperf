@@ -129,7 +129,7 @@ namespace BeebPerf
 
             if (startCycleCount > stackFrame.EndCycleCount || endCycleCount < stackFrame.StartCycleCount)
             {
-                return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle count
+                return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle instructionCount
             }
 
             int excludedCycleCount = 0;
@@ -674,7 +674,7 @@ namespace BeebPerf
                 $"self: {metrics.SelfCycleCount}, " +
                 $"inclusive: {metrics.InclusiveCycleCount}, " +
                 $"elapsed: {metrics.ElapsedCycleCount}, " +
-                $"count: {metrics.ExecutionCount}");
+                $"instructionCount: {metrics.ExecutionCount}");
         }
 
         public List<InstructionMetrics> CalculateInstructionMetrics(Routine routine, CallStack? callStack)
@@ -690,8 +690,48 @@ namespace BeebPerf
 
             var instructionMetricsList = instructionMetrics.Values.ToList();
             instructionMetricsList.Sort();
+            
+            IdentifyModifiedCode(instructionMetricsList);
 
             return instructionMetricsList;
+        }
+
+        private void IdentifyModifiedCode(List<InstructionMetrics> instructionMetrics)
+        {
+            // construct diction that maps addresses to number of distinct instructions
+            var addressSlots = new Dictionary<CanonicalAddress, int>(instructionMetrics.Count);
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                byte opcode = instructionMetric.Instruction.Opcode;
+                var address = instructionMetric.Instruction.OpcodeAddress;
+                int size = _InstructionSet!.Size(opcode);
+
+                // determine instruction count
+                int instructionCount = 1;
+                for (int i = 0; i < size; i++)
+                { 
+                    if (addressSlots.TryGetValue(address, out var existingInstructionCount))
+                        if (instructionCount <= existingInstructionCount)
+                            instructionCount = existingInstructionCount + 1;
+                    address = address.Offset(1);
+                }
+
+                // set instructionCount
+                address = instructionMetric.Instruction.OpcodeAddress;
+                for (int i = 0; i < size; i++)
+                {
+                    addressSlots[address] = instructionCount;
+                    address = address.Offset(1);
+                }
+            }
+
+            // mark instructions
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                var address = instructionMetric.Instruction.OpcodeAddress;
+                if (addressSlots.TryGetValue(address, out var instructionCount))
+                    instructionMetric.CodeModified = (instructionCount > 1);
+            }
         }
 
         private void CalculateStackFrameMetrics(
@@ -715,7 +755,7 @@ namespace BeebPerf
                     if (childStackFrame.Type == CallType.JSR ||
                         childStackFrame.Type == CallType.TailCall)
                     {
-                        // we need to get the cycle count
+                        // we need to get the cycle instructionCount
                         var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
                         if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
                             metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;

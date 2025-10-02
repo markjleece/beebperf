@@ -53,5 +53,6 @@ namespace BeebPerf.model
         public int Ordinal;
         public int ExecutionCount;
         public int InclusiveCycleCount;
+        public bool CodeModified;
     }
 }

@@ -288,6 +288,7 @@ namespace BeebPerf.ux
                 var instructionMetrics = (InstructionMetrics)value!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
+                bool codeModified = instructionMetrics.CodeModified;
                 string mnemonic = instructionSet.Mnemonic(opcode);
                 int opSize = instructionSet.Size(opcode);
                 InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
@@ -378,6 +379,12 @@ namespace BeebPerf.ux
                     graphics.DrawString(segment.Text, cellStyle.Font, brush, xPos, yPos + heightAdjust);
 
                     xPos += measure.Width;
+                }
+
+                if (codeModified)
+                {
+                    using var pen = new Pen(cellStyle.ForeColor);
+                    graphics.DrawLine(pen, cellBounds.Left, cellBounds.Top, cellBounds.Left, cellBounds.Bottom);
                 }
             }
             private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
