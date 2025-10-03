@@ -115,7 +115,7 @@ namespace BeebPerf.ux
             var dataGrid = (DataGridView)sender!;
             var routine = (Routine)e.Value!;
 
-            switch (dataGrid.Columns[e.ColumnIndex].Index)
+            switch (e.ColumnIndex)
             {
                 case RoutineColumnIndex:
                     int padding = routine.HotRoutine ? 4 : 0;

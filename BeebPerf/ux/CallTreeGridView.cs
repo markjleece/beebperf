@@ -140,7 +140,7 @@ namespace BeebPerf.ux
 
             var treeNode = (CallTreeNode)e.Value;
 
-            switch (Columns[e.ColumnIndex].Index)
+            switch (e.ColumnIndex)
             {
                 case RoutineColumnIndex:
                     int padding = treeNode.HotPath ? 4 : 0;
