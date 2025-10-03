@@ -26,6 +26,12 @@ namespace BeebPerf.ux
 {
     internal class CodeGridView : DataGridView
     {
+        private const int AddressColumnIndex = 0;
+        private const int LabelColumnIndex = 1;
+        private const int InstructionColumnIndex = 2;
+        private const int TotalCPUColumnIndex = 3;
+        private const int ExecutionCountColumnIndex = 4;
+
         public CodeGridView() : base()
         {
             AllowUserToAddRows = false;
@@ -137,9 +143,9 @@ namespace BeebPerf.ux
                 return;
             }
 
-            string columnName = Columns[e.ColumnIndex].Name;
+            int columnIndex = Columns[e.ColumnIndex].Index;
             var instructionMetrics = (InstructionMetrics)e.Value!;
-            if (e.RowIndex > 0 && (columnName == "Address" || columnName == "Label"))
+            if (e.RowIndex > 0 && (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex))
             {
                 // is duplicate?
                 var valueAbove = Rows[e.RowIndex - 1].Cells[e.ColumnIndex].Value;
@@ -155,12 +161,12 @@ namespace BeebPerf.ux
                 }
             }
 
-            e.Value = columnName switch {
-                "Address"        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
-                "Label"          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
-                "Instruction"    => FormatInstruction(instructionMetrics.Instruction),
-                "TotalCPU"       => $"{instructionMetrics.InclusiveCycleCount:N0}",
-                "ExecutionCount" => $"{instructionMetrics.ExecutionCount:N0}",
+            e.Value = columnIndex switch {
+                AddressColumnIndex        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
+                LabelColumnIndex          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
+                InstructionColumnIndex    => FormatInstruction(instructionMetrics.Instruction),
+                TotalCPUColumnIndex       => $"{instructionMetrics.InclusiveCycleCount:N0}",
+                ExecutionCountColumnIndex => $"{instructionMetrics.ExecutionCount:N0}",
                 _                => string.Empty };
             e.FormattingApplied = true;
         }
@@ -246,13 +252,13 @@ namespace BeebPerf.ux
                                           DataGridViewPaintParts paintParts)
             {
                 var codeGridView = (CodeGridView)DataGridView!;
-                bool isInstructionColumn = (codeGridView.Columns[ColumnIndex].Name == "Instruction");
+                bool isInstructionColumn = (codeGridView.Columns[ColumnIndex].Index == InstructionColumnIndex);
 
                 base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
                             !isInstructionColumn ? value : null,
                             !isInstructionColumn ? formattedValue : null,
                             !isInstructionColumn ? errorText : null,
-                            cellStyle, advancedBorderStyle, paintParts);
+                            cellStyle, advancedBorderStyle, paintParts & ~DataGridViewPaintParts.Focus);
 
                 if (value! is InstructionMetrics)
                 {

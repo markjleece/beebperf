@@ -20,16 +20,26 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
+using static BeebPerf.ux.RoutineGridView;
 
 namespace BeebPerf.ux
 {
     internal class CallTreeGridView : DataGridView
     {
+        private const int RoutineColumnIndex = 0;
+        private const int SelfCPUColumnIndex = 1;
+        private const int TotalCPUColumnIndex = 2;
+        private const int ElapsedCPUColumnIndex = 3;
+        private const int ExecutionCountColumnIndex = 4;
+
         public CallTreeGridView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            AllowUserToResizeColumns = false;
+            AllowUserToResizeRows = false;
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
             BackgroundColor = DefaultCellStyle.BackColor;
             CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellFormatting += CellFormattingFunc;
@@ -43,20 +53,23 @@ namespace BeebPerf.ux
             SortCompare += SortCompareFunc;
 
             AutoGenerateColumns = false;
-            Columns.Add(new DataGridViewColumn()
-            {
-                Name = "Routine",
-                HeaderText = "Routine",
-                CellTemplate = new CallTreeCellRenderer(),
-                SortMode = DataGridViewColumnSortMode.NotSortable
-            });
-
+            Columns.Add("Routine", "Routine");
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
-            Sort(Columns["TotalCPU"]!, System.ComponentModel.ListSortDirection.Descending);
+            var cellTemplate = new CellTemplate();
+            foreach (DataGridViewColumn column in Columns)
+                column.CellTemplate = cellTemplate;
+
+            Columns[SelfCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[ElapsedCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+            Columns[RoutineColumnIndex]!.SortMode = DataGridViewColumnSortMode.NotSortable;
+            Sort(Columns[TotalCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
         }
 
         private Form GetParentForm()
@@ -127,9 +140,9 @@ namespace BeebPerf.ux
 
             var treeNode = (CallTreeNode)e.Value;
 
-            switch (Columns[e.ColumnIndex].Name)
+            switch (Columns[e.ColumnIndex].Index)
             {
-                case "Routine":
+                case RoutineColumnIndex:
                     int padding = treeNode.HotPath ? 4 : 0;
                     e.Value = $"{"".PadLeft(padding)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
                     e.FormattingApplied = true;
@@ -137,22 +150,22 @@ namespace BeebPerf.ux
                     e.CellStyle.Padding = new Padding(e.CellStyle.Padding.Left + indent, e.CellStyle.Padding.Top, e.CellStyle.Padding.Right, e.CellStyle.Padding.Bottom);
                     break;
 
-                case "SelfCPU":
+                case SelfCPUColumnIndex:
                     e.Value = FormatCPUMetric(treeNode.CPUMetrics.SelfCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
-                case "TotalCPU":
+                case TotalCPUColumnIndex:
                     e.Value = FormatCPUMetric(treeNode.CPUMetrics.InclusiveCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
-                case "ElapsedCPU":
+                case ElapsedCPUColumnIndex:
                     e.Value = FormatCPUMetric(treeNode.CPUMetrics.ElapsedCycleCount, treeNode.Depth);
                     e.FormattingApplied = true;
                     break;
 
-                case "ExecutionCount":
+                case ExecutionCountColumnIndex:
                     e.Value = $"{"".PadLeft(2*treeNode.Depth)}{treeNode.CPUMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
                     break;
@@ -233,12 +246,12 @@ namespace BeebPerf.ux
                 SortOrder sortOrder = column.HeaderCell.SortGlyphDirection;
                 if (sortOrder != SortOrder.None)
                 {
-                    CallTreeNode.SortField sortField = column.Name switch
+                    CallTreeNode.SortField sortField = column.Index switch
                     {
-                        "SelfCPU" => CallTreeNode.SortField.SelfCPU,
-                        "TotalCPU" => CallTreeNode.SortField.InclusiveCPU,
-                        "ElapsedCPU" => CallTreeNode.SortField.ElapsedCPU,
-                        "ExecutionCount" => CallTreeNode.SortField.Count,
+                        SelfCPUColumnIndex => CallTreeNode.SortField.SelfCPU,
+                        TotalCPUColumnIndex => CallTreeNode.SortField.InclusiveCPU,
+                        ElapsedCPUColumnIndex => CallTreeNode.SortField.ElapsedCPU,
+                        ExecutionCountColumnIndex => CallTreeNode.SortField.Count,
                         _ => 0
                     };
                     treeNode.Sort(sortField, sortOrder);
@@ -281,19 +294,19 @@ namespace BeebPerf.ux
             }
         }
 
-        private Stack<int> GetSortKey(string columnName, CallTreeNode treeNode)
+        private Stack<int> GetSortKey(int columnIndex, CallTreeNode treeNode)
         {
             var sortKey = new Stack<int>();
 
             for (var node = treeNode; node != null; node = node.Parent)
             {
                 var cpuMetrics = treeNode.CPUMetrics;
-                var metric = columnName switch
+                var metric = columnIndex switch
                 {
-                    "SelfCPU" => cpuMetrics.SelfCycleCount,
-                    "TotalCPU" => cpuMetrics.InclusiveCycleCount,
-                    "ElapsedCPU" => cpuMetrics.ElapsedCycleCount,
-                    "ExecutionCount" => cpuMetrics.ExecutionCount,
+                    SelfCPUColumnIndex => cpuMetrics.SelfCycleCount,
+                    TotalCPUColumnIndex => cpuMetrics.InclusiveCycleCount,
+                    ElapsedCPUColumnIndex => cpuMetrics.ElapsedCycleCount,
+                    ExecutionCountColumnIndex => cpuMetrics.ExecutionCount,
                     _ => 0
                 };
                 sortKey.Push(metric);
@@ -304,12 +317,12 @@ namespace BeebPerf.ux
 
         private void SortCompareFunc(object? sender, DataGridViewSortCompareEventArgs e)
         {
-            var columnName = e.Column.Name;
+            var columnIndex = e.Column.Index;
             var treeNode1 = (CallTreeNode)e.CellValue1!;
             var treeNode2 = (CallTreeNode)e.CellValue2!;
 
-            var sortKey1 = GetSortKey(columnName, treeNode1);
-            var sortKey2 = GetSortKey(columnName, treeNode2);
+            var sortKey1 = GetSortKey(columnIndex, treeNode1);
+            var sortKey2 = GetSortKey(columnIndex, treeNode2);
 
             int comparison = 0;
             while (comparison == 0 && sortKey1.Count > 0 && sortKey2.Count > 0)
@@ -324,7 +337,7 @@ namespace BeebPerf.ux
                 else if (sortKey2.Count > 0)
                     comparison = -1;
 
-                if (Columns[columnName]!.HeaderCell.SortGlyphDirection == SortOrder.Descending)
+                if (Columns[columnIndex]!.HeaderCell.SortGlyphDirection == SortOrder.Descending)
                     comparison *= -1;
             }
 
@@ -332,7 +345,7 @@ namespace BeebPerf.ux
             e.Handled = true;
         }
 
-        public class CallTreeCellRenderer : DataGridViewTextBoxCell
+        public class CellTemplate : DataGridViewTextBoxCell
         {
             protected override void Paint(Graphics graphics,
                                           Rectangle clipBounds,
@@ -346,78 +359,155 @@ namespace BeebPerf.ux
                                           DataGridViewAdvancedBorderStyle advancedBorderStyle,
                                           DataGridViewPaintParts paintParts)
             {
-                // default behavior
-                base.Paint(graphics, clipBounds, cellBounds, rowIndex,
-                           cellState, value, formattedValue, errorText,
-                           cellStyle, advancedBorderStyle, paintParts);
-
-
-                // paint expand/close triangle
+                var callTreeDateView = (CallTreeGridView)DataGridView!;
                 var treeNode = (CallTreeNode)value!;
 
-                int cellHeight = cellBounds.Height;
-                float centerX = cellBounds.Left + cellHeight / 2;
-                centerX += (treeNode.Depth * cellHeight);
-
-                if (treeNode.HasChildren)
+                int columnIndex = callTreeDateView.Columns[ColumnIndex].Index;
+                if (columnIndex == RoutineColumnIndex || 
+                    columnIndex == ExecutionCountColumnIndex || 
+                    columnIndex == ElapsedCPUColumnIndex)
                 {
-                    float centerY = cellBounds.Top + cellHeight / 2;
+                    // paint default, minus focus rect
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, paintParts & ~DataGridViewPaintParts.Focus);
+                }
+                else
+                {
+                    Debug.Assert(
+                        columnIndex == SelfCPUColumnIndex ||
+                        columnIndex == TotalCPUColumnIndex ||
+                        columnIndex == ElapsedCPUColumnIndex);
+
+                    // paint default background
+                    var backPaintParts = paintParts &
+                        (DataGridViewPaintParts.Border |
+                         DataGridViewPaintParts.Background |
+                         DataGridViewPaintParts.ContentBackground |
+                         DataGridViewPaintParts.SelectionBackground);
+
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, backPaintParts);
+
+                    // draw percentage bar
+                    int cycleCount = columnIndex switch
+                    {
+                        SelfCPUColumnIndex => treeNode.CPUMetrics.SelfCycleCount,
+                        TotalCPUColumnIndex => treeNode.CPUMetrics.InclusiveCycleCount,
+                        ElapsedCPUColumnIndex => treeNode.CPUMetrics.ElapsedCycleCount,
+                        _ => 0
+                    };
+
+                    int margin = cellBounds.Height / 8;
+
+                    int width = 0;
+                    if (cycleCount > 0)
+                    {
+                        int maxWidth = cellBounds.Width - (margin * 2);
+                        width = (int)double.Ceiling((double)cycleCount * maxWidth / callTreeDateView.TotalCycleCount);
+                    }
+
+                    var rect = new Rectangle(
+                        cellBounds.Right - margin - width,
+                        cellBounds.Y + margin,
+                        width,
+                        cellBounds.Height - margin * 2);
 
                     bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
-                    var foreColor = selected ? cellStyle.SelectionForeColor : cellStyle.ForeColor;
-                    var backColor = selected ? cellStyle.SelectionBackColor : cellStyle.BackColor;
 
-                    PointF[]? points = null;
+                    var color = Blend(
+                        callTreeDateView.DefaultCellStyle.BackColor,
+                        callTreeDateView.DefaultCellStyle.SelectionBackColor,
+                        selected ? 0.75f : 0.25f);
 
-                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
-                    {
-                        float halfHeight = cellHeight / 5;
-                        float quarterHeight = halfHeight / 2;
+                    using var brush = new SolidBrush(color);
+                    graphics.FillRectangle(brush, rect);
 
-                        points = new[]
-                        {
-                            new PointF(centerX - quarterHeight, centerY - halfHeight),
-                            new PointF(centerX + quarterHeight, centerY),
-                            new PointF(centerX - quarterHeight, centerY + halfHeight),
-                        };
-                    }
-                    else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
-                    {
-                        float hypotenuse = cellHeight / 5 * (float)Math.Sqrt(2.0);
-                        float halfHypotenuse = hypotenuse / 2;
-
-                        points = new[]
-                        {
-                            new PointF(centerX - halfHypotenuse, centerY + halfHypotenuse),
-                            new PointF(centerX + halfHypotenuse, centerY - halfHypotenuse),
-                            new PointF(centerX + halfHypotenuse, centerY + halfHypotenuse)
-                        };
-
-                        backColor = foreColor;
-                    }
-
-                    if (points != null)
-                    {
-                        using var brush = new SolidBrush(backColor);
-                        graphics.FillPolygon(brush, points);
-
-                        using var pen = new Pen(foreColor);
-                        graphics.DrawPolygon(pen, points);
-                    }
+                    // draw default foreground
+                    var forePaintParts = paintParts & DataGridViewPaintParts.ContentForeground;
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, forePaintParts);
                 }
 
-                // paint flame icon
-                if (treeNode.HotPath)
+                if (columnIndex == RoutineColumnIndex)
                 {
-                    int size = cellBounds.Height / 2;
-                    int inset = cellBounds.Height / 4;
-                    int indent = (int)centerX + cellHeight / 2;
-                    var rect = new Rectangle(indent + inset / 2, cellBounds.Top + inset, size, size);
+                    // paint expand/close triangle
+                    int cellHeight = cellBounds.Height;
+                    float centerX = cellBounds.Left + cellHeight / 2;
+                    centerX += (treeNode.Depth * cellHeight);
 
-                    var control = (CallTreeGridView)DataGridView!;
-                    BeebPerfForm form = (BeebPerfForm)control.GetParentForm();
-                    graphics.DrawImage(form.FlameImage, rect);
+                    if (treeNode.HasChildren)
+                    {
+                        float centerY = cellBounds.Top + cellHeight / 2;
+
+                        bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
+                        var foreColor = selected ? cellStyle.SelectionForeColor : cellStyle.ForeColor;
+                        var backColor = selected ? cellStyle.SelectionBackColor : cellStyle.BackColor;
+
+                        PointF[]? points = null;
+
+                        if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                        {
+                            float halfHeight = cellHeight / 5;
+                            float quarterHeight = halfHeight / 2;
+
+                            points = new[]
+                            {
+                                new PointF(centerX - quarterHeight, centerY - halfHeight),
+                                new PointF(centerX + quarterHeight, centerY),
+                                new PointF(centerX - quarterHeight, centerY + halfHeight),
+                            };
+                        }
+                        else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                        {
+                            float hypotenuse = cellHeight / 5 * (float)Math.Sqrt(2.0);
+                            float halfHypotenuse = hypotenuse / 2;
+
+                            points = new[]
+                            {
+                                new PointF(centerX - halfHypotenuse, centerY + halfHypotenuse),
+                                new PointF(centerX + halfHypotenuse, centerY - halfHypotenuse),
+                                new PointF(centerX + halfHypotenuse, centerY + halfHypotenuse)
+                            };
+
+                            backColor = foreColor;
+                        }
+
+                        if (points != null)
+                        {
+                            using var brush = new SolidBrush(backColor);
+                            graphics.FillPolygon(brush, points);
+
+                            using var pen = new Pen(foreColor);
+                            graphics.DrawPolygon(pen, points);
+                        }
+                    }
+
+                    // paint flame icon
+                    if (treeNode.HotPath)
+                    {
+                        int size = cellBounds.Height / 2;
+                        int inset = cellBounds.Height / 4;
+                        int indent = (int)centerX + cellHeight / 2;
+                        var rect = new Rectangle(indent + inset / 2, cellBounds.Top + inset, size, size);
+
+                        BeebPerfForm form = (BeebPerfForm)callTreeDateView.GetParentForm();
+                        graphics.DrawImage(form.FlameImage, rect);
+                    }
                 }
+            }
+
+            private Color Blend(Color first, Color second, float ratio)
+            {
+                int r = (int)(first.R * (1 - ratio) + second.R * ratio);
+                int g = (int)(first.G * (1 - ratio) + second.G * ratio);
+                int b = (int)(first.B * (1 - ratio) + second.B * ratio);
+                return Color.FromArgb(r, g, b);
             }
         }
     }

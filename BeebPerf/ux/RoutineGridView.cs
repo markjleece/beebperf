@@ -20,16 +20,27 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
     internal class RoutineGridView : DataGridView
     {
+        private const int RoutineColumnIndex = 0;
+        private const int SelfCPUColumnIndex = 1;
+        private const int TotalCPUColumnIndex = 2;
+        private const int ElapsedCPUColumnIndex = 3;
+        private const int ExecutionCountColumnIndex = 4;
+
         public RoutineGridView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            AllowUserToResizeColumns = false;
+            AllowUserToResizeRows = false;
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
             BackgroundColor = DefaultCellStyle.BackColor;
             CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellFormatting += CellFormattingFunc;
@@ -48,9 +59,16 @@ namespace BeebPerf.ux
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
-            Columns["Routine"]!.CellTemplate = new CellTemplate();
+            var cellTemplate = new CellTemplate();
+            foreach (DataGridViewColumn column in Columns)
+                column.CellTemplate = cellTemplate;
 
-            Sort(Columns["SelfCPU"]!, System.ComponentModel.ListSortDirection.Descending);
+            Columns[SelfCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[ElapsedCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+            Sort(Columns[SelfCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
         }
 
         public void Clear()
@@ -97,29 +115,29 @@ namespace BeebPerf.ux
             var dataGrid = (DataGridView)sender!;
             var routine = (Routine)e.Value!;
 
-            switch (dataGrid.Columns[e.ColumnIndex].Name)
+            switch (dataGrid.Columns[e.ColumnIndex].Index)
             {
-                case "Routine":
+                case RoutineColumnIndex:
                     int padding = routine.HotRoutine ? 4 : 0;
                     e.Value = $"{"".PadLeft(padding)}{routine.StartAddress} {routine.Label}";
                     break;
 
-                case "SelfCPU":
+                case SelfCPUColumnIndex:
                     e.Value = FormatCPUMetric(routine.AggregateMetrics.SelfCycleCount);
                     e.FormattingApplied = true;
                     break;
 
-                case "TotalCPU":
+                case TotalCPUColumnIndex:
                     e.Value = FormatCPUMetric(routine.AggregateMetrics.InclusiveCycleCount);
                     e.FormattingApplied = true;
                     break;
 
-                case "ElapsedCPU":
+                case ElapsedCPUColumnIndex:
                     e.Value = FormatCPUMetric(routine.AggregateMetrics.ElapsedCycleCount);
                     e.FormattingApplied = true;
                     break;
 
-                case "ExecutionCount":
+                case ExecutionCountColumnIndex:
                     e.Value = $"{routine.AggregateMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
                     break;
@@ -134,29 +152,29 @@ namespace BeebPerf.ux
             var a = (Routine)e.CellValue1!;
             var b = (Routine)e.CellValue2!;
 
-            switch (e.Column.Name)
+            switch (e.Column.Index)
             {
-                case "Routine":
+                case RoutineColumnIndex:
                     e.SortResult = a.StartAddress.Address - b.StartAddress.Address;
                     e.Handled = true;
                     break;
 
-                case "SelfCPU":
+                case SelfCPUColumnIndex:
                     e.SortResult = a.AggregateMetrics.SelfCycleCount - b.AggregateMetrics.SelfCycleCount;
                     e.Handled = true;
                     break;
 
-                case "TotalCPU":
+                case TotalCPUColumnIndex:
                     e.SortResult = a.AggregateMetrics.InclusiveCycleCount - b.AggregateMetrics.InclusiveCycleCount;
                     e.Handled = true;
                     break;
 
-                case "ElapsedCPU":
+                case ElapsedCPUColumnIndex:
                     e.SortResult = a.AggregateMetrics.ElapsedCycleCount - b.AggregateMetrics.ElapsedCycleCount;
                     e.Handled = true;
                     break;
 
-                case "ExecutionCount":
+                case ExecutionCountColumnIndex:
                     e.SortResult = a.AggregateMetrics.ExecutionCount - b.AggregateMetrics.ExecutionCount;
                     e.Handled = true;
                     break;
@@ -187,14 +205,82 @@ namespace BeebPerf.ux
                                           DataGridViewAdvancedBorderStyle advancedBorderStyle,
                                           DataGridViewPaintParts paintParts)
             {
-                base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
-                            value, formattedValue, errorText,
-                            cellStyle, advancedBorderStyle, paintParts);
-
-                // paint flame icon
                 var routineGridView = (RoutineGridView)DataGridView!;
                 var routine = (Routine)value!;
-                if (routine.HotRoutine)
+
+                int columnIndex = routineGridView.Columns[ColumnIndex].Index;
+                if (columnIndex == RoutineColumnIndex || 
+                    columnIndex == ExecutionCountColumnIndex || 
+                    columnIndex == ElapsedCPUColumnIndex)
+                {
+                    // paint default, minus focus rect
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, paintParts & ~DataGridViewPaintParts.Focus);
+                }
+                else
+                {
+                    Debug.Assert(
+                        columnIndex == SelfCPUColumnIndex ||
+                        columnIndex == TotalCPUColumnIndex ||
+                        columnIndex == ElapsedCPUColumnIndex);
+
+                    // paint default background
+                    var backPaintParts = paintParts &
+                        (DataGridViewPaintParts.Border |
+                         DataGridViewPaintParts.Background |
+                         DataGridViewPaintParts.ContentBackground |
+                         DataGridViewPaintParts.SelectionBackground);
+
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, backPaintParts);
+
+                    // draw percentage bar
+                    int cycleCount = columnIndex switch
+                    {
+                        SelfCPUColumnIndex => routine.AggregateMetrics.SelfCycleCount,
+                        TotalCPUColumnIndex => routine.AggregateMetrics.InclusiveCycleCount,
+                        ElapsedCPUColumnIndex => routine.AggregateMetrics.ElapsedCycleCount,
+                        _ => 0 };
+
+                    int margin = cellBounds.Height / 8;
+
+                    int width = 0;
+                    if (cycleCount > 0)
+                    {
+                        int maxWidth = cellBounds.Width - (margin * 2);
+                        width = (int)double.Ceiling((double)cycleCount * maxWidth / routineGridView.TotalCycleCount);
+                    }
+
+                    var rect = new Rectangle(
+                        cellBounds.Right - margin - width, 
+                        cellBounds.Y + margin, 
+                        width, 
+                        cellBounds.Height - margin * 2);
+
+                    bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
+
+                    var color = Blend(
+                        routineGridView.DefaultCellStyle.BackColor,
+                        routineGridView.DefaultCellStyle.SelectionBackColor,
+                        selected ? 0.75f : 0.25f);
+
+                    using var brush = new SolidBrush(color);
+                    graphics.FillRectangle(brush, rect);
+
+                    // draw default foreground
+                    var forePaintParts = paintParts & DataGridViewPaintParts.ContentForeground;
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState,
+                        value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, forePaintParts);
+                }
+
+                // paint flame icon
+                if (columnIndex == RoutineColumnIndex && routine.HotRoutine)
                 {
                     int size = cellBounds.Height / 2;
                     int inset = cellBounds.Height / 4;
@@ -202,6 +288,14 @@ namespace BeebPerf.ux
                     BeebPerfForm form = (BeebPerfForm)routineGridView.GetParentForm();
                     graphics.DrawImage(form.FlameImage, rect);
                 }
+            }
+
+            private Color Blend(Color first, Color second, float ratio)
+            {
+                int r = (int)(first.R * (1 - ratio) + second.R * ratio);
+                int g = (int)(first.G * (1 - ratio) + second.G * ratio);
+                int b = (int)(first.B * (1 - ratio) + second.B * ratio);
+                return Color.FromArgb(r, g, b);
             }
         }
     }
