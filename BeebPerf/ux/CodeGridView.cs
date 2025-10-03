@@ -43,6 +43,7 @@ namespace BeebPerf.ux
             RowTemplate.DefaultCellStyle.NullValue = null;
             SelectionChanged += SelectionChangedFunc;
 
+            AutoGenerateColumns = false;
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
             Columns.Add("Instruction", "Instruction");

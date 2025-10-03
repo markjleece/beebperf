@@ -41,6 +41,7 @@ namespace BeebPerf.ux
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
 
+            AutoGenerateColumns = false;
             Columns.Add("Routine", "Routine");
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");

@@ -42,6 +42,7 @@ namespace BeebPerf.ux
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
 
+            AutoGenerateColumns = false;
             Columns.Add(new DataGridViewColumn()
             {
                 Name = "Routine",
