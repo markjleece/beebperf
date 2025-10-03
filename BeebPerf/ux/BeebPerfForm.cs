@@ -74,14 +74,6 @@ namespace BeebPerf.ux
                 _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount:0, endCycleCount: Int32.MaxValue);
                 UpdateState();
 
-                // populate hot routines
-                hotRoutinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
-                hotRoutinesDataGrid.Clear();
-                foreach (var routine in _CPUAnalysis.HotRoutines)
-                {
-                    hotRoutinesDataGrid.AddRoutine(routine);
-                }
-
                 // populate routines
                 routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
                 routinesDataGrid.Clear();

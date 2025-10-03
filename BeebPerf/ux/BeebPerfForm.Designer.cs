@@ -46,8 +46,6 @@ namespace BeebPerf.ux
             timelinePanel = new Panel();
             splitContainer = new SplitContainer();
             tabControl = new TabControl();
-            hotRoutinesTabPage = new TabPage();
-            hotRoutinesDataGrid = new RoutineGridView();
             callTreeTabPage = new TabPage();
             callTreeControl = new CallTreeGridView();
             callerCalleeTabPage = new TabPage();
@@ -62,8 +60,6 @@ namespace BeebPerf.ux
             splitContainer.Panel2.SuspendLayout();
             splitContainer.SuspendLayout();
             tabControl.SuspendLayout();
-            hotRoutinesTabPage.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).BeginInit();
             callTreeTabPage.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)callTreeControl).BeginInit();
             routinesTabPage.SuspendLayout();
@@ -198,10 +194,9 @@ namespace BeebPerf.ux
             // 
             // tabControl
             // 
-            tabControl.Controls.Add(hotRoutinesTabPage);
+            tabControl.Controls.Add(routinesTabPage);
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(callerCalleeTabPage);
-            tabControl.Controls.Add(routinesTabPage);
             tabControl.Controls.Add(hotGraphTabPage);
             tabControl.Controls.Add(interruptsTabPage);
             tabControl.Dock = DockStyle.Fill;
@@ -212,20 +207,8 @@ namespace BeebPerf.ux
             tabControl.TabIndex = 0;
             tabControl.TabStop = false;
             // 
-            // hotRoutinesTabPage
+            // dataGridViewCellStyle
             // 
-            hotRoutinesTabPage.Controls.Add(hotRoutinesDataGrid);
-            hotRoutinesTabPage.Location = new Point(4, 34);
-            hotRoutinesTabPage.Name = "hotRoutinesTabPage";
-            hotRoutinesTabPage.Padding = new Padding(3);
-            hotRoutinesTabPage.Size = new Size(1737, 448);
-            hotRoutinesTabPage.TabIndex = 0;
-            hotRoutinesTabPage.Text = "HotPath Routines";
-            hotRoutinesTabPage.UseVisualStyleBackColor = true;
-            // 
-            // hotRoutinesDataGrid
-            // 
-            hotRoutinesDataGrid.ColumnHeadersHeight = 34;
             dataGridViewCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle.BackColor = SystemColors.Window;
             dataGridViewCellStyle.Font = new Font("Segoe UI", 9F);
@@ -235,13 +218,6 @@ namespace BeebPerf.ux
             dataGridViewCellStyle.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle.WrapMode = DataGridViewTriState.False;
-            hotRoutinesDataGrid.DefaultCellStyle = dataGridViewCellStyle;
-            hotRoutinesDataGrid.Dock = DockStyle.Fill;
-            hotRoutinesDataGrid.Location = new Point(3, 3);
-            hotRoutinesDataGrid.Name = "hotRoutinesDataGrid";
-            hotRoutinesDataGrid.RowHeadersWidth = 62;
-            hotRoutinesDataGrid.Size = new Size(1731, 442);
-            hotRoutinesDataGrid.TabIndex = 0;
             // 
             // callTreeTabPage
             // 
@@ -343,8 +319,6 @@ namespace BeebPerf.ux
             ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
             splitContainer.ResumeLayout(false);
             tabControl.ResumeLayout(false);
-            hotRoutinesTabPage.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)hotRoutinesDataGrid).EndInit();
             callTreeTabPage.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)callTreeControl).EndInit();
             routinesTabPage.ResumeLayout(false);
@@ -369,13 +343,11 @@ namespace BeebPerf.ux
         private Panel timelinePanel;
         private SplitContainer splitContainer;
         private TabControl tabControl;
-        private TabPage hotRoutinesTabPage;
         private TabPage callTreeTabPage;
         private TabPage callerCalleeTabPage;
         private TabPage routinesTabPage;
         private TabPage hotGraphTabPage;
         private TabPage interruptsTabPage;
-        private RoutineGridView hotRoutinesDataGrid;
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
         private CodeGridView codeView;
