@@ -391,7 +391,6 @@ namespace BeebPerf.ux
                      DataGridViewPaintParts.Background |
                      DataGridViewPaintParts.ContentBackground |
                      DataGridViewPaintParts.SelectionBackground);
-
                 base.Paint(
                     graphics, clipBounds, cellBounds, rowIndex, cellState,
                     value, formattedValue, errorText,
@@ -401,10 +400,6 @@ namespace BeebPerf.ux
 
                 if (ColumnIndex == RoutineColumnIndex)
                 {
-                    int cellHeight = cellBounds.Height;
-                    float centerX = cellBounds.Left + cellHeight / 2;
-                    centerX += (treeNode.Depth * cellHeight);
-
                     if (treeNode.HasChildren)
                         PaintOpenCloseTriangle(treeNode, graphics, cellBounds, cellState, cellStyle);
 
@@ -489,6 +484,7 @@ namespace BeebPerf.ux
                 int cellHeight = cellBounds.Height;
                 int centerX = cellBounds.Left + RoutineColumnIndent(treeNode.Depth) - cellHeight / 2;
                 float centerY = cellBounds.Top + cellHeight / 2;
+
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
                 var foreColor = selected ? cellStyle.SelectionForeColor : cellStyle.ForeColor;
                 var backColor = selected ? cellStyle.SelectionBackColor : cellStyle.BackColor;
