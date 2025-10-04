@@ -71,16 +71,25 @@ namespace BeebPerf.ux
                 InstructionSet = _Model.InstructionSet;
 
                 _CPUAnalysis.StaticAnalysis(_Model);
-                _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount:0, endCycleCount: Int32.MaxValue);
+                _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount: 0, endCycleCount: Int32.MaxValue);
                 UpdateState();
 
                 // populate routines
-                routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
                 routinesDataGrid.Clear();
                 foreach (var routine in _CPUAnalysis.HotRoutines)
                 {
                     routinesDataGrid.AddRoutine(routine);
                 }
+
+                int maxExecutionCount = 0;
+                foreach (var routine in _CPUAnalysis.HotRoutines)
+                {
+                   if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
+                        maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
+                }
+
+                routinesDataGrid.MaxExecutionCount = maxExecutionCount;
+                routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
                 // populate call tree
                 callTreeControl.Clear();

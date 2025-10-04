@@ -122,6 +122,21 @@ namespace BeebPerf.ux
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet.Size(obj.Instruction.Opcode));
                 }
             }
+
+            // calculate mean
+            float sum = 0.0f;
+            foreach (var instructionMetric in instructionMetrics)
+                sum += instructionMetric.InclusiveCycleCount;
+            _Mean = sum / instructionMetrics.Count;
+
+            // calculate standard deviation
+            double varianceSum = 0.0;
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                double diff = instructionMetric.InclusiveCycleCount - _Mean;
+                varianceSum += diff * diff;
+            }
+            _StandardDeviation = (float)Math.Sqrt(varianceSum / instructionMetrics.Count);
         }
 
         public void Clear()
@@ -254,16 +269,16 @@ namespace BeebPerf.ux
                 var codeGridView = (CodeGridView)DataGridView!;
                 bool isInstructionColumn = (codeGridView.Columns[ColumnIndex].Index == InstructionColumnIndex);
 
-                base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
-                            !isInstructionColumn ? value : null,
-                            !isInstructionColumn ? formattedValue : null,
-                            !isInstructionColumn ? errorText : null,
-                            cellStyle, advancedBorderStyle, paintParts & ~DataGridViewPaintParts.Focus);
+                PaintBackground(graphics, cellBounds, value);
 
                 if (value! is InstructionMetrics)
                 {
                     if (isInstructionColumn)
                         PaintInstruction(graphics, cellBounds, value, cellStyle);
+                    else
+                        base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
+                               value, formattedValue, errorText,
+                               cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
                 }
                 else if (value! is Ellipses)
                 {
@@ -274,6 +289,41 @@ namespace BeebPerf.ux
                 {
                     PaintFallThrough(graphics, rowIndex, cellStyle);
                 }
+            }
+
+            private void PaintBackground(
+                Graphics graphics,
+                Rectangle cellBounds,
+                object? value)
+            {
+                var codeGridView = (CodeGridView)DataGridView!;
+                var backColor = codeGridView.DefaultCellStyle.BackColor;
+
+                if (value! is InstructionMetrics)
+                {
+                    var instructionMetrics = (InstructionMetrics)value!;
+
+                    float zScore = 0;
+                    if (codeGridView._StandardDeviation > 0.0)
+                    {
+                        zScore = (float)((instructionMetrics.InclusiveCycleCount - codeGridView._Mean) / codeGridView._StandardDeviation);
+                    }
+               
+                    backColor = Blend(
+                        backColor,
+                        backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed,
+                        MapToUnitRange(zScore, fromValue:0.0, toValue:5.0));
+                }
+
+                using var brush = new SolidBrush(backColor);
+                graphics.FillRectangle(brush, cellBounds);
+            }
+
+            private static double MapToUnitRange(double value, double fromValue, double toValue)
+            {
+                if (value <= fromValue) return 0.0;
+                if (value >= toValue) return 1.0;
+                return (value - fromValue) / (toValue - fromValue);
             }
 
             private void PaintInstruction(
@@ -439,6 +489,15 @@ namespace BeebPerf.ux
                 public string Text;
                 public Color Color;
             };
+
+            private Color Blend(Color first, Color second, double ratio)
+            {
+                int r = (int)(first.R * (1 - ratio) + second.R * ratio);
+                int g = (int)(first.G * (1 - ratio) + second.G * ratio);
+                int b = (int)(first.B * (1 - ratio) + second.B * ratio);
+                return Color.FromArgb(r, g, b);
+            }
+
         }
 
         private class InstructionColors
@@ -453,5 +512,7 @@ namespace BeebPerf.ux
         private Dictionary<ushort, string>? _Labels;
         private InstructionSet? _InstructionSet;
         private InstructionColors _InstructionStyle;
+        private double _StandardDeviation;
+        private double _Mean;
     }
 }

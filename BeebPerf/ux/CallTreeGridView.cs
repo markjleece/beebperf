@@ -21,7 +21,6 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
-using static BeebPerf.ux.RoutineGridView;
 
 namespace BeebPerf.ux
 {
@@ -129,9 +128,12 @@ namespace BeebPerf.ux
                     }
                 }
             }
+
+            RefreshExecutionCounts();
         }
 
         public int TotalCycleCount;
+        public int MaxExecutionCount;
 
         private void CellFormattingFunc(object? sender, DataGridViewCellFormattingEventArgs e)
         {
@@ -173,6 +175,19 @@ namespace BeebPerf.ux
                 default:
                     break;
             }
+        }
+
+        private void RefreshExecutionCounts()
+        {
+            int maxExecutionCount = 0;
+            foreach (DataGridViewRow row in Rows)
+            {
+                var treeNode = (CallTreeNode)row.Cells[ExecutionCountColumnIndex].Value!;
+                if (maxExecutionCount < treeNode.CPUMetrics.ExecutionCount)
+                    maxExecutionCount = treeNode.CPUMetrics.ExecutionCount;
+            }
+            MaxExecutionCount = maxExecutionCount;
+            InvalidateColumn(ExecutionCountColumnIndex);
         }
 
         private string FormatCPUMetric(int value, int indent)
@@ -261,12 +276,14 @@ namespace BeebPerf.ux
 
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
             AddChildRows(rowIndex + 1, treeNode);
+            RefreshExecutionCounts();
         }
 
         private void CloseTreeNode(int rowIndex, CallTreeNode treeNode)
         {
             RemoveChildRows(rowIndex + 1, treeNode);
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
+            RefreshExecutionCounts();
         }
 
         private int AddChildRows(int index, CallTreeNode treeNode)
@@ -363,9 +380,7 @@ namespace BeebPerf.ux
                 var treeNode = (CallTreeNode)value!;
 
                 int columnIndex = callTreeDateView.Columns[ColumnIndex].Index;
-                if (columnIndex == RoutineColumnIndex || 
-                    columnIndex == ExecutionCountColumnIndex || 
-                    columnIndex == ElapsedCPUColumnIndex)
+                if (columnIndex == RoutineColumnIndex)
                 {
                     // paint default, minus focus rect
                     base.Paint(
@@ -378,7 +393,8 @@ namespace BeebPerf.ux
                     Debug.Assert(
                         columnIndex == SelfCPUColumnIndex ||
                         columnIndex == TotalCPUColumnIndex ||
-                        columnIndex == ElapsedCPUColumnIndex);
+                        columnIndex == ElapsedCPUColumnIndex ||
+                        columnIndex == ExecutionCountColumnIndex);
 
                     // paint default background
                     var backPaintParts = paintParts &
@@ -392,22 +408,23 @@ namespace BeebPerf.ux
                         value, formattedValue, errorText,
                         cellStyle, advancedBorderStyle, backPaintParts);
 
-                    // draw percentage bar
-                    int cycleCount = columnIndex switch
+                    // draw bar
+                    (int num, int den) ratio = columnIndex switch
                     {
-                        SelfCPUColumnIndex => treeNode.CPUMetrics.SelfCycleCount,
-                        TotalCPUColumnIndex => treeNode.CPUMetrics.InclusiveCycleCount,
-                        ElapsedCPUColumnIndex => treeNode.CPUMetrics.ElapsedCycleCount,
-                        _ => 0
+                        SelfCPUColumnIndex => (treeNode.CPUMetrics.SelfCycleCount, callTreeDateView.TotalCycleCount),
+                        TotalCPUColumnIndex => (treeNode.CPUMetrics.InclusiveCycleCount, callTreeDateView.TotalCycleCount),
+                        ElapsedCPUColumnIndex => (treeNode.CPUMetrics.ElapsedCycleCount, callTreeDateView.TotalCycleCount),
+                        ExecutionCountColumnIndex => (treeNode.CPUMetrics.ExecutionCount, callTreeDateView.MaxExecutionCount),
+                        _ => (0, 0)
                     };
 
+                    int width = 0;
                     int margin = cellBounds.Height / 8;
 
-                    int width = 0;
-                    if (cycleCount > 0)
+                    if (ratio.num > 0 && ratio.den > 0)
                     {
                         int maxWidth = cellBounds.Width - (margin * 2);
-                        width = (int)double.Ceiling((double)cycleCount * maxWidth / callTreeDateView.TotalCycleCount);
+                        width = (int)double.Ceiling((double)ratio.num * maxWidth / ratio.den);
                     }
 
                     var rect = new Rectangle(
@@ -421,7 +438,7 @@ namespace BeebPerf.ux
                     var color = Blend(
                         callTreeDateView.DefaultCellStyle.BackColor,
                         callTreeDateView.DefaultCellStyle.SelectionBackColor,
-                        selected ? 0.75f : 0.25f);
+                        selected ? 0.75 : 0.25);
 
                     using var brush = new SolidBrush(color);
                     graphics.FillRectangle(brush, rect);
@@ -502,7 +519,7 @@ namespace BeebPerf.ux
                 }
             }
 
-            private Color Blend(Color first, Color second, float ratio)
+            private Color Blend(Color first, Color second, double ratio)
             {
                 int r = (int)(first.R * (1 - ratio) + second.R * ratio);
                 int g = (int)(first.G * (1 - ratio) + second.G * ratio);
