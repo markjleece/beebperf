@@ -207,8 +207,7 @@ namespace BeebPerf.ux
                 var routineGridView = (RoutineGridView)DataGridView!;
                 var routine = (Routine)value!;
 
-                int columnIndex = routineGridView.Columns[ColumnIndex].Index;
-                if (columnIndex == RoutineColumnIndex)
+                if (ColumnIndex == RoutineColumnIndex)
                 {
                     // paint default, minus focus rect
                     base.Paint(
@@ -219,10 +218,10 @@ namespace BeebPerf.ux
                 else
                 {
                     Debug.Assert(
-                        columnIndex == SelfCPUColumnIndex ||
-                        columnIndex == TotalCPUColumnIndex ||
-                        columnIndex == ElapsedCPUColumnIndex ||
-                        columnIndex == ExecutionCountColumnIndex);
+                        ColumnIndex == SelfCPUColumnIndex ||
+                        ColumnIndex == TotalCPUColumnIndex ||
+                        ColumnIndex == ElapsedCPUColumnIndex ||
+                        ColumnIndex == ExecutionCountColumnIndex);
 
                     // paint default background
                     var backPaintParts = paintParts &
@@ -237,7 +236,7 @@ namespace BeebPerf.ux
                         cellStyle, advancedBorderStyle, backPaintParts);
 
                     // draw bar
-                    (int num, int den) ratio = columnIndex switch
+                    (int num, int den) ratio = ColumnIndex switch
                     {
                         SelfCPUColumnIndex => (routine.AggregateMetrics.SelfCycleCount, routineGridView.TotalCycleCount),
                         TotalCPUColumnIndex => (routine.AggregateMetrics.InclusiveCycleCount, routineGridView.TotalCycleCount),
@@ -280,7 +279,7 @@ namespace BeebPerf.ux
                 }
 
                 // paint flame icon
-                if (columnIndex == RoutineColumnIndex && routine.HotRoutine)
+                if (ColumnIndex == RoutineColumnIndex && routine.HotRoutine)
                 {
                     int size = cellBounds.Height / 2;
                     int inset = cellBounds.Height / 4;

@@ -158,9 +158,8 @@ namespace BeebPerf.ux
                 return;
             }
 
-            int columnIndex = Columns[e.ColumnIndex].Index;
             var instructionMetrics = (InstructionMetrics)e.Value!;
-            if (e.RowIndex > 0 && (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex))
+            if (e.RowIndex > 0 && (e.ColumnIndex == AddressColumnIndex || e.ColumnIndex == LabelColumnIndex))
             {
                 // is duplicate?
                 var valueAbove = Rows[e.RowIndex - 1].Cells[e.ColumnIndex].Value;
@@ -176,7 +175,7 @@ namespace BeebPerf.ux
                 }
             }
 
-            e.Value = columnIndex switch {
+            e.Value = e.ColumnIndex switch {
                 AddressColumnIndex        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
                 LabelColumnIndex          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
                 InstructionColumnIndex    => FormatInstruction(instructionMetrics.Instruction),
