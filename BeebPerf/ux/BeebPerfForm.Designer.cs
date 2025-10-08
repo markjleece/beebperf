@@ -43,7 +43,7 @@ namespace BeebPerf.ux
             toolStripSeparator3 = new ToolStripSeparator();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
-            timelinePanel = new Panel();
+            timelineView = new TimelineView();
             splitContainer = new SplitContainer();
             tabControl = new TabControl();
             callTreeTabPage = new TabPage();
@@ -166,13 +166,13 @@ namespace BeebPerf.ux
             helpButton.Text = "Help";
             helpButton.Click += helpButton_Click;
             // 
-            // timelinePanel
+            // timelineView
             // 
-            timelinePanel.Dock = DockStyle.Top;
-            timelinePanel.Location = new Point(0, 33);
-            timelinePanel.Name = "timelinePanel";
-            timelinePanel.Size = new Size(1745, 100);
-            timelinePanel.TabIndex = 1;
+            timelineView.Dock = DockStyle.Top;
+            timelineView.Location = new Point(0, 33);
+            timelineView.Name = "timelineView";
+            timelineView.Size = new Size(1745, 100);
+            timelineView.TabIndex = 1;
             // 
             // splitContainer
             // 
@@ -307,7 +307,7 @@ namespace BeebPerf.ux
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1745, 1110);
             Controls.Add(splitContainer);
-            Controls.Add(timelinePanel);
+            Controls.Add(timelineView);
             Controls.Add(toolStrip);
             Name = "BeebPerfForm";
             Text = "BeebPerf";
@@ -340,7 +340,7 @@ namespace BeebPerf.ux
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
         private ToolStripButton openButton;
-        private Panel timelinePanel;
+        private TimelineView timelineView;
         private SplitContainer splitContainer;
         private TabControl tabControl;
         private TabPage callTreeTabPage;

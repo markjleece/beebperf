@@ -20,7 +20,6 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace BeebPerf
@@ -98,9 +97,10 @@ namespace BeebPerf
             int instructionIndex = stackFrame.FirstInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
 
+            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
-            while (cycleCount <= stackFrame.EndCycleCount)
+            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
             {
                 if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
                 {

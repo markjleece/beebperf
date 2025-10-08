@@ -69,42 +69,46 @@ namespace BeebPerf.ux
             if (_UndoRedoHistory.Execute(openOperation))
             {
                 InstructionSet = _Model.InstructionSet;
-
                 _CPUAnalysis.StaticAnalysis(_Model);
-                _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount: 0, endCycleCount: Int32.MaxValue);
-                UpdateState();
-
-                // populate routines
-                routinesDataGrid.Clear();
-                foreach (var routine in _CPUAnalysis.HotRoutines)
-                {
-                    routinesDataGrid.AddRoutine(routine);
-                }
-
-                int maxExecutionCount = 0;
-                foreach (var routine in _CPUAnalysis.HotRoutines)
-                {
-                   if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
-                        maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
-                }
-
-                routinesDataGrid.MaxExecutionCount = maxExecutionCount;
-                routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
-
-                // populate call tree
-                callTreeControl.Clear();
-
-                if (_CPUAnalysis!.ProgramCallTree != null)
-                    callTreeControl.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
-
-                if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                    callTreeControl.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
-
-                if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                    callTreeControl.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
-
-                callTreeControl.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+                timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
             }
+        }
+
+        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        { 
+            _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount, endCycleCount);
+            UpdateState();
+
+            // populate routines
+            routinesDataGrid.Clear();
+            foreach (var routine in _CPUAnalysis.HotRoutines)
+            {
+                routinesDataGrid.AddRoutine(routine);
+            }
+
+            int maxExecutionCount = 0;
+            foreach (var routine in _CPUAnalysis.HotRoutines)
+            {
+                if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
+                    maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
+            }
+
+            routinesDataGrid.MaxExecutionCount = maxExecutionCount;
+            routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+
+            // populate call tree
+            callTreeControl.Clear();
+
+            if (_CPUAnalysis!.ProgramCallTree != null)
+                callTreeControl.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+
+            if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
+                callTreeControl.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+
+            if (_CPUAnalysis!.MaskableInterruptCallTree != null)
+                callTreeControl.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+
+            callTreeControl.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
         }
 
         private void undoButton_Click(object sender, EventArgs e)
@@ -123,11 +127,14 @@ namespace BeebPerf.ux
 
         private void zoomInButton_Click(object sender, EventArgs e)
         {
+            timelineView.ZoomIn();
+            UpdateState();
         }
 
         private void zoomOutButton_Click(object sender, EventArgs e)
         {
-
+            timelineView.ZoomOut();
+            UpdateState();
         }
 
         private void settingsButton_Click(object sender, EventArgs e)
@@ -144,6 +151,8 @@ namespace BeebPerf.ux
         {
             undoButton.Enabled = _UndoRedoHistory.CanUndo();
             redoButton.Enabled = _UndoRedoHistory.CanRedo();
+            zoomInButton.Enabled = timelineView.CanZoomIn();
+            zoomOutButton.Enabled = timelineView.CanZoomOut();
         }
 
         private UndoRedoHistory _UndoRedoHistory = new();
