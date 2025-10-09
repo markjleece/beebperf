@@ -37,7 +37,7 @@ namespace BeebPerf
         {
             Preamble(model);
             CalculateInstructionRange(startCycleCount, endCycleCount);
-            CalculateMetrics(startCycleCount, endCycleCount);
+            CalculateMetrics();
             PopulateHotRoutines();
             PopulateProgramCallTree();
             PopulateNonMaskableInterruptCallTree();
@@ -57,40 +57,34 @@ namespace BeebPerf
             int cycleCount = 0;
             int instructionIndex = 0;
 
-            if (startCycleCount <= StartCycleCount)
+            while (instructionIndex < _Instructions.Length)
             {
-                FirstInstructionIndex = 0;
-            }
-            else while (instructionIndex < _Instructions.Length)
-                {
-                    if (cycleCount >= startCycleCount)
-                    {
-                        FirstInstructionIndex = instructionIndex;
-                        break;
-                    }
-                    cycleCount += _Instructions[instructionIndex++].CycleCount;
-                }
+                if (cycleCount >= startCycleCount)
+                    break;
 
-            if (endCycleCount >= EndCycleCount)
-            {
-                LastInstructionIndex = _Instructions.Length - 1;
+                cycleCount += _Instructions[instructionIndex++].CycleCount;
             }
-            else while (instructionIndex < _Instructions.Length)
-                {
-                    if (cycleCount >= endCycleCount)
-                    {
-                        LastInstructionIndex = instructionIndex;
-                        break;
-                    }
-                    cycleCount += _Instructions[instructionIndex++].CycleCount;
-                }
+
+            FirstInstructionIndex = instructionIndex;
+            StartCycleCount = cycleCount;
+
+            while (instructionIndex < _Instructions.Length)
+            {
+                cycleCount += _Instructions[instructionIndex].CycleCount;
+                if (cycleCount >= endCycleCount)
+                    break;
+                instructionIndex++;
+            }
+
+            LastInstructionIndex = instructionIndex;
+            EndCycleCount = cycleCount;
         }
 
-        private int CalculatedExcludedCycles(model.StackFrame stackFrame, int startCycleCount, int endCycleCount)
+        private int CalculatedExcludedCycles(model.StackFrame stackFrame)
         {
             Debug.Assert(
-                (startCycleCount > stackFrame.StartCycleCount && startCycleCount <= stackFrame.EndCycleCount) ||
-                (endCycleCount >= stackFrame.StartCycleCount && endCycleCount < stackFrame.EndCycleCount));
+                (StartCycleCount > stackFrame.StartCycleCount && StartCycleCount <= stackFrame.EndCycleCount) ||
+                (EndCycleCount >= stackFrame.StartCycleCount && EndCycleCount < stackFrame.EndCycleCount));
 
             int excludedCycleCount = 0;
             int childIndex = 0;
@@ -115,7 +109,7 @@ namespace BeebPerf
                 // update cycle counts
                 ref Instruction instruction = ref _Instructions[instructionIndex];
                 int instructionCycleCount = instruction.CycleCount;
-                if (cycleCount < startCycleCount || cycleCount > endCycleCount)
+                if (cycleCount < StartCycleCount || cycleCount > EndCycleCount)
                     excludedCycleCount += instructionCycleCount;
 
                 cycleCount += instructionCycleCount;
@@ -125,19 +119,19 @@ namespace BeebPerf
             return excludedCycleCount;
         }
 
-        private int CalculateMetrics(model.StackFrame stackFrame, int startCycleCount, int endCycleCount)
+        private int CalculateMetrics(model.StackFrame stackFrame)
         {
             stackFrame.CPUMetrics.Clear();
 
-            if (startCycleCount > stackFrame.EndCycleCount || endCycleCount < stackFrame.StartCycleCount)
+            if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
             {
                 return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle instructionCount
             }
 
             int excludedCycleCount = 0;
-            if (startCycleCount > stackFrame.StartCycleCount || endCycleCount < stackFrame.EndCycleCount)
+            if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
             {
-                excludedCycleCount = CalculatedExcludedCycles(stackFrame, startCycleCount, endCycleCount);
+                excludedCycleCount = CalculatedExcludedCycles(stackFrame);
             }
 
             int childInclusiveCycleCount = 0;
@@ -145,7 +139,7 @@ namespace BeebPerf
 
             foreach (var childStackFrame in stackFrame.Children)
             {
-                excludedCycleCount += CalculateMetrics(childStackFrame, startCycleCount, endCycleCount);
+                excludedCycleCount += CalculateMetrics(childStackFrame);
                 childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
                 if (childStackFrame.Type != CallType.ISR)
                     childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
@@ -433,6 +427,7 @@ namespace BeebPerf
                 cycleCount = postCycleCount;
             }
 
+            // set initial cycle counts
             StartCycleCount = 0;
             EndCycleCount = cycleCount;
 
@@ -520,20 +515,14 @@ namespace BeebPerf
             }
         }
 
-        private void CalculateMetrics(int startCycleCount, int endCycleCount)
+        private void CalculateMetrics()
         {
-            if (startCycleCount < StartCycleCount)
-                startCycleCount = StartCycleCount;
-
-            if (endCycleCount < EndCycleCount)
-                endCycleCount = EndCycleCount;
-
             _RootStackFrame.ClearMetrics();
 
             foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
-            CalculateMetrics(_RootStackFrame, startCycleCount, endCycleCount);
+            CalculateMetrics(_RootStackFrame);
         }
 
         private void PopulateHotRoutines()
@@ -612,7 +601,7 @@ namespace BeebPerf
         private void PopulateNonMaskableInterruptCallTree()
         {
             NonMaskableInterruptCallTree = null;
-            if (_NonMaskableISR is null)
+            if (_NonMaskableISR is null || _NonMaskableISR.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
@@ -633,7 +622,7 @@ namespace BeebPerf
         private void PopulateMaskableInterruptCallTree()
         {
             MaskableInterruptCallTree = null;
-            if (_MaskableISR is null)
+            if (_MaskableISR is null || _MaskableISR.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
