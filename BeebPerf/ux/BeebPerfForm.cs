@@ -77,7 +77,7 @@ namespace BeebPerf.ux
 
         public void DynamicAnalysis(int startCycleCount, int endCycleCount)
         { 
-            _CPUAnalysis.DynamicAnalysis(_Model, startCycleCount, endCycleCount);
+            _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount);
             UpdateState();
 
             // populate routines

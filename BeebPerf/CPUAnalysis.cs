@@ -28,15 +28,14 @@ namespace BeebPerf
     {
         public void StaticAnalysis(Model model)
         {
-            Preamble(model);
+            Initialize(model);
             IdentifyRoutines();
             IdentifyStackFrames();
         }
 
-        public void DynamicAnalysis(Model model, int startCycleCount, int endCycleCount)
+        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
-            Preamble(model);
-            CalculateInstructionRange(startCycleCount, endCycleCount);
+            CalculateRange(startCycleCount, endCycleCount);
             CalculateMetrics();
             PopulateHotRoutines();
             PopulateProgramCallTree();
@@ -45,123 +44,14 @@ namespace BeebPerf
             MarkHotPaths();
         }
 
-        private void Preamble(Model model)
+        //
+        // static analysis...
+        //
+        private void Initialize(Model model)
         {
             _Instructions = model.Instructions;
             _InstructionSet = model.InstructionSet;
             _Labels = model.Labels;
-        }
-
-        private void CalculateInstructionRange(int startCycleCount, int endCycleCount)
-        {
-            int cycleCount = 0;
-            int instructionIndex = 0;
-
-            while (instructionIndex < _Instructions.Length)
-            {
-                if (cycleCount >= startCycleCount)
-                    break;
-
-                cycleCount += _Instructions[instructionIndex++].CycleCount;
-            }
-
-            FirstInstructionIndex = instructionIndex;
-            StartCycleCount = cycleCount;
-
-            while (instructionIndex < _Instructions.Length)
-            {
-                cycleCount += _Instructions[instructionIndex].CycleCount;
-                if (cycleCount >= endCycleCount)
-                    break;
-                instructionIndex++;
-            }
-
-            LastInstructionIndex = instructionIndex;
-            EndCycleCount = cycleCount;
-        }
-
-        private int CalculatedExcludedCycles(model.StackFrame stackFrame)
-        {
-            Debug.Assert(
-                (StartCycleCount > stackFrame.StartCycleCount && StartCycleCount <= stackFrame.EndCycleCount) ||
-                (EndCycleCount >= stackFrame.StartCycleCount && EndCycleCount < stackFrame.EndCycleCount));
-
-            int excludedCycleCount = 0;
-            int childIndex = 0;
-            int instructionIndex = stackFrame.FirstInstructionIndex;
-            int cycleCount = stackFrame.StartCycleCount;
-
-            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
-            model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
-
-            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
-            {
-                if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
-                {
-                    // skip over child stack frames
-                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
-                    cycleCount = childStackFrame.EndCycleCount;
-
-                    childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
-                    continue;
-                }
-
-                // update cycle counts
-                ref Instruction instruction = ref _Instructions[instructionIndex];
-                int instructionCycleCount = instruction.CycleCount;
-                if (cycleCount < StartCycleCount || cycleCount > EndCycleCount)
-                    excludedCycleCount += instructionCycleCount;
-
-                cycleCount += instructionCycleCount;
-                instructionIndex++;
-            }
-
-            return excludedCycleCount;
-        }
-
-        private int CalculateMetrics(model.StackFrame stackFrame)
-        {
-            stackFrame.CPUMetrics.Clear();
-
-            if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
-            {
-                return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle instructionCount
-            }
-
-            int excludedCycleCount = 0;
-            if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
-            {
-                excludedCycleCount = CalculatedExcludedCycles(stackFrame);
-            }
-
-            int childInclusiveCycleCount = 0;
-            int childElapsedCycleCount = 0;
-
-            foreach (var childStackFrame in stackFrame.Children)
-            {
-                excludedCycleCount += CalculateMetrics(childStackFrame);
-                childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
-                if (childStackFrame.Type != CallType.ISR)
-                    childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
-            }
-
-            var cpuMetrics = stackFrame.CPUMetrics;
-            cpuMetrics.ExecutionCount = 1;
-            cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
-            cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
-            cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
-
-            Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
-            Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
-
-            if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
-                metrics.Add(cpuMetrics);
-            else
-                stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
-
-            stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
-
-            return excludedCycleCount;
         }
 
         private void IdentifyRoutines()
@@ -490,29 +380,35 @@ namespace BeebPerf
             return (instruction.DestinationAddress.CompareTo(jsrInstruction.OpcodeAddress.Offset(3)) != 0);
         }
 
-        private void ValidateStackFrame(model.StackFrame stackFrame)
+        //
+        // dynamic analysis...
+        //
+        private void CalculateRange(int startCycleCount, int endCycleCount)
         {
-            Debug.Assert(stackFrame.StartCycleCount == 0 || stackFrame.FirstInstructionIndex > 0);
-            Debug.Assert(stackFrame.LastInstructionIndex > 0);
-            Debug.Assert(stackFrame.StartCycleCount <= stackFrame.EndCycleCount);
-            Debug.Assert(stackFrame.FirstInstructionIndex <= stackFrame.LastInstructionIndex);
+            int cycleCount = 0;
+            int instructionIndex = 0;
 
-            model.StackFrame? lastChildStackFrame = null;
-            foreach (var childStackFrame in stackFrame.Children)
+            while (instructionIndex < _Instructions.Length)
             {
-                ValidateStackFrame(childStackFrame);
+                if (cycleCount >= startCycleCount)
+                    break;
 
-                Debug.Assert(childStackFrame.StartCycleCount >= stackFrame.StartCycleCount);
-                Debug.Assert(childStackFrame.EndCycleCount <= stackFrame.EndCycleCount);
-
-                if (lastChildStackFrame != null)
-                {
-                    Debug.Assert(lastChildStackFrame.EndCycleCount <= childStackFrame.StartCycleCount);
-                    Debug.Assert(lastChildStackFrame.LastInstructionIndex < childStackFrame.FirstInstructionIndex);
-                }
-
-                lastChildStackFrame = childStackFrame;
+                cycleCount += _Instructions[instructionIndex++].CycleCount;
             }
+
+            FirstInstructionIndex = instructionIndex;
+            StartCycleCount = cycleCount;
+
+            while (instructionIndex < _Instructions.Length)
+            {
+                cycleCount += _Instructions[instructionIndex].CycleCount;
+                if (cycleCount >= endCycleCount)
+                    break;
+                instructionIndex++;
+            }
+
+            LastInstructionIndex = instructionIndex;
+            EndCycleCount = cycleCount;
         }
 
         private void CalculateMetrics()
@@ -523,6 +419,90 @@ namespace BeebPerf
                 routine.ClearMetrics();
 
             CalculateMetrics(_RootStackFrame);
+        }
+
+        private int CalculateMetrics(model.StackFrame stackFrame)
+        {
+            stackFrame.CPUMetrics.Clear();
+
+            if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
+            {
+                return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle instructionCount
+            }
+
+            int excludedCycleCount = 0;
+            if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
+            {
+                excludedCycleCount = CalculatedExcludedCycles(stackFrame);
+            }
+
+            int childInclusiveCycleCount = 0;
+            int childElapsedCycleCount = 0;
+
+            foreach (var childStackFrame in stackFrame.Children)
+            {
+                excludedCycleCount += CalculateMetrics(childStackFrame);
+                childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
+                if (childStackFrame.Type != CallType.ISR)
+                    childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+            }
+
+            var cpuMetrics = stackFrame.CPUMetrics;
+            cpuMetrics.ExecutionCount = 1;
+            cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
+            cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
+            cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
+
+            Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
+            Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
+
+            if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
+                metrics.Add(cpuMetrics);
+            else
+                stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
+
+            stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
+
+            return excludedCycleCount;
+        }
+
+        private int CalculatedExcludedCycles(model.StackFrame stackFrame)
+        {
+            Debug.Assert(
+                (StartCycleCount > stackFrame.StartCycleCount && StartCycleCount <= stackFrame.EndCycleCount) ||
+                (EndCycleCount >= stackFrame.StartCycleCount && EndCycleCount < stackFrame.EndCycleCount));
+
+            int excludedCycleCount = 0;
+            int childIndex = 0;
+            int instructionIndex = stackFrame.FirstInstructionIndex;
+            int cycleCount = stackFrame.StartCycleCount;
+
+            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+            model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+
+            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
+            {
+                if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
+                {
+                    // skip over child stack frames
+                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
+                    cycleCount = childStackFrame.EndCycleCount;
+
+                    childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
+                    continue;
+                }
+
+                // update cycle counts
+                ref Instruction instruction = ref _Instructions[instructionIndex];
+                int instructionCycleCount = instruction.CycleCount;
+                if (cycleCount < StartCycleCount || cycleCount > EndCycleCount)
+                    excludedCycleCount += instructionCycleCount;
+
+                cycleCount += instructionCycleCount;
+                instructionIndex++;
+            }
+
+            return excludedCycleCount;
         }
 
         private void PopulateHotRoutines()
@@ -541,13 +521,6 @@ namespace BeebPerf
                 DebugPrintLine(indent: 0, routine, routine.AggregateMetrics);
         }
 
-        private void PopulateCallTreeNodeList(CallTreeNode treeNode, List<CallTreeNode> treeNodeList)
-        {
-            treeNodeList.Add(treeNode);
-            foreach (var child in treeNode.Children)
-                PopulateCallTreeNodeList(child, treeNodeList);
-        }
-
         private void PopulateProgramCallTree()
         {
             Dictionary<CallStack, CallTreeNode> treeNodesByStack = new();
@@ -562,15 +535,6 @@ namespace BeebPerf
 
             Debug.WriteLine("Program stack:");
             DebugPrintTree(ProgramCallTree, depth: 0);
-        }
-
-        private bool SetHotPaths(CallTreeNode treeNode)
-        {
-            bool hotChild = false;
-            foreach (var child in treeNode.Children)
-                hotChild |= SetHotPaths(child);
-            treeNode.HotPath = (hotChild || treeNode.Routine.HotRoutine);
-            return treeNode.HotPath;
         }
 
         private static CallTreeNode? PopulateProgramCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
@@ -691,6 +655,13 @@ namespace BeebPerf
                 treeNodes[i].HotPath = true;
         }
 
+        private void PopulateCallTreeNodeList(CallTreeNode treeNode, List<CallTreeNode> treeNodeList)
+        {
+            treeNodeList.Add(treeNode);
+            foreach (var child in treeNode.Children)
+                PopulateCallTreeNodeList(child, treeNodeList);
+        }
+
         private static void DebugPrintTree(CallTreeNode treeNode, int depth)
         {
             var routine = treeNode.Routine;
@@ -713,6 +684,9 @@ namespace BeebPerf
                 $"instructionCount: {metrics.ExecutionCount}");
         }
 
+        //
+        // instruction metrics...
+        //
         public List<InstructionMetrics> CalculateInstructionMetrics(Routine routine, CallStack? callStack)
         {
             Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics = new();
@@ -730,44 +704,6 @@ namespace BeebPerf
             IdentifyModifiedCode(instructionMetricsList);
 
             return instructionMetricsList;
-        }
-
-        private void IdentifyModifiedCode(List<InstructionMetrics> instructionMetrics)
-        {
-            // construct diction that maps addresses to number of distinct instructions
-            var addressSlots = new Dictionary<CanonicalAddress, int>(instructionMetrics.Count);
-            foreach (var instructionMetric in instructionMetrics)
-            {
-                byte opcode = instructionMetric.Instruction.Opcode;
-                var address = instructionMetric.Instruction.OpcodeAddress;
-                int size = _InstructionSet!.Size(opcode);
-
-                // determine instruction count
-                int instructionCount = 1;
-                for (int i = 0; i < size; i++)
-                { 
-                    if (addressSlots.TryGetValue(address, out var existingInstructionCount))
-                        if (instructionCount <= existingInstructionCount)
-                            instructionCount = existingInstructionCount + 1;
-                    address = address.Offset(1);
-                }
-
-                // set instructionCount
-                address = instructionMetric.Instruction.OpcodeAddress;
-                for (int i = 0; i < size; i++)
-                {
-                    addressSlots[address] = instructionCount;
-                    address = address.Offset(1);
-                }
-            }
-
-            // mark instructions
-            foreach (var instructionMetric in instructionMetrics)
-            {
-                var address = instructionMetric.Instruction.OpcodeAddress;
-                if (addressSlots.TryGetValue(address, out var instructionCount))
-                    instructionMetric.CodeModified = (instructionCount > 1);
-            }
         }
 
         private void CalculateStackFrameMetrics(
@@ -830,6 +766,44 @@ namespace BeebPerf
 
                 cycleCount += instructionCycleCount;
                 instructionIndex++;
+            }
+        }
+
+        private void IdentifyModifiedCode(List<InstructionMetrics> instructionMetrics)
+        {
+            // construct diction that maps addresses to number of distinct instructions
+            var addressSlots = new Dictionary<CanonicalAddress, int>(instructionMetrics.Count);
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                byte opcode = instructionMetric.Instruction.Opcode;
+                var address = instructionMetric.Instruction.OpcodeAddress;
+                int size = _InstructionSet!.Size(opcode);
+
+                // determine instruction count
+                int instructionCount = 1;
+                for (int i = 0; i < size; i++)
+                {
+                    if (addressSlots.TryGetValue(address, out var existingInstructionCount))
+                        if (instructionCount <= existingInstructionCount)
+                            instructionCount = existingInstructionCount + 1;
+                    address = address.Offset(1);
+                }
+
+                // set instructionCount
+                address = instructionMetric.Instruction.OpcodeAddress;
+                for (int i = 0; i < size; i++)
+                {
+                    addressSlots[address] = instructionCount;
+                    address = address.Offset(1);
+                }
+            }
+
+            // mark instructions
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                var address = instructionMetric.Instruction.OpcodeAddress;
+                if (addressSlots.TryGetValue(address, out var instructionCount))
+                    instructionMetric.CodeModified = (instructionCount > 1);
             }
         }
 
