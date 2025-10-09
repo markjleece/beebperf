@@ -69,9 +69,9 @@ namespace BeebPerf.ux
             _InstructionStyle = new InstructionColors()
             {
                 MnemonicColor = Color.DarkGreen,
-                AddressColor = Color.CadetBlue,
+                AddressColor = Color.DarkBlue,
                 LabelColor = Color.Black,
-                PunctuationColor = Color.DarkGray
+                PunctuationColor = Color.DarkSlateGray
             };
         }
 

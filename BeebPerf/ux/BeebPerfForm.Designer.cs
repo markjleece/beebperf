@@ -82,9 +82,9 @@ namespace BeebPerf.ux
             openButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             openButton.Image = (Image)resources.GetObject("openButton.Image");
             openButton.ImageTransparentColor = Color.Magenta;
-            openButton.Name = "Open";
+            openButton.Name = "openButton";
             openButton.Size = new Size(34, 28);
-            openButton.Text = "openButton";
+            openButton.Text = "Open";
             openButton.ToolTipText = "Open";
             openButton.Click += openButton_Click;
             // 
