@@ -71,6 +71,7 @@ namespace BeebPerf.ux
                 InstructionSet = _Model.InstructionSet;
                 _CPUAnalysis.StaticAnalysis(_Model);
                 timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
+                DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
             }
         }
 
@@ -137,6 +138,12 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
+        private void selectAllButton_Click(object sender, EventArgs e)
+        {
+            timelineView.SelectAll();
+            UpdateState();
+        }
+
         private void settingsButton_Click(object sender, EventArgs e)
         {
 
@@ -153,6 +160,7 @@ namespace BeebPerf.ux
             redoButton.Enabled = _UndoRedoHistory.CanRedo();
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
+            selectAllButton.Enabled = timelineView.CanSelectAll();
         }
 
         private UndoRedoHistory _UndoRedoHistory = new();

@@ -40,6 +40,7 @@ namespace BeebPerf.ux
             toolStripSeparator2 = new ToolStripSeparator();
             zoomInButton = new ToolStripButton();
             zoomOutButton = new ToolStripButton();
+            selectAllButton = new ToolStripButton();
             toolStripSeparator3 = new ToolStripSeparator();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
@@ -69,7 +70,7 @@ namespace BeebPerf.ux
             // toolStrip
             // 
             toolStrip.ImageScalingSize = new Size(24, 24);
-            toolStrip.Items.AddRange(new ToolStripItem[] { openButton, toolStripSeparator1, undoButton, redoButton, toolStripSeparator2, zoomInButton, zoomOutButton, toolStripSeparator3, settingsButton, helpButton });
+            toolStrip.Items.AddRange(new ToolStripItem[] { openButton, toolStripSeparator1, undoButton, redoButton, toolStripSeparator2, zoomInButton, zoomOutButton, selectAllButton, toolStripSeparator3, settingsButton, helpButton });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Size = new Size(1745, 33);
@@ -78,10 +79,10 @@ namespace BeebPerf.ux
             // 
             // openButton
             // 
-            openButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            openButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             openButton.Image = (Image)resources.GetObject("openButton.Image");
             openButton.ImageTransparentColor = Color.Magenta;
-            openButton.Name = "openButton";
+            openButton.Name = "Open";
             openButton.Size = new Size(34, 28);
             openButton.Text = "openButton";
             openButton.ToolTipText = "Open";
@@ -94,7 +95,7 @@ namespace BeebPerf.ux
             // 
             // undoButton
             // 
-            undoButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            undoButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             undoButton.Image = (Image)resources.GetObject("undoButton.Image");
             undoButton.ImageTransparentColor = Color.Magenta;
             undoButton.Name = "undoButton";
@@ -105,7 +106,7 @@ namespace BeebPerf.ux
             // 
             // redoButton
             // 
-            redoButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            redoButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             redoButton.Image = (Image)resources.GetObject("redoButton.Image");
             redoButton.ImageTransparentColor = Color.Magenta;
             redoButton.Name = "redoButton";
@@ -121,7 +122,7 @@ namespace BeebPerf.ux
             // 
             // zoomInButton
             // 
-            zoomInButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            zoomInButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             zoomInButton.Image = (Image)resources.GetObject("zoomInButton.Image");
             zoomInButton.ImageTransparentColor = Color.Magenta;
             zoomInButton.Name = "zoomInButton";
@@ -132,13 +133,23 @@ namespace BeebPerf.ux
             // 
             // zoomOutButton
             // 
-            zoomOutButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            zoomOutButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             zoomOutButton.Image = (Image)resources.GetObject("zoomOutButton.Image");
             zoomOutButton.ImageTransparentColor = Color.Magenta;
             zoomOutButton.Name = "zoomOutButton";
             zoomOutButton.Size = new Size(34, 28);
             zoomOutButton.Text = "Zoom Out";
             zoomOutButton.Click += zoomOutButton_Click;
+            // 
+            // selectAllButton
+            // 
+            selectAllButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            selectAllButton.Image = (Image)resources.GetObject("selectAllButton.Image");
+            selectAllButton.ImageTransparentColor = Color.Magenta;
+            selectAllButton.Name = "selectAllButton";
+            selectAllButton.Size = new Size(34, 28);
+            selectAllButton.Text = "Select All";
+            selectAllButton.Click += selectAllButton_Click;
             // 
             // toolStripSeparator3
             // 
@@ -147,7 +158,7 @@ namespace BeebPerf.ux
             // 
             // settingsButton
             // 
-            settingsButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            settingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             settingsButton.Image = (Image)resources.GetObject("settingsButton.Image");
             settingsButton.ImageTransparentColor = Color.Magenta;
             settingsButton.Name = "settingsButton";
@@ -158,7 +169,7 @@ namespace BeebPerf.ux
             // 
             // helpButton
             // 
-            helpButton.DisplayStyle = ToolStripItemDisplayStyle.Image;
+            helpButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
             helpButton.Image = (Image)resources.GetObject("helpButton.Image");
             helpButton.ImageTransparentColor = Color.Magenta;
             helpButton.Name = "helpButton";
@@ -171,7 +182,7 @@ namespace BeebPerf.ux
             timelineView.Dock = DockStyle.Top;
             timelineView.Location = new Point(0, 33);
             timelineView.Name = "timelineView";
-            timelineView.Size = new Size(1745, 100);
+            timelineView.Size = new Size(1745, 84);
             timelineView.TabIndex = 1;
             // 
             // splitContainer
@@ -336,6 +347,7 @@ namespace BeebPerf.ux
         private ToolStripSeparator toolStripSeparator2;
         private ToolStripButton zoomInButton;
         private ToolStripButton zoomOutButton;
+        private ToolStripButton selectAllButton;
         private ToolStripSeparator toolStripSeparator3;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;

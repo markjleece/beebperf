@@ -22,6 +22,7 @@
 using System.Diagnostics;
 using System.DirectoryServices;
 using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -34,12 +35,16 @@ namespace BeebPerf.ux
             _ScrollBar.Scroll += ScrollBar_Scroll;
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
+
+            _SelectionChangeTimer = new System.Windows.Forms.Timer();
+            _SelectionChangeTimer.Interval = 500;
+            _SelectionChangeTimer.Tick += SelectionChangeTimer_Tick;
         }
 
         protected override void OnResize(EventArgs eventargs)
         {
             base.OnResize(eventargs);
-            RefreshTimeline();
+            UpdateTimeline();
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -131,7 +136,8 @@ namespace BeebPerf.ux
 
             _DragMode = DragMode.None;
 
-            PerformAnalysis();
+            _SelectionChangeTimer.Stop();
+            _SelectionChangeTimer.Start();
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
@@ -141,68 +147,87 @@ namespace BeebPerf.ux
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            Graphics graphics = e.Graphics;
+
             int displayFrom = _TimelineRect.Left;
             int displayTo = _TimelineRect.Right;
 
             // draw handles
             using var handleBrush = new SolidBrush(ForeColor);
-            e.Graphics.FillRectangle(handleBrush, _LeftHandleRect);
-            e.Graphics.FillRectangle(handleBrush, _RightHandleRect);
+            graphics.FillRectangle(handleBrush, _LeftHandleRect);
+            graphics.FillRectangle(handleBrush, _RightHandleRect);
 
-            e.Graphics.ExcludeClip(_LeftHandleRect);
-            e.Graphics.ExcludeClip(_RightHandleRect);
+            graphics.ExcludeClip(_LeftHandleRect);
+            graphics.ExcludeClip(_RightHandleRect);
 
             // draw background
-            var leftExclusion = new Rectangle(displayFrom, _TimelineRect.Top, _LeftHandleRect.Left - displayFrom, _TimelineRect.Height);
-            var rightExclusion = new Rectangle(_RightHandleRect.Right, _TimelineRect.Top, displayTo - _RightHandleRect.Right, _TimelineRect.Height);
+            int left = SecondsToPixels(0);
+            int right = SecondsToPixels(_RecordingDuration);
 
-            leftExclusion.Intersect(_TimelineRect);
-            rightExclusion.Intersect(_TimelineRect);
+            using var exclusionBrush = new SolidBrush(Blend(BackColor, ForeColor, 0.2));
+            var leftExclusionRect = new Rectangle(left, _TimelineRect.Top, _LeftHandleRect.Left - left, _TimelineRect.Height);
+            if (graphics.IsVisible(leftExclusionRect))
+                graphics.FillRectangle(exclusionBrush, leftExclusionRect);
 
-            GraphicsState state = e.Graphics.Save();
+            var rightExclusionRect = new Rectangle(_RightHandleRect.Right, _TimelineRect.Top, right - _RightHandleRect.Right, _TimelineRect.Height);
+            if (graphics.IsVisible(rightExclusionRect))
+                graphics.FillRectangle(exclusionBrush, rightExclusionRect);
 
-            e.Graphics.ExcludeClip(leftExclusion);
-            e.Graphics.ExcludeClip(rightExclusion);
+            using var centerBrush = new SolidBrush(SystemColors.Highlight);
+            var centerRect = new Rectangle(_LeftHandleRect.Right, _TimelineRect.Top, _RightHandleRect.Left - _LeftHandleRect.Right, _TimelineRect.Height);
+            if (graphics.IsVisible(centerRect))
+                graphics.FillRectangle(centerBrush, centerRect);
 
-            using var windowBrush = new SolidBrush(BackColor);
-            e.Graphics.FillRectangle(windowBrush, e.ClipRectangle);
+            GraphicsState state;
+            var exclusionRect = new Rectangle(left, _TimelineRect.Top, right - left, _TimelineRect.Height);
+            if (graphics.IsVisible(exclusionRect))
+            {
+                state = graphics.Save();
+                graphics.ExcludeClip(exclusionRect);
+
+                using var windowBrush = new SolidBrush(BackColor);
+                graphics.FillRectangle(windowBrush, e.ClipRectangle);
+                graphics.Restore(state);
+            }
 
             // draw header text
             using var textBrush = new SolidBrush(ForeColor);
-            e.Graphics.DrawString(_DurationText, Font, textBrush, new PointF(0, 0));
-
-            e.Graphics.Restore(state);
-
-            if (!leftExclusion.IsEmpty || !rightExclusion.IsEmpty)
-            {
-                using var borderBrush = new SolidBrush(Blend(BackColor, ForeColor, 0.2));
-
-                if (e.ClipRectangle.IntersectsWith(leftExclusion))
-                    e.Graphics.FillRectangle(borderBrush, leftExclusion);
-
-                if (e.ClipRectangle.IntersectsWith(rightExclusion))
-                    e.Graphics.FillRectangle(borderBrush, rightExclusion);
-            }
+            graphics.DrawString(_DurationText, Font, textBrush, new PointF(0, 0));
 
             // draw top and bottom lines
-            var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
-            e.Graphics.DrawLine(pen, 0, _TimelineRect.Top, Width, _TimelineRect.Top);
-            e.Graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
+            using var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
+            using var brush = new SolidBrush(ForeColor);
 
+            graphics.DrawLine(pen, 0, _TimelineRect.Top, Width, _TimelineRect.Top);
+            graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
+
+            // draw ruler ticks and text
+            state = graphics.Save();
+            graphics.ExcludeClip(centerRect);
+            DrawRulerForeground(graphics, pen, brush);
+            graphics.Restore(state);
+
+            graphics.IntersectClip(centerRect);
+            using var highlightPen = new Pen(Blend(SystemColors.Highlight, BackColor, 0.5));
+            using var highlightBrush = new SolidBrush(BackColor);
+            DrawRulerForeground(graphics, highlightPen, highlightBrush);
+        }
+
+        private void DrawRulerForeground(Graphics graphics, Pen pen, Brush brush)
+        {
             // draw ticks
             foreach (var tick in _MajorTicks)
             {
                 int xPos = SecondsToPixels(tick);
-                e.Graphics.DrawLine(pen, xPos, _TimelineRect.Top, xPos, _TimelineRect.Bottom - 1);
+                graphics.DrawLine(pen, xPos, _TimelineRect.Top, xPos, _TimelineRect.Bottom - 1);
                 string text = FormatSeconds(tick);
-                using var brush = new SolidBrush(ForeColor);
-                e.Graphics.DrawString(text, Font, brush, xPos, _TimelineRect.Top);
+                graphics.DrawString(text, Font, brush, xPos, _TimelineRect.Top);
             }
 
             foreach (var tick in _MinorTicks)
             {
                 int xPos = SecondsToPixels(tick);
-                e.Graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - 1, xPos, _TimelineRect.Bottom - _TimelineRect.Height / 4);
+                graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - 1, xPos, _TimelineRect.Bottom - _TimelineRect.Height / 4);
             }
         }
 
@@ -295,7 +320,10 @@ namespace BeebPerf.ux
                 _ => throw new NotImplementedException(),
             };
 
-            string newText = $"Analysis Duration: {FormatSeconds(duration)}";
+            string newText = $"Duration: {FormatSeconds(_RecordingDuration)}";
+            if (duration != _RecordingDuration)
+                newText += $" ({FormatSeconds(duration)} selected)";
+
             if (newText == _DurationText)
                 return;
 
@@ -327,52 +355,9 @@ namespace BeebPerf.ux
         public void SetDuration(int recordingDuration)
         {
             _RecordingDuration = (double)recordingDuration / 2_000_000;
-            ResetTimeline();
-        }
-
-        public void ResetTimeline()
-        {
-            int margin = Font.Height * 4;
-            int range = Width - margin * 2;
-            double extends = _RecordingDuration * margin / range;
-
-            _DisplayFrom = -extends;
-            _DisplayTo = _RecordingDuration + extends;
-
             _AnalysisFrom = 0;
             _AnalysisTo = _RecordingDuration;
-
-            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
-            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
-
-            UpdateDurationText();
-            RefreshTimeline();
-
-            _ScrollBar.Enabled = false;
-
-            PerformAnalysis();
-        }
-
-        public void ScaleToFit()
-        {
-            int margin = Font.Height * 4;
-            int range = Width - margin * 2;
-            double extends = (_AnalysisTo - _AnalysisFrom) * margin / range;
-            _DisplayFrom = _AnalysisFrom - extends;
-            _DisplayTo = _AnalysisTo + extends;
-
-            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
-            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
-
-            UpdateDurationText();
-            RefreshTimeline();
-
-            _ScrollBar.Minimum = SecondsToPixels(-extends);
-            _ScrollBar.Maximum = SecondsToPixels(_RecordingDuration + extends);
-            _ScrollBar.LargeChange = SecondsToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
-            _ScrollBar.SmallChange = Width / DeviceDpi;
-            _ScrollBar.Value = 0;
-            _ScrollBar.Enabled = true;
+            ZoomOut();
         }
 
         private void ScrollBar_Scroll(object? sender, ScrollEventArgs e)
@@ -385,7 +370,7 @@ namespace BeebPerf.ux
             SetRightHandleRect(SecondsToPixels(_AnalysisTo));
 
             UpdateDurationText();
-            RefreshTimeline();
+            UpdateTimeline();
         }
 
         public bool CanZoomIn()
@@ -393,19 +378,65 @@ namespace BeebPerf.ux
             return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
         }
 
-        public bool CanZoomOut()
-        {
-            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
-        }
-
         public void ZoomIn()
         {
-            ScaleToFit();
+            int margin = Font.Height * 4;
+            int range = Width - margin * 2;
+            double extends = (_AnalysisTo - _AnalysisFrom) * margin / range;
+            _DisplayFrom = _AnalysisFrom - extends;
+            _DisplayTo = _AnalysisTo + extends;
+
+            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
+            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
+
+            UpdateDurationText();
+            UpdateTimeline();
+
+            _ScrollBar.Minimum = SecondsToPixels(-extends);
+            _ScrollBar.Maximum = SecondsToPixels(_RecordingDuration + extends);
+            _ScrollBar.LargeChange = SecondsToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
+            _ScrollBar.SmallChange = Width / DeviceDpi;
+            _ScrollBar.Value = 0;
+            _ScrollBar.Enabled = true;
+        }
+
+        public bool CanZoomOut()
+        {
+            return _ScrollBar.Enabled;
         }
 
         public void ZoomOut()
         {
-            ResetTimeline();
+            int margin = Font.Height * 4;
+            int range = Width - margin * 2;
+            double extends = _RecordingDuration * margin / range;
+
+            _DisplayFrom = -extends;
+            _DisplayTo = _RecordingDuration + extends;
+
+            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
+            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
+
+            UpdateDurationText();
+            UpdateTimeline();
+
+            _ScrollBar.Enabled = false;
+        }
+
+        public bool CanSelectAll()
+        {
+            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
+        }
+
+        public void SelectAll()
+        {
+            _AnalysisFrom = 0;
+            _AnalysisTo = _RecordingDuration;
+
+            ZoomOut();
+
+            _SelectionChangeTimer.Stop();
+            _SelectionChangeTimer.Start();
         }
 
         private int TickCount()
@@ -416,14 +447,14 @@ namespace BeebPerf.ux
             }
         }
 
-        private void RefreshTimeline()
+        private void UpdateTimeline()
         {
             int margin = Font.Height;
             _TimelineRect = new Rectangle(
                 0,
                 margin,
                 Width,
-                Height - margin - (margin / 2) - _ScrollBar.Height);
+                Height - margin - _ScrollBar.Height);
 
             ComputeTicks();
             Invalidate();
@@ -495,8 +526,10 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
-        private void PerformAnalysis()
+        private void SelectionChangeTimer_Tick(object? sender, EventArgs e)
         {
+            _SelectionChangeTimer.Stop();
+
             var form = (BeebPerfForm)GetParentForm();
             int cyclesFrom = (int)(_AnalysisFrom * 2_000_000.0);
             int cyclesTo = (int)(_AnalysisTo * 2_000_000.0);
@@ -526,5 +559,6 @@ namespace BeebPerf.ux
         private List<double> _MajorTicks = [];
         private List<double> _MinorTicks = [];
         private HScrollBar _ScrollBar;
+        private System.Windows.Forms.Timer _SelectionChangeTimer;
     }
 }
