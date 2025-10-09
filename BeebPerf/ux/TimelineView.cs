@@ -349,7 +349,7 @@ namespace BeebPerf.ux
             else if (value >= 1e-3)
                 return $"{(value * 1e3):#.###}ms";
             else
-                return $"{(value * 1e6)}µs";
+                return $"{(value * 1e6):#.#}µs";
         }
 
         public void SetDuration(int recordingDuration)
