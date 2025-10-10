@@ -21,8 +21,6 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
-using BeebPerf.Properties;
-using System.Resources;
 
 namespace BeebPerf.ux
 {
@@ -35,14 +33,22 @@ namespace BeebPerf.ux
 
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
             FlameImage = (Image)resources.GetObject("flame.Image")!;
+
+            FormClosing += BeebPerfForm_FormClosing;
+        }
+
+        private void BeebPerfForm_FormClosing(object? sender, FormClosingEventArgs e)
+        {
+            SaveAppState();
         }
 
         private void BeebPerfForm_Load(object sender, EventArgs e)
         {
-            string filePathName = AppSettings.Instance.RecentFilePathName;
-            if (filePathName != string.Empty && File.Exists(filePathName))
+            RestoreAppState();
+
+            if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
             {
-                OpenPerfFile(filePathName);
+                OpenPerfFile(_RecentFilePathName);
             }
         }
 
@@ -50,7 +56,7 @@ namespace BeebPerf.ux
         {
             OpenFileDialog openFileDialog = new()
             {
-                InitialDirectory = Path.GetDirectoryName(AppSettings.Instance.RecentFilePathName),
+                InitialDirectory = Path.GetDirectoryName(_RecentFilePathName),
                 Filter = "Beeb .perf files (*.perf)|*.perf",
                 FilterIndex = 1,
                 RestoreDirectory = true
@@ -58,7 +64,7 @@ namespace BeebPerf.ux
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                AppSettings.Instance.RecentFilePathName = openFileDialog.FileName;
+                _RecentFilePathName = openFileDialog.FileName;
                 OpenPerfFile(openFileDialog.FileName);
             }
         }
@@ -182,9 +188,40 @@ namespace BeebPerf.ux
             _SelectedCallStack = null;
         }
 
+        private void SaveAppState()
+        {
+            var bounds = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
+            var windowState = (WindowState == FormWindowState.Minimized) ? FormWindowState.Normal : WindowState;
+            Properties.Settings.Default.WindowLocation = bounds.Location;
+            Properties.Settings.Default.WindowSize = bounds.Size;
+            Properties.Settings.Default.WindowState = (int)windowState;
+            Properties.Settings.Default.RecentFilePathName = _RecentFilePathName;
+            Properties.Settings.Default.Save();
+        }
+
+        private void RestoreAppState()
+        {
+            _RecentFilePathName = Properties.Settings.Default.RecentFilePathName;
+
+            var location = Properties.Settings.Default.WindowLocation;
+            var size = Properties.Settings.Default.WindowSize;
+            var state = Properties.Settings.Default.WindowState;
+
+            var screenBounds = Screen.FromPoint(location).WorkingArea;
+            if (!screenBounds.Contains(new Rectangle(location, size)))
+                location = new Point(100, 100);
+
+            StartPosition = FormStartPosition.Manual;
+            Location = location;
+            Size = size;
+            WindowState = (FormWindowState)state;
+        }
+
         public Image FlameImage;
         public InstructionSet? InstructionSet;
+
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
+        private string _RecentFilePathName = string.Empty;
     }
 }

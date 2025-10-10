@@ -124,7 +124,7 @@ namespace BeebPerf.ux
 
             if (_DragMode == DragMode.LeftHandle || _DragMode == DragMode.Range)
                 _AnalysisFrom = PixelsToSeconds(_LeftHandleRect.Right - 1);
-            
+
             if (_DragMode == DragMode.RightHandle || _DragMode == DragMode.Range)
                 _AnalysisTo = PixelsToSeconds(_RightHandleRect.Left);
 
@@ -140,11 +140,15 @@ namespace BeebPerf.ux
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            // do nothing
+            if (_RecordingDuration == 0)
+                PaintDefaultBackground(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (_RecordingDuration == 0)
+                return;
+
             Graphics graphics = e.Graphics;
 
             int displayFrom = _TimelineRect.Left;
@@ -226,6 +230,42 @@ namespace BeebPerf.ux
             {
                 int xPos = SecondsToPixels(tick);
                 graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - 1, xPos, _TimelineRect.Bottom - _TimelineRect.Height / 4);
+            }
+        }
+
+        private void PaintDefaultBackground(PaintEventArgs e)
+        {
+            Graphics graphics = e.Graphics;
+
+            // draw background
+            using var windowBrush = new SolidBrush(BackColor);
+            graphics.FillRectangle(windowBrush, e.ClipRectangle);
+
+            // draw header text
+            using var textBrush = new SolidBrush(ForeColor);
+            graphics.DrawString("Duration:", Font, textBrush, new PointF(0, 0));
+
+            // draw default ruler
+            using var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
+            using var brush = new SolidBrush(ForeColor);
+
+            graphics.DrawLine(pen, 0, _TimelineRect.Top, Width, _TimelineRect.Top);
+            graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
+
+            int origin = Font.Height * 4;
+            double maxSeconds = 4.0 * (Width - origin) / graphics.DpiX;
+            for (double seconds = 0.0; seconds < maxSeconds; seconds += 1.0)
+            {
+                int xPos = origin + (int)(seconds * (Width - origin) / maxSeconds);
+                if ((int)Math.Round(seconds) % 5 == 0)
+                {
+                    graphics.DrawLine(pen, xPos, _TimelineRect.Top, xPos, _TimelineRect.Bottom - 1);
+                    graphics.DrawString(FormatSeconds(seconds), Font, brush, xPos, _TimelineRect.Top);
+                }
+                else
+                {
+                    graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - 1, xPos, _TimelineRect.Bottom - _TimelineRect.Height / 4);
+                }
             }
         }
 
@@ -478,15 +518,15 @@ namespace BeebPerf.ux
                 majorSpacing = 10 * magnitude;
 
             double minorDivisions;
-            if (residual <= 1.0) 
+            if (residual <= 1.0)
                 minorDivisions = 5;
-            else if (residual <= 2.0) 
+            else if (residual <= 2.0)
                 minorDivisions = 4;
-            else if (residual <= 3.5) 
+            else if (residual <= 3.5)
                 minorDivisions = 5;
-            else if (residual <= 7.5) 
+            else if (residual <= 7.5)
                 minorDivisions = 4;
-            else 
+            else
                 minorDivisions = 2;
 
             double minorSpacing = majorSpacing / (minorDivisions + 1);
