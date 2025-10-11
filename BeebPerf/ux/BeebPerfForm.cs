@@ -21,20 +21,30 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using System.Net.NetworkInformation;
+using System.Runtime.CompilerServices;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
     public partial class BeebPerfForm : Form
     {
-        public BeebPerfForm()
+        public BeebPerfForm() : base()
         {
             InitializeComponent();
-            UpdateState();
+            UpdateToolbarState();
 
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
             FlameImage = (Image)resources.GetObject("flame.Image")!;
 
             FormClosing += BeebPerfForm_FormClosing;
+            Resize += BeebPerfForm_Resize;
+
+        }
+
+        private void BeebPerfForm_Resize(object? sender, EventArgs e)
+        {
+            ResizeSpinner();
         }
 
         private void BeebPerfForm_FormClosing(object? sender, FormClosingEventArgs e)
@@ -69,25 +79,37 @@ namespace BeebPerf.ux
             }
         }
 
-        private void OpenPerfFile(string filePathName)
+        private async void OpenPerfFile(string filePathName)
         {
             var openOperation = new OpenOperation(filePathName, _Model);
-            if (_UndoRedoHistory.Execute(openOperation))
+
+            SetState(AppStateFlags.Loading);
+            bool success = await _UndoRedoHistory.Execute(openOperation);
+            ClearState(AppStateFlags.Loading);
+
+            if (success)
             {
                 InstructionSet = _Model.InstructionSet;
-                _CPUAnalysis.StaticAnalysis(_Model);
-                timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
-                DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+
+                SetState(AppStateFlags.StaticCPUAnalysis);
+                success = await _CPUAnalysis.StaticAnalysis(_Model);
+                ClearState(AppStateFlags.StaticCPUAnalysis);
+
+                if (success)
+                {
+                    timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
+                    DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+                }
             }
         }
 
-        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
-        { 
-            _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount);
-            UpdateState();
+        public async void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        {
+            SetState(AppStateFlags.DynamicCPUAnalysis);
+            var success = await _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount);
+            ClearState(AppStateFlags.DynamicCPUAnalysis);
 
             // populate routines
-            routinesDataGrid.Clear();
             foreach (var routine in _CPUAnalysis.HotRoutines)
             {
                 routinesDataGrid.AddRoutine(routine);
@@ -104,8 +126,6 @@ namespace BeebPerf.ux
             routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
             // populate call tree
-            callTreeControl.Clear();
-
             if (_CPUAnalysis!.ProgramCallTree != null)
                 callTreeControl.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
 
@@ -122,32 +142,32 @@ namespace BeebPerf.ux
         {
             if (_UndoRedoHistory.CanUndo())
                 _UndoRedoHistory.Undo();
-            UpdateState();
+            UpdateToolbarState();
         }
 
         private void redoButton_Click(object sender, EventArgs e)
         {
             if (_UndoRedoHistory.CanRedo())
                 _UndoRedoHistory.Redo();
-            UpdateState();
+            UpdateToolbarState();
         }
 
         private void zoomInButton_Click(object sender, EventArgs e)
         {
             timelineView.ZoomIn();
-            UpdateState();
+            UpdateToolbarState();
         }
 
         private void zoomOutButton_Click(object sender, EventArgs e)
         {
             timelineView.ZoomOut();
-            UpdateState();
+            UpdateToolbarState();
         }
 
         private void selectAllButton_Click(object sender, EventArgs e)
         {
             timelineView.SelectAll();
-            UpdateState();
+            UpdateToolbarState();
         }
 
         private void settingsButton_Click(object sender, EventArgs e)
@@ -158,15 +178,6 @@ namespace BeebPerf.ux
         private void helpButton_Click(object sender, EventArgs e)
         {
 
-        }
-
-        private void UpdateState()
-        {
-            undoButton.Enabled = _UndoRedoHistory.CanUndo();
-            redoButton.Enabled = _UndoRedoHistory.CanRedo();
-            zoomInButton.Enabled = timelineView.CanZoomIn();
-            zoomOutButton.Enabled = timelineView.CanZoomOut();
-            selectAllButton.Enabled = timelineView.CanSelectAll();
         }
 
         private UndoRedoHistory _UndoRedoHistory = new();
@@ -217,6 +228,65 @@ namespace BeebPerf.ux
             WindowState = (FormWindowState)state;
         }
 
+        private void UpdateToolbarState()
+        {
+            openButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
+            undoButton.Enabled = _UndoRedoHistory.CanUndo();
+            redoButton.Enabled = _UndoRedoHistory.CanRedo();
+            zoomInButton.Enabled = timelineView.CanZoomIn();
+            zoomOutButton.Enabled = timelineView.CanZoomOut();
+            selectAllButton.Enabled = timelineView.CanSelectAll();
+        }
+
+        private void SetState(AppStateFlags state)
+        {
+            if (state == AppStateFlags.Loading)
+            {
+                timelineView.SetDuration(0);
+                routinesDataGrid.Clear();
+                callTreeControl.Clear();
+                codeView.Clear();
+            }
+
+            if (state == AppStateFlags.DynamicCPUAnalysis)
+            {
+                routinesDataGrid.Clear();
+                callTreeControl.Clear();
+                codeView.Clear();
+            }
+
+            if (state == AppStateFlags.Loading ||
+                state == AppStateFlags.StaticCPUAnalysis ||
+                state == AppStateFlags.DynamicCPUAnalysis)
+                spinner.Visible = true;
+
+            AppState |= state;
+            UpdateToolbarState();
+        }
+
+        private void ClearState(AppStateFlags state)
+        {
+            AppState &= ~state;
+            UpdateToolbarState();
+
+            if ((AppState & (AppStateFlags.Loading | AppStateFlags.StaticCPUAnalysis | AppStateFlags.DynamicCPUAnalysis)) == 0)
+                spinner.Visible = false;
+        }
+
+        public enum AppStateFlags
+        {
+            Loading = 0x01,
+            StaticCPUAnalysis = 0x02,
+            DynamicCPUAnalysis = 0x04,
+        }
+
+        private void ResizeSpinner()
+        {
+            spinner.Size = new Size(DeviceDpi, DeviceDpi);
+            spinner.Location = splitContainer.Location + (tabControl.Size / 2) - (spinner.Size / 2);
+        }
+
+        public AppStateFlags AppState;
         public Image FlameImage;
         public InstructionSet? InstructionSet;
 

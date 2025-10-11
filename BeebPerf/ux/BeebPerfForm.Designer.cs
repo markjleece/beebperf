@@ -55,6 +55,8 @@ namespace BeebPerf.ux
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
             codeView = new CodeGridView();
+            spinner = new Spinner();
+
             toolStrip.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
             splitContainer.Panel1.SuspendLayout();
@@ -176,6 +178,10 @@ namespace BeebPerf.ux
             helpButton.Size = new Size(34, 28);
             helpButton.Text = "Help";
             helpButton.Click += helpButton_Click;
+            // 
+            // spinner
+            // 
+            spinner.BackColor = SystemColors.Window;
             // 
             // timelineView
             // 
@@ -317,6 +323,7 @@ namespace BeebPerf.ux
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1745, 1110);
+            Controls.Add(spinner);
             Controls.Add(splitContainer);
             Controls.Add(timelineView);
             Controls.Add(toolStrip);
@@ -363,5 +370,6 @@ namespace BeebPerf.ux
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
         private CodeGridView codeView;
+        private Spinner spinner;
     }
 }

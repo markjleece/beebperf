@@ -33,10 +33,6 @@ namespace BeebPerf.ux
             _ScrollBar.Scroll += ScrollBar_Scroll;
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
-
-            _SelectionChangeTimer = new System.Windows.Forms.Timer();
-            _SelectionChangeTimer.Interval = 500;
-            _SelectionChangeTimer.Tick += SelectionChangeTimer_Tick;
         }
 
         protected override void OnResize(EventArgs eventargs)
@@ -134,8 +130,7 @@ namespace BeebPerf.ux
 
             _DragMode = DragMode.None;
 
-            _SelectionChangeTimer.Stop();
-            _SelectionChangeTimer.Start();
+            DynamicAnalysis();
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
@@ -470,11 +465,8 @@ namespace BeebPerf.ux
         {
             _AnalysisFrom = 0;
             _AnalysisTo = _RecordingDuration;
-
             ZoomOut();
-
-            _SelectionChangeTimer.Stop();
-            _SelectionChangeTimer.Start();
+            DynamicAnalysis();
         }
 
         private int TickCount()
@@ -564,10 +556,8 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
-        private void SelectionChangeTimer_Tick(object? sender, EventArgs e)
+        private void DynamicAnalysis()
         {
-            _SelectionChangeTimer.Stop();
-
             var form = (BeebPerfForm)GetParentForm();
             int cyclesFrom = (int)(_AnalysisFrom * 2_000_000.0);
             int cyclesTo = (int)(_AnalysisTo * 2_000_000.0);
@@ -597,6 +587,5 @@ namespace BeebPerf.ux
         private List<double> _MajorTicks = [];
         private List<double> _MinorTicks = [];
         private HScrollBar _ScrollBar;
-        private System.Windows.Forms.Timer _SelectionChangeTimer;
     }
 }

@@ -33,23 +33,25 @@ namespace BeebPerf.operation
             _NewModel = new();
         }
 
-        public override bool Execute()
+        public override async Task<bool> Execute()
         {
-            try
+            return await Task.Run(() =>
             {
-                var perfReader = new PerfReader();
-                Model? model = perfReader.ReadFile(_FilePathName);
-                if (model == null)
-                    throw new Exception($"An error occurred reading {_FilePathName}");
-                _NewModel = model;
-                Redo();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                // TODO message box
-                return false;
-            }
+                try
+                {
+                    var perfReader = new PerfReader();
+                    Model? model = perfReader.ReadFile(_FilePathName);
+                    if (model == null)
+                        throw new Exception($"An error occurred reading {_FilePathName}");
+                    _NewModel = model;
+                    Redo();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    return false;
+                }
+            });
         }
 
         public override void Redo()

@@ -26,22 +26,30 @@ namespace BeebPerf
 {
     public class CPUAnalysis
     {
-        public void StaticAnalysis(Model model)
+        public async Task<bool> StaticAnalysis(Model model)
         {
-            Initialize(model);
-            IdentifyRoutines();
-            IdentifyStackFrames();
+            return await Task.Run(() => 
+            {
+                Initialize(model);
+                IdentifyRoutines();
+                IdentifyStackFrames();
+                return true; 
+            });
         }
 
-        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        public async Task<bool> DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
-            CalculateRange(startCycleCount, endCycleCount);
-            CalculateMetrics();
-            PopulateHotRoutines();
-            PopulateProgramCallTree();
-            PopulateNonMaskableInterruptCallTree();
-            PopulateMaskableInterruptCallTree();
-            MarkHotPaths();
+            return await Task.Run(() => 
+            {
+                CalculateRange(startCycleCount, endCycleCount);
+                CalculateMetrics();
+                PopulateHotRoutines();
+                PopulateProgramCallTree();
+                PopulateNonMaskableInterruptCallTree();
+                PopulateMaskableInterruptCallTree();
+                MarkHotPaths();
+                return true; 
+            });
         }
 
         //

@@ -23,13 +23,16 @@ namespace BeebPerf.model
 {
     public class UndoRedoHistory
     {
-        public bool Execute(Operation op)
+        public async Task<bool> Execute(Operation op)
         {
-            bool success = op.Execute();
+            _Executing = true;
+            var success = await op.Execute();
+            _Executing = false;
+
             if (success)
             {
-                RedoHistory.Clear();
-                UndoHistory.Push(op);
+                _RedoHistory.Clear();
+                _UndoHistory.Push(op);
             }
 
             return success;
@@ -37,29 +40,30 @@ namespace BeebPerf.model
 
         public bool CanUndo()
         {
-            return UndoHistory.Count > 0;
+            return !_Executing && _UndoHistory.Count > 0;
         }
 
         public bool CanRedo()
         {
-            return RedoHistory.Count > 0;
+            return !_Executing && _RedoHistory.Count > 0;
         }
 
         public void Undo()
         {
-            Operation op = UndoHistory.Pop();
+            Operation op = _UndoHistory.Pop();
             op.Undo();
-            RedoHistory.Push(op);
+            _RedoHistory.Push(op);
         }
 
         public void Redo()
         {
-            Operation op = RedoHistory.Pop();
+            Operation op = _RedoHistory.Pop();
             op.Redo();
-            UndoHistory.Push(op);
+            _UndoHistory.Push(op);
         }
 
-        private readonly Stack<Operation> UndoHistory = new();
-        private readonly Stack<Operation> RedoHistory = new();
+        private bool _Executing = false;
+        private readonly Stack<Operation> _UndoHistory = new();
+        private readonly Stack<Operation> _RedoHistory = new();
     }
 }
