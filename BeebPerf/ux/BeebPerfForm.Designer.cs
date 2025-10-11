@@ -182,6 +182,8 @@ namespace BeebPerf.ux
             // spinner
             // 
             spinner.BackColor = SystemColors.Window;
+            spinner.Location = new Point(0, 0);
+            spinner.Size = new Size(1, 1);
             // 
             // timelineView
             // 
