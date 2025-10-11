@@ -19,9 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Configuration;
 using System.Drawing.Drawing2D;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
 
 namespace BeebPerf.ux
 {
@@ -294,7 +292,7 @@ namespace BeebPerf.ux
 
             if (_TimelineRect.Contains(mousePos))
             {
-                double cycles = CyclesToPixels(mousePos.X);
+                int cycles = PixelsToCycles(mousePos.X);
                 if (cycles >= 0.0 && cycles <= _RecordingDuration)
                 {
                     Cursor = Cursors.VSplit;
