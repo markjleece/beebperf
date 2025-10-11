@@ -19,8 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Diagnostics;
+using System.Configuration;
 using System.Drawing.Drawing2D;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
 
 namespace BeebPerf.ux
 {
@@ -35,10 +36,19 @@ namespace BeebPerf.ux
             Controls.Add(_ScrollBar);
         }
 
-        protected override void OnResize(EventArgs eventargs)
+        protected override void OnResize(EventArgs e)
         {
-            base.OnResize(eventargs);
-            UpdateTimeline();
+            base.OnResize(e);
+
+            if (_ScrollBar.Enabled)
+            {
+                _DisplayTo = _DisplayFrom + MulDiv(_DisplayTo - _DisplayFrom, Width, _TimelineRect.Width);
+                UpdateTimeline();
+            }
+            else
+            {
+                ZoomOut();
+            }
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -61,8 +71,8 @@ namespace BeebPerf.ux
             }
             else if (_TimelineRect.Contains(mousePos))
             {
-                double seconds = PixelsToSeconds(e.X);
-                if (seconds >= 0.0 && seconds <= _RecordingDuration)
+                int cycles = PixelsToCycles(e.X);
+                if (cycles >= 0 && cycles <= _RecordingDuration)
                 {
                     _DragMode = DragMode.Range;
                     _DragOrigin = e.X;
@@ -86,18 +96,18 @@ namespace BeebPerf.ux
                     return;
 
                 case DragMode.LeftHandle:
-                    int value = Math.Clamp(e.X + _DragOffset, SecondsToPixels(0), SecondsToPixels(_AnalysisTo) - 1);
+                    int value = Math.Clamp(e.X + _DragOffset, CyclesToPixels(0), CyclesToPixels(_AnalysisTo) - 1);
                     SetLeftHandleRect(value);
                     break;
 
                 case DragMode.RightHandle:
-                    value = Math.Clamp(e.X - _DragOffset, SecondsToPixels(_AnalysisFrom) + 1, SecondsToPixels(_RecordingDuration));
+                    value = Math.Clamp(e.X - _DragOffset, CyclesToPixels(_AnalysisFrom) + 1, CyclesToPixels(_RecordingDuration));
                     SetRightHandleRect(value);
                     break;
 
                 case DragMode.Range:
-                    int min = SecondsToPixels(0);
-                    int max = SecondsToPixels(_RecordingDuration);
+                    int min = CyclesToPixels(0);
+                    int max = CyclesToPixels(_RecordingDuration);
 
                     value = Math.Clamp((e.X > _DragOrigin) ? _DragOrigin : e.X, min, max);
                     SetLeftHandleRect(value);
@@ -119,14 +129,16 @@ namespace BeebPerf.ux
                 return;
 
             if (_DragMode == DragMode.LeftHandle || _DragMode == DragMode.Range)
-                _AnalysisFrom = PixelsToSeconds(_LeftHandleRect.Right - 1);
+                _AnalysisFrom = PixelsToCycles(_LeftHandleRect.Right - 1);
 
             if (_DragMode == DragMode.RightHandle || _DragMode == DragMode.Range)
-                _AnalysisTo = PixelsToSeconds(_RightHandleRect.Left);
+                _AnalysisTo = PixelsToCycles(_RightHandleRect.Left);
 
-            if (_AnalysisFrom < 0) _AnalysisFrom = 0;
-            if (_AnalysisTo > _RecordingDuration) _AnalysisTo = _RecordingDuration;
-            Debug.Assert(_AnalysisFrom < _AnalysisTo);
+            _AnalysisFrom = Math.Clamp(_AnalysisFrom, 0, _RecordingDuration - 1);
+            _AnalysisTo = Math.Clamp(_AnalysisTo, 1, _RecordingDuration);
+
+            if (_AnalysisFrom >= _AnalysisTo)
+                _AnalysisTo = _AnalysisFrom + 1;
 
             _DragMode = DragMode.None;
 
@@ -146,9 +158,6 @@ namespace BeebPerf.ux
 
             Graphics graphics = e.Graphics;
 
-            int displayFrom = _TimelineRect.Left;
-            int displayTo = _TimelineRect.Right;
-
             // draw handles
             using var handleBrush = new SolidBrush(ForeColor);
             graphics.FillRectangle(handleBrush, _LeftHandleRect);
@@ -158,8 +167,11 @@ namespace BeebPerf.ux
             graphics.ExcludeClip(_RightHandleRect);
 
             // draw background
-            int left = SecondsToPixels(0);
-            int right = SecondsToPixels(_RecordingDuration);
+            int left = CyclesToPixels(0);
+            int right = CyclesToPixels(_RecordingDuration);
+
+            if (left < 0) left = 0;
+            if (right > Width) right = Width;
 
             using var exclusionBrush = new SolidBrush(Blend(BackColor, ForeColor, 0.2));
             var leftExclusionRect = new Rectangle(left, _TimelineRect.Top, _LeftHandleRect.Left - left, _TimelineRect.Height);
@@ -175,17 +187,14 @@ namespace BeebPerf.ux
             if (graphics.IsVisible(centerRect))
                 graphics.FillRectangle(centerBrush, centerRect);
 
-            GraphicsState state;
+            GraphicsState state = graphics.Save();
             var exclusionRect = new Rectangle(left, _TimelineRect.Top, right - left, _TimelineRect.Height);
             if (graphics.IsVisible(exclusionRect))
-            {
-                state = graphics.Save();
                 graphics.ExcludeClip(exclusionRect);
 
-                using var windowBrush = new SolidBrush(BackColor);
-                graphics.FillRectangle(windowBrush, e.ClipRectangle);
-                graphics.Restore(state);
-            }
+            using var windowBrush = new SolidBrush(BackColor);
+            graphics.FillRectangle(windowBrush, e.ClipRectangle);
+            graphics.Restore(state);
 
             // draw header text
             using var textBrush = new SolidBrush(ForeColor);
@@ -212,19 +221,24 @@ namespace BeebPerf.ux
 
         private void DrawRulerForeground(Graphics graphics, Pen pen, Brush brush)
         {
-            // draw ticks
-            foreach (var tick in _MajorTicks)
+            foreach (var tick in _Ticks)
             {
-                int xPos = SecondsToPixels(tick);
-                graphics.DrawLine(pen, xPos, _TimelineRect.Top, xPos, _TimelineRect.Bottom - 1);
-                string text = FormatSeconds(tick);
-                graphics.DrawString(text, Font, brush, xPos, _TimelineRect.Top);
-            }
+                int tickHeight = tick.Size switch
+                {
+                    TickSize.Major => _TimelineRect.Height,
+                    TickSize.Medium => _TimelineRect.Height / 2,
+                    TickSize.Minor => _TimelineRect.Height / 4,
+                    _ => throw new NotImplementedException()
+                };
 
-            foreach (var tick in _MinorTicks)
-            {
-                int xPos = SecondsToPixels(tick);
-                graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - 1, xPos, _TimelineRect.Bottom - _TimelineRect.Height / 4);
+                int xPos = SecondsToPixels(tick.Position);
+                graphics.DrawLine(pen, xPos, _TimelineRect.Bottom - tickHeight, xPos, _TimelineRect.Bottom - 1);
+
+                if (tick.Size == TickSize.Major)
+                {
+                    string text = FormatSeconds(tick.Position);
+                    graphics.DrawString(text, Font, brush, xPos, _TimelineRect.Top);
+                }
             }
         }
 
@@ -280,8 +294,8 @@ namespace BeebPerf.ux
 
             if (_TimelineRect.Contains(mousePos))
             {
-                double seconds = PixelsToSeconds(mousePos.X);
-                if (seconds >= 0.0 && seconds <= _RecordingDuration)
+                double cycles = CyclesToPixels(mousePos.X);
+                if (cycles >= 0.0 && cycles <= _RecordingDuration)
                 {
                     Cursor = Cursors.VSplit;
                     return;
@@ -332,30 +346,45 @@ namespace BeebPerf.ux
             }
         }
 
-        private int SecondsToPixels(double value)
+        private double CyclesToSeconds(int value)
         {
-            return (int)((value - _DisplayFrom) / (_DisplayTo - _DisplayFrom) * (double)Width);
+            return (double)value / 2_000_000;
         }
 
-        private double PixelsToSeconds(int value)
+        private int SecondsToCycles(double value)
         {
-            return _DisplayFrom + ((double)value * (_DisplayTo - _DisplayFrom) / (double)Width);
+            return (int)double.Round(value * 2_000_000);
+        }
+
+        private int CyclesToPixels(int value)
+        {
+            return MulDiv(Width, value - _DisplayFrom, _DisplayTo - _DisplayFrom);
+        }
+
+        private int PixelsToCycles(int value)
+        {
+            return _DisplayFrom + MulDiv(value, _DisplayTo - _DisplayFrom, Width);
+        }
+
+        private int SecondsToPixels(double value)
+        {
+            return MulDiv(Width, SecondsToCycles(value) - _DisplayFrom, _DisplayTo - _DisplayFrom);
         }
 
         private void UpdateDurationText()
         {
-            double duration = _DragMode switch
+            int cycles = _DragMode switch
             {
                 DragMode.None => _AnalysisTo - _AnalysisFrom,
-                DragMode.LeftHandle => _AnalysisTo - PixelsToSeconds(_LeftHandleRect.Right - 1),
-                DragMode.RightHandle => PixelsToSeconds(_RightHandleRect.Left) - _AnalysisFrom,
-                DragMode.Range => PixelsToSeconds(_RightHandleRect.Left) - PixelsToSeconds(_LeftHandleRect.Right - 1),
+                DragMode.LeftHandle => _AnalysisTo - PixelsToCycles(_LeftHandleRect.Right - 1),
+                DragMode.RightHandle => PixelsToCycles(_RightHandleRect.Left) - _AnalysisFrom,
+                DragMode.Range => PixelsToCycles(_RightHandleRect.Left) - PixelsToCycles(_LeftHandleRect.Right - 1),
                 _ => throw new NotImplementedException(),
             };
 
-            string newText = $"Duration: {FormatSeconds(_RecordingDuration)}";
-            if (duration != _RecordingDuration)
-                newText += $" ({FormatSeconds(duration)} selected)";
+            string newText = $"Duration: {FormatCycles(_RecordingDuration)}";
+            if (cycles != _RecordingDuration)
+                newText += $" ({FormatCycles(cycles)} selected)";
 
             if (newText == _DurationText)
                 return;
@@ -367,18 +396,29 @@ namespace BeebPerf.ux
             var origin = new Point(0, 0);
             var previousRect = new Rectangle(origin, previousSize);
             var newRect = new Rectangle(origin, newSize);
-            if (previousRect != newRect)
+            if (newText != _DurationText)
+            {
                 Invalidate(Union(previousRect, newRect));
+                _DurationText = newText;
+            }
+        }
 
-            _DurationText = newText;
+        private string FormatCycles(int value)
+        {
+            if (value == 0)
+                return "0";
+            else if (value < 1000)
+                return $"{value} cycles";
+            else
+                return FormatSeconds(CyclesToSeconds(value));
         }
 
         private string FormatSeconds(double value)
         {
-            if (value == 0)
+            if (value == 0.0)
                 return "0";
-            if (value >= 1.0)
-                return $"{value:#.###}s";
+            else if (value >= 1.0)
+                return $"{(value):#.###}s";
             else if (value >= 1e-3)
                 return $"{(value * 1e3):#.###}ms";
             else
@@ -387,20 +427,20 @@ namespace BeebPerf.ux
 
         public void SetDuration(int recordingDuration)
         {
-            _RecordingDuration = (double)recordingDuration / 2_000_000;
+            _RecordingDuration = recordingDuration;
             _AnalysisFrom = 0;
-            _AnalysisTo = _RecordingDuration;
+            _AnalysisTo = recordingDuration;
             ZoomOut();
         }
 
         private void ScrollBar_Scroll(object? sender, ScrollEventArgs e)
         {
-            double deltaSeconds = PixelsToSeconds(e.NewValue) - PixelsToSeconds(e.OldValue);
-            _DisplayFrom += deltaSeconds;
-            _DisplayTo += deltaSeconds;
+            int deltaCycles = PixelsToCycles(e.NewValue) - PixelsToCycles(e.OldValue);
+            _DisplayFrom += deltaCycles;
+            _DisplayTo += deltaCycles;
 
-            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
-            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
 
             UpdateDurationText();
             UpdateTimeline();
@@ -415,19 +455,26 @@ namespace BeebPerf.ux
         {
             int margin = Font.Height * 4;
             int range = Width - margin * 2;
-            double extends = (_AnalysisTo - _AnalysisFrom) * margin / range;
+            int analysisSize = _AnalysisTo - _AnalysisFrom;
+            int extends = MulDiv(analysisSize, margin, range);
+
+            int minDisplayRange = 4 * Width;
+            int minExtends = (minDisplayRange - analysisSize) / 2;
+            if (minExtends > extends)
+                extends = minExtends;
+
             _DisplayFrom = _AnalysisFrom - extends;
             _DisplayTo = _AnalysisTo + extends;
 
-            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
-            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
 
             UpdateDurationText();
             UpdateTimeline();
 
-            _ScrollBar.Minimum = SecondsToPixels(-extends);
-            _ScrollBar.Maximum = SecondsToPixels(_RecordingDuration + extends);
-            _ScrollBar.LargeChange = SecondsToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
+            _ScrollBar.Minimum = CyclesToPixels(-extends);
+            _ScrollBar.Maximum = CyclesToPixels(_RecordingDuration + extends);
+            _ScrollBar.LargeChange = CyclesToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
             _ScrollBar.SmallChange = Width / DeviceDpi;
             _ScrollBar.Value = 0;
             _ScrollBar.Enabled = true;
@@ -442,13 +489,13 @@ namespace BeebPerf.ux
         {
             int margin = Font.Height * 4;
             int range = Width - margin * 2;
-            double extends = _RecordingDuration * margin / range;
+            int extends = MulDiv(_RecordingDuration, margin, range);
 
             _DisplayFrom = -extends;
             _DisplayTo = _RecordingDuration + extends;
 
-            SetLeftHandleRect(SecondsToPixels(_AnalysisFrom));
-            SetRightHandleRect(SecondsToPixels(_AnalysisTo));
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
 
             UpdateDurationText();
             UpdateTimeline();
@@ -469,14 +516,6 @@ namespace BeebPerf.ux
             DynamicAnalysis();
         }
 
-        private int TickCount()
-        {
-            using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
-            {
-                return (int)float.Round((float)Width / g.DpiX);
-            }
-        }
-
         private void UpdateTimeline()
         {
             int margin = Font.Height;
@@ -490,51 +529,43 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
-        private void ComputeTicks()
+        public void ComputeTicks()
         {
-            if (_DisplayTo <= _DisplayFrom) return;
+            _Ticks.Clear();
 
-            double range = (double)(_DisplayTo - _DisplayFrom);
-            double rawSpacing = range / TickCount();
-            double magnitude = Math.Pow(10, Math.Floor(Math.Log10(rawSpacing)));
-            double residual = rawSpacing / magnitude;
+            double start = CyclesToSeconds(_DisplayFrom);
+            double end = CyclesToSeconds(_DisplayTo);
+            double range = end - start;
+            if (range <= 0) 
+                return;
 
-            double majorSpacing;
-            if (residual <= 1)
-                majorSpacing = 1 * magnitude;
-            else if (residual <= 2)
-                majorSpacing = 2 * magnitude;
-            else if (residual <= 5)
-                majorSpacing = 5 * magnitude;
-            else
-                majorSpacing = 10 * magnitude;
+            using Graphics g = Graphics.FromHwnd(IntPtr.Zero);
+            double maxTickCount = Width / g.DpiX;
+            double rawStep = range / maxTickCount;
+            double magnitude = Math.Pow(10, Math.Floor(Math.Log10(rawStep)));
 
-            double minorDivisions;
-            if (residual <= 1.0)
-                minorDivisions = 5;
-            else if (residual <= 2.0)
-                minorDivisions = 4;
-            else if (residual <= 3.5)
-                minorDivisions = 5;
-            else if (residual <= 7.5)
-                minorDivisions = 4;
-            else
-                minorDivisions = 2;
+            Divisions[] options = [
+                new Divisions { Major = 1, Medium = 2, Minor = 5 },
+                new Divisions { Major = 2, Medium = 4, Minor = 2 },
+                new Divisions { Major = 5, Medium = 5, Minor = 2 },
+                new Divisions { Major = 10, Medium = 2, Minor = 5 } ];
 
-            double minorSpacing = majorSpacing / (minorDivisions + 1);
-            double firstMinorTick = Math.Ceiling(_DisplayFrom / minorSpacing) * minorSpacing;
-            double lastMinorTick = Math.Floor(_DisplayTo / minorSpacing) * minorSpacing;
+            Divisions divisions = Array.Find(options, d => magnitude * d.Major >= rawStep);
+            double minorStep = magnitude * divisions.Major / divisions.Medium / divisions.Minor;
 
-            _MinorTicks.Clear();
-            _MajorTicks.Clear();
+            int firstIndex = (int)Math.Ceiling(start / minorStep);
+            int lastIndex = (int)Math.Floor(end / minorStep);
 
-            for (double minorTick = firstMinorTick; minorTick <= lastMinorTick + 1e-10; minorTick += minorSpacing)
+            for (int i = firstIndex; i <= lastIndex; i++)
             {
-                int index = (int)Math.Round(minorTick / minorSpacing);
-                if (index % (minorDivisions + 1) == 0)
-                    _MajorTicks.Add(Math.Round(minorTick, 10));
+                TickSize size;
+                if (i % (divisions.Medium * divisions.Minor) == 0)
+                    size = TickSize.Major;
+                else if (i % divisions.Minor == 0)
+                    size = TickSize.Medium;
                 else
-                    _MinorTicks.Add(Math.Round(minorTick, 10));
+                    size = TickSize.Minor;
+                _Ticks.Add(new Tick { Position = minorStep * i, Size = size });
             }
         }
 
@@ -559,9 +590,12 @@ namespace BeebPerf.ux
         private void DynamicAnalysis()
         {
             var form = (BeebPerfForm)GetParentForm();
-            int cyclesFrom = (int)(_AnalysisFrom * 2_000_000.0);
-            int cyclesTo = (int)(_AnalysisTo * 2_000_000.0);
-            form.DynamicAnalysis(cyclesFrom, cyclesTo);
+            form.DynamicAnalysis(_AnalysisFrom, _AnalysisTo);
+        }
+
+        private int MulDiv(int a, int b, int c)
+        {
+            return (int)double.Round((double)a * b / c);
         }
 
         private enum DragMode
@@ -572,11 +606,26 @@ namespace BeebPerf.ux
             Range = 3
         }
 
-        private double _RecordingDuration;
-        private double _DisplayFrom;
-        private double _DisplayTo;
-        private double _AnalysisFrom;
-        private double _AnalysisTo;
+        private enum TickSize { Major, Medium, Minor }
+
+        private struct Tick
+        {
+            public double Position;
+            public TickSize Size;
+        }
+
+        private struct Divisions
+        {
+            public int Major;
+            public int Medium;
+            public int Minor;
+        }
+
+        private int _RecordingDuration;
+        private int _DisplayFrom;
+        private int _DisplayTo;
+        private int _AnalysisFrom;
+        private int _AnalysisTo;
         private string _DurationText = string.Empty;
         private Rectangle _TimelineRect;
         private Rectangle _LeftHandleRect;
@@ -584,8 +633,7 @@ namespace BeebPerf.ux
         private DragMode _DragMode;
         private int _DragOffset;
         private int _DragOrigin;
-        private List<double> _MajorTicks = [];
-        private List<double> _MinorTicks = [];
+        private List<Tick> _Ticks = [];
         private HScrollBar _ScrollBar;
     }
 }
