@@ -190,7 +190,7 @@ namespace BeebPerf.ux
 
         private string FormatCPUMetric(int value, int indent)
         {
-            var percentage = (double)value * 100.0 / TotalCycleCount;
+            var percentage = double.Min(100.0 * value / TotalCycleCount, 100.0);
             return $"{"".PadLeft(2*indent)}{value:N0} ({percentage:F2}%)";
         }
 
@@ -448,6 +448,9 @@ namespace BeebPerf.ux
 
                 int width = 0;
                 int margin = cellBounds.Height / 8;
+
+                if (ratio.num > ratio.den)
+                    ratio.num = ratio.den;
 
                 if (ratio.num > 0 && ratio.den > 0)
                 {

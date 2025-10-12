@@ -250,7 +250,7 @@ namespace BeebPerf
                             currentStackFrame = CreateStackFrame(CallType.FallThrough, routine, cycleCount, parent: currentStackFrame);
 
                     // update instruction indices to include instruction
-                    if (currentStackFrame.FirstInstructionIndex == 0)
+                    if (currentStackFrame.FirstInstructionIndex < 0)
                         currentStackFrame.FirstInstructionIndex = instructionIndex;
 
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)

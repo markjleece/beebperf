@@ -65,7 +65,7 @@ namespace BeebPerf.model
                 child.ClearMetrics();
         }
 
-        public int FirstInstructionIndex;
+        public int FirstInstructionIndex = -1;
         public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
