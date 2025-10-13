@@ -521,12 +521,8 @@ namespace BeebPerf
             HotRoutines.Sort((a, b) => -a.AggregateMetrics.SelfCycleCount.CompareTo(b.AggregateMetrics.SelfCycleCount));
 
             int hotRoutineCount = int.Min(HotRoutines.Count, (int)float.Ceiling(0.05f * HotRoutines.Count)); 
-            for (int i = 0; i < hotRoutineCount; i++)
-                HotRoutines[i].HotRoutine = true;
-
-            Debug.WriteLine("HotPath routines:");
-            foreach (var routine in HotRoutines)
-                DebugPrintLine(indent: 0, routine, routine.AggregateMetrics);
+            for (int i = 0; i < HotRoutines.Count; i++)
+                HotRoutines[i].HotRoutine = (i < hotRoutineCount);
         }
 
         private void PopulateProgramCallTree()
@@ -540,9 +536,6 @@ namespace BeebPerf
                     PopulateProgramCallTree(callStack, ProgramCallTree, treeNodesByStack);
 
             ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-
-            Debug.WriteLine("Program stack:");
-            DebugPrintTree(ProgramCallTree, depth: 0);
         }
 
         private static CallTreeNode? PopulateProgramCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
@@ -586,9 +579,6 @@ namespace BeebPerf
                     PopulateInterruptCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
 
             NonMaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-
-            Debug.WriteLine("Non Maskable Interrupt stack:");
-            DebugPrintTree(NonMaskableInterruptCallTree, depth: 0);
         }
 
         private void PopulateMaskableInterruptCallTree()
@@ -607,9 +597,6 @@ namespace BeebPerf
                     PopulateInterruptCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
 
             MaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-
-            Debug.WriteLine("Maskable Interrupt stack:");
-            DebugPrintTree(MaskableInterruptCallTree, depth: 0);
         }
 
         private static CallTreeNode? PopulateInterruptCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
@@ -659,8 +646,8 @@ namespace BeebPerf
             treeNodes.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
 
             int hotPathCount = int.Min(treeNodes.Count, (int)float.Ceiling(0.03f * treeNodes.Count));
-            for (int i = 0; i < hotPathCount; i++)
-                treeNodes[i].HotPath = true;
+            for (int i = 0; i < treeNodes.Count; i++)
+                treeNodes[i].HotPath = (i < hotPathCount);
         }
 
         private void PopulateCallTreeNodeList(CallTreeNode treeNode, List<CallTreeNode> treeNodeList)
@@ -668,28 +655,6 @@ namespace BeebPerf
             treeNodeList.Add(treeNode);
             foreach (var child in treeNode.Children)
                 PopulateCallTreeNodeList(child, treeNodeList);
-        }
-
-        private static void DebugPrintTree(CallTreeNode treeNode, int depth)
-        {
-            var routine = treeNode.Routine;
-            DebugPrintLine(indent: depth, routine, treeNode.CPUMetrics);
-            foreach (var childNode in treeNode.Children)
-                DebugPrintTree(childNode, depth + 1);
-        }
-
-        private static void DebugPrintLine(int indent, Routine routine, CPUMetrics metrics)
-        {
-            indent -= 1515;
-            indent = int.Max(0, indent);
-
-            Debug.WriteLine(
-                $"{"".PadLeft(indent)}" +
-                $"{routine.StartAddress.ToString()} {routine.Label}, " +
-                $"self: {metrics.SelfCycleCount}, " +
-                $"inclusive: {metrics.InclusiveCycleCount}, " +
-                $"elapsed: {metrics.ElapsedCycleCount}, " +
-                $"instructionCount: {metrics.ExecutionCount}");
         }
 
         //
