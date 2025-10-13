@@ -29,9 +29,9 @@ namespace BeebPerf.ux
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
         private const int InstructionColumnIndex = 2;
-        private const int BranchCountColumnIndex = 3;
-        private const int TailCallColumnIndex = 4;
-        private const int TotalCPUColumnIndex = 5;
+        private const int TailCallColumnIndex = 3;
+        private const int TotalCPUColumnIndex = 4;
+        private const int BranchCountColumnIndex = 5;
         private const int ExecutionCountColumnIndex = 6;
 
         public CodeGridView() : base()
@@ -55,13 +55,13 @@ namespace BeebPerf.ux
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
             Columns.Add("Instruction", "Instruction");
-            Columns.Add("BranchCount", "Branch count [#, %]");
             Columns.Add("TailCall", "Tail call");
-            Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
-            Columns.Add("ExecutionCount", "Execution count");
+            Columns.Add("TotalCPU", "Total CPU [#cycles, %");
+            Columns.Add("BranchCount", "Branch count [#, %]");
+            Columns.Add("ExecutionCount", "Execution count [#, %]");
 
-            Columns[BranchCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             Columns[TailCallColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            Columns[BranchCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
@@ -199,25 +199,24 @@ namespace BeebPerf.ux
                 InstructionColumnIndex    => FormatInstruction(instructionMetrics),
                 BranchCountColumnIndex    => FormatBranchCount(instructionMetrics),
                 TailCallColumnIndex       => instructionMetrics.TailCall ? "yes" : string.Empty,
-                TotalCPUColumnIndex       => FormatCycles(instructionMetrics.InclusiveCycleCount),
-                ExecutionCountColumnIndex => $"{instructionMetrics.ExecutionCount:N0}",
+                TotalCPUColumnIndex       => FormatValue(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
+                ExecutionCountColumnIndex => FormatValue(instructionMetrics.ExecutionCount, _MaxExecutionCount),
                 _                         => string.Empty };
             e.FormattingApplied = true;
         }
 
-        private string FormatCycles(int value)
-        {
-            var percentage = double.Min(100.0 * value / _TotalCycleCount, 100.0);
-            return $"{value:N0} ({percentage:F2}%)";
-        }
-
         private string FormatBranchCount(InstructionMetrics instructionMetrics)
         {
-            if (!_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+            if (_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+                return FormatValue(instructionMetrics.BranchCount, instructionMetrics.ExecutionCount);
+            else
                 return string.Empty;
+        }
 
-            double percentage = 100.0 * instructionMetrics.BranchCount / instructionMetrics.ExecutionCount;
-            return $"{instructionMetrics.BranchCount:N0} ({percentage:F2}%)";
+        private string FormatValue(int value, int range)
+        {
+            var percentage = double.Min(100.0 * value / range, 100);
+            return $"{value:N0} ({percentage:F2}%)";
         }
 
         private string FormatInstruction(InstructionMetrics instructionMetrics)
