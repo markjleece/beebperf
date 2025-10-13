@@ -29,8 +29,10 @@ namespace BeebPerf.ux
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
         private const int InstructionColumnIndex = 2;
-        private const int TotalCPUColumnIndex = 3;
-        private const int ExecutionCountColumnIndex = 4;
+        private const int BranchCountColumnIndex = 3;
+        private const int TailCallColumnIndex = 4;
+        private const int TotalCPUColumnIndex = 5;
+        private const int ExecutionCountColumnIndex = 6;
 
         public CodeGridView() : base()
         {
@@ -53,8 +55,15 @@ namespace BeebPerf.ux
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
             Columns.Add("Instruction", "Instruction");
-            Columns.Add("TotalCPU", "Total CPU [#cycles]");
+            Columns.Add("BranchCount", "Branch count [#, %]");
+            Columns.Add("TailCall", "Tail call");
+            Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
+
+            Columns[BranchCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[TailCallColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
             var cellRenderer = new CallTreeCellRenderer();
             foreach (DataGridViewColumn column in Columns)
@@ -63,9 +72,7 @@ namespace BeebPerf.ux
                 column.SortMode = DataGridViewColumnSortMode.NotSortable;
             }
 
-            DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
-            DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
-
+            _SelectionBackColor = DefaultCellStyle.SelectionBackColor;
             _InstructionStyle = new InstructionColors()
             {
                 MnemonicColor = Color.DarkGreen,
@@ -73,6 +80,9 @@ namespace BeebPerf.ux
                 LabelColor = Color.Black,
                 PunctuationColor = Color.DarkSlateGray
             };
+
+            DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
+            DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
         }
 
         private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
@@ -110,24 +120,32 @@ namespace BeebPerf.ux
                 {
                     // add ellipses
                     if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses);
+                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses);
 
                     // add fall-through
                     if (routinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
                         if (routine_ != routine)
-                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
+                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
 
                     // add instruction metrics
-                    Rows.Add(obj, obj, obj, obj, obj);
+                    Rows.Add(obj, obj, obj, obj, obj, obj, obj);
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet.Size(obj.Instruction.Opcode));
                 }
             }
 
-            // calculate mean
-            float sum = 0.0f;
+            // sum cycles
+            int totalCycles = 0;
+            int maxExecutionCount = 0;
             foreach (var instructionMetric in instructionMetrics)
-                sum += instructionMetric.InclusiveCycleCount;
-            _Mean = sum / instructionMetrics.Count;
+            {
+                totalCycles += instructionMetric.InclusiveCycleCount;
+                maxExecutionCount = Math.Max(maxExecutionCount, instructionMetric.ExecutionCount);
+            }
+            _TotalCycleCount = totalCycles;
+            _MaxExecutionCount = maxExecutionCount;
+
+            // calculate mean
+            _Mean = (double)totalCycles / instructionMetrics.Count;
 
             // calculate standard deviation
             double varianceSum = 0.0;
@@ -178,15 +196,33 @@ namespace BeebPerf.ux
             e.Value = e.ColumnIndex switch {
                 AddressColumnIndex        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
                 LabelColumnIndex          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
-                InstructionColumnIndex    => FormatInstruction(instructionMetrics.Instruction),
-                TotalCPUColumnIndex       => $"{instructionMetrics.InclusiveCycleCount:N0}",
+                InstructionColumnIndex    => FormatInstruction(instructionMetrics),
+                BranchCountColumnIndex    => FormatBranchCount(instructionMetrics),
+                TailCallColumnIndex       => instructionMetrics.TailCall ? "yes" : string.Empty,
+                TotalCPUColumnIndex       => FormatCycles(instructionMetrics.InclusiveCycleCount),
                 ExecutionCountColumnIndex => $"{instructionMetrics.ExecutionCount:N0}",
-                _                => string.Empty };
+                _                         => string.Empty };
             e.FormattingApplied = true;
         }
 
-        private string FormatInstruction(CoreInstruction instruction)
+        private string FormatCycles(int value)
         {
+            var percentage = double.Min(100.0 * value / _TotalCycleCount, 100.0);
+            return $"{value:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatBranchCount(InstructionMetrics instructionMetrics)
+        {
+            if (!_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+                return string.Empty;
+
+            double percentage = 100.0 * instructionMetrics.BranchCount / instructionMetrics.ExecutionCount;
+            return $"{instructionMetrics.BranchCount:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatInstruction(InstructionMetrics instructionMetrics)
+        {
+            var instruction = instructionMetrics.Instruction;
             byte opcode = instruction.Opcode;
             ushort operand = instruction.Operand;
 
@@ -300,22 +336,25 @@ namespace BeebPerf.ux
 
                 if (value! is InstructionMetrics)
                 {
-                    var instructionMetrics = (InstructionMetrics)value!;
-
                     float zScore = 0;
                     if (codeGridView._StandardDeviation > 0.0)
                     {
+                        var instructionMetrics = (InstructionMetrics)value!;
                         zScore = (float)((instructionMetrics.InclusiveCycleCount - codeGridView._Mean) / codeGridView._StandardDeviation);
                     }
-               
-                    backColor = Blend(
-                        backColor,
-                        backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed,
-                        MapToUnitRange(zScore, fromValue:0.0, toValue:5.0));
+
+                    Color red = backColor.GetBrightness() > 0.5 ? ColorLightRed : Color.DarkRed;
+                    backColor = Blend(backColor, red, MapToUnitRange(zScore, fromValue:0.0, toValue:5.0));
                 }
 
                 using var brush = new SolidBrush(backColor);
                 graphics.FillRectangle(brush, cellBounds);
+
+                if (value! is InstructionMetrics)
+                {
+                    var instructionMetrics = (InstructionMetrics)value!;
+                    DrawBar(instructionMetrics, codeGridView, graphics, cellBounds, backColor);
+                }
             }
 
             private static double MapToUnitRange(double value, double fromValue, double toValue)
@@ -323,6 +362,41 @@ namespace BeebPerf.ux
                 if (value <= fromValue) return 0.0;
                 if (value >= toValue) return 1.0;
                 return (value - fromValue) / (toValue - fromValue);
+            }
+
+            private void DrawBar(
+                InstructionMetrics instructionMetrics,
+                CodeGridView codeGridView,
+                Graphics graphics,
+                Rectangle cellBounds,
+                Color backColor)
+            {
+                double ratio = ColumnIndex switch
+                {
+                    TotalCPUColumnIndex => (double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount,
+                    ExecutionCountColumnIndex => (double)instructionMetrics.ExecutionCount / codeGridView._MaxExecutionCount,
+                    BranchCountColumnIndex => (double)instructionMetrics.BranchCount / instructionMetrics.ExecutionCount,
+                    _ => -1
+                };
+
+                if (ratio < 0)
+                    return;
+                else if (ratio > 1.0)
+                    ratio = 1.0;
+
+                int margin = cellBounds.Height / 8;
+                int maxWidth = cellBounds.Width - (margin * 2);
+                int width = (int)double.Ceiling((double)ratio * maxWidth);
+
+                var rect = new Rectangle(
+                    cellBounds.Right - margin - width,
+                    cellBounds.Y + margin,
+                    width,
+                    cellBounds.Height - margin * 2);
+
+                var color = Blend(backColor, codeGridView._SelectionBackColor, 0.25);
+                using var brush = new SolidBrush(color);
+                graphics.FillRectangle(brush, rect);
             }
 
             private void PaintInstruction(
@@ -436,6 +510,7 @@ namespace BeebPerf.ux
                     graphics.DrawLine(pen, cellBounds.Left, cellBounds.Top, cellBounds.Left, cellBounds.Bottom);
                 }
             }
+
             private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
             {
                 graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
@@ -497,6 +572,7 @@ namespace BeebPerf.ux
                 return Color.FromArgb(r, g, b);
             }
 
+            private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
         private class InstructionColors
@@ -511,6 +587,9 @@ namespace BeebPerf.ux
         private Dictionary<ushort, string>? _Labels;
         private InstructionSet? _InstructionSet;
         private InstructionColors _InstructionStyle;
+        private Color _SelectionBackColor;
+        private int _MaxExecutionCount;
+        private int _TotalCycleCount;
         private double _StandardDeviation;
         private double _Mean;
     }

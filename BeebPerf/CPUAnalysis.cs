@@ -738,7 +738,11 @@ namespace BeebPerf
                         // we need to get the cycle instructionCount
                         var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
                         if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
+                        {
                             metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                            if (childStackFrame.Type == CallType.TailCall)
+                                metrics.TailCall |= true;
+                        }
                     }
 
                     if (childStackFrame.Type == CallType.FallThrough)
@@ -768,6 +772,9 @@ namespace BeebPerf
 
                     metrics.InclusiveCycleCount += instructionCycleCount;
                     metrics.ExecutionCount += 1;
+
+                    if (_InstructionSet!.IsBranch(instruction.Opcode) && instructionCycleCount > 2)
+                        metrics.BranchCount += 1;
 
                     previousInstructionIndex = instructionIndex;
                 }

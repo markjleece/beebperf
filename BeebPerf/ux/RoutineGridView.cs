@@ -236,42 +236,7 @@ namespace BeebPerf.ux
                         cellStyle, advancedBorderStyle, backPaintParts);
 
                     // draw bar
-                    (int num, int den) ratio = ColumnIndex switch
-                    {
-                        SelfCPUColumnIndex => (routine.AggregateMetrics.SelfCycleCount, routineGridView.TotalCycleCount),
-                        TotalCPUColumnIndex => (routine.AggregateMetrics.InclusiveCycleCount, routineGridView.TotalCycleCount),
-                        ElapsedCPUColumnIndex => (routine.AggregateMetrics.ElapsedCycleCount, routineGridView.TotalCycleCount),
-                        ExecutionCountColumnIndex => (routine.AggregateMetrics.ExecutionCount, routineGridView.MaxExecutionCount),
-                        _ => (0, 0)
-                    };
-
-                    int width = 0;
-                    int margin = cellBounds.Height / 8;
-
-                    if (ratio.num > ratio.den)
-                        ratio.num = ratio.den;
-
-                    if (ratio.num > 0 && ratio.den > 0)
-                    {
-                        int maxWidth = cellBounds.Width - (margin * 2);
-                        width = (int)double.Ceiling((double)ratio.num * maxWidth / ratio.den);
-                    }
-
-                    var rect = new Rectangle(
-                        cellBounds.Right - margin - width,
-                        cellBounds.Y + margin,
-                        width,
-                        cellBounds.Height - margin * 2);
-
-                    bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
-
-                    var color = Blend(
-                        routineGridView.DefaultCellStyle.BackColor,
-                        routineGridView.DefaultCellStyle.SelectionBackColor,
-                        selected ? 0.75 : 0.25);
-
-                    using var brush = new SolidBrush(color);
-                    graphics.FillRectangle(brush, rect);
+                    DrawBar(routine, routineGridView, graphics, cellBounds, cellState);
 
                     // draw default foreground
                     var forePaintParts = paintParts & DataGridViewPaintParts.ContentForeground;
@@ -290,6 +255,48 @@ namespace BeebPerf.ux
                     BeebPerfForm form = (BeebPerfForm)routineGridView.GetParentForm();
                     graphics.DrawImage(form.FlameImage, rect);
                 }
+            }
+
+            private void DrawBar(
+                Routine routine, 
+                RoutineGridView routineGridView, 
+                Graphics graphics, 
+                Rectangle cellBounds, 
+                DataGridViewElementStates cellState)
+            {
+                double ratio = ColumnIndex switch
+                {
+                    SelfCPUColumnIndex => (double)routine.AggregateMetrics.SelfCycleCount / routineGridView.TotalCycleCount,
+                    TotalCPUColumnIndex => (double)routine.AggregateMetrics.InclusiveCycleCount / routineGridView.TotalCycleCount,
+                    ElapsedCPUColumnIndex => (double)routine.AggregateMetrics.ElapsedCycleCount / routineGridView.TotalCycleCount,
+                    ExecutionCountColumnIndex => (double)routine.AggregateMetrics.ExecutionCount / routineGridView.MaxExecutionCount,
+                    _ => -1
+                };
+
+                if (ratio < 0)
+                    return;
+                else if (ratio > 1.0)
+                    ratio = 1.0;
+
+                int margin = cellBounds.Height / 8;
+                int maxWidth = cellBounds.Width - (margin * 2);
+                int width = (int)double.Ceiling((double)ratio * maxWidth);
+
+                var rect = new Rectangle(
+                    cellBounds.Right - margin - width,
+                    cellBounds.Y + margin,
+                    width,
+                    cellBounds.Height - margin * 2);
+
+                bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
+
+                var color = Blend(
+                    routineGridView.DefaultCellStyle.BackColor,
+                    routineGridView.DefaultCellStyle.SelectionBackColor,
+                    selected ? 0.75 : 0.25);
+
+                using var brush = new SolidBrush(color);
+                graphics.FillRectangle(brush, rect);
             }
 
             private Color Blend(Color first, Color second, double ratio)

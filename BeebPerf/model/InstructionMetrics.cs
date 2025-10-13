@@ -52,7 +52,9 @@ namespace BeebPerf.model
         public CoreInstruction Instruction;
         public int Ordinal;
         public int ExecutionCount;
+        public int BranchCount;
         public int InclusiveCycleCount;
         public bool CodeModified;
+        public bool TailCall;
     }
 }
