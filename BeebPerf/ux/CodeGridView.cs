@@ -247,39 +247,39 @@ namespace BeebPerf.ux
                     formattedOperand = $"{label} ({formattedOperand})";
             }
 
-            string mnemonic = instructionSet.Mnemonic(opcode);
+            string mnemonic = instructionSet.Mnemonic(opcode).PadRight(5);
             switch (addressMode)
             {
                 case InstructionSet.AddressMode.Implied:
                     return $"{mnemonic}";
 
                 case InstructionSet.AddressMode.Accumulator:
-                    return $"{mnemonic} A";
+                    return $"{mnemonic}A";
 
                 case InstructionSet.AddressMode.Immediate:
-                    return $"{mnemonic} #{formattedOperand}";
+                    return $"{mnemonic}#{formattedOperand}";
 
                 case InstructionSet.AddressMode.ZeroPage:
                 case InstructionSet.AddressMode.Relative:
                 case InstructionSet.AddressMode.Absolute:
-                    return $"{mnemonic} {formattedOperand}";
+                    return $"{mnemonic}{formattedOperand}";
 
                 case InstructionSet.AddressMode.ZeroPageX:
                 case InstructionSet.AddressMode.AbsoluteX:
-                    return $"{mnemonic} {formattedOperand},X";
+                    return $"{mnemonic}{formattedOperand},X";
 
                 case InstructionSet.AddressMode.ZeroPageY:
                 case InstructionSet.AddressMode.AbsoluteY:
-                    return $"{mnemonic} {formattedOperand},Y";
+                    return $"{mnemonic}{formattedOperand},Y";
 
                 case InstructionSet.AddressMode.Indirect:
-                    return $"{mnemonic} ({formattedOperand})";
+                    return $"{mnemonic}({formattedOperand})";
 
                 case InstructionSet.AddressMode.IndirectX:
-                    return $"{mnemonic} ({formattedOperand},X)";
+                    return $"{mnemonic}({formattedOperand},X)";
 
                 case InstructionSet.AddressMode.IndirectY:
-                    return $"{mnemonic} ({formattedOperand}),Y";
+                    return $"{mnemonic}({formattedOperand}),Y";
 
                 default:
                     return "???";
@@ -288,41 +288,28 @@ namespace BeebPerf.ux
 
         public class CallTreeCellRenderer : DataGridViewTextBoxCell
         {
-            protected override void Paint(Graphics graphics,
-                                          Rectangle clipBounds,
-                                          Rectangle cellBounds,
-                                          int rowIndex,
-                                          DataGridViewElementStates cellState,
-                                          object? value,
-                                          object? formattedValue,
-                                          string? errorText,
-                                          DataGridViewCellStyle cellStyle,
-                                          DataGridViewAdvancedBorderStyle advancedBorderStyle,
-                                          DataGridViewPaintParts paintParts)
+            protected override void Paint(
+                Graphics graphics,
+                Rectangle clipBounds,
+                Rectangle cellBounds,
+                int rowIndex,
+                DataGridViewElementStates cellState,
+                object? value,
+                object? formattedValue,
+                string? errorText,
+                DataGridViewCellStyle cellStyle,
+                DataGridViewAdvancedBorderStyle advancedBorderStyle,
+                DataGridViewPaintParts paintParts)
             {
-                var codeGridView = (CodeGridView)DataGridView!;
-                bool isInstructionColumn = (codeGridView.Columns[ColumnIndex].Index == InstructionColumnIndex);
-
                 PaintBackground(graphics, cellBounds, value);
-
                 if (value! is InstructionMetrics)
-                {
-                    if (isInstructionColumn)
-                        PaintInstruction(graphics, cellBounds, value, cellStyle);
-                    else
-                        base.Paint(graphics, clipBounds, cellBounds, rowIndex, cellState,
-                               value, formattedValue, errorText,
-                               cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
-                }
+                    PaintInstruction(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, paintParts);
                 else if (value! is Ellipses)
-                {
-                    if (isInstructionColumn)
-                        PaintEllipses(graphics, cellBounds, cellStyle);
-                }
+                    PaintEllipses(graphics, cellBounds, cellStyle);
                 else if (value! is FallThrough)
-                {
                     PaintFallThrough(graphics, rowIndex, cellStyle);
-                }
             }
 
             private void PaintBackground(
@@ -400,19 +387,34 @@ namespace BeebPerf.ux
 
             private void PaintInstruction(
                 Graphics graphics,
+                Rectangle clipBounds,
                 Rectangle cellBounds,
+                int rowIndex,
+                DataGridViewElementStates cellState,
                 object? value,
-                DataGridViewCellStyle cellStyle)
+                object? formattedValue,
+                string? errorText,
+                DataGridViewCellStyle cellStyle,
+                DataGridViewAdvancedBorderStyle advancedBorderStyle,
+                DataGridViewPaintParts paintParts)
             {
+                if (ColumnIndex != InstructionColumnIndex)
+                {
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
+                    return;
+                }
+
                 var codeGridView = (CodeGridView)DataGridView!;
-                var instructionSet = codeGridView._InstructionSet!;
 
                 var instructionMetrics = (InstructionMetrics)value!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
-                bool codeModified = instructionMetrics.CodeModified;
-                string mnemonic = instructionSet.Mnemonic(opcode);
+
+                var instructionSet = codeGridView._InstructionSet!;
                 int opSize = instructionSet.Size(opcode);
+                string mnemonic = instructionSet.Mnemonic(opcode);
                 InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
 
                 if (addressMode == InstructionSet.AddressMode.Relative)
@@ -421,12 +423,10 @@ namespace BeebPerf.ux
                     operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
                 }
 
-                var format = new StringFormat { LineAlignment = StringAlignment.Center };
-
                 List<Segment> segments = new();
                 var colors = codeGridView._InstructionStyle;
 
-                segments.Add(new Segment() { Text = mnemonic.PadRight(5), Color = colors.MnemonicColor });
+                segments.Add(new Segment { Text = mnemonic.PadRight(5), Color = colors.MnemonicColor });
 
                 string hexOperand = string.Empty;
                 if (opSize > 1)
@@ -436,50 +436,50 @@ namespace BeebPerf.ux
                     else if (opSize == 3)
                         hexOperand = $"&{operand:X4}";
 
-                    segments.Add(new Segment() { Text = hexOperand, Color = colors.AddressColor });
+                    segments.Add(new Segment { Text = hexOperand, Color = colors.AddressColor });
 
                     if (addressMode != InstructionSet.AddressMode.Immediate &&
                         codeGridView!._Labels!.TryGetValue(operand, out var label))
                     {
-                        segments.Insert(1, new Segment() { Text = label, Color = colors.LabelColor });
-                        segments.Insert(2, new Segment() { Text = " (", Color = colors.PunctuationColor });
-                        segments.Add(new Segment() { Text = ")", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Text = label, Color = colors.LabelColor });
+                        segments.Insert(2, new Segment { Text = " (", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
                     }
                 }
 
                 switch (addressMode)
                 {
                     case InstructionSet.AddressMode.Accumulator:
-                        segments.Add(new Segment() { Text = "A", Color = colors.MnemonicColor });
+                        segments.Add(new Segment { Text = "A", Color = colors.MnemonicColor });
                         break;
 
                     case InstructionSet.AddressMode.Immediate:
-                        segments.Insert(1, new Segment() { Text = "#", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Text = "#", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageX:
                     case InstructionSet.AddressMode.AbsoluteX:
-                        segments.Add(new Segment() { Text = ",X", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = ",X", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageY:
                     case InstructionSet.AddressMode.AbsoluteY:
-                        segments.Add(new Segment() { Text = ",Y", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = ",Y", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.Indirect:
-                        segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment() { Text = ")", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.IndirectX:
-                        segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment() { Text = ",X)", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = ",X)", Color = colors.PunctuationColor });
                         break;
 
                     case InstructionSet.AddressMode.IndirectY:
-                        segments.Insert(1, new Segment() { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment() { Text = "),Y", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Text = "),Y", Color = colors.PunctuationColor });
                         break;
                     default:
                         break;
@@ -503,7 +503,7 @@ namespace BeebPerf.ux
                     xPos += measure.Width;
                 }
 
-                if (codeModified)
+                if (instructionMetrics.CodeModified)
                 {
                     using var pen = new Pen(cellStyle.ForeColor);
                     graphics.DrawLine(pen, cellBounds.Left, cellBounds.Top, cellBounds.Left, cellBounds.Bottom);
@@ -512,7 +512,8 @@ namespace BeebPerf.ux
 
             private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
             {
-                graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
+                if (ColumnIndex == AddressColumnIndex || ColumnIndex == InstructionColumnIndex)
+                    graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
             }
 
             private void PaintFallThrough(Graphics graphics, int rowIndex, DataGridViewCellStyle cellStyle)
