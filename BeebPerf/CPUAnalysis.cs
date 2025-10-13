@@ -311,7 +311,7 @@ namespace BeebPerf
                 else if (instruction.IsInterrupt && !isLastInstruction)
                 {
                     // update instruction indices to include interrupt
-                    if (currentStackFrame.FirstInstructionIndex == 0)
+                    if (currentStackFrame.FirstInstructionIndex < 0)
                         currentStackFrame.FirstInstructionIndex = instructionIndex;
 
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)
