@@ -189,14 +189,21 @@ namespace BeebPerf.ux
             _SelectedRoutine = routine;
             _SelectedCallStack = callStack;
 
+            if (_SelectedCallStack != null)
+                routinesDataGrid.ClearSelection();
+            else
+                callTreeControl.ClearSelection();
+
             List<InstructionMetrics> instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
             codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
+
         }
 
         public void ClearSelectedRoutine()
         {
             _SelectedRoutine = null;
             _SelectedCallStack = null;
+            codeView.Clear();
         }
 
         private void SaveAppState()
