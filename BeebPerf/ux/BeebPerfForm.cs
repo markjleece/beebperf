@@ -21,9 +21,6 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
-using System.Net.NetworkInformation;
-using System.Runtime.CompilerServices;
-using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -186,17 +183,20 @@ namespace BeebPerf.ux
 
         public void SetSelectedRoutine(Routine routine, CallStack? callStack)
         {
-            _SelectedRoutine = routine;
-            _SelectedCallStack = callStack;
-
             if (_SelectedCallStack != null)
                 routinesDataGrid.ClearSelection();
             else
                 callTreeControl.ClearSelection();
 
-            List<InstructionMetrics> instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
-            codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
+            _SelectedRoutine = routine;
+            _SelectedCallStack = callStack;
 
+            var callerMetrics = _CPUAnalysis.GetCallerMetrics(routine);
+            var calleeMetrics = _CPUAnalysis.GetCalleeMetrics(routine);
+            callerCalleeView.SetRoutine(routine, callerMetrics, calleeMetrics, _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount, _Model.Labels);
+
+            var instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
+            codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
         }
 
         public void ClearSelectedRoutine()
@@ -204,6 +204,7 @@ namespace BeebPerf.ux
             _SelectedRoutine = null;
             _SelectedCallStack = null;
             codeView.Clear();
+            callerCalleeView.Clear();
         }
 
         private void SaveAppState()

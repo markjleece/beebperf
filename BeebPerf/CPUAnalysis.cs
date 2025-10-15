@@ -727,13 +727,10 @@ namespace BeebPerf
                 if (instruction.IsInstruction &&
                     cycleCount >= StartCycleCount && cycleCount <= EndCycleCount)
                 {
-                    InstructionMetrics? metrics;
                     var coreInstruction = new CoreInstruction(ref instruction);
-                    if (!instructionMetrics.TryGetValue(coreInstruction, out metrics))
-                    {
-                        metrics = new InstructionMetrics(coreInstruction, instructionOrdinal++);
-                        instructionMetrics.Add(coreInstruction, metrics);
-                    }
+                    var metrics = instructionMetrics.TryGetValue(coreInstruction, out var existing)
+                        ? existing
+                        : instructionMetrics[coreInstruction] = new InstructionMetrics(coreInstruction, instructionOrdinal++);
 
                     metrics.InclusiveCycleCount += instructionCycleCount;
                     metrics.ExecutionCount += 1;
@@ -785,6 +782,72 @@ namespace BeebPerf
                 if (addressSlots.TryGetValue(address, out var instructionCount))
                     instructionMetric.CodeModified = (instructionCount > 1);
             }
+        }
+
+        //
+        // caller / callee metrics...
+        //
+        public struct RoutineMetrics
+        {
+            public Routine Routine;
+            public CPUMetrics CPUMetrics;
+        };
+
+        public List<RoutineMetrics> GetCallerMetrics(Routine routine)
+        {
+            Dictionary<CallStack, CPUMetrics> callerMetrics = new();
+
+            foreach (var callStack in routine.MetricsByStack.Keys)
+            {
+                if (callStack.Parent == null)
+                    continue;
+
+                var caller = callStack.Parent!;
+
+                if (caller.Routine.MetricsByStack.TryGetValue(caller, out var parentMetrics))
+                {
+                    var metrics = callerMetrics.TryGetValue(caller, out var existing)
+                        ? existing
+                        : callerMetrics[caller] = new CPUMetrics();
+                    metrics.Add(parentMetrics);
+                }
+            }
+
+            var list = new List<RoutineMetrics>(callerMetrics.Count);
+            foreach (var kvp in callerMetrics)
+                list.Add(new RoutineMetrics { Routine = RoutinesByAddress[kvp.Key.CanonicalAddress], CPUMetrics = kvp.Value });
+
+            list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
+
+            return list;
+        }
+
+        public List<RoutineMetrics> GetCalleeMetrics(Routine routine)
+        {
+            Dictionary<CallStack, CPUMetrics> calleeMetrics = new();
+
+            foreach (var stackFrame in routine.StackFrames)
+            {
+                if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
+                    continue;
+
+                foreach (var child in stackFrame.Children)
+                {
+                    if (child.Type == CallType.ISR)
+                        continue;
+
+                    if (!calleeMetrics.ContainsKey(child))
+                        calleeMetrics[child] = child.Routine.MetricsByStack[child].Clone();
+                }
+            }
+
+            var list = new List<RoutineMetrics>(calleeMetrics.Count);
+            foreach (var kvp in calleeMetrics)
+                list.Add(new RoutineMetrics { Routine = RoutinesByAddress[kvp.Key.CanonicalAddress], CPUMetrics = kvp.Value });
+
+            list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
+
+            return list;
         }
 
         public Dictionary<CanonicalAddress, Routine> RoutinesByAddress = new();

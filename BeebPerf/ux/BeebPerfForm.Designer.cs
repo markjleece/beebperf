@@ -55,6 +55,7 @@ namespace BeebPerf.ux
             hotGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
             codeView = new CodeGridView();
+            callerCalleeView = new CallerCalleeView();
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -262,6 +263,7 @@ namespace BeebPerf.ux
             // 
             // callerCalleeTabPage
             // 
+            callerCalleeTabPage.Controls.Add(callerCalleeView);
             callerCalleeTabPage.Location = new Point(4, 34);
             callerCalleeTabPage.Name = "callerCalleeTabPage";
             callerCalleeTabPage.Padding = new Padding(3);
@@ -269,6 +271,15 @@ namespace BeebPerf.ux
             callerCalleeTabPage.TabIndex = 2;
             callerCalleeTabPage.Text = "Caller / Callee";
             callerCalleeTabPage.UseVisualStyleBackColor = true;
+            // 
+            // callerCalleeView
+            // 
+            callerCalleeView.BackColor = SystemColors.Window;
+            callerCalleeView.Dock = DockStyle.Fill;
+            callerCalleeView.Location = new Point(3, 3);
+            callerCalleeView.Name = "callerCalleeView";
+            callerCalleeView.Size = new Size(1731, 442);
+            callerCalleeView.TabIndex = 0;
             // 
             // routinesTabPage
             // 
@@ -372,6 +383,7 @@ namespace BeebPerf.ux
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
         private CodeGridView codeView;
+        private CallerCalleeView callerCalleeView;
         private Spinner spinner;
     }
 }
