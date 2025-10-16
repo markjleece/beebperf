@@ -27,7 +27,7 @@ namespace BeebPerf.ux
     {
         public Spinner() : base()
         {
-            _Timer = new System.Windows.Forms.Timer();
+            _Timer = new();
             _Timer.Interval = 20;
             _Timer.Tick += Timer_Tick;
             VisibleChanged += OnVisibleChanged;

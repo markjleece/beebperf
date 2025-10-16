@@ -75,9 +75,7 @@ namespace BeebPerf.ux
         {
             Control control = this;
             while (control is not Form)
-            {
                 control = control!.Parent!;
-            }
             return (Form)control;
         }
 

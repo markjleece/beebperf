@@ -20,14 +20,23 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System.Drawing;
+using System.Drawing.Imaging.Effects;
 using static BeebPerf.CPUAnalysis;
 using static System.Net.Mime.MediaTypeNames;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TaskbarClock;
 
 namespace BeebPerf.ux
 {
     internal class CallerCalleeView : Panel
     {
+        public CallerCalleeView() : base() 
+        {
+            _ToolTipTimer = new();
+            _ToolTipTimer.Interval = 500;
+            _ToolTipTimer.Tick += ToolTipTimer_Tick;
+            VisibleChanged += OnVisibleChanged;
+        }
+
         public void SetRoutine(
             Routine routine,
             List<RoutineMetrics> callers,
@@ -52,14 +61,10 @@ namespace BeebPerf.ux
             _Callees = new ();
         }
 
-        private Form GetParentForm()
+        protected override void OnResize(EventArgs e)
         {
-            Control control = this;
-            while (control is not Form)
-            {
-                control = control!.Parent!;
-            }
-            return (Form)control;
+            base.OnResize(e);
+            LayoutRoutineCells();
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
@@ -68,13 +73,13 @@ namespace BeebPerf.ux
 
             foreach (var routineCell in _RoutineCells)
             {
-                if ((routineCell.Flags & RoutineCellFlags.Selectable) != 0 &&
-                     routineCell.Rectangle.Contains(e.X, e.Y))
-                {
-                    BeebPerfForm form = (BeebPerfForm)GetParentForm();
-                    form.SetSelectedRoutine(routineCell.Routine, callStack: null);
-                    return;
-                }
+                if (!routineCell.Rectangle.Contains(e.X, e.Y) ||
+                    (routineCell.Flags & RoutineCellFlags.Selectable) == 0)
+                    continue;
+
+                BeebPerfForm form = (BeebPerfForm)GetParentForm();
+                form.SetSelectedRoutine(routineCell.Routine, callStack: null);
+                return;
             }
         }
 
@@ -84,43 +89,37 @@ namespace BeebPerf.ux
 
             foreach (var routineCell in _RoutineCells)
             {
+                if (!routineCell.Rectangle.Contains(e.Location))
+                    continue;
+
+                ShowToolTip(routineCell, e.Location);
                 if ((routineCell.Flags & RoutineCellFlags.Selectable) != 0 &&
-                     routineCell.Rectangle.Contains(e.X, e.Y))
-                {
-                    if (routineCell != _SelectedRoutineCell)
-                    {
-                        if (_SelectedRoutineCell != null)
-                            Invalidate(_SelectedRoutineCell.Rectangle);
-                        Invalidate(routineCell.Rectangle);
-                        _SelectedRoutineCell = routineCell;
-                        Update();
-                    }
-                    return;
-                }
+                    routineCell != _FocusRoutineCell)
+                    SetFocus(routineCell);
+                return;
             }
 
-            if (_SelectedRoutineCell != null)
-            {
-                Invalidate(_SelectedRoutineCell.Rectangle);
-                _SelectedRoutineCell = null;
-                Update();
-            }
+            HideToolTip();
+            RemoveFocus();
         }
 
         protected override void OnMouseLeave(EventArgs e)
         {
             base.OnMouseLeave(e);
 
-            if (_SelectedRoutineCell != null)
-            {
-                Invalidate(_SelectedRoutineCell.Rectangle);
-                _SelectedRoutineCell = null;
-                Update();
-            }
+            HideToolTip();
+            RemoveFocus();
+        }
+
+        private void OnVisibleChanged(object? sender, EventArgs e)
+        {
+            if (!Visible)
+                HideToolTip();
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
+            // nothing
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -146,12 +145,6 @@ namespace BeebPerf.ux
             int arrowSize = 2 * borderSize;
             PaintArrow(new Rectangle(borderSize + panelWidth, panelHeight / 2, arrowSize, arrowSize), e);
             PaintArrow(new Rectangle(3 * borderSize + 2 * panelWidth, panelHeight / 2, arrowSize, arrowSize), e);
-        }
-
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            LayoutRoutineCells();
         }
 
         private void PaintPanel(string caption, Rectangle panelRect, PaintEventArgs e)
@@ -202,12 +195,12 @@ namespace BeebPerf.ux
             // paint background
             Color fillColor = BackColor;
             bool colorBackground = (routineCell.Flags & RoutineCellFlags.ColorBackground) != 0;
-            if (colorBackground || routineCell == _SelectedRoutineCell)
+            if (colorBackground || routineCell == _FocusRoutineCell)
             {
                 if (colorBackground)
                     fillColor = BackColor.GetBrightness() > 0.5 ? _ColorLightRed : Color.DarkRed;
 
-                if (routineCell == _SelectedRoutineCell)
+                if (routineCell == _FocusRoutineCell)
                     fillColor = Blend(fillColor, ForeColor, 0.1);
             }
             using var fillBrush = new SolidBrush(fillColor);
@@ -232,7 +225,11 @@ namespace BeebPerf.ux
             textRect.Intersect(bounds);
             if (textRect.Height >= Font.Height)
             {
-                string metrics = FormatMetrics(routineCell);
+                int metric = (routineCell.Flags & RoutineCellFlags.RoutineBody) != 0
+                    ? routineCell.Metrics.SelfCycleCount
+                    : routineCell.Metrics.InclusiveCycleCount;
+
+                string metrics = FormatMetrics(metric);
                 Size metricsMeasure = TextRenderer.MeasureText(
                     metrics, Font,
                     new Size(int.MaxValue, int.MaxValue),
@@ -258,29 +255,28 @@ namespace BeebPerf.ux
                     Trimming = StringTrimming.EllipsisCharacter
                 };
 
-                string label = FormatLabel(routineCell);
+                string label;
+                if ((routineCell.Flags & RoutineCellFlags.RoutineBody) != 0)
+                    label = "Function Body";
+                else 
+                    label = FormatRoutine(routineCell);
+
                 e.Graphics.DrawString(label, Font, brush, textRect, textFormat);
             }
 
             e.Graphics.ExcludeClip(new Rectangle(bounds.X, bounds.Y, bounds.Width + 1, bounds.Height + 1));
         }
 
-        private string FormatMetrics(RoutineCell routineCell)
+        private string FormatMetrics(int value)
         {
-            int metric = (routineCell.Flags & RoutineCellFlags.FunctionBody) != 0
-                ? routineCell.Metrics.SelfCycleCount
-                : routineCell.Metrics.InclusiveCycleCount;
-
-            var percentage = double.Min(100.0 * metric / _TotalCycleCount, 100);
-            return $"{metric:N0} ({percentage:F2}%)";
+            var percentage = double.Min(100.0 * value / _TotalCycleCount, 100);
+            return $"{value:N0} ({percentage:F2}%)";
         }
 
-        private string FormatLabel(RoutineCell routineCell)
+        private string FormatRoutine(RoutineCell routineCell)
         {
             var routine = routineCell.Routine;
-            if ((routineCell.Flags & RoutineCellFlags.FunctionBody) != 0)
-                return "Function Body";
-            else if (routine.Label.Length > 0)
+            if (routine.Label.Length > 0)
                 return $"{routine.Label} ({routine.StartAddress})";
             else
                 return routine.StartAddress.ToString();
@@ -339,7 +335,7 @@ namespace BeebPerf.ux
                     Rectangle = rect,
                     Routine = _Routine!,
                     Metrics = _Routine!.AggregateMetrics,
-                    Flags = RoutineCellFlags.FunctionBody
+                    Flags = RoutineCellFlags.RoutineBody
                 });
             }
         }
@@ -381,6 +377,51 @@ namespace BeebPerf.ux
             }
         }
 
+        private void ShowToolTip(RoutineCell routineCell, Point mousePosition)
+        {
+            _ToolTipTimer.Stop();
+            _ToolTipTimer.Start();
+
+            var routineBody = (routineCell.Flags & RoutineCellFlags.RoutineBody) != 0;
+            var metric = routineBody ? routineCell.Metrics.SelfCycleCount : routineCell.Metrics.InclusiveCycleCount;
+            var label = routineBody ? "Self CPU" : "Total CPU";
+
+            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\n{label}: {FormatMetrics(metric)}";
+            _ToolTipLocation = mousePosition;
+            _ToolTipLocation.Offset(10, 10);
+        }
+
+        private void HideToolTip()
+        {
+            _ToolTip.Hide(this);
+        }
+
+        private void ToolTipTimer_Tick(object? sender, EventArgs e)
+        {
+            _ToolTipTimer.Stop();
+            _ToolTip.Show(_ToolTipText, this, _ToolTipLocation);
+        }
+
+        private void SetFocus(RoutineCell routineCell)
+        {
+            if (_FocusRoutineCell != null)
+                Invalidate(_FocusRoutineCell.Rectangle);
+
+            Invalidate(routineCell.Rectangle);
+            _FocusRoutineCell = routineCell;
+            Update();
+        }
+
+        private void RemoveFocus()
+        {
+            if (_FocusRoutineCell != null)
+            {
+                Invalidate(_FocusRoutineCell.Rectangle);
+                _FocusRoutineCell = null;
+                Update();
+            }
+        }
+
         private Color Blend(Color first, Color second, double ratio)
         {
             int r = (int)(first.R * (1 - ratio) + second.R * ratio);
@@ -389,12 +430,20 @@ namespace BeebPerf.ux
             return Color.FromArgb(r, g, b);
         }
 
+        private Form GetParentForm()
+        {
+            Control control = this;
+            while (control is not Form)
+                control = control!.Parent!;
+            return (Form)control;
+        }
+
         private enum RoutineCellFlags
         {
             None = 0,
             HideBorder = 0x01,
             Selectable = 0x02,
-            FunctionBody = 0x04,
+            RoutineBody = 0x04,
             ColorBackground = 0x10
         };
        
@@ -406,7 +455,7 @@ namespace BeebPerf.ux
             public required RoutineCellFlags Flags;
         }
 
-        private RoutineCell? _SelectedRoutineCell;
+        private RoutineCell? _FocusRoutineCell;
         private List<RoutineCell> _RoutineCells = new();
         private List<RoutineMetrics> _Callers = new();
         private List<RoutineMetrics> _Callees = new();
@@ -414,5 +463,10 @@ namespace BeebPerf.ux
         private int _TotalCycleCount;
         private Dictionary<ushort, string> _Labels = new();
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
+
+        private ToolTip _ToolTip = new ToolTip();
+        private string _ToolTipText = string.Empty;
+        private Point _ToolTipLocation;
+        private System.Windows.Forms.Timer _ToolTipTimer = new();
     }
 }

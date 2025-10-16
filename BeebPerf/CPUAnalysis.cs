@@ -102,7 +102,7 @@ namespace BeebPerf
                 }
             }
 
-            // create routines for every RTS return address which doesn't match a JSR return address
+            // create routines for every RTS return routineAddress which doesn't match a JSR return routineAddress
             foreach (CanonicalAddress rtsReturnAddress in rtsReturnAddresses)
                 if (!jsrReturnAddresses.Contains(rtsReturnAddress))
                     CreateRoutine(rtsReturnAddress, RoutineType.Pseudo);
@@ -813,13 +813,7 @@ namespace BeebPerf
                 }
             }
 
-            var list = new List<RoutineMetrics>(callerMetrics.Count);
-            foreach (var kvp in callerMetrics)
-                list.Add(new RoutineMetrics { Routine = RoutinesByAddress[kvp.Key.CanonicalAddress], CPUMetrics = kvp.Value });
-
-            list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
-
-            return list;
+            return ToList(callerMetrics);
         }
 
         public List<RoutineMetrics> GetCalleeMetrics(Routine routine)
@@ -841,9 +835,24 @@ namespace BeebPerf
                 }
             }
 
-            var list = new List<RoutineMetrics>(calleeMetrics.Count);
-            foreach (var kvp in calleeMetrics)
-                list.Add(new RoutineMetrics { Routine = RoutinesByAddress[kvp.Key.CanonicalAddress], CPUMetrics = kvp.Value });
+            return ToList(calleeMetrics);
+        }
+
+        private List<RoutineMetrics> ToList(Dictionary<CallStack, CPUMetrics> routineMetrics)
+        {
+            Dictionary<CanonicalAddress, CPUMetrics> metricsByRoutine = new();
+            foreach (var kvp in routineMetrics)
+            {
+                var routineAddress = kvp.Key.Routine.StartAddress;
+                var metrics = metricsByRoutine.TryGetValue(routineAddress, out var existing)
+                    ? existing
+                    : metricsByRoutine[routineAddress] = new CPUMetrics();
+                metrics.Add(kvp.Value);
+            }
+
+            var list = new List<RoutineMetrics>(metricsByRoutine.Count);
+            foreach (var kvp in metricsByRoutine)
+                list.Add(new RoutineMetrics { Routine = RoutinesByAddress[kvp.Key], CPUMetrics = kvp.Value });
 
             list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
 
