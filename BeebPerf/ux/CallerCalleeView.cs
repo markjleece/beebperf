@@ -260,11 +260,9 @@ namespace BeebPerf.ux
         private Color CalcHotnessColor(RoutineCell routineCell)
         {
             int metric = routineCell.RoutineBody ? routineCell.Metrics.SelfCycleCount : routineCell.Metrics.InclusiveCycleCount;
-
-            double ratio = Math.Clamp((double)metric / _Routine!.AggregateMetrics.InclusiveCycleCount, 0, 1);
+            double hotness = Math.Clamp((double)metric / _Routine!.AggregateMetrics.InclusiveCycleCount, 0, 1);
             var hotColor = BackColor.GetBrightness() > 0.5 ? _ColorLightRed : Color.DarkRed;
-
-            return Blend(BackColor, hotColor, ratio);
+            return Blend(BackColor, hotColor, hotness);
         }
 
         private string FormatMetrics(int value)

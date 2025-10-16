@@ -133,7 +133,7 @@ namespace BeebPerf.ux
                 }
             }
 
-            // sum cycles
+            // sum cycles and find max
             int totalCycles = 0;
             int maxExecutionCount = 0;
             foreach (var instructionMetric in instructionMetrics)
@@ -143,18 +143,6 @@ namespace BeebPerf.ux
             }
             _TotalCycleCount = totalCycles;
             _MaxExecutionCount = maxExecutionCount;
-
-            // calculate mean
-            _Mean = (double)totalCycles / instructionMetrics.Count;
-
-            // calculate standard deviation
-            double varianceSum = 0.0;
-            foreach (var instructionMetric in instructionMetrics)
-            {
-                double diff = instructionMetric.InclusiveCycleCount - _Mean;
-                varianceSum += diff * diff;
-            }
-            _StandardDeviation = (float)Math.Sqrt(varianceSum / instructionMetrics.Count);
         }
 
         public void Clear()
@@ -322,15 +310,10 @@ namespace BeebPerf.ux
 
                 if (value! is InstructionMetrics)
                 {
-                    float zScore = 0;
-                    if (codeGridView._StandardDeviation > 0.0)
-                    {
-                        var instructionMetrics = (InstructionMetrics)value!;
-                        zScore = (float)((instructionMetrics.InclusiveCycleCount - codeGridView._Mean) / codeGridView._StandardDeviation);
-                    }
-
-                    Color red = backColor.GetBrightness() > 0.5 ? ColorLightRed : Color.DarkRed;
-                    backColor = Blend(backColor, red, MapToUnitRange(zScore, fromValue:0.0, toValue:5.0));
+                    var instructionMetrics = (InstructionMetrics)value!;
+                    double hotness = Math.Clamp((double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount, 0.0, 1.0);
+                    Color hotColor = backColor.GetBrightness() > 0.5 ? ColorLightRed : Color.DarkRed;
+                    backColor = Blend(backColor, hotColor, hotness);
                 }
 
                 using var brush = new SolidBrush(backColor);
@@ -590,7 +573,5 @@ namespace BeebPerf.ux
         private Color _SelectionBackColor;
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
-        private double _StandardDeviation;
-        private double _Mean;
     }
 }
