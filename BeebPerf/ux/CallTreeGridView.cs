@@ -85,7 +85,7 @@ namespace BeebPerf.ux
             if (SelectedRows.Count == 1)
             {
                 var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(treeNode.Routine, treeNode.Context);
+                form.SetSelectedRoutine(treeNode.Routine, treeNode.CallStack);
             }
             else
             {

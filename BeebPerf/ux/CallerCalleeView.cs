@@ -21,7 +21,6 @@
 
 using BeebPerf.model;
 using static BeebPerf.CPUAnalysis;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace BeebPerf.ux
 {
@@ -29,10 +28,11 @@ namespace BeebPerf.ux
     {
         public CallerCalleeView() : base() 
         {
+            DoubleBuffered = true;
+            VisibleChanged += OnVisibleChanged;
             _ToolTipTimer = new();
             _ToolTipTimer.Interval = 500;
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
-            VisibleChanged += OnVisibleChanged;
         }
 
         public void SetRoutine(
@@ -117,7 +117,8 @@ namespace BeebPerf.ux
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            // nothing
+            using var brush = new SolidBrush(BackColor);
+            e.Graphics.FillRectangle(brush, e.ClipRectangle);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -128,14 +129,6 @@ namespace BeebPerf.ux
             int panelWidth = (Width - borderSize * 6) / 3;
             int panelHeight = Height - borderSize;
 
-            var state = e.Graphics.Save();
-            foreach (var routineCell in _RoutineCells)
-                PaintRoutineCell(routineCell, e);
-
-            using var brush = new SolidBrush(BackColor);
-            e.Graphics.FillRectangle(brush, e.ClipRectangle);
-            e.Graphics.Restore(state);
-
             PaintPanel("Calling Routines", new Rectangle(borderSize, 0, panelWidth, panelHeight), e);
             PaintPanel("Current Routine", new Rectangle(3 * borderSize + panelWidth, 0, panelWidth, panelHeight), e);
             PaintPanel("Called Routines", new Rectangle(5 * borderSize + 2 * panelWidth, 0, panelWidth, panelHeight), e);
@@ -143,6 +136,9 @@ namespace BeebPerf.ux
             int arrowSize = 2 * borderSize;
             PaintArrow(new Rectangle(borderSize + panelWidth, panelHeight / 2, arrowSize, arrowSize), e);
             PaintArrow(new Rectangle(3 * borderSize + 2 * panelWidth, panelHeight / 2, arrowSize, arrowSize), e);
+
+            foreach (var routineCell in _RoutineCells)
+                PaintRoutineCell(routineCell, e);
         }
 
         private void PaintPanel(string caption, Rectangle panelRect, PaintEventArgs e)
@@ -220,10 +216,8 @@ namespace BeebPerf.ux
             textRect.Intersect(bounds);
             if (textRect.Height >= Font.Height)
             {
-                int metric = routineCell.RoutineBody ? routineCell.Metrics.SelfCycleCount : routineCell.Metrics.InclusiveCycleCount;
-
                 // paint metric (right aligned)
-                string metrics = FormatMetrics(metric);
+                string metrics = FormatMetrics(routineCell);
                 Size metricsMeasure = TextRenderer.MeasureText(
                     metrics, Font,
                     new Size(int.MaxValue, int.MaxValue),
@@ -253,22 +247,19 @@ namespace BeebPerf.ux
                 string label = routineCell.RoutineBody ? "Function Body" : FormatRoutine(routineCell);
                 e.Graphics.DrawString(label, Font, brush, textRect, textFormat);
             }
-
-            e.Graphics.ExcludeClip(new Rectangle(bounds.X, bounds.Y, bounds.Width + 1, bounds.Height + 1));
         }
 
         private Color CalcHotnessColor(RoutineCell routineCell)
         {
-            int metric = routineCell.RoutineBody ? routineCell.Metrics.SelfCycleCount : routineCell.Metrics.InclusiveCycleCount;
-            double hotness = Math.Clamp((double)metric / _Routine!.AggregateMetrics.InclusiveCycleCount, 0, 1);
+            double hotness = Math.Clamp((double)routineCell.CycleCount / _Routine!.AggregateMetrics.InclusiveCycleCount, 0, 1);
             var hotColor = BackColor.GetBrightness() > 0.5 ? _ColorLightRed : Color.DarkRed;
             return Blend(BackColor, hotColor, hotness);
         }
 
-        private string FormatMetrics(int value)
+        private string FormatMetrics(RoutineCell routineCell)
         {
-            var percentage = double.Min(100.0 * value / _TotalCycleCount, 100);
-            return $"{value:N0} ({percentage:F2}%)";
+            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
         private string FormatRoutine(RoutineCell routineCell)
@@ -319,7 +310,7 @@ namespace BeebPerf.ux
                 {
                     Rectangle = rect,
                     Routine = _Routine!,
-                    Metrics = _Routine!.AggregateMetrics,
+                    CycleCount = _Routine!.AggregateMetrics.InclusiveCycleCount,
                     HideBorder = true
                 });
             }
@@ -332,7 +323,7 @@ namespace BeebPerf.ux
                 {
                     Rectangle = rect,
                     Routine = _Routine!,
-                    Metrics = _Routine!.AggregateMetrics,
+                    CycleCount = _Routine!.AggregateMetrics.SelfCycleCount,
                     RoutineBody = true,
                     ShowHotness = true
                 });
@@ -369,7 +360,7 @@ namespace BeebPerf.ux
                     {
                         Rectangle = rect,
                         Routine = routineMetric.Routine,
-                        Metrics = routineMetric.CPUMetrics,
+                        CycleCount = routineMetric.CPUMetrics.InclusiveCycleCount,
                         ShowHotness = showHotness,
                         Selectable = true
                     });
@@ -382,10 +373,8 @@ namespace BeebPerf.ux
             _ToolTipTimer.Stop();
             _ToolTipTimer.Start();
 
-            var metric = routineCell.RoutineBody ? routineCell.Metrics.SelfCycleCount : routineCell.Metrics.InclusiveCycleCount;
             var label = routineCell.RoutineBody ? "Self CPU" : "Total CPU";
-
-            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\n{label}: {FormatMetrics(metric)}";
+            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\n{label}: {FormatMetrics(routineCell)}";
             _ToolTipLocation = mousePosition;
             _ToolTipLocation.Offset(10, 10);
         }
@@ -440,8 +429,8 @@ namespace BeebPerf.ux
         private class RoutineCell
         {
             public required Routine Routine;
-            public required CPUMetrics Metrics;
             public required Rectangle Rectangle;
+            public required int CycleCount;
             public bool HideBorder;
             public bool Selectable;
             public bool RoutineBody;

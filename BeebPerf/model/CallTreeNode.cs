@@ -27,7 +27,7 @@ namespace BeebPerf.model
     {
         public CallTreeNode(CallStack callStack)
         {
-            Context = callStack;
+            CallStack = callStack;
             Routine = callStack.Routine;
             CPUMetrics = callStack.Routine.MetricsByStack[callStack];
         }
@@ -78,7 +78,7 @@ namespace BeebPerf.model
         }
 
         public readonly Routine Routine;
-        public readonly CallStack Context;
+        public readonly CallStack CallStack;
         public readonly CPUMetrics CPUMetrics;
         public bool HotPath;
     }

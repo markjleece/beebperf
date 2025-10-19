@@ -19,6 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Drawing;
 using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
@@ -27,6 +28,7 @@ namespace BeebPerf.ux
     {
         public TimelineView() : base()
         {
+            DoubleBuffered = true;
             _ScrollBar = new HScrollBar();
             _ScrollBar.Dock = DockStyle.Bottom;
             _ScrollBar.Scroll += ScrollBar_Scroll;
@@ -143,28 +145,17 @@ namespace BeebPerf.ux
             DynamicAnalysis();
         }
 
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            if (_RecordingDuration == 0)
-                PaintDefaultBackground(e);
-        }
-
         protected override void OnPaint(PaintEventArgs e)
         {
-            if (_RecordingDuration == 0)
-                return;
-
             Graphics graphics = e.Graphics;
 
-            // draw handles
-            using var handleBrush = new SolidBrush(ForeColor);
-            graphics.FillRectangle(handleBrush, _LeftHandleRect);
-            graphics.FillRectangle(handleBrush, _RightHandleRect);
+            if (_RecordingDuration == 0)
+            {
+                PaintDefaultRuler(e);
+                return;
+            }
 
-            graphics.ExcludeClip(_LeftHandleRect);
-            graphics.ExcludeClip(_RightHandleRect);
-
-            // draw background
+            // draw ruler background
             int left = CyclesToPixels(0);
             int right = CyclesToPixels(_RecordingDuration);
 
@@ -185,15 +176,6 @@ namespace BeebPerf.ux
             if (graphics.IsVisible(centerRect))
                 graphics.FillRectangle(centerBrush, centerRect);
 
-            GraphicsState state = graphics.Save();
-            var exclusionRect = new Rectangle(left, _TimelineRect.Top, right - left, _TimelineRect.Height);
-            if (graphics.IsVisible(exclusionRect))
-                graphics.ExcludeClip(exclusionRect);
-
-            using var windowBrush = new SolidBrush(BackColor);
-            graphics.FillRectangle(windowBrush, e.ClipRectangle);
-            graphics.Restore(state);
-
             // draw header text
             using var textBrush = new SolidBrush(ForeColor);
             graphics.DrawString(_DurationText, Font, textBrush, new PointF(0, 0));
@@ -205,8 +187,13 @@ namespace BeebPerf.ux
             graphics.DrawLine(pen, 0, _TimelineRect.Top, Width, _TimelineRect.Top);
             graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
 
+            // draw handles
+            using var handleBrush = new SolidBrush(ForeColor);
+            graphics.FillRectangle(handleBrush, _LeftHandleRect);
+            graphics.FillRectangle(handleBrush, _RightHandleRect);
+
             // draw ruler ticks and text
-            state = graphics.Save();
+            var state = graphics.Save();
             graphics.ExcludeClip(centerRect);
             DrawRulerForeground(graphics, pen, brush);
             graphics.Restore(state);
@@ -240,13 +227,9 @@ namespace BeebPerf.ux
             }
         }
 
-        private void PaintDefaultBackground(PaintEventArgs e)
+        private void PaintDefaultRuler(PaintEventArgs e)
         {
             Graphics graphics = e.Graphics;
-
-            // draw background
-            using var windowBrush = new SolidBrush(BackColor);
-            graphics.FillRectangle(windowBrush, e.ClipRectangle);
 
             // draw header text
             using var textBrush = new SolidBrush(ForeColor);

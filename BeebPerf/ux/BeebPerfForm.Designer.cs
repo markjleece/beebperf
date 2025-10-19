@@ -42,6 +42,7 @@ namespace BeebPerf.ux
             zoomOutButton = new ToolStripButton();
             selectAllButton = new ToolStripButton();
             toolStripSeparator3 = new ToolStripSeparator();
+            flipViewButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
@@ -52,10 +53,11 @@ namespace BeebPerf.ux
             callerCalleeTabPage = new TabPage();
             routinesTabPage = new TabPage();
             routinesDataGrid = new RoutineGridView();
-            hotGraphTabPage = new TabPage();
+            flameGraphTabPage = new TabPage();
             interruptsTabPage = new TabPage();
             codeView = new CodeGridView();
             callerCalleeView = new CallerCalleeView();
+            flameGraphView = new FlameGraphView();
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -73,7 +75,7 @@ namespace BeebPerf.ux
             // toolStrip
             // 
             toolStrip.ImageScalingSize = new Size(24, 24);
-            toolStrip.Items.AddRange(new ToolStripItem[] { openButton, toolStripSeparator1, undoButton, redoButton, toolStripSeparator2, zoomInButton, zoomOutButton, selectAllButton, toolStripSeparator3, settingsButton, helpButton });
+            toolStrip.Items.AddRange(new ToolStripItem[] { openButton, toolStripSeparator1, undoButton, redoButton, toolStripSeparator2, zoomInButton, zoomOutButton, selectAllButton, toolStripSeparator3, flipViewButton, settingsButton, helpButton });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Size = new Size(1745, 33);
@@ -159,6 +161,17 @@ namespace BeebPerf.ux
             toolStripSeparator3.Name = "toolStripSeparator3";
             toolStripSeparator3.Size = new Size(6, 33);
             // 
+            // flipViewButton
+            // 
+            flipViewButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            flipViewButton.Image = (Image)resources.GetObject("flipViewButton.Image");
+            flipViewButton.ImageTransparentColor = Color.Magenta;
+            flipViewButton.Name = "flipViewButton";
+            flipViewButton.Size = new Size(34, 28);
+            flipViewButton.Text = "Flip View";
+            flipViewButton.ToolTipText = "Flip View";
+            flipViewButton.Click += flipViewButton_Click;
+            // 
             // settingsButton
             // 
             settingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -217,7 +230,7 @@ namespace BeebPerf.ux
             tabControl.Controls.Add(routinesTabPage);
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(callerCalleeTabPage);
-            tabControl.Controls.Add(hotGraphTabPage);
+            tabControl.Controls.Add(flameGraphTabPage);
             tabControl.Controls.Add(interruptsTabPage);
             tabControl.Dock = DockStyle.Fill;
             tabControl.Location = new Point(0, 0);
@@ -303,15 +316,25 @@ namespace BeebPerf.ux
             routinesDataGrid.Size = new Size(1731, 442);
             routinesDataGrid.TabIndex = 0;
             // 
-            // hotGraphTabPage
+            // flameGraphTabPage
             // 
-            hotGraphTabPage.Location = new Point(4, 34);
-            hotGraphTabPage.Name = "hotGraphTabPage";
-            hotGraphTabPage.Padding = new Padding(3);
-            hotGraphTabPage.Size = new Size(1737, 448);
-            hotGraphTabPage.TabIndex = 4;
-            hotGraphTabPage.Text = "HotPath Graph";
-            hotGraphTabPage.UseVisualStyleBackColor = true;
+            flameGraphTabPage.Controls.Add(flameGraphView);
+            flameGraphTabPage.Location = new Point(4, 34);
+            flameGraphTabPage.Name = "flameGraphTabPage";
+            flameGraphTabPage.Padding = new Padding(3);
+            flameGraphTabPage.Size = new Size(1737, 448);
+            flameGraphTabPage.TabIndex = 4;
+            flameGraphTabPage.Text = "Flame Graph";
+            flameGraphTabPage.UseVisualStyleBackColor = true;
+            // 
+            // callerCalleeView
+            // 
+            flameGraphView.BackColor = SystemColors.Window;
+            flameGraphView.Dock = DockStyle.Fill;
+            flameGraphView.Location = new Point(3, 3);
+            flameGraphView.Name = "flameGraphView";
+            flameGraphView.Size = new Size(1731, 442);
+            flameGraphView.TabIndex = 0;
             // 
             // interruptsTabPage
             // 
@@ -369,6 +392,7 @@ namespace BeebPerf.ux
         private ToolStripButton zoomOutButton;
         private ToolStripButton selectAllButton;
         private ToolStripSeparator toolStripSeparator3;
+        private ToolStripButton flipViewButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
         private ToolStripButton openButton;
@@ -378,12 +402,13 @@ namespace BeebPerf.ux
         private TabPage callTreeTabPage;
         private TabPage callerCalleeTabPage;
         private TabPage routinesTabPage;
-        private TabPage hotGraphTabPage;
+        private TabPage flameGraphTabPage;
         private TabPage interruptsTabPage;
         private RoutineGridView routinesDataGrid;
         private CallTreeGridView callTreeControl;
         private CodeGridView codeView;
         private CallerCalleeView callerCalleeView;
+        private FlameGraphView flameGraphView;
         private Spinner spinner;
     }
 }

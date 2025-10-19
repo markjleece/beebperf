@@ -133,6 +133,16 @@ namespace BeebPerf.ux
                 callTreeControl.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
 
             callTreeControl.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+
+            // populate flame graph
+            if (_CPUAnalysis!.ProgramCallTree != null)
+                flameGraphView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+
+            if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
+                flameGraphView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+
+            if (_CPUAnalysis!.MaskableInterruptCallTree != null)
+                flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
         }
 
         private void undoButton_Click(object sender, EventArgs e)
@@ -167,6 +177,11 @@ namespace BeebPerf.ux
             UpdateToolbarState();
         }
 
+        private void flipViewButton_Click(object sender, EventArgs e)
+        {
+            flameGraphView.FlipView();
+        }
+
         private void settingsButton_Click(object sender, EventArgs e)
         {
 
@@ -197,6 +212,13 @@ namespace BeebPerf.ux
 
             var instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
             codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
+
+            tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
+        }
+
+        private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            UpdateToolbarState();
         }
 
         public void ClearSelectedRoutine()
@@ -205,6 +227,7 @@ namespace BeebPerf.ux
             _SelectedCallStack = null;
             codeView.Clear();
             callerCalleeView.Clear();
+            flameGraphView.Clear();
         }
 
         private void SaveAppState()
@@ -244,6 +267,7 @@ namespace BeebPerf.ux
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
             selectAllButton.Enabled = timelineView.CanSelectAll();
+            flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
         }
 
         private void SetState(AppStateFlags state)
