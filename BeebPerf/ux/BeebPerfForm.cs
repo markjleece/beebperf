@@ -37,6 +37,7 @@ namespace BeebPerf.ux
             FormClosing += BeebPerfForm_FormClosing;
             Resize += BeebPerfForm_Resize;
 
+            tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
         }
 
         private void BeebPerfForm_Resize(object? sender, EventArgs e)
@@ -213,7 +214,8 @@ namespace BeebPerf.ux
             var instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
             codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
 
-            tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
+            if (callStack != null)
+                flameGraphView.SelectRoutine(routine, callStack);
         }
 
         private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
@@ -277,6 +279,7 @@ namespace BeebPerf.ux
                 timelineView.SetDuration(0);
                 routinesDataGrid.Clear();
                 callTreeControl.Clear();
+                flameGraphView.Clear();
                 codeView.Clear();
             }
 
@@ -284,6 +287,7 @@ namespace BeebPerf.ux
             {
                 routinesDataGrid.Clear();
                 callTreeControl.Clear();
+                flameGraphView.Clear();
                 codeView.Clear();
             }
 

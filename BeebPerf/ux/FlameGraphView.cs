@@ -50,15 +50,46 @@ namespace BeebPerf.ux
         public void AddCallTree(CallTreeNode treeNode)
         {
             _CallTrees.Add(treeNode);
-            _LayoutInvalid = true;
+            _ResetView = true;
+            Invalidate();
+        }
+
+        public void Clear()
+        {
+            _CallTrees.Clear();
+            _ResetView = true;
+            Invalidate();
+        }
+
+        public void SelectRoutine(Routine routine, CallStack callStack)
+        {
+            foreach (var routineCell in _RoutineCells)
+            {
+                if (routineCell.Routine != routine ||
+                    routineCell.CallStack != callStack)
+                    continue;
+
+                _SelectedRoutine = routineCell.Routine;
+                _SelectedCallStack = routineCell.CallStack;
+
+                LayoutRoutineCells();
+                ScrollSelectedRoutineIntoView();
+                Invalidate();
+
+                return;
+            }
+
+            _SelectedRoutine = null;
+            _SelectedCallStack = null;
+
+            LayoutRoutineCells();
+            SetVScrollValue(0);
             Invalidate();
         }
 
         public void ClearSelectedRoutine()
         {
-            _SelectedRoutine = null;
-            _SelectedCallStack = null;
-            _LayoutInvalid = true;
+            _ResetView = true;
             Invalidate();
         }
 
@@ -119,7 +150,6 @@ namespace BeebPerf.ux
                 _SelectedCallStack = null;
 
                 LayoutRoutineCells();
-                SetHScrollValue(0);
                 SetVScrollValue(0);
                 Invalidate();
 
@@ -164,10 +194,14 @@ namespace BeebPerf.ux
         {
             base.OnPaint(e);
 
-            if (_LayoutInvalid)
+            if (_ResetView)
             {
+                _SelectedRoutine = null;
+                _SelectedCallStack = null;
                 LayoutRoutineCells();
-                _LayoutInvalid = false;
+                SetHScrollValue(0);
+                SetVScrollValue(0);
+                _ResetView = false;
             }
 
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
@@ -319,6 +353,7 @@ namespace BeebPerf.ux
         private void LayoutRoutineCells()
         {
             _RoutineCells.Clear();
+            _FocusRoutineCell = null;
 
             // calc total cycle count
             int totalCycleCount = 0;
@@ -326,29 +361,37 @@ namespace BeebPerf.ux
                 totalCycleCount += treeNode.CPUMetrics.InclusiveCycleCount;
             _TotalCycleCount = totalCycleCount;
 
-            // calc displayed cycle count
-            int displayedCycleCount = totalCycleCount;
-            if (_SelectedRoutine != null)
+            if (totalCycleCount > 0)
             {
-                if (_SelectedCallStack != null)
-                    displayedCycleCount = _SelectedRoutine.MetricsByStack[_SelectedCallStack].InclusiveCycleCount;
-                else
-                    displayedCycleCount = _SelectedRoutine.AggregateMetrics.InclusiveCycleCount;
+                // calc displayed cycle count
+                int displayedCycleCount = totalCycleCount;
+                if (_SelectedRoutine != null)
+                {
+                    if (_SelectedCallStack != null)
+                        displayedCycleCount = _SelectedRoutine.MetricsByStack[_SelectedCallStack].InclusiveCycleCount;
+                    else
+                        displayedCycleCount = _SelectedRoutine.AggregateMetrics.InclusiveCycleCount;
+                }
+
+                // calc scaler
+                int marginSize = Font.Height / 2;
+                double scaler = (double)(GetClientExtents().Width - 2 * marginSize) / displayedCycleCount;
+
+                // calc layout extents
+                int cellHeight = Font.Height;
+                int maxTreeDepth = MaxDepth(_CallTrees, 1);
+
+                _LayoutExtents.Width = (int)double.Round(scaler * totalCycleCount) + (2 * marginSize);
+                _LayoutExtents.Height = (maxTreeDepth * cellHeight) + (2 * marginSize);
+
+                // layout siblings, and their descendants
+                LayoutSiblings(_CallTrees, left: marginSize, top: marginSize, scaler, cellHeight, new HashSet<Rectangle>());
             }
-
-            // calc scaler
-            int marginSize = Font.Height / 2;
-            double scaler = (double)(GetClientExtents().Width - 2 * marginSize) / displayedCycleCount;
-
-            // calc layout extents
-            int cellHeight = Font.Height;
-            int maxTreeDepth = MaxDepth(_CallTrees, 1);
-
-            _LayoutExtents.Width = (int)double.Round(scaler * totalCycleCount) + (2 * marginSize);
-            _LayoutExtents.Height = (maxTreeDepth * cellHeight) + (2 * marginSize);
-
-            // layout siblings, and their descendants
-            LayoutSiblings(_CallTrees, left:marginSize, top:marginSize, scaler, cellHeight, new HashSet<Rectangle>());
+            else
+            {
+                _LayoutExtents.Width = 0;
+                _LayoutExtents.Height = 0;
+            }
 
             UpdateScrollBars();
         }
@@ -591,7 +634,7 @@ namespace BeebPerf.ux
         private List<CallTreeNode> _CallTrees = new();
         private int _TotalCycleCount;
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
-        private bool _LayoutInvalid;
+        private bool _ResetView;
 
         private ToolTip _ToolTip = new ToolTip();
         private string _ToolTipText = string.Empty;
