@@ -227,7 +227,7 @@ namespace BeebPerf.ux
             _SelectedCallStack = null;
             codeView.Clear();
             callerCalleeView.Clear();
-            flameGraphView.Clear();
+            flameGraphView.ClearSelectedRoutine();
         }
 
         private void SaveAppState()

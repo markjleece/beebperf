@@ -19,13 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-//
-// TODO:
-// - Sorting behavior
-// - Flip view
-//
 using BeebPerf.model;
-using System.Drawing.Printing;
 
 namespace BeebPerf.ux
 {
@@ -56,14 +50,12 @@ namespace BeebPerf.ux
         public void AddCallTree(CallTreeNode treeNode)
         {
             _CallTrees.Add(treeNode);
-            _ScrollTopLeft = new();
             _LayoutInvalid = true;
             Invalidate();
         }
 
-        public void Clear()
+        public void ClearSelectedRoutine()
         {
-            _ScrollTopLeft = new();
             _SelectedRoutine = null;
             _SelectedCallStack = null;
             _LayoutInvalid = true;
@@ -73,26 +65,26 @@ namespace BeebPerf.ux
         public void FlipView()
         {
             _FlipView = !_FlipView;
-            if (_VScrollBar.Enabled)
-            {
-                if (_FlipView)
-                    _ScrollTopLeft.Y = _VScrollBar.Maximum - _VScrollBar.LargeChange;
-                else
-                    _ScrollTopLeft.Y = _VScrollBar.Minimum;
-            }
-            else
-            {
-                _ScrollTopLeft.Y = 0;
-            }
-
-            _LayoutInvalid = true;
+            SetVScrollValue(0);
             Invalidate();
         }
 
         protected override void OnResize(EventArgs eventArgs)
         {
+            int vScrollPos = GetVScrollValue();
+            double hScrollPos = GetHScrollUnitValue();
+
             base.OnResize(eventArgs);
-            LayoutRoutineCells();
+
+            if (Width != _PrevWidth)
+                LayoutRoutineCells();
+            else
+                UpdateScrollBars();
+
+            SetVScrollValue(vScrollPos);
+            SetHScrollUnitValue(hScrollPos);
+
+            _PrevWidth = Width;
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
@@ -101,10 +93,9 @@ namespace BeebPerf.ux
 
             BeebPerfForm form = (BeebPerfForm)GetParentForm();
 
-            var pos = new Point(e.X + _ScrollTopLeft.X, e.Y + _ScrollTopLeft.Y);
             foreach (var routineCell in _RoutineCells)
             {
-                if (!routineCell.Rectangle.Contains(pos))
+                if (!routineCell.Rectangle.Contains(PixelsToLayout(e.Location)))
                     continue;
 
                 if (_SelectedRoutine != routineCell.Routine ||
@@ -113,7 +104,8 @@ namespace BeebPerf.ux
                     _SelectedRoutine = routineCell.Routine;
                     _SelectedCallStack = routineCell.CallStack;
 
-                    _LayoutInvalid = true;
+                    LayoutRoutineCells();
+                    ScrollSelectedRoutineIntoView();
                     Invalidate();
 
                     form.SetSelectedRoutine(routineCell.Routine, routineCell.CallStack);
@@ -126,7 +118,9 @@ namespace BeebPerf.ux
                 _SelectedRoutine = null;
                 _SelectedCallStack = null;
 
-                _LayoutInvalid = true;
+                LayoutRoutineCells();
+                SetHScrollValue(0);
+                SetVScrollValue(0);
                 Invalidate();
 
                 form.ClearSelectedRoutine();
@@ -137,10 +131,9 @@ namespace BeebPerf.ux
         {
             base.OnMouseMove(e);
 
-            var pos = new Point(e.X + _ScrollTopLeft.X, e.Y + _ScrollTopLeft.Y);
             foreach (var routineCell in _RoutineCells)
             {
-                if (!routineCell.Rectangle.Contains(pos))
+                if (!routineCell.Rectangle.Contains(PixelsToLayout(e.Location)))
                     continue;
 
                 ShowToolTip(routineCell, e.Location);
@@ -188,11 +181,7 @@ namespace BeebPerf.ux
             using var textBrush = new SolidBrush(ForeColor);
 
             foreach (var routineCell in _RoutineCells)
-                if (routineCell != _FocusRoutineCell)
-                    PaintRoutineCell(routineCell, e, linePen, selectedLinePen, fillBrush, focusFillBrush, textBrush);
-
-            if (_FocusRoutineCell != null)
-                PaintRoutineCell(_FocusRoutineCell, e, linePen, selectedLinePen, fillBrush, focusFillBrush, textBrush);
+                PaintRoutineCell(routineCell, e, linePen, selectedLinePen, fillBrush, focusFillBrush, textBrush);
         }
 
         private void PaintRoutineCell(
@@ -204,56 +193,53 @@ namespace BeebPerf.ux
             Brush focusFillBrush,
             Brush textBrush)
         {
-            var bounds = routineCell.Rectangle;
-            bounds.X -= _ScrollTopLeft.X;
-            bounds.Y -= _ScrollTopLeft.Y;
+            Graphics graphics = e.Graphics;
 
-            // determine if the bounds extend left and/or right, clipping them if they do
-            bool extendsLeft = (bounds.X < 0);
-            bool extendsRight = (bounds.Right > (Width - _VScrollBar.Width));
+            var clientRect = LayoutToPixels(routineCell.Rectangle);
+            var clientExtents = GetClientExtents();
+
+            // determine if the client borderRect extends left and/or right, clipping if so
+            bool extendsLeft = (clientRect.X < 0);
+            bool extendsRight = (clientRect.Right > clientExtents.Width);
 
             if (extendsLeft)
             {
-                bounds.Width += bounds.X + 1;
-                bounds.X = -1;
+                clientRect.Width += clientRect.X + 1;
+                clientRect.X = -1;
             }
 
             if (extendsRight)
             {
-                bounds.Width = (Width - _VScrollBar.Width) - bounds.X;
+                clientRect.Width = clientExtents.Width - clientRect.X;
             }
 
             // paint background
-            if (bounds.Width > 1)
-                e.Graphics.FillRectangle((routineCell == _FocusRoutineCell) ? focusFillBrush : fillBrush, bounds);
+            if (clientRect.Width > 1)
+                graphics.FillRectangle((routineCell == _FocusRoutineCell) ? focusFillBrush : fillBrush, clientRect);
 
             // paint border
-            if (bounds.Width > 0)
+            Pen borderPen = linePen;
+            var borderRect = clientRect;
+            if (borderRect.Width > 0)
             {
-                Pen pen = linePen;
-                var rect = bounds;
-
                 if (routineCell.Routine == _SelectedRoutine &&
                     routineCell.CallStack == _SelectedCallStack)
                 {
                     // inset two-pixel border
-                    pen = selectedLinePen;
-                    rect.X += 1;
-                    rect.Y += 1;
-                    rect.Width -= 1;
-                    rect.Height -= 1;
+                    borderPen = selectedLinePen;
+                    borderRect.X += 1;
+                    borderRect.Y += 1;
+                    borderRect.Width -= 1;
+                    borderRect.Height -= 1;
                 }
-
-                e.Graphics.DrawRectangle(pen, rect);
+                graphics.DrawRectangle(borderPen, borderRect);
             }
             else
-                e.Graphics.DrawLine(linePen, bounds.X, bounds.Y, bounds.X, bounds.Y + bounds.Height);
+                graphics.DrawLine(borderPen, borderRect.X, borderRect.Y, borderRect.X, borderRect.Y + borderRect.Height);
 
             // paint text
             int padding = Font.Height / 2;
-            int textWidth = bounds.Width - 2 * padding;
-            var textRect = new Rectangle(bounds.X + padding, bounds.Y, textWidth, bounds.Height);
-
+            int textWidth = clientRect.Width - (2 * padding);
             if (textWidth > 0)
             {
                 StringFormat textFormat = new StringFormat
@@ -264,22 +250,55 @@ namespace BeebPerf.ux
                     Trimming = StringTrimming.EllipsisCharacter
                 };
 
-                e.Graphics.DrawString(FormatRoutine(routineCell), Font, textBrush, textRect, textFormat);
+                var textRect = new Rectangle(clientRect.X + padding, clientRect.Y, textWidth, clientRect.Height);
+                graphics.DrawString(FormatRoutine(routineCell), Font, textBrush, textRect, textFormat);
 
                 if (extendsLeft)
                 {
                     textFormat.Trimming = StringTrimming.None;
                     textFormat.Alignment = StringAlignment.Near;
-                    e.Graphics.DrawString("<", Font, textBrush, bounds, textFormat);
+                    graphics.DrawString("<", Font, textBrush, clientRect, textFormat);
                 }
 
                 if (extendsRight)
                 {
                     textFormat.Trimming = StringTrimming.None;
                     textFormat.Alignment = StringAlignment.Far;
-                    e.Graphics.DrawString(">", Font, textBrush, bounds, textFormat);
+                    graphics.DrawString(">", Font, textBrush, clientRect, textFormat);
                 }
             }
+        }
+
+        private Rectangle LayoutToPixels(Rectangle rect)
+        {
+            int x = rect.X - GetHScrollValue();
+
+            int y = rect.Y;
+            if (!_FlipView)
+                y = GetClientExtents().Height - y - rect.Height;
+
+            if (_FlipView)
+                y -= GetVScrollValue();
+            else
+                y += GetVScrollValue();
+
+            return new Rectangle(x, y, rect.Width, rect.Height);
+        }
+
+        private Point PixelsToLayout(Point point)
+        {
+            int x = point.X + GetHScrollValue();
+
+            int y = point.Y;
+            if (_FlipView)
+                y += GetVScrollValue();
+            else
+                y -= GetVScrollValue();
+
+            if (!_FlipView)
+                y = GetClientExtents().Height - y;
+
+            return new Point(x, y);
         }
 
         private string FormatMetrics(RoutineCell routineCell)
@@ -301,16 +320,13 @@ namespace BeebPerf.ux
         {
             _RoutineCells.Clear();
 
-            int cellHeight = Font.Height;
-            int marginSize = Font.Height / 2;
-            int maxTreeDepth = MaxDepth(_CallTrees, 1);
-
-            // calc displayed cycle count
+            // calc total cycle count
             int totalCycleCount = 0;
             foreach (var treeNode in _CallTrees)
                 totalCycleCount += treeNode.CPUMetrics.InclusiveCycleCount;
             _TotalCycleCount = totalCycleCount;
 
+            // calc displayed cycle count
             int displayedCycleCount = totalCycleCount;
             if (_SelectedRoutine != null)
             {
@@ -321,29 +337,25 @@ namespace BeebPerf.ux
             }
 
             // calc scaler
-            double scaler = (double)(Width - _VScrollBar.Width - 2 * marginSize) / displayedCycleCount;
+            int marginSize = Font.Height / 2;
+            double scaler = (double)(GetClientExtents().Width - 2 * marginSize) / displayedCycleCount;
 
-            // layout
-            var hashSet = new HashSet<Rectangle>();
+            // calc layout extents
+            int cellHeight = Font.Height;
+            int maxTreeDepth = MaxDepth(_CallTrees, 1);
 
-            int top = marginSize;
-            if (_FlipView)
-            {
-                int contentHeight = (maxTreeDepth * cellHeight) + (2 * marginSize);
-                if (contentHeight <= Height - _HScrollBar.Height)
-                    top = Height - _HScrollBar.Height - marginSize - cellHeight;
-                else
-                    top = marginSize + (maxTreeDepth - 1) * cellHeight;
-                cellHeight = -cellHeight;
-            }
-            LayoutSiblings(_CallTrees, marginSize, top, scaler, cellHeight, hashSet);
+            _LayoutExtents.Width = (int)double.Round(scaler * totalCycleCount) + (2 * marginSize);
+            _LayoutExtents.Height = (maxTreeDepth * cellHeight) + (2 * marginSize);
 
-            UpdateScrollbars(marginSize, Math.Abs(cellHeight), maxTreeDepth);
+            // layout siblings, and their descendants
+            LayoutSiblings(_CallTrees, left:marginSize, top:marginSize, scaler, cellHeight, new HashSet<Rectangle>());
+
+            UpdateScrollBars();
         }
 
-        private void LayoutSiblings(IReadOnlyList<CallTreeNode> siblings, int left, int top, double scaler, int cellHeight, HashSet<Rectangle> hashSet)
+        private void LayoutSiblings(IReadOnlyList<CallTreeNode> siblings, int left, int top, double scaler, int cellHeight, HashSet<Rectangle> rectSet)
         {
-            // sort siblings by their InclusiveCycleCount
+            // sort siblings by their inclusive cycle count
             var sortedSiblings = siblings.ToList();
             sortedSiblings.Sort((a, b) => b.CPUMetrics.InclusiveCycleCount.CompareTo(a.CPUMetrics.InclusiveCycleCount));
 
@@ -354,10 +366,12 @@ namespace BeebPerf.ux
                 int siblingLeft = left + (int)double.Round(scaler * cycleCount);
                 cycleCount += sibling.CPUMetrics.InclusiveCycleCount;
                 int siblingRight = left + (int)double.Round(scaler * cycleCount);
-                var rect = new Rectangle(siblingLeft, top, siblingRight - siblingLeft, Math.Abs(cellHeight));
-                if (!hashSet.Contains(rect))
+                var rect = new Rectangle(siblingLeft, top, siblingRight - siblingLeft, cellHeight);
+
+                if (!rectSet.Contains(rect)) // duplicate rect?
                 {
-                    hashSet.Add(rect);
+                    rectSet.Add(rect);
+
                     _RoutineCells.Add(new RoutineCell
                     {
                         Routine = sibling.Routine,
@@ -370,70 +384,122 @@ namespace BeebPerf.ux
                 // recursively layout children
                 if (sibling.HasChildren)
                 {
-                    LayoutSiblings(sibling.Children, siblingLeft, top + cellHeight, scaler, cellHeight, hashSet);
+                    LayoutSiblings(sibling.Children, siblingLeft, top + cellHeight, scaler, cellHeight, rectSet);
                 }
             }
         }
 
-        private void UpdateScrollbars(int marginSize, int cellHeight, int maxTreeDepth)
+        private void ScrollSelectedRoutineIntoView()
         {
-            // horizontal scroll bar
-            _ScrollTopLeft.X = 0;
-            int contentWidth = 0;
-            if (_SelectedRoutine != null)
+            if (_SelectedRoutine == null)
+                return;
+
+            foreach (var routineCell in _RoutineCells)
             {
-                foreach (var routineCell in _RoutineCells)
-                {
-                    if (routineCell.Routine == _SelectedRoutine &&
-                        routineCell.CallStack == _SelectedCallStack)
-                    {
-                        _ScrollTopLeft.X = routineCell.Rectangle.X - marginSize;
-                    }
+                if (routineCell.Routine != _SelectedRoutine ||
+                    routineCell.CallStack != _SelectedCallStack)
+                    continue;
 
-                    if (contentWidth < routineCell.Rectangle.Right)
-                        contentWidth = routineCell.Rectangle.Right;
-                }
+                int marginSize = Font.Height / 2;
+                SetHScrollValue(routineCell.Rectangle.X - marginSize);
+                break;
             }
+        }
 
-            _HScrollBar.Enabled = (Width - _VScrollBar.Width < contentWidth);
+        private void UpdateScrollBars()
+        {
+            Size clientExtents = GetClientExtents();
+            _HScrollBar.Enabled = (_LayoutExtents.Width > clientExtents.Width);
             if (_HScrollBar.Enabled)
             {
                 _HScrollBar.Minimum = 0;
-                _HScrollBar.Maximum = contentWidth + marginSize;
-                _HScrollBar.LargeChange = Width - _VScrollBar.Width;
+                _HScrollBar.Maximum = _LayoutExtents.Width;
+                _HScrollBar.LargeChange = Math.Max(clientExtents.Width, 1);
                 _HScrollBar.SmallChange = DeviceDpi / 2;
-                _HScrollBar.Value = _ScrollTopLeft.X;
+
+                int maxValue = _HScrollBar.Maximum - _HScrollBar.LargeChange;
+                _HScrollBar.Value = Math.Clamp(_HScrollBar.Value, 0, maxValue);
             }
 
-            // vertical scroll bar
-            int contentHeight = (maxTreeDepth * cellHeight) + (2 * marginSize);
-            _VScrollBar.Enabled = (Height - _HScrollBar.Height < contentHeight);
+            _VScrollBar.Enabled = (_LayoutExtents.Height > clientExtents.Height);
             if (_VScrollBar.Enabled)
             {
                 _VScrollBar.Minimum = 0;
-                _VScrollBar.Maximum = contentHeight;
-                _VScrollBar.LargeChange = Height - _HScrollBar.Height;
+                _VScrollBar.Maximum = _LayoutExtents.Height;
+                _VScrollBar.LargeChange = Math.Max(clientExtents.Height, 1);
                 _VScrollBar.SmallChange = DeviceDpi / 2;
-                _VScrollBar.Value = _ScrollTopLeft.Y;
+
+                int maxValue = _VScrollBar.Maximum - _VScrollBar.LargeChange;
+                _VScrollBar.Value = Math.Clamp(_VScrollBar.Value, 0, maxValue);
             }
+        }
+
+        private int GetVScrollValue()
+        {
+            if (!_VScrollBar.Enabled)
+                return 0;
+
+            int maxValue = _VScrollBar.Maximum - _VScrollBar.LargeChange;
+            return Math.Clamp(_FlipView ? _VScrollBar.Value : maxValue - _VScrollBar.Value, 0, maxValue);
+        }
+
+        private void SetVScrollValue(int value)
+        {
+            if (!_VScrollBar.Enabled)
+                return;
+
+            int maxValue = _VScrollBar.Maximum - _VScrollBar.LargeChange;
+            value = Math.Clamp(_FlipView ? value : maxValue - value, 0, maxValue);
+
+            _VScrollBar.Value = value;
+        }
+
+        private int GetHScrollValue()
+        {
+            if (!_HScrollBar.Enabled)
+                return 0;
+
+            int maxValue = _HScrollBar.Maximum - _HScrollBar.LargeChange;
+            return Math.Clamp(_HScrollBar.Value, 0, maxValue);
+        }
+
+        private void SetHScrollValue(int value)
+        {
+            if (!_HScrollBar.Enabled)
+                return;
+
+            int maxValue = _HScrollBar.Maximum - _HScrollBar.LargeChange;
+            _HScrollBar.Value = Math.Clamp(value, 0, maxValue);
+        }
+
+        private double GetHScrollUnitValue()
+        {
+            if (!_HScrollBar.Enabled)
+                return 0;
+
+            int maxValue = _HScrollBar.Maximum - _HScrollBar.LargeChange;
+            double halfLargeChange = 0.5 * _HScrollBar.LargeChange;
+            return double.Clamp(((double)_HScrollBar.Value + halfLargeChange) / maxValue, 0, 1);
+        }
+
+        private void SetHScrollUnitValue(double value)
+        {
+            if (!_HScrollBar.Enabled)
+                return;
+
+            int maxValue = _HScrollBar.Maximum - _HScrollBar.LargeChange;
+            double halfLargeChange = 0.5 * _HScrollBar.LargeChange;
+            _HScrollBar.Value = int.Clamp((int)double.Round((value * maxValue - halfLargeChange)), 0, maxValue);
         }
 
         private void ScrollBar_VScroll(object? sender, ScrollEventArgs e)
         {
-            if (_ScrollTopLeft.Y != e.NewValue)
-            {
-                _ScrollTopLeft.Y = e.NewValue;
-                Invalidate();
-            }
+            Invalidate();
         }
 
         private void ScrollBar_HScroll(object? sender, ScrollEventArgs e)
         {
-            if (_ScrollTopLeft.X != e.NewValue)
-            {
-                _ScrollTopLeft.X = e.NewValue;
-                Invalidate();
-            }
+            Invalidate();
         }
 
         private int MaxDepth(IReadOnlyList<CallTreeNode> siblings, int depth)
@@ -469,25 +535,18 @@ namespace BeebPerf.ux
         private void SetFocus(RoutineCell routineCell)
         {
             if (_FocusRoutineCell != null)
-                Invalidate(_FocusRoutineCell.Rectangle);
+                Invalidate(LayoutToPixels(_FocusRoutineCell.Rectangle));
 
-            Invalidate(routineCell.Rectangle);
+            Invalidate(LayoutToPixels(routineCell.Rectangle));
             _FocusRoutineCell = routineCell;
             Update();
-        }
-
-        private new void Invalidate(Rectangle rect)
-        {
-            rect.X -= _ScrollTopLeft.X;
-            rect.Y -= _ScrollTopLeft.Y;
-            base.Invalidate(rect);
         }
 
         private void RemoveFocus()
         {
             if (_FocusRoutineCell != null)
             {
-                Invalidate(_FocusRoutineCell.Rectangle);
+                Invalidate(LayoutToPixels(_FocusRoutineCell.Rectangle));
                 _FocusRoutineCell = null;
                 Update();
             }
@@ -499,6 +558,13 @@ namespace BeebPerf.ux
             int g = (int)(first.G * (1 - ratio) + second.G * ratio);
             int b = (int)(first.B * (1 - ratio) + second.B * ratio);
             return Color.FromArgb(r, g, b);
+        }
+
+        private Size GetClientExtents()
+        {
+            return new Size(
+                Math.Max(Width - _VScrollBar.Width, 0),
+                Math.Max(Height - _HScrollBar.Height, 0));
         }
 
         private Form GetParentForm()
@@ -524,7 +590,6 @@ namespace BeebPerf.ux
         private List<RoutineCell> _RoutineCells = new();
         private List<CallTreeNode> _CallTrees = new();
         private int _TotalCycleCount;
-        private Dictionary<ushort, string> _Labels = new();
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         private bool _LayoutInvalid;
 
@@ -533,7 +598,8 @@ namespace BeebPerf.ux
         private Point _ToolTipLocation;
         private System.Windows.Forms.Timer _ToolTipTimer = new();
 
-        private Point _ScrollTopLeft = new();
+        private Size _LayoutExtents = new();
+        private int _PrevWidth = 0;
         private VScrollBar _VScrollBar;
         private HScrollBar _HScrollBar;
     }
