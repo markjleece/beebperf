@@ -230,22 +230,6 @@ namespace BeebPerf.ux
             Graphics graphics = e.Graphics;
 
             var clientRect = LayoutToPixels(routineCell.Rectangle);
-            var clientExtents = GetClientExtents();
-
-            // determine if the client borderRect extends left and/or right, clipping if so
-            bool extendsLeft = (clientRect.X < 0);
-            bool extendsRight = (clientRect.Right > clientExtents.Width);
-
-            if (extendsLeft)
-            {
-                clientRect.Width += clientRect.X + 1;
-                clientRect.X = -1;
-            }
-
-            if (extendsRight)
-            {
-                clientRect.Width = clientExtents.Width - clientRect.X;
-            }
 
             // paint background
             if (clientRect.Width > 1)
@@ -272,33 +256,56 @@ namespace BeebPerf.ux
                 graphics.DrawLine(borderPen, borderRect.X, borderRect.Y, borderRect.X, borderRect.Y + borderRect.Height);
 
             // paint text
-            int padding = Font.Height / 2;
-            int textWidth = clientRect.Width - (2 * padding);
-            if (textWidth > 0)
+            if (clientRect.Width > FontHeight / 2)
             {
+                // clip left and right ends
+                var clientExtents = GetClientExtents();
+
+                bool clipLeft = (clientRect.X < 0);
+                bool clipRight = (clientRect.Right >= clientExtents.Width);
+
+                if (clipLeft)
+                {
+                    clientRect.Width = clientRect.Right;
+                    clientRect.X = 0;
+                }
+
+                if (clipRight)
+                {
+                    clientRect.Width = clientExtents.Width - clientRect.X;
+                }
+
+                int charWidth = Font.Height / 2;
+
                 StringFormat textFormat = new StringFormat
                 {
                     Alignment = StringAlignment.Center,
-                    LineAlignment = StringAlignment.Center,
                     FormatFlags = StringFormatFlags.NoWrap,
-                    Trimming = StringTrimming.EllipsisCharacter
                 };
 
-                var textRect = new Rectangle(clientRect.X + padding, clientRect.Y, textWidth, clientRect.Height);
-                graphics.DrawString(FormatRoutine(routineCell), Font, textBrush, textRect, textFormat);
-
-                if (extendsLeft)
+                // paint '<'?
+                if (clipLeft && clientRect.Width > charWidth)
                 {
-                    textFormat.Trimming = StringTrimming.None;
                     textFormat.Alignment = StringAlignment.Near;
                     graphics.DrawString("<", Font, textBrush, clientRect, textFormat);
+                    clientRect.X += charWidth;
+                    clientRect.Width -= charWidth;
                 }
 
-                if (extendsRight)
+                // paint '>'?
+                if (clipRight && clientRect.Width > charWidth)
                 {
-                    textFormat.Trimming = StringTrimming.None;
                     textFormat.Alignment = StringAlignment.Far;
                     graphics.DrawString(">", Font, textBrush, clientRect, textFormat);
+                    clientRect.Width -= charWidth;
+                }
+
+                // paint routine address/label?
+                if (clientRect.Width > charWidth)
+                {
+                    textFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    textFormat.Alignment = StringAlignment.Center;
+                    graphics.DrawString(FormatRoutine(routineCell), Font, textBrush, clientRect, textFormat);
                 }
             }
         }
