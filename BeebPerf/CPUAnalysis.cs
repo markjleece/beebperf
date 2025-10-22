@@ -201,8 +201,6 @@ namespace BeebPerf
             RoutinesByAddress.Add(address, routine);
             _SortedRoutineAddresses.Add(address);
 
-            Debug.WriteLine($"CreateRoutine( {address.ToString()} {routine.Label}, {routineType.ToString()} )");
-
             return routine;
         }
 
