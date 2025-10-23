@@ -35,14 +35,10 @@ namespace BeebPerf.ux
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
         }
 
-        public void Initialize(
-            int startCycleCount,
-            int endCycleCount,
-            Dictionary<CanonicalAddress, Routine> routinesByAddress)
+        public void SetCycleCounts(int startCycleCount, int endCycleCount)
         {
             _StartCycleCount = startCycleCount;
             _EndCycleCount = endCycleCount;
-            _RoutinesByAddress = routinesByAddress;
         }
 
         public void SelectRoutine(Routine routine)
@@ -477,19 +473,19 @@ namespace BeebPerf.ux
 
         private List<RoutineMetrics> ToList(Dictionary<CallStack, CPUMetrics> routineMetrics)
         {
-            Dictionary<CanonicalAddress, CPUMetrics> metricsByRoutine = new();
+            Dictionary<Routine, CPUMetrics> metricsByRoutine = new();
             foreach (var kvp in routineMetrics)
             {
-                var routineAddress = kvp.Key.Routine.StartAddress;
-                var metrics = metricsByRoutine.TryGetValue(routineAddress, out var existing)
+                var routine = kvp.Key.Routine;
+                var metrics = metricsByRoutine.TryGetValue(routine, out var existing)
                     ? existing
-                    : metricsByRoutine[routineAddress] = new CPUMetrics();
+                    : metricsByRoutine[routine] = new CPUMetrics();
                 metrics.Add(kvp.Value);
             }
 
             var list = new List<RoutineMetrics>(metricsByRoutine.Count);
             foreach (var kvp in metricsByRoutine)
-                list.Add(new RoutineMetrics { Routine = _RoutinesByAddress[kvp.Key], CPUMetrics = kvp.Value });
+                list.Add(new RoutineMetrics { Routine = kvp.Key, CPUMetrics = kvp.Value });
 
             list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
 
@@ -520,7 +516,6 @@ namespace BeebPerf.ux
         private Routine? _Routine;
         private int _StartCycleCount;
         private int _EndCycleCount;
-        private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
 
         private ToolTip _ToolTip = new ToolTip();
