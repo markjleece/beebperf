@@ -782,6 +782,81 @@ namespace BeebPerf
             }
         }
 
+        //
+        // caller / callee metrics...
+        //
+        public List<RoutineMetrics> GetCallerMetrics(Routine routine)
+        {
+            Dictionary<CallStack, CPUMetrics> callerMetrics = new();
+
+            foreach (var callStack in routine!.MetricsByStack.Keys)
+            {
+                if (callStack.Parent == null)
+                    continue;
+
+                var caller = callStack.Parent!;
+
+                if (caller.Routine.MetricsByStack.TryGetValue(caller, out var parentMetrics))
+                {
+                    var metrics = callerMetrics.TryGetValue(caller, out var existing)
+                        ? existing
+                        : callerMetrics[caller] = new CPUMetrics();
+                    metrics.Add(parentMetrics);
+                }
+            }
+
+            return ToList(callerMetrics);
+        }
+
+        public List<RoutineMetrics> GetCalleeMetrics(Routine routine)
+        {
+            Dictionary<CallStack, CPUMetrics> calleeMetrics = new();
+
+            foreach (var stackFrame in routine!.StackFrames)
+            {
+                if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
+                    continue;
+
+                foreach (var child in stackFrame.Children)
+                {
+                    if (child.Type == CallType.ISR)
+                        continue;
+
+                    if (!calleeMetrics.ContainsKey(child))
+                        calleeMetrics[child] = child.Routine.MetricsByStack[child].Clone();
+                }
+            }
+
+            return ToList(calleeMetrics);
+        }
+
+        private List<RoutineMetrics> ToList(Dictionary<CallStack, CPUMetrics> routineMetrics)
+        {
+            Dictionary<Routine, CPUMetrics> metricsByRoutine = new();
+            foreach (var kvp in routineMetrics)
+            {
+                var routine = kvp.Key.Routine;
+                var metrics = metricsByRoutine.TryGetValue(routine, out var existing)
+                    ? existing
+                    : metricsByRoutine[routine] = new CPUMetrics();
+                metrics.Add(kvp.Value);
+            }
+
+            var list = new List<RoutineMetrics>(metricsByRoutine.Count);
+            foreach (var kvp in metricsByRoutine)
+                list.Add(new RoutineMetrics { Routine = kvp.Key, CPUMetrics = kvp.Value });
+
+            list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
+
+            return list;
+        }
+
+        public struct RoutineMetrics
+        {
+            public Routine Routine;
+            public CPUMetrics CPUMetrics;
+        };
+
         public Dictionary<CanonicalAddress, Routine> RoutinesByAddress = new();
         public List<Routine> HotRoutines = new();
         public CallTreeNode? ProgramCallTree;

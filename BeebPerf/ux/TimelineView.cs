@@ -19,9 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Drawing;
-using System.Drawing.Drawing2D;
-
 namespace BeebPerf.ux
 {
     internal class TimelineView : Panel

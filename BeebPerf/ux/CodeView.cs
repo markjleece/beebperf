@@ -98,18 +98,22 @@ namespace BeebPerf.ux
         class Ellipses {};
         class FallThrough {};
 
-        public void SetCode(
-            Routine routine,
-            List<InstructionMetrics> instructionMetrics,
+        public void Initialize(
+            Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
             Dictionary<CanonicalAddress, Routine> routinesByAddress,
-            Dictionary<ushort, string> labels,
-            InstructionSet instructionSet)
+            Dictionary<ushort, string>? labels,
+            InstructionSet? instructionSet)
         {
-            _Routine = routine;
+            _CalculateInstructionMetrics = calculateInstructionMetrics;
+            _RoutinesByAddress = routinesByAddress;
             _Labels = labels;
             _InstructionSet = instructionSet;
+        }
 
+        public void SetCode(Routine routine, CallStack? callStack)
+        {
             Rows.Clear();
+            var instructionMetrics = _CalculateInstructionMetrics!.Invoke(routine, callStack);
             if (instructionMetrics.Count > 0)
             {
                 var ellipses = new Ellipses();
@@ -123,13 +127,13 @@ namespace BeebPerf.ux
                         Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses);
 
                     // add fall-through
-                    if (routinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
+                    if (_RoutinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
                         if (routine_ != routine)
                             Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
 
                     // add instruction metrics
                     Rows.Add(obj, obj, obj, obj, obj, obj, obj);
-                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet.Size(obj.Instruction.Opcode));
+                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
                 }
             }
 
@@ -566,12 +570,13 @@ namespace BeebPerf.ux
             public Color PunctuationColor;
         }
 
-        private Routine? _Routine;
         private Dictionary<ushort, string>? _Labels;
         private InstructionSet? _InstructionSet;
         private InstructionColors _InstructionStyle;
         private Color _SelectionBackColor;
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
+        private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
+        private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
     }
 }
