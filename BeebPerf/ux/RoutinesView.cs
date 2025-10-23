@@ -20,7 +20,9 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -67,6 +69,13 @@ namespace BeebPerf.ux
             Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
             Sort(Columns[SelfCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
+
+            Sorted += (s, e) =>
+            {
+                _IgnoreSelectionChangedEvent++;
+                ClearSelection();
+                _IgnoreSelectionChangedEvent--;
+            };
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -82,6 +91,13 @@ namespace BeebPerf.ux
                     ClearSelection();
                 _IgnoreSelectionChangedEvent--;
             }));
+        }
+
+        public void ShowHotRoutines()
+        {
+            Sort(Columns[SelfCPUColumnIndex], ListSortDirection.Descending);
+            FirstDisplayedScrollingRowIndex = 0;
+            Invalidate();
         }
 
         public void SelectRoutine(Routine routine)

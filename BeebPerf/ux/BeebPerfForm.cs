@@ -193,6 +193,22 @@ namespace BeebPerf.ux
             UpdateToolbarState();
         }
 
+        private void hotRoutinesButton_Click(object sender, EventArgs e)
+        {
+            ClearSelectedRoutine(null);
+            if (tabControl.SelectedTab != routinesTabPage)
+                tabControl.SelectedTab = routinesTabPage;
+            routinesView.ShowHotRoutines();
+        }
+
+        private void hotPathsButton_Click(object sender, EventArgs e)
+        {
+            ClearSelectedRoutine(null);
+            if (tabControl.SelectedTab != callTreeTabPage)
+                tabControl.SelectedTab = callTreeTabPage;
+            callTreeView.ShowHotPaths();
+        }
+
         private void flipViewButton_Click(object sender, EventArgs e)
         {
             flameGraphView.FlipView();
@@ -315,6 +331,8 @@ namespace BeebPerf.ux
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
             selectAllButton.Enabled = timelineView.CanSelectAll();
+            hotRoutinesButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
+            hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
         }
 
