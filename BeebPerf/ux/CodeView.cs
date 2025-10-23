@@ -102,7 +102,7 @@ namespace BeebPerf.ux
             Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
             Dictionary<CanonicalAddress, Routine> routinesByAddress,
             Dictionary<ushort, string>? labels,
-            InstructionSet? instructionSet)
+            InstructionSet instructionSet)
         {
             _CalculateInstructionMetrics = calculateInstructionMetrics;
             _RoutinesByAddress = routinesByAddress;
@@ -151,7 +151,6 @@ namespace BeebPerf.ux
 
         public void Clear()
         {
-            _Labels = null;
             Rows.Clear();
             Invalidate();
         }

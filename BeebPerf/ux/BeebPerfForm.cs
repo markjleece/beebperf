@@ -158,7 +158,7 @@ namespace BeebPerf.ux
                 _CPUAnalysis.CalculateInstructionMetrics,
                 _CPUAnalysis.RoutinesByAddress,
                 _Model.Labels,
-                _Model.InstructionSet);
+                _Model.InstructionSet!);
         }
 
         private void undoButton_Click(object sender, EventArgs e)
