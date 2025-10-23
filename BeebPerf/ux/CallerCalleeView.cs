@@ -38,14 +38,11 @@ namespace BeebPerf.ux
         public void Initialize(
             int startCycleCount,
             int endCycleCount,
-            Dictionary<CanonicalAddress, Routine> routinesByAddress,
-            Dictionary<ushort, string> labels)
+            Dictionary<CanonicalAddress, Routine> routinesByAddress)
         {
             _StartCycleCount = startCycleCount;
             _EndCycleCount = endCycleCount;
-            _TotalCycleCount = endCycleCount - startCycleCount;
             _RoutinesByAddress = routinesByAddress;
-            _Labels = labels;
         }
 
         public void SelectRoutine(Routine routine)
@@ -265,7 +262,7 @@ namespace BeebPerf.ux
 
         private string FormatMetrics(RoutineCell routineCell)
         {
-            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            var percentage = double.Min(100.0 * routineCell.CycleCount / (_EndCycleCount - _StartCycleCount), 100);
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
@@ -523,9 +520,7 @@ namespace BeebPerf.ux
         private Routine? _Routine;
         private int _StartCycleCount;
         private int _EndCycleCount;
-        private int _TotalCycleCount;
         private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
-        private Dictionary<ushort, string> _Labels = new();
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
 
         private ToolTip _ToolTip = new ToolTip();

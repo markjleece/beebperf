@@ -166,7 +166,7 @@ namespace BeebPerf.ux
                 flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
 
             // caller/callee
-            callerCalleeView.Initialize(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _CPUAnalysis.RoutinesByAddress, _Model.Labels);
+            callerCalleeView.Initialize(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _CPUAnalysis.RoutinesByAddress);
         }
 
         private void undoButton_Click(object sender, EventArgs e)
