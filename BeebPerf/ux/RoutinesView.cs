@@ -21,10 +21,11 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
-    internal class RoutineGridView : DataGridView
+    internal class RoutinesView : DataGridView
     {
         private const int RoutineColumnIndex = 0;
         private const int SelfCPUColumnIndex = 1;
@@ -32,7 +33,7 @@ namespace BeebPerf.ux
         private const int ElapsedCPUColumnIndex = 3;
         private const int ExecutionCountColumnIndex = 4;
 
-        public RoutineGridView() : base()
+        public RoutinesView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
@@ -69,14 +70,81 @@ namespace BeebPerf.ux
             Sort(Columns[SelfCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
         }
 
-        public void Clear()
+        protected override void OnHandleCreated(EventArgs e)
         {
-            Rows.Clear();
+            _IgnoreSelectionChangedEvent++;
+            base.OnHandleCreated(e);
+
+            BeginInvoke(new MethodInvoker(() =>
+            {
+                if (_SelectedRoutine != null)
+                    SelectRoutine(_SelectedRoutine);
+                else
+                    ClearSelection();
+                _IgnoreSelectionChangedEvent--;
+            }));
+        }
+
+        public void SelectRoutine(Routine routine)
+        {
+            foreach (DataGridViewRow row in Rows)
+            {
+                Routine rowRoutine = (Routine)row.Cells[0].Value!;
+                if (routine != rowRoutine)
+                    continue;
+
+                _SelectedRoutine = rowRoutine;
+
+                _IgnoreSelectionChangedEvent++;
+                row.Selected = true;
+                _IgnoreSelectionChangedEvent--;
+
+                FirstDisplayedScrollingRowIndex = Math.Clamp(row.Index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                return;
+            }
+
+            ClearSelection();
+        }
+
+        public new void ClearSelection()
+        {
+            _SelectedRoutine = null;
+
+            _IgnoreSelectionChangedEvent++;
+            base.ClearSelection();
+            _IgnoreSelectionChangedEvent--;
+        }
+
+        private void SelectionChangedFunc(object? sender, EventArgs e)
+        {
+            if (_IgnoreSelectionChangedEvent > 0)
+                return;
+
+            BeebPerfForm form = (BeebPerfForm)GetParentForm();
+            if (SelectedRows.Count == 1)
+            {
+                _SelectedRoutine = (Routine)SelectedRows[0].Cells[0].Value!;
+                form.SetSelectedRoutine(sender: this, _SelectedRoutine, callStack: null);
+            }
+            else
+            {
+                _SelectedRoutine = null;
+                form.ClearSelectedRoutine(sender: this);
+            }
         }
 
         public void AddRoutine(Routine routine)
         {
+            _IgnoreSelectionChangedEvent++;
             Rows.Add(routine, routine, routine, routine, routine);
+            ClearSelection();
+            _IgnoreSelectionChangedEvent--;
+        }
+
+        public void Clear()
+        {
+            _SelectedRoutine = null;
+            Rows.Clear();
         }
 
         public int TotalCycleCount;
@@ -88,20 +156,6 @@ namespace BeebPerf.ux
             while (control is not Form)
                 control = control!.Parent!;
             return (Form)control;
-        }
-
-        private void SelectionChangedFunc(object? sender, EventArgs e)
-        {
-            BeebPerfForm form = (BeebPerfForm)GetParentForm();
-            if (SelectedRows.Count == 1)
-            {
-                var routine = (Routine)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(routine, callStack: null);
-            }
-            else
-            {
-                form.ClearSelectedRoutine();
-            }
         }
 
         private void CellFormattingFunc(object? sender, DataGridViewCellFormattingEventArgs e)
@@ -202,7 +256,7 @@ namespace BeebPerf.ux
                                           DataGridViewAdvancedBorderStyle advancedBorderStyle,
                                           DataGridViewPaintParts paintParts)
             {
-                var routineGridView = (RoutineGridView)DataGridView!;
+                var routineGridView = (RoutinesView)DataGridView!;
                 var routine = (Routine)value!;
 
                 if (ColumnIndex == RoutineColumnIndex)
@@ -257,7 +311,7 @@ namespace BeebPerf.ux
 
             private void DrawBar(
                 Routine routine, 
-                RoutineGridView routineGridView, 
+                RoutinesView routineGridView, 
                 Graphics graphics, 
                 Rectangle cellBounds, 
                 DataGridViewElementStates cellState)
@@ -305,5 +359,8 @@ namespace BeebPerf.ux
                 return Color.FromArgb(r, g, b);
             }
         }
+
+        private Routine? _SelectedRoutine;
+        private int _IgnoreSelectionChangedEvent;
     }
 }

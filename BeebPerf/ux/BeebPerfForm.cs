@@ -19,8 +19,26 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+/*
+ TODO:
+  - Use notion of current routine and stack-frame to control view
+     - Call Tree and Flame Graph set both routine and call-stack
+     - Routines and Caller/Callee set just routine (call-stack == null)
+
+     - What is the model for setting and changing the selection?
+         - The form maintains the current selected context
+         - The context can set by any view (call-stack may be set or cleared)
+         - Each view responds to a context change (call-stack specific views select the call-stack with the largest inclusive cycle time)
+         - Selecting a view may update the code-view because the call-stack may not be relevant for the selected view).
+         - Selecting a view does not modify the context
+
+  - Undo Redo functionality
+     - 
+
+*/
 using BeebPerf.model;
 using BeebPerf.operation;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -110,7 +128,7 @@ namespace BeebPerf.ux
             // populate routines
             foreach (var routine in _CPUAnalysis.HotRoutines)
             {
-                routinesDataGrid.AddRoutine(routine);
+                routinesView.AddRoutine(routine);
             }
 
             int maxExecutionCount = 0;
@@ -120,20 +138,22 @@ namespace BeebPerf.ux
                     maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
             }
 
-            routinesDataGrid.MaxExecutionCount = maxExecutionCount;
-            routinesDataGrid.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+            routinesView.MaxExecutionCount = maxExecutionCount;
+            routinesView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
             // populate call tree
+            callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+
             if (_CPUAnalysis!.ProgramCallTree != null)
-                callTreeControl.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+                callTreeView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
 
             if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                callTreeControl.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+                callTreeView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
 
             if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                callTreeControl.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+                callTreeView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
 
-            callTreeControl.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+            callTreeView.ShowHotPaths();
 
             // populate flame graph
             if (_CPUAnalysis!.ProgramCallTree != null)
@@ -144,6 +164,9 @@ namespace BeebPerf.ux
 
             if (_CPUAnalysis!.MaskableInterruptCallTree != null)
                 flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+
+            // caller/callee
+            callerCalleeView.Initialize(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _CPUAnalysis.RoutinesByAddress, _Model.Labels);
         }
 
         private void undoButton_Click(object sender, EventArgs e)
@@ -197,39 +220,73 @@ namespace BeebPerf.ux
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
 
-        public void SetSelectedRoutine(Routine routine, CallStack? callStack)
+        public void SetSelectedRoutine(Object? sender, Routine routine, CallStack? callStack)
         {
-            if (_SelectedCallStack != null)
-                routinesDataGrid.ClearSelection();
-            else
-                callTreeControl.ClearSelection();
+            if (routine == _SelectedRoutine && callStack == _SelectedCallStack)
+                return;
 
             _SelectedRoutine = routine;
+
+            if (callStack == null)
+            {
+                var elements = routine.MetricsByStack.ToList();
+                elements.Sort((a, b) => (b.Value.InclusiveCycleCount - a.Value.InclusiveCycleCount));
+                callStack = elements.First().Key;
+            }
+
             _SelectedCallStack = callStack;
 
-            var callerMetrics = _CPUAnalysis.GetCallerMetrics(routine);
-            var calleeMetrics = _CPUAnalysis.GetCalleeMetrics(routine);
-            callerCalleeView.SetRoutine(routine, callerMetrics, calleeMetrics, _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount, _Model.Labels);
+            if (sender != routinesView)
+                routinesView.SelectRoutine(routine);
+
+            if (sender != callerCalleeView)
+                callerCalleeView.SelectRoutine(routine);
+
+            if (sender != callTreeView)
+                callTreeView.SelectRoutine(routine, callStack);
+
+            if (sender != flameGraphView)
+                flameGraphView.SelectRoutine(routine, callStack);
 
             var instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(routine, callStack);
             codeView.SetCode(routine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
-
-            if (callStack != null)
-                flameGraphView.SelectRoutine(routine, callStack);
         }
+
+        public void ClearSelectedRoutine(Object? sender)
+        {
+            if (_SelectedRoutine == null && _SelectedCallStack == null)
+                return;
+
+            _SelectedRoutine = null;
+            _SelectedCallStack = null;
+
+            if (sender != routinesView)
+                routinesView.ClearSelection();
+
+            if (sender != callerCalleeView)
+                callerCalleeView.Clear();
+
+            if (sender != callTreeView)
+                callTreeView.ClearSelection();
+
+            if (sender != flameGraphView)
+                flameGraphView.ClearSelection();
+
+            codeView.Clear();
+        }
+
 
         private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
         {
             UpdateToolbarState();
-        }
 
-        public void ClearSelectedRoutine()
-        {
-            _SelectedRoutine = null;
-            _SelectedCallStack = null;
-            codeView.Clear();
-            callerCalleeView.Clear();
-            flameGraphView.ClearSelectedRoutine();
+            if (_SelectedRoutine != null)
+            {
+                bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
+                var callStack = callStackApplicable ? _SelectedCallStack : null;
+                var instructionMetrics = _CPUAnalysis.CalculateInstructionMetrics(_SelectedRoutine!, callStack);
+                codeView.SetCode(_SelectedRoutine, instructionMetrics, _CPUAnalysis.RoutinesByAddress, _Model.Labels, _Model.InstructionSet!);
+            }
         }
 
         private void SaveAppState()
@@ -277,16 +334,16 @@ namespace BeebPerf.ux
             if (state == AppStateFlags.Loading)
             {
                 timelineView.SetDuration(0);
-                routinesDataGrid.Clear();
-                callTreeControl.Clear();
+                routinesView.Clear();
+                callTreeView.Clear();
                 flameGraphView.Clear();
                 codeView.Clear();
             }
 
             if (state == AppStateFlags.DynamicCPUAnalysis)
             {
-                routinesDataGrid.Clear();
-                callTreeControl.Clear();
+                routinesView.Clear();
+                callTreeView.Clear();
                 flameGraphView.Clear();
                 codeView.Clear();
             }

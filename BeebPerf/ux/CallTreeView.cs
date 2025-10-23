@@ -21,10 +21,11 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
-    internal class CallTreeGridView : DataGridView
+    internal class CallTreeView : DataGridView
     {
         private const int RoutineColumnIndex = 0;
         private const int SelfCPUColumnIndex = 1;
@@ -32,7 +33,7 @@ namespace BeebPerf.ux
         private const int ElapsedCPUColumnIndex = 3;
         private const int ExecutionCountColumnIndex = 4;
 
-        public CallTreeGridView() : base()
+        public CallTreeView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
@@ -71,6 +72,111 @@ namespace BeebPerf.ux
             Sort(Columns[TotalCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            _IgnoreSelectionChangedEvent++;
+            base.OnHandleCreated(e);
+
+            BeginInvoke(new MethodInvoker(() =>
+            {
+                if (_SelectedTreeNode != null)
+                    SelectRoutine(_SelectedTreeNode.Routine, _SelectedTreeNode.CallStack);
+                else
+                    ClearSelection();
+                _IgnoreSelectionChangedEvent--;
+            }));
+        }
+
+        public void SelectRoutine(Routine routine, CallStack callStack)
+        {
+            // find tree node
+            var treeNode = FindTreeNode(routine, callStack);
+            if (treeNode == null)
+            {
+                ClearSelection();
+                return;
+            }
+
+            // create tip-to-root stack of tree nodes 
+            Stack<CallTreeNode> treeNodeStack = new();
+            while (treeNode != null)
+            {
+                treeNodeStack.Push(treeNode);
+                treeNode = treeNode.Parent;
+            }
+
+            // expand tree nodes root-to-tip, selecting the tip
+            CollapseTree();
+
+            int rowIndex = 0;
+            treeNode = treeNodeStack.Pop();
+            while (treeNode != null && rowIndex < Rows.Count)
+            {
+                if (treeNode == Rows[rowIndex].Cells[0].Value!)
+                {
+                    if (treeNodeStack.Count == 0)
+                    {
+                        _SelectedTreeNode = treeNode;
+
+                        _IgnoreSelectionChangedEvent++;
+                        Rows[rowIndex].Selected = true;
+                        _IgnoreSelectionChangedEvent--;
+
+                        FirstDisplayedScrollingRowIndex = Math.Clamp(rowIndex - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                        return;
+                    }
+
+                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                        OpenTreeNode(rowIndex, treeNode);
+                    treeNode = treeNodeStack.Pop();
+                }
+                rowIndex++;
+            }
+        }
+
+        public new void ClearSelection()
+        {
+            _SelectedTreeNode = null;
+
+            _IgnoreSelectionChangedEvent++;
+            base.ClearSelection();
+            _IgnoreSelectionChangedEvent--;
+        }
+
+        private void SelectionChangedFunc(object? sender, EventArgs e)
+        {
+            if (_IgnoreSelectionChangedEvent > 0)
+                return;
+
+            BeebPerfForm form = (BeebPerfForm)GetParentForm();
+            if (SelectedRows.Count == 1)
+            {
+                var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
+                _SelectedTreeNode = treeNode;
+                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack);
+            }
+            else
+            {
+                _SelectedTreeNode = null;
+                form.ClearSelectedRoutine(sender: this);
+            }
+        }
+
+        public void AddCallTree(CallTreeNode treeNode)
+        {
+            _IgnoreSelectionChangedEvent++;
+            Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode);
+            ClearSelection();
+            _IgnoreSelectionChangedEvent--;
+            RefreshExecutionCounts();
+        }
+
+        public void Clear()
+        {
+            _SelectedTreeNode = null;
+            Rows.Clear();
+        }
+
         private Form GetParentForm()
         {
             Control control = this;
@@ -79,55 +185,60 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
-        private void SelectionChangedFunc(object? sender, EventArgs e)
+        public void CollapseTree()
         {
-            BeebPerfForm form = (BeebPerfForm)GetParentForm();
-            if (SelectedRows.Count == 1)
+            for (int rowIndex = Rows.Count - 1; rowIndex >= 0; rowIndex--)
             {
-                var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(treeNode.Routine, treeNode.CallStack);
-            }
-            else
-            {
-                form.ClearSelectedRoutine();
+                var treeNode = (CallTreeNode)Rows[rowIndex].Cells[0].Value!;
+                if (treeNode == _SelectedTreeNode)
+                    ClearSelection();
+                if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                    CloseTreeNode(rowIndex, treeNode);
             }
         }
 
-        public void Clear()
+        public void ShowHotPaths()
         {
-            Rows.Clear();
-        }
+            CollapseTree();
 
-        public void AddCallTree(CallTreeNode treeNode)
-        {
-            Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode);
-            OpenHotPaths(Rows.Count - 1, treeNode);
-        }
-
-        public void OpenHotPaths(int rowIndex, CallTreeNode treeNode)
-        {
-            if (treeNode.HotPath && treeNode.HasChildren)
+            for (int rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
             {
+                var treeNode = (CallTreeNode)Rows[rowIndex].Cells[0].Value!;
                 bool hotChild = false;
                 foreach (var childNode in treeNode.Children)
                     hotChild |= childNode.HotPath;
-
                 if (hotChild)
-                {
-                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
-                        OpenTreeNode(rowIndex, treeNode);
+                    OpenTreeNode(rowIndex, treeNode);
+            }
+            RefreshExecutionCounts();
+        }
 
-                    int childRowIndex = rowIndex + 1;
-                    foreach (var childNode in treeNode.Children)
-                    {
-                        while (Rows[childRowIndex].Cells[0].Value != childNode)
-                            childRowIndex++;
-                        OpenHotPaths(childRowIndex, childNode);
-                    }
+        private CallTreeNode? FindTreeNode(Routine routine, CallStack callStack)
+        {
+            foreach (DataGridViewRow row in Rows)
+            {
+                var treeNode = (CallTreeNode)row.Cells[0].Value!;
+                if (treeNode.Parent == null)
+                {
+                    var found = FindTreeNode(treeNode, routine, callStack);
+                    if (found != null)
+                        return found;
                 }
             }
+            return null;
+        }
 
-            RefreshExecutionCounts();
+        private CallTreeNode? FindTreeNode(CallTreeNode treeNode, Routine routine, CallStack callStack)
+        {
+            if (treeNode.Routine == routine && callStack == treeNode.CallStack)
+                return treeNode;
+            foreach (var child in treeNode.Children)
+            {
+                var found = FindTreeNode(child, routine, callStack);
+                if (found != null)
+                    return found;
+            }
+            return null;
         }
 
         public int TotalCycleCount;
@@ -288,7 +399,10 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
+                    _IgnoreSelectionChangedEvent++;
                     Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode);
+                    _IgnoreSelectionChangedEvent--;
+
                     index = AddChildRows(index, childNode);
                 }
             }
@@ -301,7 +415,10 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
+                    _IgnoreSelectionChangedEvent++;
                     Rows.RemoveAt(index);
+                    _IgnoreSelectionChangedEvent--;
+
                     RemoveChildRows(index, childNode);
                 }
             }
@@ -365,7 +482,7 @@ namespace BeebPerf.ux
                 var size = base.GetPreferredSize(graphics, cellStyle, rowIndex, constraintSize);
                 if (ColumnIndex == RoutineColumnIndex)
                 {
-                    var callTreeDateView = (CallTreeGridView)DataGridView!;
+                    var callTreeDateView = (CallTreeView)DataGridView!;
                     var treeNode = (CallTreeNode)callTreeDateView.Rows[rowIndex]!.Cells[ColumnIndex].Value!;
                     size.Width += RoutineColumnIndent(treeNode.Depth);
                 }
@@ -434,7 +551,7 @@ namespace BeebPerf.ux
                 Rectangle cellBounds, 
                 DataGridViewElementStates cellState)
             {
-                var callTreeDateView = (CallTreeGridView)DataGridView!;
+                var callTreeDateView = (CallTreeView)DataGridView!;
                 (int num, int den) ratio = ColumnIndex switch
                 {
                     SelfCPUColumnIndex => (treeNode.CPUMetrics.SelfCycleCount, callTreeDateView.TotalCycleCount),
@@ -544,14 +661,14 @@ namespace BeebPerf.ux
                     cellBounds.Top + inset,
                     size, size);
 
-                var callTreeDateView = (CallTreeGridView)DataGridView!;
+                var callTreeDateView = (CallTreeView)DataGridView!;
                 BeebPerfForm form = (BeebPerfForm)callTreeDateView.GetParentForm();
                 graphics.DrawImage(form.FlameImage, rect);
             }
 
             private int RoutineColumnIndent(int nodeDepth)
             {
-                var callTreeDateView = (CallTreeGridView)DataGridView!;
+                var callTreeDateView = (CallTreeView)DataGridView!;
                 var cellHeight = callTreeDateView.Rows[0].Height;
                 return cellHeight + (nodeDepth * cellHeight);
             }
@@ -564,5 +681,8 @@ namespace BeebPerf.ux
                 return Color.FromArgb(r, g, b);
             }
         }
+
+        private CallTreeNode? _SelectedTreeNode;
+        private int _IgnoreSelectionChangedEvent;
     }
 }

@@ -50,46 +50,38 @@ namespace BeebPerf.ux
         public void AddCallTree(CallTreeNode treeNode)
         {
             _CallTrees.Add(treeNode);
-            _ResetView = true;
+            _InvalidLayout = true;
             Invalidate();
         }
 
         public void Clear()
         {
             _CallTrees.Clear();
-            _ResetView = true;
+            _InvalidLayout = true;
             Invalidate();
         }
 
         public void SelectRoutine(Routine routine, CallStack callStack)
         {
-            foreach (var routineCell in _RoutineCells)
-            {
-                if (routineCell.Routine != routine ||
-                    routineCell.CallStack != callStack)
-                    continue;
-
-                _SelectedRoutine = routineCell.Routine;
-                _SelectedCallStack = routineCell.CallStack;
-
-                LayoutRoutineCells();
-                ScrollSelectedRoutineIntoView();
-                Invalidate();
-
+            if (_SelectedRoutine == routine && _SelectedCallStack == callStack)
                 return;
-            }
+
+            _SelectedRoutine = routine;
+            _SelectedCallStack = callStack;
+
+            _InvalidLayout = true;
+            Invalidate();
+        }
+
+        public void ClearSelection()
+        {
+            if (_SelectedRoutine == null && _SelectedCallStack == null)
+                return;
 
             _SelectedRoutine = null;
             _SelectedCallStack = null;
 
-            LayoutRoutineCells();
-            SetVScrollValue(0);
-            Invalidate();
-        }
-
-        public void ClearSelectedRoutine()
-        {
-            _ResetView = true;
+            _InvalidLayout = true;
             Invalidate();
         }
 
@@ -132,28 +124,16 @@ namespace BeebPerf.ux
                 if (_SelectedRoutine != routineCell.Routine ||
                     _SelectedCallStack != routineCell.CallStack)
                 {
-                    _SelectedRoutine = routineCell.Routine;
-                    _SelectedCallStack = routineCell.CallStack;
-
-                    LayoutRoutineCells();
-                    ScrollSelectedRoutineIntoView();
-                    Invalidate();
-
-                    form.SetSelectedRoutine(routineCell.Routine, routineCell.CallStack);
+                    SelectRoutine(routineCell.Routine, routineCell.CallStack);
+                    form.SetSelectedRoutine(sender: this, routineCell.Routine, routineCell.CallStack);
                 }
                 return;
             }
 
             if (_SelectedRoutine != null)
             {
-                _SelectedRoutine = null;
-                _SelectedCallStack = null;
-
-                LayoutRoutineCells();
-                SetVScrollValue(0);
-                Invalidate();
-
-                form.ClearSelectedRoutine();
+                ClearSelection();
+                form.ClearSelectedRoutine(sender: this);
             }
         }
 
@@ -194,14 +174,20 @@ namespace BeebPerf.ux
         {
             base.OnPaint(e);
 
-            if (_ResetView)
+            if (_InvalidLayout)
             {
-                _SelectedRoutine = null;
-                _SelectedCallStack = null;
                 LayoutRoutineCells();
-                SetHScrollValue(0);
-                SetVScrollValue(0);
-                _ResetView = false;
+                if (_SelectedRoutine != null)
+                {
+                    ScrollSelectedRoutineIntoView();
+                }
+                else
+                {
+                    SetVScrollValue(0);
+                    SetHScrollValue(0);
+                }
+
+                _InvalidLayout = false;
             }
 
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
@@ -641,7 +627,7 @@ namespace BeebPerf.ux
         private List<CallTreeNode> _CallTrees = new();
         private int _TotalCycleCount;
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
-        private bool _ResetView;
+        private bool _InvalidLayout;
 
         private ToolTip _ToolTip = new ToolTip();
         private string _ToolTipText = string.Empty;

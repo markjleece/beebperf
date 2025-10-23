@@ -35,19 +35,24 @@ namespace BeebPerf.ux
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
         }
 
-        public void SetRoutine(
-            Routine routine,
-            List<RoutineMetrics> callers,
-            List<RoutineMetrics> callees,
-            int _totalCycleCount,
+        public void Initialize(
+            int startCycleCount,
+            int endCycleCount,
+            Dictionary<CanonicalAddress, Routine> routinesByAddress,
             Dictionary<ushort, string> labels)
         {
-            _Routine = routine;
-            _Callers = callers;
-            _Callees = callees;
-            _TotalCycleCount = _totalCycleCount;
+            _StartCycleCount = startCycleCount;
+            _EndCycleCount = endCycleCount;
+            _TotalCycleCount = endCycleCount - startCycleCount;
+            _RoutinesByAddress = routinesByAddress;
             _Labels = labels;
+        }
 
+        public void SelectRoutine(Routine routine)
+        {
+            _Routine = routine;
+            _Callers = GetCallerMetrics();
+            _Callees = GetCalleeMetrics();
             LayoutRoutineCells();
             Invalidate();
         }
@@ -56,7 +61,7 @@ namespace BeebPerf.ux
         {
             _Routine = null;
             _Callers = new();
-            _Callees = new ();
+            _Callees = new();
             _RoutineCells.Clear();
             Invalidate();
         }
@@ -76,8 +81,10 @@ namespace BeebPerf.ux
                 if (!routineCell.Selectable || !routineCell.Rectangle.Contains(e.X, e.Y))
                     continue;
 
+                SelectRoutine(routineCell.Routine);
+
                 BeebPerfForm form = (BeebPerfForm)GetParentForm();
-                form.SetSelectedRoutine(routineCell.Routine, callStack: null);
+                form.SetSelectedRoutine(sender: this, routineCell.Routine, callStack: null);
                 return;
             }
         }
@@ -426,6 +433,78 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
+        public List<RoutineMetrics> GetCallerMetrics()
+        {
+            Dictionary<CallStack, CPUMetrics> callerMetrics = new();
+
+            foreach (var callStack in _Routine!.MetricsByStack.Keys)
+            {
+                if (callStack.Parent == null)
+                    continue;
+
+                var caller = callStack.Parent!;
+
+                if (caller.Routine.MetricsByStack.TryGetValue(caller, out var parentMetrics))
+                {
+                    var metrics = callerMetrics.TryGetValue(caller, out var existing)
+                        ? existing
+                        : callerMetrics[caller] = new CPUMetrics();
+                    metrics.Add(parentMetrics);
+                }
+            }
+
+            return ToList(callerMetrics);
+        }
+
+        public List<RoutineMetrics> GetCalleeMetrics()
+        {
+            Dictionary<CallStack, CPUMetrics> calleeMetrics = new();
+
+            foreach (var stackFrame in _Routine!.StackFrames)
+            {
+                if (_StartCycleCount > stackFrame.EndCycleCount || _EndCycleCount < stackFrame.StartCycleCount)
+                    continue;
+
+                foreach (var child in stackFrame.Children)
+                {
+                    if (child.Type == CallType.ISR)
+                        continue;
+
+                    if (!calleeMetrics.ContainsKey(child))
+                        calleeMetrics[child] = child.Routine.MetricsByStack[child].Clone();
+                }
+            }
+
+            return ToList(calleeMetrics);
+        }
+
+        private List<RoutineMetrics> ToList(Dictionary<CallStack, CPUMetrics> routineMetrics)
+        {
+            Dictionary<CanonicalAddress, CPUMetrics> metricsByRoutine = new();
+            foreach (var kvp in routineMetrics)
+            {
+                var routineAddress = kvp.Key.Routine.StartAddress;
+                var metrics = metricsByRoutine.TryGetValue(routineAddress, out var existing)
+                    ? existing
+                    : metricsByRoutine[routineAddress] = new CPUMetrics();
+                metrics.Add(kvp.Value);
+            }
+
+            var list = new List<RoutineMetrics>(metricsByRoutine.Count);
+            foreach (var kvp in metricsByRoutine)
+                list.Add(new RoutineMetrics { Routine = _RoutinesByAddress[kvp.Key], CPUMetrics = kvp.Value });
+
+            list.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
+
+            return list;
+        }
+
+        public struct RoutineMetrics
+        {
+            public Routine Routine;
+            public CPUMetrics CPUMetrics;
+        };
+
         private class RoutineCell
         {
             public required Routine Routine;
@@ -442,7 +521,10 @@ namespace BeebPerf.ux
         private List<RoutineMetrics> _Callers = new();
         private List<RoutineMetrics> _Callees = new();
         private Routine? _Routine;
+        private int _StartCycleCount;
+        private int _EndCycleCount;
         private int _TotalCycleCount;
+        private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private Dictionary<ushort, string> _Labels = new();
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
 

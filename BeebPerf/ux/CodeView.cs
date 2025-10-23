@@ -24,7 +24,7 @@ using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
 {
-    internal class CodeGridView : DataGridView
+    internal class CodeView : DataGridView
     {
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
@@ -34,7 +34,7 @@ namespace BeebPerf.ux
         private const int BranchCountColumnIndex = 5;
         private const int ExecutionCountColumnIndex = 6;
 
-        public CodeGridView() : base()
+        public CodeView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
@@ -305,7 +305,7 @@ namespace BeebPerf.ux
                 Rectangle cellBounds,
                 object? value)
             {
-                var codeGridView = (CodeGridView)DataGridView!;
+                var codeGridView = (CodeView)DataGridView!;
                 var backColor = codeGridView.DefaultCellStyle.BackColor;
 
                 if (value! is InstructionMetrics)
@@ -335,7 +335,7 @@ namespace BeebPerf.ux
 
             private void DrawBar(
                 InstructionMetrics instructionMetrics,
-                CodeGridView codeGridView,
+                CodeView codeGridView,
                 Graphics graphics,
                 Rectangle cellBounds,
                 Color backColor)
@@ -389,7 +389,7 @@ namespace BeebPerf.ux
                     return;
                 }
 
-                var codeGridView = (CodeGridView)DataGridView!;
+                var codeGridView = (CodeView)DataGridView!;
 
                 var instructionMetrics = (InstructionMetrics)value!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
@@ -501,7 +501,7 @@ namespace BeebPerf.ux
 
             private void PaintFallThrough(Graphics graphics, int rowIndex, DataGridViewCellStyle cellStyle)
             {
-                var codeGridView = (CodeGridView)DataGridView!;
+                var codeGridView = (CodeView)DataGridView!;
 
                 int lastColumnIndex = codeGridView.Columns[^1].Index;
                 var lastCellBounds = codeGridView.GetCellDisplayRectangle(lastColumnIndex, rowIndex, cutOverflow: false);
