@@ -329,13 +329,6 @@ namespace BeebPerf.ux
                 }
             }
 
-            private static double MapToUnitRange(double value, double fromValue, double toValue)
-            {
-                if (value <= fromValue) return 0.0;
-                if (value >= toValue) return 1.0;
-                return (value - fromValue) / (toValue - fromValue);
-            }
-
             private void DrawBar(
                 InstructionMetrics instructionMetrics,
                 CodeView codeGridView,

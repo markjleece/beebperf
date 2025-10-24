@@ -465,7 +465,7 @@ namespace BeebPerf.ux
 
             for (var node = treeNode; node != null; node = node.Parent)
             {
-                var cpuMetrics = treeNode.CPUMetrics;
+                var cpuMetrics = node.CPUMetrics;
                 var metric = columnIndex switch
                 {
                     SelfCPUColumnIndex => cpuMetrics.SelfCycleCount,
