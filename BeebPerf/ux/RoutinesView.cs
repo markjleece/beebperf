@@ -68,7 +68,7 @@ namespace BeebPerf.ux
             Columns[ElapsedCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
-            Sort(Columns[SelfCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
+            Sort(Columns[SelfCPUColumnIndex]!, ListSortDirection.Descending);
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -89,7 +89,10 @@ namespace BeebPerf.ux
 
         public void ShowHotRoutines()
         {
+            _SuppressSelectionChangedEvent++;
             Sort(Columns[SelfCPUColumnIndex], ListSortDirection.Descending);
+            _SuppressSelectionChangedEvent--;
+
             FirstDisplayedScrollingRowIndex = 0;
             Invalidate();
         }

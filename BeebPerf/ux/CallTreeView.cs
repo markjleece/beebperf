@@ -233,7 +233,11 @@ namespace BeebPerf.ux
         public void ShowHotPaths()
         {
             CollapseTree();
+
+            _SuppressSelectionChangedEvent++;
             Sort(Columns[TotalCPUColumnIndex], ListSortDirection.Descending);
+            _SuppressSelectionChangedEvent--;
+
             for (int rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
             {
                 var treeNode = (CallTreeNode)Rows[rowIndex].Cells[0].Value!;
