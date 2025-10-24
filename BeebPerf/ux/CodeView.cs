@@ -134,6 +134,9 @@ namespace BeebPerf.ux
                     // add instruction metrics
                     Rows.Add(obj, obj, obj, obj, obj, obj, obj);
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
+
+                    // set tool-tip text
+                    Rows[^1].Cells[InstructionColumnIndex].ToolTipText = FormatToolTipText(obj.Instruction);
                 }
             }
 
@@ -552,6 +555,21 @@ namespace BeebPerf.ux
             }
 
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
+        }
+
+        private string FormatToolTipText(CoreInstruction instruction)
+        {
+            byte opcode = instruction.Opcode;
+
+            if (_InstructionSet!.AddressingMode(opcode) != InstructionSet.AddressMode.Immediate)
+                return string.Empty;
+
+            ushort operand = instruction.Operand;
+            int size = _InstructionSet!.Size(opcode);
+            string hex = (size == 2) ? $"{operand:X2}" : $"{operand:X4}";
+            string octal = Convert.ToString(operand, 8).PadLeft(size == 2 ? 3 : 6, '0');
+            string binary = Convert.ToString(operand, 2).PadLeft(size == 2 ? 8 : 16, '0');
+            return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
         }
 
         private class InstructionColors

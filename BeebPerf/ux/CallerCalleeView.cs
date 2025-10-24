@@ -442,6 +442,8 @@ namespace BeebPerf.ux
             public bool ShowHotness;
         }
 
+        private Func<Routine, List<RoutineMetrics>>? _GetCallerMetrics;
+        private Func<Routine, List<RoutineMetrics>>? _GetCalleeMetrics;
         private RoutineCell? _FocusRoutineCell;
         private List<RoutineCell> _RoutineCells = new();
         private List<RoutineMetrics> _Callers = new();
@@ -454,7 +456,5 @@ namespace BeebPerf.ux
         private string _ToolTipText = string.Empty;
         private Point _ToolTipLocation;
         private System.Windows.Forms.Timer _ToolTipTimer = new();
-        private Func<Routine, List<RoutineMetrics>>? _GetCallerMetrics;
-        private Func<Routine, List<RoutineMetrics>>? _GetCalleeMetrics;
     }
 }
