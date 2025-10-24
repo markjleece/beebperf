@@ -22,7 +22,6 @@
 using BeebPerf.model;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -51,6 +50,7 @@ namespace BeebPerf.ux
             SelectionChanged += SelectionChangedFunc;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
+            Sorted += SortedFunc;
 
             AutoGenerateColumns = false;
             Columns.Add("Routine", "Routine");
@@ -69,18 +69,12 @@ namespace BeebPerf.ux
             Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
             Sort(Columns[SelfCPUColumnIndex]!, System.ComponentModel.ListSortDirection.Descending);
-
-            Sorted += (s, e) =>
-            {
-                _IgnoreSelectionChangedEvent++;
-                ClearSelection();
-                _IgnoreSelectionChangedEvent--;
-            };
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
-            _IgnoreSelectionChangedEvent++;
+            // ensure selection is correctly reflected when window is created
+            _SuppressSelectionChangedEvent++;
             base.OnHandleCreated(e);
 
             BeginInvoke(new MethodInvoker(() =>
@@ -89,7 +83,7 @@ namespace BeebPerf.ux
                     SelectRoutine(_SelectedRoutine);
                 else
                     ClearSelection();
-                _IgnoreSelectionChangedEvent--;
+                _SuppressSelectionChangedEvent--;
             }));
         }
 
@@ -110,9 +104,9 @@ namespace BeebPerf.ux
 
                 _SelectedRoutine = rowRoutine;
 
-                _IgnoreSelectionChangedEvent++;
+                _SuppressSelectionChangedEvent++;
                 row.Selected = true;
-                _IgnoreSelectionChangedEvent--;
+                _SuppressSelectionChangedEvent--;
 
                 FirstDisplayedScrollingRowIndex = Math.Clamp(row.Index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
                 return;
@@ -125,14 +119,14 @@ namespace BeebPerf.ux
         {
             _SelectedRoutine = null;
 
-            _IgnoreSelectionChangedEvent++;
+            _SuppressSelectionChangedEvent++;
             base.ClearSelection();
-            _IgnoreSelectionChangedEvent--;
+            _SuppressSelectionChangedEvent--;
         }
 
         private void SelectionChangedFunc(object? sender, EventArgs e)
         {
-            if (_IgnoreSelectionChangedEvent > 0)
+            if (_SuppressSelectionChangedEvent > 0)
                 return;
 
             BeebPerfForm form = (BeebPerfForm)GetParentForm();
@@ -148,12 +142,44 @@ namespace BeebPerf.ux
             }
         }
 
+        protected override void OnColumnHeaderMouseClick(DataGridViewCellMouseEventArgs e)
+        {
+            _SuppressSelectionChangedEvent++;
+            base.OnColumnHeaderMouseClick(e);
+            _SuppressSelectionChangedEvent--;
+        }
+
+        private void SortedFunc(Object? sender, EventArgs args)
+        {
+            // ensure selection is correctly reflected after a sort
+            if (Rows.Count == 0)
+                return;
+
+            if (_SelectedRoutine != null)
+            {
+                foreach (DataGridViewRow row in Rows)
+                {
+                    if (_SelectedRoutine != (Routine)row.Cells[0].Value!)
+                        continue;
+
+                    FirstDisplayedScrollingRowIndex = Math.Clamp(row.Index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                    break;
+                }
+            }
+            else
+            {
+                ClearSelection();
+                FirstDisplayedScrollingRowIndex = 0;
+            }
+        }
+
         public void AddRoutine(Routine routine)
         {
-            _IgnoreSelectionChangedEvent++;
+            _SuppressSelectionChangedEvent++;
             Rows.Add(routine, routine, routine, routine, routine);
+            _SuppressSelectionChangedEvent--;
+
             ClearSelection();
-            _IgnoreSelectionChangedEvent--;
         }
 
         public void Clear()
@@ -248,7 +274,6 @@ namespace BeebPerf.ux
                 default:
                     break;
             }
-
         }
 
         private string FormatCPUMetric(int value)
@@ -376,6 +401,6 @@ namespace BeebPerf.ux
         }
 
         private Routine? _SelectedRoutine;
-        private int _IgnoreSelectionChangedEvent;
+        private int _SuppressSelectionChangedEvent;
     }
 }

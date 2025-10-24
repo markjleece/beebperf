@@ -51,6 +51,7 @@ namespace BeebPerf.ux
             SelectionChanged += SelectionChangedFunc;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             SortCompare += SortCompareFunc;
+            Sorted += SortedFunc;
 
             AutoGenerateColumns = false;
             Columns.Add("Routine", "Routine");
@@ -69,18 +70,12 @@ namespace BeebPerf.ux
             Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
 
             Columns[RoutineColumnIndex]!.SortMode = DataGridViewColumnSortMode.NotSortable;
-
-            Sorted += (s, e) =>
-            {
-                _IgnoreSelectionChangedEvent++;
-                ClearSelection();
-                _IgnoreSelectionChangedEvent--;
-            };
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
-            _IgnoreSelectionChangedEvent++;
+            // ensure selection is correctly reflected when window is created
+            _SuppressSelectionChangedEvent++;
             base.OnHandleCreated(e);
 
             BeginInvoke(new MethodInvoker(() =>
@@ -89,7 +84,7 @@ namespace BeebPerf.ux
                     SelectRoutine(_SelectedTreeNode.Routine, _SelectedTreeNode.CallStack);
                 else
                     ClearSelection();
-                _IgnoreSelectionChangedEvent--;
+                _SuppressSelectionChangedEvent--;
             }));
         }
 
@@ -124,9 +119,9 @@ namespace BeebPerf.ux
                     {
                         _SelectedTreeNode = treeNode;
 
-                        _IgnoreSelectionChangedEvent++;
+                        _SuppressSelectionChangedEvent++;
                         Rows[rowIndex].Selected = true;
-                        _IgnoreSelectionChangedEvent--;
+                        _SuppressSelectionChangedEvent--;
 
                         FirstDisplayedScrollingRowIndex = Math.Clamp(rowIndex - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
                         return;
@@ -144,14 +139,14 @@ namespace BeebPerf.ux
         {
             _SelectedTreeNode = null;
 
-            _IgnoreSelectionChangedEvent++;
+            _SuppressSelectionChangedEvent++;
             base.ClearSelection();
-            _IgnoreSelectionChangedEvent--;
+            _SuppressSelectionChangedEvent--;
         }
 
         private void SelectionChangedFunc(object? sender, EventArgs e)
         {
-            if (_IgnoreSelectionChangedEvent > 0)
+            if (_SuppressSelectionChangedEvent > 0)
                 return;
 
             BeebPerfForm form = (BeebPerfForm)GetParentForm();
@@ -168,12 +163,44 @@ namespace BeebPerf.ux
             }
         }
 
+        protected override void OnColumnHeaderMouseClick(DataGridViewCellMouseEventArgs e)
+        {
+            _SuppressSelectionChangedEvent++;
+            base.OnColumnHeaderMouseClick(e);
+            _SuppressSelectionChangedEvent--;
+        }
+
+        private void SortedFunc(Object? sender, EventArgs args)
+        {
+            // ensure selection is correctly reflected after a sort
+            if (Rows.Count == 0)
+                return;
+
+            if (_SelectedTreeNode != null)
+            {
+                foreach (DataGridViewRow row in Rows)
+                {
+                    if (_SelectedTreeNode != (CallTreeNode)row.Cells[0].Value!)
+                        continue;
+
+                    FirstDisplayedScrollingRowIndex = Math.Clamp(row.Index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                    break;
+                }
+            }
+            else
+            {
+                ClearSelection();
+                FirstDisplayedScrollingRowIndex = 0;
+            }
+        }
+
         public void AddCallTree(CallTreeNode treeNode)
         {
-            _IgnoreSelectionChangedEvent++;
+            _SuppressSelectionChangedEvent++;
             Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode);
+            _SuppressSelectionChangedEvent--;
+            
             ClearSelection();
-            _IgnoreSelectionChangedEvent--;
             RefreshExecutionCounts();
         }
 
@@ -407,9 +434,9 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
-                    _IgnoreSelectionChangedEvent++;
+                    _SuppressSelectionChangedEvent++;
                     Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode);
-                    _IgnoreSelectionChangedEvent--;
+                    _SuppressSelectionChangedEvent--;
 
                     index = AddChildRows(index, childNode);
                 }
@@ -423,9 +450,9 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
-                    _IgnoreSelectionChangedEvent++;
+                    _SuppressSelectionChangedEvent++;
                     Rows.RemoveAt(index);
-                    _IgnoreSelectionChangedEvent--;
+                    _SuppressSelectionChangedEvent--;
 
                     RemoveChildRows(index, childNode);
                 }
@@ -691,6 +718,6 @@ namespace BeebPerf.ux
         }
 
         private CallTreeNode? _SelectedTreeNode;
-        private int _IgnoreSelectionChangedEvent;
+        private int _SuppressSelectionChangedEvent;
     }
 }
