@@ -385,6 +385,7 @@ namespace BeebPerf.ux
 
         private void HideToolTip()
         {
+            _ToolTipTimer.Stop();
             _ToolTip.Hide(this);
         }
 
