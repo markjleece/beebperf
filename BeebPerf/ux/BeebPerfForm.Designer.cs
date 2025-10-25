@@ -57,7 +57,7 @@ namespace BeebPerf.ux
             routinesTabPage = new TabPage();
             routinesView = new RoutinesView();
             flameGraphTabPage = new TabPage();
-            interruptsTabPage = new TabPage();
+            memoryTabPage = new TabPage();
             codeView = new CodeView();
             callerCalleeView = new CallerCalleeView();
             flameGraphView = new FlameGraphView();
@@ -261,7 +261,7 @@ namespace BeebPerf.ux
             tabControl.Controls.Add(callerCalleeTabPage);
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(flameGraphTabPage);
-            tabControl.Controls.Add(interruptsTabPage);
+            tabControl.Controls.Add(memoryTabPage);
             tabControl.Dock = DockStyle.Fill;
             tabControl.Location = new Point(0, 0);
             tabControl.Name = "tabControl";
@@ -366,15 +366,15 @@ namespace BeebPerf.ux
             flameGraphView.Size = new Size(1731, 442);
             flameGraphView.TabIndex = 0;
             // 
-            // interruptsTabPage
+            // memoryTabPage
             // 
-            interruptsTabPage.Location = new Point(4, 34);
-            interruptsTabPage.Name = "interruptsTabPage";
-            interruptsTabPage.Padding = new Padding(3);
-            interruptsTabPage.Size = new Size(1737, 448);
-            interruptsTabPage.TabIndex = 5;
-            interruptsTabPage.Text = "Interrupts";
-            interruptsTabPage.UseVisualStyleBackColor = true;
+            memoryTabPage.Location = new Point(4, 34);
+            memoryTabPage.Name = "memoryTabPage";
+            memoryTabPage.Padding = new Padding(3);
+            memoryTabPage.Size = new Size(1737, 448);
+            memoryTabPage.TabIndex = 5;
+            memoryTabPage.Text = "Memory";
+            memoryTabPage.UseVisualStyleBackColor = true;
             // 
             // codeView
             // 
@@ -436,7 +436,7 @@ namespace BeebPerf.ux
         private TabPage callerCalleeTabPage;
         private TabPage routinesTabPage;
         private TabPage flameGraphTabPage;
-        private TabPage interruptsTabPage;
+        private TabPage memoryTabPage;
         private RoutinesView routinesView;
         private CallTreeView callTreeView;
         private CodeView codeView;
