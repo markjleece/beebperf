@@ -60,10 +60,18 @@ namespace BeebPerf.ux
             Columns.Add("BranchCount", "Branch count [#, %]");
             Columns.Add("ExecutionCount", "Execution count [#, %]");
 
-            Columns[TailCallColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            Columns[BranchCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            SetColumnAlignment(TailCallColumnIndex, DataGridViewContentAlignment.MiddleCenter);
+            SetColumnAlignment(BranchCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+
+            SetColumnHeaderToolTip(AddressColumnIndex, "Address");
+            SetColumnHeaderToolTip(LabelColumnIndex, "Label");
+            SetColumnHeaderToolTip(InstructionColumnIndex, "Instruction mnemonic and operand");
+            SetColumnHeaderToolTip(TailCallColumnIndex, "Whether a jump or branch instruction executes a tail call");
+            SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used executing instruction and routines it calls");
+            SetColumnHeaderToolTip(BranchCountColumnIndex, "Number of times the branch was taken");
+            SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times the instruction was executed");
 
             var cellRenderer = new CallTreeCellRenderer();
             foreach (DataGridViewColumn column in Columns)
@@ -83,6 +91,16 @@ namespace BeebPerf.ux
 
             DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
             DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
+        }
+
+        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
+        {
+            Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
+        }
+
+        private void SetColumnHeaderToolTip(int columnIndex, string text)
+        {
+            Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)

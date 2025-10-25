@@ -31,7 +31,8 @@ namespace BeebPerf.ux
         private const int SelfCPUColumnIndex = 1;
         private const int TotalCPUColumnIndex = 2;
         private const int ElapsedCPUColumnIndex = 3;
-        private const int ExecutionCountColumnIndex = 4;
+        private const int InterruptsColumnIndex = 4;
+        private const int ExecutionCountColumnIndex = 5;
 
         public CallTreeView() : base()
         {
@@ -58,18 +59,37 @@ namespace BeebPerf.ux
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
+            Columns.Add("Interrupts", "Interrupts [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
             var cellTemplate = new CellTemplate();
             foreach (DataGridViewColumn column in Columns)
                 column.CellTemplate = cellTemplate;
 
-            Columns[SelfCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[ElapsedCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ElapsedCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(InterruptsColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+
+            SetColumnHeaderToolTip(RoutineColumnIndex, "Routine address and label");
+            SetColumnHeaderToolTip(SelfCPUColumnIndex, "Cycles used just by this routine");
+            SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used by this routine and all routines it calls.");
+            SetColumnHeaderToolTip(ElapsedCPUColumnIndex, "Total cycles elapsed during execution of routine, including cycles in interrupts");
+            SetColumnHeaderToolTip(InterruptsColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
+            SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times this routine was executed");
 
             Columns[RoutineColumnIndex]!.SortMode = DataGridViewColumnSortMode.NotSortable;
+        }
+
+        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
+        {
+            Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
+        }
+
+        private void SetColumnHeaderToolTip(int columnIndex, string text)
+        {
+            Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -197,7 +217,7 @@ namespace BeebPerf.ux
         public void AddCallTree(CallTreeNode treeNode)
         {
             _SuppressSelectionChangedEvent++;
-            Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode);
+            Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode, treeNode);
             _SuppressSelectionChangedEvent--;
             
             ClearSelection();
@@ -313,6 +333,11 @@ namespace BeebPerf.ux
                     e.FormattingApplied = true;
                     break;
 
+                case InterruptsColumnIndex:
+                    e.Value = FormatInterruptsMetric(treeNode.CPUMetrics.ElapsedCycleCount, treeNode.CPUMetrics.InclusiveCycleCount);
+                    e.FormattingApplied = true;
+                    break;
+
                 case ExecutionCountColumnIndex:
                     e.Value = $"{"".PadLeft(2*treeNode.Depth)}{treeNode.CPUMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
@@ -340,6 +365,13 @@ namespace BeebPerf.ux
         {
             var percentage = double.Min(100.0 * value / TotalCycleCount, 100.0);
             return $"{"".PadLeft(2*indent)}{value:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatInterruptsMetric(int elapsedCycleCount, int inclusiveCycleCount)
+        {
+            int interruptsCycleCount = elapsedCycleCount - inclusiveCycleCount;
+            var percentage = double.Min(100.0 * interruptsCycleCount / elapsedCycleCount, 100.0);
+            return $"{interruptsCycleCount:N0} ({percentage:F2}%)";
         }
 
         private void KeyDownFunc(object? sender, KeyEventArgs e)
@@ -412,6 +444,7 @@ namespace BeebPerf.ux
                         SelfCPUColumnIndex => CallTreeNode.SortField.SelfCPU,
                         TotalCPUColumnIndex => CallTreeNode.SortField.InclusiveCPU,
                         ElapsedCPUColumnIndex => CallTreeNode.SortField.ElapsedCPU,
+                        InterruptsColumnIndex => CallTreeNode.SortField.Interrupts,
                         ExecutionCountColumnIndex => CallTreeNode.SortField.Count,
                         _ => 0
                     };
@@ -439,7 +472,7 @@ namespace BeebPerf.ux
                 foreach (var childNode in treeNode.Children)
                 {
                     _SuppressSelectionChangedEvent++;
-                    Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode);
+                    Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode, childNode);
                     _SuppressSelectionChangedEvent--;
 
                     index = AddChildRows(index, childNode);
@@ -475,6 +508,7 @@ namespace BeebPerf.ux
                     SelfCPUColumnIndex => cpuMetrics.SelfCycleCount,
                     TotalCPUColumnIndex => cpuMetrics.InclusiveCycleCount,
                     ElapsedCPUColumnIndex => cpuMetrics.ElapsedCycleCount,
+                    InterruptsColumnIndex => cpuMetrics.ElapsedCycleCount - cpuMetrics.InclusiveCycleCount,
                     ExecutionCountColumnIndex => cpuMetrics.ExecutionCount,
                     _ => 0
                 };
@@ -573,6 +607,7 @@ namespace BeebPerf.ux
                         ColumnIndex == SelfCPUColumnIndex ||
                         ColumnIndex == TotalCPUColumnIndex ||
                         ColumnIndex == ElapsedCPUColumnIndex ||
+                        ColumnIndex == InterruptsColumnIndex ||
                         ColumnIndex == ExecutionCountColumnIndex);
                     PaintBar(treeNode, graphics, cellBounds, cellState);
                 }
@@ -596,6 +631,7 @@ namespace BeebPerf.ux
                     SelfCPUColumnIndex => (treeNode.CPUMetrics.SelfCycleCount, callTreeDateView.TotalCycleCount),
                     TotalCPUColumnIndex => (treeNode.CPUMetrics.InclusiveCycleCount, callTreeDateView.TotalCycleCount),
                     ElapsedCPUColumnIndex => (treeNode.CPUMetrics.ElapsedCycleCount, callTreeDateView.TotalCycleCount),
+                    InterruptsColumnIndex => (treeNode.CPUMetrics.ElapsedCycleCount - treeNode.CPUMetrics.InclusiveCycleCount, treeNode.CPUMetrics.ElapsedCycleCount),
                     ExecutionCountColumnIndex => (treeNode.CPUMetrics.ExecutionCount, callTreeDateView.MaxExecutionCount),
                     _ => (0, 0)
                 };

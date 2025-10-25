@@ -22,6 +22,7 @@
 using BeebPerf.model;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Forms;
 
 namespace BeebPerf.ux
 {
@@ -31,7 +32,8 @@ namespace BeebPerf.ux
         private const int SelfCPUColumnIndex = 1;
         private const int TotalCPUColumnIndex = 2;
         private const int ElapsedCPUColumnIndex = 3;
-        private const int ExecutionCountColumnIndex = 4;
+        private const int InterruptsColumnIndex = 4;
+        private const int ExecutionCountColumnIndex = 5;
 
         public RoutinesView() : base()
         {
@@ -57,18 +59,37 @@ namespace BeebPerf.ux
             Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
             Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
+            Columns.Add("Interrupts", "Interrupts [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
             var cellTemplate = new CellTemplate();
             foreach (DataGridViewColumn column in Columns)
                 column.CellTemplate = cellTemplate;
 
-            Columns[SelfCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[TotalCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[ElapsedCPUColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            Columns[ExecutionCountColumnIndex]!.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ElapsedCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(InterruptsColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+
+            SetColumnHeaderToolTip(RoutineColumnIndex, "Routine address and label");
+            SetColumnHeaderToolTip(SelfCPUColumnIndex,"Cycles used just by this routine");
+            SetColumnHeaderToolTip(TotalCPUColumnIndex,"Total cycles used by this routine and all routines it calls.");
+            SetColumnHeaderToolTip(ElapsedCPUColumnIndex, "Total cycles elapsed during execution of routine, including cycles in interrupts");
+            SetColumnHeaderToolTip(InterruptsColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
+            SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times this routine was executed");
 
             Sort(Columns[SelfCPUColumnIndex]!, ListSortDirection.Descending);
+        }
+
+        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
+        {
+            Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
+        }
+
+        private void SetColumnHeaderToolTip(int columnIndex, string text)
+        {
+            Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -179,7 +200,7 @@ namespace BeebPerf.ux
         public void AddRoutine(Routine routine)
         {
             _SuppressSelectionChangedEvent++;
-            Rows.Add(routine, routine, routine, routine, routine);
+            Rows.Add(routine, routine, routine, routine, routine, routine);
             _SuppressSelectionChangedEvent--;
 
             ClearSelection();
@@ -232,6 +253,11 @@ namespace BeebPerf.ux
                     e.FormattingApplied = true;
                     break;
 
+                case InterruptsColumnIndex:
+                    e.Value = FormatInterruptsMetric(routine.AggregateMetrics.ElapsedCycleCount, routine.AggregateMetrics.InclusiveCycleCount);
+                    e.FormattingApplied = true;
+                    break;
+
                 case ExecutionCountColumnIndex:
                     e.Value = $"{routine.AggregateMetrics.ExecutionCount:N0}";
                     e.FormattingApplied = true;
@@ -269,6 +295,13 @@ namespace BeebPerf.ux
                     e.Handled = true;
                     break;
 
+                case InterruptsColumnIndex:
+                    e.SortResult = 
+                        (a.AggregateMetrics.ElapsedCycleCount - a.AggregateMetrics.InclusiveCycleCount) - 
+                        (b.AggregateMetrics.ElapsedCycleCount - b.AggregateMetrics.InclusiveCycleCount);
+                    e.Handled = true;
+                    break;
+
                 case ExecutionCountColumnIndex:
                     e.SortResult = a.AggregateMetrics.ExecutionCount - b.AggregateMetrics.ExecutionCount;
                     e.Handled = true;
@@ -283,6 +316,13 @@ namespace BeebPerf.ux
         {
             var percentage = double.Min(100.0 * value / TotalCycleCount, 100.0);
             return $"{value:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatInterruptsMetric(int elapsedCycleCount, int inclusiveCycleCount)
+        {
+            int interruptsCycleCount = elapsedCycleCount - inclusiveCycleCount;
+            var percentage = double.Min(100.0 * interruptsCycleCount / elapsedCycleCount, 100.0);
+            return $"{interruptsCycleCount:N0} ({percentage:F2}%)";
         }
 
         public class CellTemplate : DataGridViewTextBoxCell
@@ -316,6 +356,7 @@ namespace BeebPerf.ux
                         ColumnIndex == SelfCPUColumnIndex ||
                         ColumnIndex == TotalCPUColumnIndex ||
                         ColumnIndex == ElapsedCPUColumnIndex ||
+                        ColumnIndex == InterruptsColumnIndex ||
                         ColumnIndex == ExecutionCountColumnIndex);
 
                     // paint default background
@@ -364,6 +405,7 @@ namespace BeebPerf.ux
                     SelfCPUColumnIndex => (double)routine.AggregateMetrics.SelfCycleCount / routineGridView.TotalCycleCount,
                     TotalCPUColumnIndex => (double)routine.AggregateMetrics.InclusiveCycleCount / routineGridView.TotalCycleCount,
                     ElapsedCPUColumnIndex => (double)routine.AggregateMetrics.ElapsedCycleCount / routineGridView.TotalCycleCount,
+                    InterruptsColumnIndex => (double)(routine.AggregateMetrics.ElapsedCycleCount - routine.AggregateMetrics.InclusiveCycleCount) / routine.AggregateMetrics.ElapsedCycleCount,
                     ExecutionCountColumnIndex => (double)routine.AggregateMetrics.ExecutionCount / routineGridView.MaxExecutionCount,
                     _ => -1
                 };

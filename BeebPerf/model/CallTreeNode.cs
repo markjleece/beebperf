@@ -37,6 +37,7 @@ namespace BeebPerf.model
             SelfCPU,
             InclusiveCPU,
             ElapsedCPU,
+            Interrupts,
             Count
         };
 
@@ -63,6 +64,13 @@ namespace BeebPerf.model
                         Sort((a, b) => a.CPUMetrics.ElapsedCycleCount.CompareTo(b.CPUMetrics.ElapsedCycleCount));
                     else if (sortOrder == SortOrder.Descending)
                         Sort((a, b) => b.CPUMetrics.ElapsedCycleCount.CompareTo(a.CPUMetrics.ElapsedCycleCount));
+                    break;
+
+                case SortField.Interrupts:
+                    if (sortOrder == SortOrder.Ascending)
+                        Sort((a, b) => (a.CPUMetrics.ElapsedCycleCount - a.CPUMetrics.InclusiveCycleCount).CompareTo(b.CPUMetrics.ElapsedCycleCount - b.CPUMetrics.InclusiveCycleCount));
+                    else if (sortOrder == SortOrder.Descending)
+                        Sort((a, b) => (b.CPUMetrics.ElapsedCycleCount - b.CPUMetrics.InclusiveCycleCount).CompareTo(a.CPUMetrics.ElapsedCycleCount - a.CPUMetrics.InclusiveCycleCount));
                     break;
 
                 case SortField.Count:
