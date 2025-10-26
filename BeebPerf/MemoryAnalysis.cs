@@ -39,18 +39,16 @@ namespace BeebPerf
             _SnapshotMemory = snapshotMemory;
         }
 
-        public async Task<bool> DynamicAnalysis(int startCycleCount, int endCycleCount)
+        public async Task<bool> DynamicAnalysisAsync(int startCycleCount, int endCycleCount, bool zeroPage)
         {
             return await Task.Run(() =>
             {
-                StartCycleCount = startCycleCount;
-                EndCycleCount = endCycleCount;
-                DynamicAnalysis();
+                DynamicAnalysis(startCycleCount, endCycleCount, zeroPage);
                 return true;
             });
         }
 
-        private void DynamicAnalysis()
+        private void DynamicAnalysis(int startCycleCount, int endCycleCount, bool zeroPage)
         {
             // initialize read/write counters
             int addressCount = 0;
@@ -75,7 +73,7 @@ namespace BeebPerf
                 
                 int postCycleCount = cycleCount + instruction.CycleCount;
 
-                if (cycleCount >= StartCycleCount && postCycleCount < EndCycleCount && instruction.IsInstruction)
+                if (cycleCount >= startCycleCount && postCycleCount < endCycleCount && instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
                     byte memoryAccess = _InstructionSet!.MemoryAccess(opcode);
@@ -83,9 +81,9 @@ namespace BeebPerf
                     if (memoryAccess != 0) // memory access?
                     {
                         var memoryAddress = instruction.MemoryAddress;
-                        int page = (int)memoryAddress.Page;
-                        int offset = memoryAddress.PageOffset;
-                        memory[page][offset] += increments[memoryAccess];
+                        var page = memoryAddress.Page;
+                        if (!zeroPage || (page == MemoryPage.WholeRam && memoryAddress.Address < 0x100))
+                            memory[(int)page][memoryAddress.PageOffset] += increments[memoryAccess];
                     }
                 }
 
@@ -141,8 +139,6 @@ namespace BeebPerf
             public int ReadWriteCount;
         }
 
-        public int StartCycleCount;
-        public int EndCycleCount;
         public List<MemoryAccess> MemoryAccesses = [];
 
         private BBCModelType _ModelType;

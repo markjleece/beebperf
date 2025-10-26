@@ -105,7 +105,7 @@ namespace BeebPerf.ux
         {
             SetState(AppStateFlags.DynamicCPUAnalysis);
 
-            var dynamicAnalysisTask = _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount).ContinueWith((success) =>
+            var dynamicAnalysisTask = _CPUAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {
@@ -169,6 +169,7 @@ namespace BeebPerf.ux
                 }));
             });
 
+            SetState(AppStateFlags.DynamicMemoryAnalysis);
             _MemoryAnalysis.Initialize(
                 _Model.BBCModel,
                 _Model.Instructions,
@@ -176,10 +177,12 @@ namespace BeebPerf.ux
                 _Model.Labels,
                 _Model.Snapshot.Memory);
 
-            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysis(startCycleCount, endCycleCount).ContinueWith((success) =>
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount, _ZeroPageMemoryAnalysis).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {
+                    ClearState(AppStateFlags.DynamicMemoryAnalysis);
+
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
                 }));
             });
@@ -246,6 +249,18 @@ namespace BeebPerf.ux
         private void helpButton_Click(object sender, EventArgs e)
         {
 
+        }
+        private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            _ZeroPageMemoryAnalysis = memoryZeroPageCheckBox.Checked;
+
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _ZeroPageMemoryAnalysis).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
+                }));
+            });
         }
 
         private UndoRedoHistory _UndoRedoHistory = new();
@@ -359,6 +374,7 @@ namespace BeebPerf.ux
             hotRoutinesButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
+            memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
         }
 
         private void SetState(AppStateFlags state)
@@ -370,6 +386,7 @@ namespace BeebPerf.ux
                 callTreeView.Clear();
                 flameGraphView.Clear();
                 codeView.Clear();
+                memoryView.Clear();
             }
 
             if (state == AppStateFlags.DynamicCPUAnalysis)
@@ -378,11 +395,18 @@ namespace BeebPerf.ux
                 callTreeView.Clear();
                 flameGraphView.Clear();
                 codeView.Clear();
+                memoryView.Clear();
+            }
+
+            if (state == AppStateFlags.DynamicMemoryAnalysis)
+            {
+                memoryView.Clear();
             }
 
             if (state == AppStateFlags.Loading ||
                 state == AppStateFlags.StaticCPUAnalysis ||
-                state == AppStateFlags.DynamicCPUAnalysis)
+                state == AppStateFlags.DynamicCPUAnalysis ||
+                state == AppStateFlags.DynamicMemoryAnalysis)
                 spinner.Visible = true;
 
             AppState |= state;
@@ -394,7 +418,11 @@ namespace BeebPerf.ux
             AppState &= ~state;
             UpdateToolbarState();
 
-            if ((AppState & (AppStateFlags.Loading | AppStateFlags.StaticCPUAnalysis | AppStateFlags.DynamicCPUAnalysis)) == 0)
+            if ((AppState & 
+                (AppStateFlags.Loading | 
+                 AppStateFlags.StaticCPUAnalysis | 
+                 AppStateFlags.DynamicCPUAnalysis | 
+                 AppStateFlags.DynamicMemoryAnalysis)) == 0)
                 spinner.Visible = false;
         }
 
@@ -403,6 +431,7 @@ namespace BeebPerf.ux
             Loading = 0x01,
             StaticCPUAnalysis = 0x02,
             DynamicCPUAnalysis = 0x04,
+            DynamicMemoryAnalysis = 0x8,
         }
 
         private void ResizeSpinner()
@@ -418,5 +447,6 @@ namespace BeebPerf.ux
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
         private string _RecentFilePathName = string.Empty;
+        private bool _ZeroPageMemoryAnalysis;
     }
 }

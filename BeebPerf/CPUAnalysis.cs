@@ -37,7 +37,7 @@ namespace BeebPerf
             });
         }
 
-        public async Task<bool> DynamicAnalysis(int startCycleCount, int endCycleCount)
+        public async Task<bool> DynamicAnalysisAsync(int startCycleCount, int endCycleCount)
         {
             return await Task.Run(() => 
             {

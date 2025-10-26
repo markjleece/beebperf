@@ -286,8 +286,6 @@ namespace BeebPerf.ux
 
             RowCount = memoryAccesses.Count;
 
-            FirstDisplayedScrollingRowIndex = 0;
-
             Invalidate();
         }
 

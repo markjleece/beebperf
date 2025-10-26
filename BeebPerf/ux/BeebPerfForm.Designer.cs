@@ -65,7 +65,6 @@ namespace BeebPerf.ux
             memoryZeroPageCheckBox = new CheckBox();
             memoryView = new MemoryView();
             memoryRoutinesView = new Panel();
-
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -396,6 +395,7 @@ namespace BeebPerf.ux
             memoryZeroPageCheckBox.Name = "memoryZeroPageCheckBox";
             memoryZeroPageCheckBox.Text = "Zero page addresses";
             memoryZeroPageCheckBox.TabIndex = 0;
+            memoryZeroPageCheckBox.CheckedChanged += MemoryZeroPageCheckBox_CheckedChanged;
             // 
             // memoryView
             // 
