@@ -101,64 +101,88 @@ namespace BeebPerf.ux
             }
         }
 
-        public async void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
             SetState(AppStateFlags.DynamicCPUAnalysis);
-            var success = await _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount);
-            ClearState(AppStateFlags.DynamicCPUAnalysis);
 
-            // populate routines
-            foreach (var routine in _CPUAnalysis.HotRoutines)
+            var dynamicAnalysisTask = _CPUAnalysis.DynamicAnalysis(startCycleCount, endCycleCount).ContinueWith((success) =>
             {
-                routinesView.AddRoutine(routine);
-            }
+                this.Invoke((Action)(() =>
+                {
+                    ClearState(AppStateFlags.DynamicCPUAnalysis);
 
-            int maxExecutionCount = 0;
-            foreach (var routine in _CPUAnalysis.HotRoutines)
-            {
-                if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
-                    maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
-            }
+                    // populate routines
+                    foreach (var routine in _CPUAnalysis.HotRoutines)
+                    {
+                        routinesView.AddRoutine(routine);
+                    }
 
-            routinesView.MaxExecutionCount = maxExecutionCount;
-            routinesView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+                    int maxExecutionCount = 0;
+                    foreach (var routine in _CPUAnalysis.HotRoutines)
+                    {
+                        if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
+                            maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
+                    }
 
-            // populate call tree
-            callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+                    routinesView.MaxExecutionCount = maxExecutionCount;
+                    routinesView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
-            if (_CPUAnalysis!.ProgramCallTree != null)
-                callTreeView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+                    // populate call tree
+                    callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
-            if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                callTreeView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+                    if (_CPUAnalysis!.ProgramCallTree != null)
+                        callTreeView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
 
-            if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                callTreeView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+                    if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
+                        callTreeView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
 
-            callTreeView.ShowHotPaths();
+                    if (_CPUAnalysis!.MaskableInterruptCallTree != null)
+                        callTreeView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
 
-            // populate flame graph
-            if (_CPUAnalysis!.ProgramCallTree != null)
-                flameGraphView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+                    callTreeView.ShowHotPaths();
 
-            if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                flameGraphView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+                    // populate flame graph
+                    if (_CPUAnalysis!.ProgramCallTree != null)
+                        flameGraphView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
 
-            if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+                    if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
+                        flameGraphView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
 
-            // caller/callee
-            callerCalleeView.Initialize(
-                _CPUAnalysis.GetCallerMetrics,
-                _CPUAnalysis.GetCalleeMetrics,
-                _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount);
+                    if (_CPUAnalysis!.MaskableInterruptCallTree != null)
+                        flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
 
-            // code view
-            codeView.Initialize(
-                _CPUAnalysis.CalculateInstructionMetrics,
-                _CPUAnalysis.RoutinesByAddress,
+                    // caller/callee
+                    callerCalleeView.Initialize(
+                        _CPUAnalysis.GetCallerMetrics,
+                        _CPUAnalysis.GetCalleeMetrics,
+                        _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount);
+
+                    // code view
+                    codeView.Initialize(
+                        _CPUAnalysis.CalculateInstructionMetrics,
+                        _CPUAnalysis.RoutinesByAddress,
+                        _Model.Labels,
+                        _Model.InstructionSet!);
+
+                    // memory view
+                    memoryView.Labels = _Model.Labels;
+                }));
+            });
+
+            _MemoryAnalysis.Initialize(
+                _Model.BBCModel,
+                _Model.Instructions,
+                _Model.InstructionSet!,
                 _Model.Labels,
-                _Model.InstructionSet!);
+                _Model.Snapshot.Memory);
+
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysis(startCycleCount, endCycleCount).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
+                }));
+            });
         }
 
         private void undoButton_Click(object sender, EventArgs e)
@@ -227,6 +251,7 @@ namespace BeebPerf.ux
         private UndoRedoHistory _UndoRedoHistory = new();
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
+        private MemoryAnalysis _MemoryAnalysis = new();
 
         public void SetSelectedRoutine(Object? sender, Routine routine, CallStack? callStack)
         {

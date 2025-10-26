@@ -23,7 +23,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
 using BeebPerf.model;
-using System.Net.Http.Headers;
 
 namespace BeebPerf
 {
@@ -330,7 +329,7 @@ namespace BeebPerf
                         if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressMode.Complex)
                             memoryAddress = ReadShort(dataStream);
                         else
-                            memoryAddress = opcode;
+                            memoryAddress = operand;
 
                         instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress);
 

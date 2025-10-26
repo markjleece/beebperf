@@ -50,6 +50,7 @@ namespace BeebPerf.ux
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
             splitContainer = new SplitContainer();
+            memoryContainer = new Panel();
             tabControl = new TabControl();
             callTreeTabPage = new TabPage();
             callTreeView = new CallTreeView();
@@ -61,6 +62,10 @@ namespace BeebPerf.ux
             codeView = new CodeView();
             callerCalleeView = new CallerCalleeView();
             flameGraphView = new FlameGraphView();
+            memoryZeroPageCheckBox = new CheckBox();
+            memoryView = new MemoryView();
+            memoryRoutinesView = new Panel();
+
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -243,13 +248,7 @@ namespace BeebPerf.ux
             splitContainer.Location = new Point(0, 133);
             splitContainer.Name = "splitContainer";
             splitContainer.Orientation = Orientation.Horizontal;
-            // 
-            // splitContainer.Panel1
-            // 
             splitContainer.Panel1.Controls.Add(tabControl);
-            // 
-            // splitContainer.Panel2
-            // 
             splitContainer.Panel2.Controls.Add(codeView);
             splitContainer.Size = new Size(1745, 977);
             splitContainer.SplitterDistance = 486;
@@ -368,6 +367,8 @@ namespace BeebPerf.ux
             // 
             // memoryTabPage
             // 
+            memoryTabPage.Controls.Add(memoryContainer);
+            memoryTabPage.Controls.Add(memoryRoutinesView);
             memoryTabPage.Location = new Point(4, 34);
             memoryTabPage.Name = "memoryTabPage";
             memoryTabPage.Padding = new Padding(3);
@@ -375,6 +376,42 @@ namespace BeebPerf.ux
             memoryTabPage.TabIndex = 5;
             memoryTabPage.Text = "Memory";
             memoryTabPage.UseVisualStyleBackColor = true;
+            // 
+            // memoryContainer
+            // 
+            memoryContainer.AutoSize = true;
+            memoryContainer.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            memoryContainer.Dock = DockStyle.Left;
+            memoryContainer.Location = new Point(0, 133);
+            memoryContainer.Name = "memoryContainer";
+            memoryContainer.Controls.Add(memoryView);
+            memoryContainer.Controls.Add(memoryZeroPageCheckBox);
+            memoryContainer.TabIndex = 0;
+            // 
+            // memoryZeroPageCheckBox
+            // 
+            memoryZeroPageCheckBox.Dock = DockStyle.Top;
+            memoryZeroPageCheckBox.Location = new Point(0, 0);
+            memoryZeroPageCheckBox.AutoSize = true;
+            memoryZeroPageCheckBox.Name = "memoryZeroPageCheckBox";
+            memoryZeroPageCheckBox.Text = "Zero page addresses";
+            memoryZeroPageCheckBox.TabIndex = 0;
+            // 
+            // memoryView
+            // 
+            memoryView.AutoSize = true;
+            memoryView.Dock = DockStyle.Fill;
+            memoryView.Location = new Point(0, 0);
+            memoryView.Name = "memoryView";
+            memoryView.TabIndex = 0;
+            // 
+            // memoryRoutinesView
+            // 
+            memoryRoutinesView.Dock = DockStyle.Fill;
+            memoryRoutinesView.Location = new Point(0, 0);
+            memoryRoutinesView.Name = "memoryRoutinesView";
+            memoryRoutinesView.Size = new Size(1745, 487);
+            memoryRoutinesView.TabIndex = 0;
             // 
             // codeView
             // 
@@ -442,6 +479,10 @@ namespace BeebPerf.ux
         private CodeView codeView;
         private CallerCalleeView callerCalleeView;
         private FlameGraphView flameGraphView;
+        private Panel memoryContainer;
+        private CheckBox memoryZeroPageCheckBox;
+        private MemoryView memoryView;
+        private Panel memoryRoutinesView;
         private Spinner spinner;
     }
 }

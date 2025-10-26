@@ -23,7 +23,21 @@ namespace BeebPerf.model
 {
     public enum MemoryPage
     {
-        PagedRom = 0,
+        PageRom0 = 0,
+        PageRom1 = 1,
+        PageRom2 = 2,
+        PageRom3 = 3,
+        PageRom4 = 4,
+        PageRom5 = 5,
+        PageRom6 = 6,
+        PageRom7 = 7,
+        PageRom8 = 8,
+        PageRom9 = 9,
+        PageRom10 = 10,
+        PageRom11 = 11,
+        PageRom12 = 12,
+        PageRom14 = 14,
+        PageRom15 = 15,
         WholeRam = 16,
         ShadowRam = 17,
         PrivateRam = 18,

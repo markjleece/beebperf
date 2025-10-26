@@ -37,7 +37,10 @@ namespace BeebPerf.model
 
         public int CompareTo(CanonicalAddress other)
         {
-            return _PageAddress.CompareTo(other._PageAddress);
+            int diff = Address.CompareTo(other.Address);
+            if (diff == 0)
+                diff = Page.CompareTo(other.Page);
+            return diff;
         }
 
         public bool Equals(CanonicalAddress other)
