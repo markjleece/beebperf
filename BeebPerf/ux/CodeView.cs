@@ -123,12 +123,14 @@ namespace BeebPerf.ux
         public void Initialize(
             Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
             Dictionary<CanonicalAddress, Routine> routinesByAddress,
-            Dictionary<ushort, string>? labels,
+            Dictionary<ushort, string> labels,
             InstructionSet instructionSet)
         {
             _CalculateInstructionMetrics = calculateInstructionMetrics;
             _RoutinesByAddress = routinesByAddress;
             _Labels = labels;
+            _LabelAddresses = labels!.Keys.ToList();
+            _LabelAddresses.Sort();
             _InstructionSet = instructionSet;
         }
 
@@ -225,7 +227,7 @@ namespace BeebPerf.ux
 
             e.Value = e.ColumnIndex switch {
                 AddressColumnIndex => instructionMetrics.Instruction.OpcodeAddress.ToString(),
-                LabelColumnIndex => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
+                LabelColumnIndex => _Labels.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
                 InstructionColumnIndex => FormatInstruction(instructionMetrics),
                 BranchCountColumnIndex => FormatBranchCount(instructionMetrics),
                 TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
@@ -289,8 +291,12 @@ namespace BeebPerf.ux
                 else if (opSize == 3)
                     formattedOperand = $"&{operand:X4}";
 
-                if (addressMode != InstructionSet.AddressMode.Immediate && _Labels!.TryGetValue(operand, out var label))
-                    formattedOperand = $"{label} ({formattedOperand})";
+                if (addressMode != InstructionSet.AddressMode.Immediate)
+                {
+                    string label = FormatLabel(operand);
+                    if (label.Length > 0)
+                        formattedOperand = $"{label} ({formattedOperand})";
+                }
             }
 
             string mnemonic = instructionSet.Mnemonic(opcode).PadRight(5);
@@ -330,6 +336,23 @@ namespace BeebPerf.ux
                 default:
                     return "???";
             }
+        }
+
+        private string FormatLabel(ushort address)
+        {
+            int index = _LabelAddresses.BinarySearch(address);
+            if (index >= 0)
+                return _Labels[address];
+            index = ~index - 1;
+            if (index >= 0)
+            {
+                ushort lowerAddress = _LabelAddresses[index];
+                int offset = address - lowerAddress;
+                if (offset < 0x100)
+                    return $"{_Labels[lowerAddress]}+{offset}";
+            }
+
+            return string.Empty;
         }
 
         private void SetColumnVisibility(int columnIndex, bool visibility)
@@ -492,12 +515,15 @@ namespace BeebPerf.ux
 
                     segments.Add(new Segment { Text = hexOperand, Color = colors.AddressColor });
 
-                    if (addressMode != InstructionSet.AddressMode.Immediate &&
-                        codeGridView!._Labels!.TryGetValue(operand, out var label))
+                    if (addressMode != InstructionSet.AddressMode.Immediate)
                     {
-                        segments.Insert(1, new Segment { Text = label, Color = colors.LabelColor });
-                        segments.Insert(2, new Segment { Text = " (", Color = colors.PunctuationColor });
-                        segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
+                        string label = codeGridView.FormatLabel(operand);
+                        if (label.Length > 0)
+                        {
+                            segments.Insert(1, new Segment { Text = label, Color = colors.LabelColor });
+                            segments.Insert(2, new Segment { Text = " (", Color = colors.PunctuationColor });
+                            segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
+                        }
                     }
                 }
 
@@ -652,7 +678,8 @@ namespace BeebPerf.ux
             public Color PunctuationColor;
         }
 
-        private Dictionary<ushort, string>? _Labels;
+        private Dictionary<ushort, string> _Labels = new();
+        private List<ushort> _LabelAddresses = new();
         private InstructionSet? _InstructionSet;
         private InstructionColors _InstructionStyle;
         private Color _SelectionBackColor;

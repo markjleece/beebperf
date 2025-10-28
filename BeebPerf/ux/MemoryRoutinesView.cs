@@ -451,6 +451,5 @@ namespace BeebPerf.ux
         List<RoutineMemoryAccess> _MemoryAccesses = [];
         private int _TotalReadCount;
         private int _TotalWriteCount;
-        private Dictionary<ushort, string> _Labels = new();
     }
 }

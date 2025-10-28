@@ -398,6 +398,7 @@ namespace BeebPerf.ux
 
             return string.Empty;
         }
+
         private void ScrollToTop()
         {
             if (Rows.Count > 0)
