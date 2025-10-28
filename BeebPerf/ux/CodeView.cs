@@ -21,6 +21,7 @@
 
 using BeebPerf.model;
 using System.Drawing.Drawing2D;
+using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
@@ -29,10 +30,12 @@ namespace BeebPerf.ux
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
         private const int InstructionColumnIndex = 2;
-        private const int TailCallColumnIndex = 3;
-        private const int TotalCPUColumnIndex = 4;
-        private const int BranchCountColumnIndex = 5;
-        private const int ExecutionCountColumnIndex = 6;
+        private const int MemoryReadCountColumnIndex = 3;
+        private const int MemoryWriteCountColumnIndex = 4;
+        private const int TailCallColumnIndex = 5;
+        private const int TotalCPUColumnIndex = 6;
+        private const int BranchCountColumnIndex = 7;
+        private const int ExecutionCountColumnIndex = 8;
 
         public CodeView() : base()
         {
@@ -55,23 +58,34 @@ namespace BeebPerf.ux
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
             Columns.Add("Instruction", "Instruction");
+            Columns.Add("MemoryReadCount", "Memory reads [#]");
+            Columns.Add("MemoryWriteCount", "Memory writes [#]");
             Columns.Add("TailCall", "Tail call");
             Columns.Add("TotalCPU", "Total CPU [#cycles, %");
             Columns.Add("BranchCount", "Branch count [#, %]");
             Columns.Add("ExecutionCount", "Execution count [#, %]");
 
+            SetColumnAlignment(MemoryReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(MemoryWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TailCallColumnIndex, DataGridViewContentAlignment.MiddleCenter);
             SetColumnAlignment(BranchCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
             SetColumnHeaderToolTip(AddressColumnIndex, "Address");
             SetColumnHeaderToolTip(LabelColumnIndex, "Label");
             SetColumnHeaderToolTip(InstructionColumnIndex, "Instruction mnemonic and operand");
+            SetColumnHeaderToolTip(MemoryReadCountColumnIndex, "Selected memory address read count");
+            SetColumnHeaderToolTip(MemoryWriteCountColumnIndex, "Selected memory address write count");
             SetColumnHeaderToolTip(TailCallColumnIndex, "Whether a jump or branch instruction executes a tail call");
             SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used executing instruction and routines it calls");
             SetColumnHeaderToolTip(BranchCountColumnIndex, "Number of times the branch was taken");
             SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times the instruction was executed");
+
+            SetColumnVisibility(MemoryReadCountColumnIndex, false);
+            SetColumnVisibility(MemoryWriteCountColumnIndex, false);
 
             var cellRenderer = new CallTreeCellRenderer();
             foreach (DataGridViewColumn column in Columns)
@@ -91,16 +105,6 @@ namespace BeebPerf.ux
 
             DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
             DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
-        }
-
-        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
-        {
-            Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
-        }
-
-        private void SetColumnHeaderToolTip(int columnIndex, string text)
-        {
-            Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
@@ -128,9 +132,20 @@ namespace BeebPerf.ux
             _InstructionSet = instructionSet;
         }
 
-        public void SetCode(Routine routine, CallStack? callStack)
+        public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
         {
             Rows.Clear();
+
+            _MemoryAccess = memoryAccess;
+            if (memoryAccess != null)
+            {
+                SetColumnHeaderText(MemoryReadCountColumnIndex, $"{memoryAccess.Address} reads [#]");
+                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"{memoryAccess.Address} writes [#]");
+            }
+
+            SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
+            SetColumnVisibility(MemoryWriteCountColumnIndex, memoryAccess != null);
+
             var instructionMetrics = _CalculateInstructionMetrics!.Invoke(routine, callStack);
             if (instructionMetrics.Count > 0)
             {
@@ -142,15 +157,15 @@ namespace BeebPerf.ux
                 {
                     // add ellipses
                     if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses);
+                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses);
 
                     // add fall-through
                     if (_RoutinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
                         if (routine_ != routine)
-                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
+                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
 
                     // add instruction metrics
-                    Rows.Add(obj, obj, obj, obj, obj, obj, obj);
+                    Rows.Add(obj, obj, obj, obj, obj, obj, obj, obj, obj);
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
 
                     // set tool-tip text
@@ -172,6 +187,9 @@ namespace BeebPerf.ux
 
         public void Clear()
         {
+            SetColumnVisibility(MemoryReadCountColumnIndex, false);
+            SetColumnVisibility(MemoryWriteCountColumnIndex, false);
+            _MemoryAccess = null;
             Rows.Clear();
             Invalidate();
         }
@@ -206,15 +224,31 @@ namespace BeebPerf.ux
             }
 
             e.Value = e.ColumnIndex switch {
-                AddressColumnIndex        => instructionMetrics.Instruction.OpcodeAddress.ToString(),
-                LabelColumnIndex          => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
-                InstructionColumnIndex    => FormatInstruction(instructionMetrics),
-                BranchCountColumnIndex    => FormatBranchCount(instructionMetrics),
-                TailCallColumnIndex       => instructionMetrics.TailCall ? "yes" : string.Empty,
-                TotalCPUColumnIndex       => FormatValue(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
+                AddressColumnIndex => instructionMetrics.Instruction.OpcodeAddress.ToString(),
+                LabelColumnIndex => _Labels!.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
+                InstructionColumnIndex => FormatInstruction(instructionMetrics),
+                BranchCountColumnIndex => FormatBranchCount(instructionMetrics),
+                TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
+                TotalCPUColumnIndex => FormatValue(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
                 ExecutionCountColumnIndex => FormatValue(instructionMetrics.ExecutionCount, _MaxExecutionCount),
-                _                         => string.Empty };
+                MemoryReadCountColumnIndex => FormatMemoryReadCount(instructionMetrics.Instruction),
+                MemoryWriteCountColumnIndex => FormatMemoryWriteCount(instructionMetrics.Instruction),
+                _ => string.Empty };
             e.FormattingApplied = true;
+        }
+
+        private string FormatMemoryReadCount(CoreInstruction instruction)
+        {
+            if (_MemoryAccess != null && _MemoryAccess.InstructionReadCounts.TryGetValue(instruction, out var count))
+                return $"{count:N0}";
+            return string.Empty;
+        }
+
+        private string FormatMemoryWriteCount(CoreInstruction instruction)
+        {
+            if (_MemoryAccess != null && _MemoryAccess.InstructionWriteCounts.TryGetValue(instruction, out var count))
+                return $"{count:N0}";
+            return string.Empty;
         }
 
         private string FormatBranchCount(InstructionMetrics instructionMetrics)
@@ -296,6 +330,26 @@ namespace BeebPerf.ux
                 default:
                     return "???";
             }
+        }
+
+        private void SetColumnVisibility(int columnIndex, bool visibility)
+        {
+            Columns[columnIndex].Visible = visibility;
+        }
+
+        private void SetColumnHeaderText(int columnIndex, string text)
+        {
+            Columns[columnIndex].HeaderText = text;
+        }
+
+        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
+        {
+            Columns[columnIndex].DefaultCellStyle.Alignment = alignment;
+        }
+
+        private void SetColumnHeaderToolTip(int columnIndex, string text)
+        {
+            Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         public class CallTreeCellRenderer : DataGridViewTextBoxCell
@@ -606,5 +660,6 @@ namespace BeebPerf.ux
         private int _TotalCycleCount;
         private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
         private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
+        private RoutineMemoryAccess? _MemoryAccess;
     }
 }

@@ -174,7 +174,7 @@ namespace BeebPerf.ux
             {
                 var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
                 _SelectedTreeNode = treeNode;
-                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack);
+                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack, memoryAccess: null);
             }
             else
             {
@@ -210,7 +210,7 @@ namespace BeebPerf.ux
             else
             {
                 ClearSelection();
-                FirstDisplayedScrollingRowIndex = 0;
+                ScrollToTop();
             }
         }
 
@@ -268,7 +268,7 @@ namespace BeebPerf.ux
                     OpenTreeNode(rowIndex, treeNode);
             }
             RefreshExecutionCounts();
-            FirstDisplayedScrollingRowIndex = 0;
+            ScrollToTop();
             Invalidate();
         }
 
@@ -546,6 +546,12 @@ namespace BeebPerf.ux
 
             e.SortResult = comparison;
             e.Handled = true;
+        }
+
+        private void ScrollToTop()
+        {
+            if (Rows.Count > 0)
+                FirstDisplayedScrollingRowIndex = 0;
         }
 
         public class CellTemplate : DataGridViewTextBoxCell

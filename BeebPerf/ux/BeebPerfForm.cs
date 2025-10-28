@@ -21,6 +21,7 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
@@ -171,7 +172,7 @@ namespace BeebPerf.ux
 
             SetState(AppStateFlags.DynamicMemoryAnalysis);
             _MemoryAnalysis.Initialize(
-                _Model.BBCModel,
+                _CPUAnalysis.RootStackFrame,
                 _Model.Instructions,
                 _Model.InstructionSet!,
                 _Model.Labels,
@@ -182,7 +183,6 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
-
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
                 }));
             });
@@ -243,21 +243,22 @@ namespace BeebPerf.ux
 
         private void settingsButton_Click(object sender, EventArgs e)
         {
-
         }
 
         private void helpButton_Click(object sender, EventArgs e)
         {
-
         }
+
         private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             _ZeroPageMemoryAnalysis = memoryZeroPageCheckBox.Checked;
 
+            SetState(AppStateFlags.DynamicMemoryAnalysis);
             var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _ZeroPageMemoryAnalysis).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {
+                    ClearState(AppStateFlags.DynamicMemoryAnalysis);
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
                 }));
             });
@@ -268,7 +269,11 @@ namespace BeebPerf.ux
         private CPUAnalysis _CPUAnalysis = new();
         private MemoryAnalysis _MemoryAnalysis = new();
 
-        public void SetSelectedRoutine(Object? sender, Routine routine, CallStack? callStack)
+        public void SetSelectedRoutine(
+            Object? sender, 
+            Routine routine, 
+            CallStack? callStack,
+            RoutineMemoryAccess? memoryAccess)
         {
             if (routine == _SelectedRoutine && callStack == _SelectedCallStack)
                 return;
@@ -284,7 +289,7 @@ namespace BeebPerf.ux
             _SelectedCallStack = callStack;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-            codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null);
+            codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess); 
 
             if (sender != routinesView)
                 routinesView.SelectRoutine(routine);
@@ -322,6 +327,27 @@ namespace BeebPerf.ux
             codeView.Clear();
         }
 
+        public void SetSelectedMemoryAddress(Object? sender, CanonicalAddress address)
+        {
+            SetState(AppStateFlags.DynamicMemoryAddressAnalysis);
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAddressAnalysisAsync(address, _CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    ClearState(AppStateFlags.DynamicMemoryAddressAnalysis);
+                    memoryRoutinesView.SetMemoryAccesses(_MemoryAnalysis.RoutineAccesses);
+                }));
+            });
+
+        }
+
+        public void ClearSelectedMemoryAddress(Object? sender)
+        {
+            if (_SelectedRoutine != null)
+                SetSelectedRoutine(sender, _SelectedRoutine, _SelectedCallStack, memoryAccess: null);
+
+            memoryRoutinesView.Clear();
+        }
 
         private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
         {
@@ -330,7 +356,7 @@ namespace BeebPerf.ux
             if (_SelectedRoutine != null)
             {
                 bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-                codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null);
+                codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
             }
         }
 
@@ -403,10 +429,18 @@ namespace BeebPerf.ux
                 memoryView.Clear();
             }
 
+            if (state == AppStateFlags.DynamicMemoryAddressAnalysis)
+            {
+                // TODO: disable memoryView selection
+                memoryRoutinesView.Clear();
+                codeView.Clear();
+            }
+
             if (state == AppStateFlags.Loading ||
                 state == AppStateFlags.StaticCPUAnalysis ||
                 state == AppStateFlags.DynamicCPUAnalysis ||
-                state == AppStateFlags.DynamicMemoryAnalysis)
+                state == AppStateFlags.DynamicMemoryAnalysis ||
+                state == AppStateFlags.DynamicMemoryAddressAnalysis)
                 spinner.Visible = true;
 
             AppState |= state;
@@ -422,7 +456,8 @@ namespace BeebPerf.ux
                 (AppStateFlags.Loading | 
                  AppStateFlags.StaticCPUAnalysis | 
                  AppStateFlags.DynamicCPUAnalysis | 
-                 AppStateFlags.DynamicMemoryAnalysis)) == 0)
+                 AppStateFlags.DynamicMemoryAnalysis |
+                 AppStateFlags.DynamicMemoryAddressAnalysis)) == 0)
                 spinner.Visible = false;
         }
 
@@ -432,6 +467,7 @@ namespace BeebPerf.ux
             StaticCPUAnalysis = 0x02,
             DynamicCPUAnalysis = 0x04,
             DynamicMemoryAnalysis = 0x8,
+            DynamicMemoryAddressAnalysis = 0x10
         }
 
         private void ResizeSpinner()

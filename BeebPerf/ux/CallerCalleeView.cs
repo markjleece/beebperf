@@ -81,7 +81,7 @@ namespace BeebPerf.ux
                 SelectRoutine(routineCell.Routine);
 
                 BeebPerfForm form = (BeebPerfForm)GetParentForm();
-                form.SetSelectedRoutine(sender: this, routineCell.Routine, callStack: null);
+                form.SetSelectedRoutine(sender: this, routineCell.Routine, callStack: null, memoryAccess : null);
                 return;
             }
         }

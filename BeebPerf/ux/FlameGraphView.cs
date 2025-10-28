@@ -125,7 +125,7 @@ namespace BeebPerf.ux
                     _SelectedCallStack != routineCell.CallStack)
                 {
                     SelectRoutine(routineCell.Routine, routineCell.CallStack);
-                    form.SetSelectedRoutine(sender: this, routineCell.Routine, routineCell.CallStack);
+                    form.SetSelectedRoutine(sender: this, routineCell.Routine, routineCell.CallStack, memoryAccess: null);
                 }
                 return;
             }

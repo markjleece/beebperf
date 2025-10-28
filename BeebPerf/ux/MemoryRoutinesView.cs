@@ -20,20 +20,19 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Windows.Forms;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class MemoryView : DataGridView
+    internal class MemoryRoutinesView : DataGridView
     {
-        private const int AddressColumnIndex = 0;
-        private const int PageColumnIndex = 1;
-        private const int LabelColumnIndex = 2;
-        private const int ReadWriteCountColumnIndex = 3;
-        private const int ReadCountColumnIndex = 4;
-        private const int WriteCountColumnIndex = 5;
+        private const int RoutineColumnIndex = 0;
+        private const int ReadWriteCountColumnIndex = 1;
+        private const int ReadCountColumnIndex = 2;
+        private const int WriteCountColumnIndex = 3;
 
-        public MemoryView() : base()
+        public MemoryRoutinesView() : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
@@ -55,9 +54,7 @@ namespace BeebPerf.ux
             VirtualMode = true;
 
             AutoGenerateColumns = false;
-            Columns.Add("Address", "Address");
-            Columns.Add("Page", "Page");
-            Columns.Add("Label", "Label");
+            Columns.Add("Routine", "Routine");
             Columns.Add("ReadWriteCount", "Reads/Writes [#, %]");
             Columns.Add("ReadCount", "Reads [#, %]");
             Columns.Add("WriteCount", "Writes [#, %]");
@@ -70,33 +67,15 @@ namespace BeebPerf.ux
             SetColumnAlignment(ReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(WriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
-            SetColumnHeaderToolTip(AddressColumnIndex, "Address");
-            SetColumnHeaderToolTip(PageColumnIndex, "Page");
-            SetColumnHeaderToolTip(LabelColumnIndex, "Label");
+            SetColumnHeaderToolTip(RoutineColumnIndex, "Routine");
             SetColumnHeaderToolTip(ReadWriteCountColumnIndex, "Total number of memory reads or writes");
             SetColumnHeaderToolTip(ReadCountColumnIndex, "Total number of memory reads");
             SetColumnHeaderToolTip(WriteCountColumnIndex, "Total number of memory writes");
 
-            SetColumnSortMode(AddressColumnIndex, DataGridViewColumnSortMode.Automatic);
-            SetColumnSortMode(PageColumnIndex, DataGridViewColumnSortMode.NotSortable);
-            SetColumnSortMode(LabelColumnIndex, DataGridViewColumnSortMode.NotSortable);
+            SetColumnSortMode(RoutineColumnIndex, DataGridViewColumnSortMode.NotSortable);
             SetColumnSortMode(ReadWriteCountColumnIndex, DataGridViewColumnSortMode.Automatic);
             SetColumnSortMode(ReadCountColumnIndex, DataGridViewColumnSortMode.Automatic);
             SetColumnSortMode(WriteCountColumnIndex, DataGridViewColumnSortMode.Automatic);
-        }
-
-        public Dictionary<ushort, string> Labels
-        {
-            get
-            {
-                return _Labels;
-            }
-            set
-            {
-                _Labels = value;
-                _LabelAddresses = value.Keys.ToList();
-                _LabelAddresses.Sort();
-            }
         }
 
         private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
@@ -123,19 +102,19 @@ namespace BeebPerf.ux
             BeginInvoke(new MethodInvoker(() =>
             {
                 if (_SelectedMemoryAccess != null)
-                    SelectAddress(((MemoryAccess)_SelectedMemoryAccess).Address);
+                    SelectRoutine(((RoutineMemoryAccess)_SelectedMemoryAccess).Routine);
                 else
                     ClearSelection();
                 _SuppressSelectionChangedEvent--;
             }));
         }
 
-        public void SelectAddress(CanonicalAddress address)
+        public void SelectRoutine(Routine routine)
         {
             foreach (DataGridViewRow row in Rows)
             {
-                var memoryAccess = (MemoryAccess)row.Cells[0].Value!;
-                if (!address.Equals(memoryAccess.Address))
+                var memoryAccess = (RoutineMemoryAccess)row.Cells[0].Value!;
+                if (routine != memoryAccess.Routine)
                     continue;
 
                 _SelectedMemoryAccess = memoryAccess;
@@ -178,12 +157,12 @@ namespace BeebPerf.ux
             {
                 var memoryAccess = _MemoryAccesses[SelectedRows[0].Index];
                 _SelectedMemoryAccess = memoryAccess;
-                form.SetSelectedMemoryAddress(this, memoryAccess.Address);
+                form.SetSelectedRoutine(this, memoryAccess.Routine, callStack: null, memoryAccess);
             }
             else
             {
                 _SelectedMemoryAccess = null;
-                form.ClearSelectedMemoryAddress(this);
+                form.ClearSelectedRoutine(this);
             }
         }
 
@@ -198,13 +177,6 @@ namespace BeebPerf.ux
             bool ascending = Columns[e.ColumnIndex].HeaderCell.SortGlyphDirection != SortOrder.Ascending;
             switch (e.ColumnIndex)
             {
-                case AddressColumnIndex:
-                    if (ascending)
-                        _MemoryAccesses.Sort((a, b) => a.Address.CompareTo(b.Address));
-                    else
-                        _MemoryAccesses.Sort((a, b) => b.Address.CompareTo(a.Address));
-                    break;
-
                 case ReadWriteCountColumnIndex:
                     if (ascending)
                         _MemoryAccesses.Sort((a, b) => (a.ReadCount + a.WriteCount).CompareTo(b.ReadCount + b.WriteCount));
@@ -231,7 +203,7 @@ namespace BeebPerf.ux
             }
 
             // set glyphs
-            int[] sortColumnIndices = [AddressColumnIndex, ReadWriteCountColumnIndex, ReadCountColumnIndex, WriteCountColumnIndex];
+            int[] sortColumnIndices = [ReadWriteCountColumnIndex, ReadCountColumnIndex, WriteCountColumnIndex];
             foreach (int columnIndex in sortColumnIndices)
             {
                 if (columnIndex == e.ColumnIndex)
@@ -269,7 +241,7 @@ namespace BeebPerf.ux
             }
         }
 
-        public void SetMemoryAccesses(List<MemoryAccess> memoryAccesses)
+        public void SetMemoryAccesses(List<RoutineMemoryAccess> memoryAccesses)
         {
             RowCount = 0;
 
@@ -298,25 +270,22 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
+        public void Clear()
+        {
+            RowCount = 0;
+            _MemoryAccesses = [];
+            _SelectedMemoryAccess = null;
+            Invalidate();
+        }
+
         private void CellValueNeededFunc(object? sender, DataGridViewCellValueEventArgs e)
         {
-            if (e.RowIndex >= _MemoryAccesses.Count)
-                return;
-
             var memoryAccess = _MemoryAccesses[e.RowIndex];
 
             switch (e.ColumnIndex)
             {
-                case AddressColumnIndex:
-                    e.Value = memoryAccess.Address.ToString();
-                    break;
-
-                case PageColumnIndex:
-                    e.Value = memoryAccess.Address.Page.ToString();
-                    break;
-
-                case LabelColumnIndex:
-                    e.Value = FormatLabel(memoryAccess.Address.Address);
+                case RoutineColumnIndex:
+                    e.Value = $"{memoryAccess.Routine.StartAddress} {memoryAccess.Routine.Label}";
                     break;
 
                 case ReadWriteCountColumnIndex:
@@ -336,14 +305,6 @@ namespace BeebPerf.ux
             }
         }
 
-        public void Clear()
-        {
-            _MemoryAccesses = [];
-            _SelectedMemoryAccess = null;
-            RowCount = 0;
-            Invalidate();
-        }
-
         private void SortCompareFunc(object? sender, DataGridViewSortCompareEventArgs e)
         {
             var a = (MemoryAccess)e.CellValue1!;
@@ -351,11 +312,6 @@ namespace BeebPerf.ux
 
             switch (e.Column.Index)
             {
-                case AddressColumnIndex:
-                    e.SortResult = a.Address.CompareTo(b.Address);
-                    e.Handled = true;
-                    break;
-
                 case ReadWriteCountColumnIndex:
                     e.SortResult = (a.ReadCount + a.WriteCount) - (b.ReadCount + b.WriteCount);
                     e.Handled = true;
@@ -382,22 +338,6 @@ namespace BeebPerf.ux
             return $"{value:N0} ({percentage:F2}%)";
         }
 
-        private string FormatLabel(ushort address)
-        {
-            int index = _LabelAddresses.BinarySearch(address);
-            if (index >= 0)
-                return _Labels[address];
-            index = ~index - 1;
-            if (index >= 0)
-            {
-                ushort lowerAddress = _LabelAddresses[index];
-                int offset = address - lowerAddress;
-                if (offset < 0x100)
-                    return $"{_Labels[lowerAddress]}+{offset}";
-            }
-
-            return string.Empty;
-        }
         private void ScrollToTop()
         {
             if (Rows.Count > 0)
@@ -460,7 +400,7 @@ namespace BeebPerf.ux
                 Rectangle cellBounds, 
                 DataGridViewElementStates cellState)
             {
-                var memoryView = (MemoryView)DataGridView!;
+                var memoryView = (MemoryRoutinesView)DataGridView!;
                 var memoryAccess = memoryView._MemoryAccesses[rowIndex];
 
                 double ratio = ColumnIndex switch
@@ -506,12 +446,11 @@ namespace BeebPerf.ux
             }
         }
 
-        private MemoryAccess? _SelectedMemoryAccess;
+        private RoutineMemoryAccess? _SelectedMemoryAccess;
         private int _SuppressSelectionChangedEvent;
-        List<MemoryAccess> _MemoryAccesses = [];
+        List<RoutineMemoryAccess> _MemoryAccesses = [];
         private int _TotalReadCount;
         private int _TotalWriteCount;
         private Dictionary<ushort, string> _Labels = new();
-        private List<ushort> _LabelAddresses = new();
     }
 }

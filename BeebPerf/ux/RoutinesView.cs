@@ -114,7 +114,7 @@ namespace BeebPerf.ux
             Sort(Columns[SelfCPUColumnIndex], ListSortDirection.Descending);
             _SuppressSelectionChangedEvent--;
 
-            FirstDisplayedScrollingRowIndex = 0;
+            ScrollToTop();
             Invalidate();
         }
 
@@ -157,7 +157,7 @@ namespace BeebPerf.ux
             if (SelectedRows.Count == 1)
             {
                 _SelectedRoutine = (Routine)SelectedRows[0].Cells[0].Value!;
-                form.SetSelectedRoutine(sender: this, _SelectedRoutine, callStack: null);
+                form.SetSelectedRoutine(sender: this, _SelectedRoutine, callStack: null, memoryAccess: null);
             }
             else
             {
@@ -193,7 +193,7 @@ namespace BeebPerf.ux
             else
             {
                 ClearSelection();
-                FirstDisplayedScrollingRowIndex = 0;
+                ScrollToTop();
             }
         }
 
@@ -323,6 +323,12 @@ namespace BeebPerf.ux
             int interruptsCycleCount = elapsedCycleCount - inclusiveCycleCount;
             var percentage = double.Min(100.0 * interruptsCycleCount / elapsedCycleCount, 100.0);
             return $"{interruptsCycleCount:N0} ({percentage:F2}%)";
+        }
+
+        private void ScrollToTop()
+        {
+            if (Rows.Count > 0)
+                FirstDisplayedScrollingRowIndex = 0;
         }
 
         public class CellTemplate : DataGridViewTextBoxCell

@@ -64,7 +64,7 @@ namespace BeebPerf.ux
             flameGraphView = new FlameGraphView();
             memoryZeroPageCheckBox = new CheckBox();
             memoryView = new MemoryView();
-            memoryRoutinesView = new Panel();
+            memoryRoutinesView = new MemoryRoutinesView();
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -366,8 +366,8 @@ namespace BeebPerf.ux
             // 
             // memoryTabPage
             // 
-            memoryTabPage.Controls.Add(memoryContainer);
             memoryTabPage.Controls.Add(memoryRoutinesView);
+            memoryTabPage.Controls.Add(memoryContainer);
             memoryTabPage.Location = new Point(4, 34);
             memoryTabPage.Name = "memoryTabPage";
             memoryTabPage.Padding = new Padding(3);
@@ -482,7 +482,7 @@ namespace BeebPerf.ux
         private Panel memoryContainer;
         private CheckBox memoryZeroPageCheckBox;
         private MemoryView memoryView;
-        private Panel memoryRoutinesView;
+        private MemoryRoutinesView memoryRoutinesView;
         private Spinner spinner;
     }
 }

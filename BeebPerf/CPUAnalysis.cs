@@ -340,7 +340,7 @@ namespace BeebPerf
             }
             Debug.Assert(depth < 10);
 
-            _RootStackFrame = currentStackFrame;
+            RootStackFrame = currentStackFrame;
         }
 
         private model.StackFrame CreateStackFrame(CallType type, Routine routine, int startCycleCount, model.StackFrame? parent)
@@ -419,12 +419,12 @@ namespace BeebPerf
 
         private void CalculateMetrics()
         {
-            _RootStackFrame.ClearMetrics();
+            RootStackFrame.ClearMetrics();
 
             foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
-            CalculateMetrics(_RootStackFrame);
+            CalculateMetrics(RootStackFrame);
         }
 
         private int CalculateMetrics(model.StackFrame stackFrame)
@@ -526,8 +526,8 @@ namespace BeebPerf
         private void PopulateProgramCallTree()
         {
             Dictionary<CallStack, CallTreeNode> treeNodesByStack = new();
-            ProgramCallTree = new CallTreeNode(_RootStackFrame);
-            treeNodesByStack.Add(_RootStackFrame, ProgramCallTree);
+            ProgramCallTree = new CallTreeNode(RootStackFrame);
+            treeNodesByStack.Add(RootStackFrame, ProgramCallTree);
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
@@ -746,7 +746,7 @@ namespace BeebPerf
 
         private void IdentifyModifiedCode(List<InstructionMetrics> instructionMetrics)
         {
-            // construct diction that maps addresses to number of distinct instructions
+            // construct dictionary that maps addresses to number of distinct instructions
             var addressSlots = new Dictionary<CanonicalAddress, int>(instructionMetrics.Count);
             foreach (var instructionMetric in instructionMetrics)
             {
@@ -866,10 +866,10 @@ namespace BeebPerf
         public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
+        public model.StackFrame RootStackFrame = new();
 
         private Routine? _MaskableISR = null;
         private Routine? _NonMaskableISR = null;
-        private model.StackFrame _RootStackFrame = new();
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
         private Instruction[] _Instructions = [];
         private Dictionary<ushort, string> _Labels = [];
