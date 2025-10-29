@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System;
 using System.Drawing.Drawing2D;
 using static BeebPerf.MemoryAnalysis;
 
@@ -141,8 +142,8 @@ namespace BeebPerf.ux
             _MemoryAccess = memoryAccess;
             if (memoryAccess != null)
             {
-                SetColumnHeaderText(MemoryReadCountColumnIndex, $"{memoryAccess.Address} reads [#]");
-                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"{memoryAccess.Address} writes [#]");
+                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#, %]");
+                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#, %]");
             }
 
             SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
@@ -233,24 +234,28 @@ namespace BeebPerf.ux
                 TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
                 TotalCPUColumnIndex => FormatValue(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
                 ExecutionCountColumnIndex => FormatValue(instructionMetrics.ExecutionCount, _MaxExecutionCount),
-                MemoryReadCountColumnIndex => FormatMemoryReadCount(instructionMetrics.Instruction),
-                MemoryWriteCountColumnIndex => FormatMemoryWriteCount(instructionMetrics.Instruction),
+                MemoryReadCountColumnIndex => FormatMemoryReadCount(instructionMetrics),
+                MemoryWriteCountColumnIndex => FormatMemoryWriteCount(instructionMetrics),
                 _ => string.Empty };
             e.FormattingApplied = true;
         }
 
-        private string FormatMemoryReadCount(CoreInstruction instruction)
+        private string FormatMemoryReadCount(InstructionMetrics instructionMetrics)
         {
-            if (_MemoryAccess != null && _MemoryAccess.InstructionReadCounts.TryGetValue(instruction, out var count))
-                return $"{count:N0}";
-            return string.Empty;
+            int count = GetMemoryReadCount(instructionMetrics.Instruction);
+            if (count >= 0)
+                return FormatValue(count, instructionMetrics.ExecutionCount);
+            else
+                return string.Empty;
         }
 
-        private string FormatMemoryWriteCount(CoreInstruction instruction)
+        private string FormatMemoryWriteCount(InstructionMetrics instructionMetrics)
         {
-            if (_MemoryAccess != null && _MemoryAccess.InstructionWriteCounts.TryGetValue(instruction, out var count))
-                return $"{count:N0}";
-            return string.Empty;
+            int count = GetMemoryWriteCount(instructionMetrics.Instruction);
+            if (count >= 0)
+                return FormatValue(count, instructionMetrics.ExecutionCount);
+            else
+                return string.Empty;
         }
 
         private string FormatBranchCount(InstructionMetrics instructionMetrics)
@@ -265,6 +270,38 @@ namespace BeebPerf.ux
         {
             var percentage = double.Min(100.0 * value / range, 100);
             return $"{value:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatLabel(ushort address)
+        {
+            int index = _LabelAddresses.BinarySearch(address);
+            if (index >= 0)
+                return _Labels[address];
+            index = ~index - 1;
+            if (index >= 0)
+            {
+                ushort lowerAddress = _LabelAddresses[index];
+                int offset = address - lowerAddress;
+                if (offset < 0x100)
+                    return $"{_Labels[lowerAddress]}+{offset}";
+            }
+
+            return string.Empty;
+        }
+
+        private string FormatToolTipText(CoreInstruction instruction)
+        {
+            byte opcode = instruction.Opcode;
+
+            if (_InstructionSet!.AddressingMode(opcode) != InstructionSet.AddressMode.Immediate)
+                return string.Empty;
+
+            ushort operand = instruction.Operand;
+            int size = _InstructionSet!.Size(opcode);
+            string hex = (size == 2) ? $"{operand:X2}" : $"{operand:X4}";
+            string octal = Convert.ToString(operand, 8).PadLeft(size == 2 ? 3 : 6, '0');
+            string binary = Convert.ToString(operand, 2).PadLeft(size == 2 ? 8 : 16, '0');
+            return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
         }
 
         private string FormatInstruction(InstructionMetrics instructionMetrics)
@@ -336,23 +373,6 @@ namespace BeebPerf.ux
                 default:
                     return "???";
             }
-        }
-
-        private string FormatLabel(ushort address)
-        {
-            int index = _LabelAddresses.BinarySearch(address);
-            if (index >= 0)
-                return _Labels[address];
-            index = ~index - 1;
-            if (index >= 0)
-            {
-                ushort lowerAddress = _LabelAddresses[index];
-                int offset = address - lowerAddress;
-                if (offset < 0x100)
-                    return $"{_Labels[lowerAddress]}+{offset}";
-            }
-
-            return string.Empty;
         }
 
         private void SetColumnVisibility(int columnIndex, bool visibility)
@@ -439,6 +459,8 @@ namespace BeebPerf.ux
                     TotalCPUColumnIndex => (double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount,
                     ExecutionCountColumnIndex => (double)instructionMetrics.ExecutionCount / codeGridView._MaxExecutionCount,
                     BranchCountColumnIndex => (double)instructionMetrics.BranchCount / instructionMetrics.ExecutionCount,
+                    MemoryReadCountColumnIndex => (double)codeGridView.GetMemoryReadCount(instructionMetrics.Instruction) / instructionMetrics.ExecutionCount,
+                    MemoryWriteCountColumnIndex => (double)codeGridView.GetMemoryWriteCount(instructionMetrics.Instruction) / instructionMetrics.ExecutionCount,
                     _ => -1
                 };
 
@@ -655,19 +677,20 @@ namespace BeebPerf.ux
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
-        private string FormatToolTipText(CoreInstruction instruction)
+        private int GetMemoryReadCount(CoreInstruction instruction)
         {
-            byte opcode = instruction.Opcode;
+            if (_MemoryAccess != null && _MemoryAccess.InstructionReadCounts.TryGetValue(instruction, out var count))
+                return count;
+            else
+                return -1;
+        }
 
-            if (_InstructionSet!.AddressingMode(opcode) != InstructionSet.AddressMode.Immediate)
-                return string.Empty;
-
-            ushort operand = instruction.Operand;
-            int size = _InstructionSet!.Size(opcode);
-            string hex = (size == 2) ? $"{operand:X2}" : $"{operand:X4}";
-            string octal = Convert.ToString(operand, 8).PadLeft(size == 2 ? 3 : 6, '0');
-            string binary = Convert.ToString(operand, 2).PadLeft(size == 2 ? 8 : 16, '0');
-            return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
+        private int GetMemoryWriteCount(CoreInstruction instruction)
+        {
+            if (_MemoryAccess != null && _MemoryAccess.InstructionWriteCounts.TryGetValue(instruction, out var count))
+                return count;
+            else
+                return -1;
         }
 
         private class InstructionColors
