@@ -193,8 +193,6 @@ namespace BeebPerf.ux
             for (int rowIndex = _DataRows.Count - 1; rowIndex >= 0; rowIndex--)
             {
                 var treeNode = _DataRows[rowIndex];
-                if (treeNode == _SelectedDataRow)
-                    ClearSelection();
                 if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     CloseTreeNode(rowIndex, treeNode);
             }
