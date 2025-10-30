@@ -515,7 +515,8 @@ namespace BeebPerf
         {
             HotRoutines.Clear();
             foreach (var routine in RoutinesByAddress.Values)
-                HotRoutines.Add(routine);
+                if (routine.AggregateMetrics.ExecutionCount > 0)
+                    HotRoutines.Add(routine);
             HotRoutines.Sort((a, b) => b.AggregateMetrics.SelfCycleCount.CompareTo(a.AggregateMetrics.SelfCycleCount));
 
             int hotRoutineCount = int.Min(HotRoutines.Count, (int)float.Ceiling(0.05f * HotRoutines.Count)); 

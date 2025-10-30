@@ -276,7 +276,7 @@ namespace BeebPerf.ux
             {
                 var elements = routine.MetricsByStack.ToList();
                 elements.Sort((a, b) => (b.Value.InclusiveCycleCount - a.Value.InclusiveCycleCount));
-                callStack = elements.First().Key;
+                callStack = elements[0].Key;
             }
 
             _SelectedRoutine = routine;

@@ -127,11 +127,10 @@ namespace BeebPerf.ux
 
         protected override string OnFormatRowData(CallTreeNode treeNode, int columnIndex, int rowIndex)
         {
-            return columnIndex switch
-            {
-               RoutineColumnIndex =>$"{"".PadLeft(treeNode.HotPath ? 4 : 0)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}",
-                _ => FormatCountAndRange(treeNode, columnIndex),
-            };
+            if (columnIndex == RoutineColumnIndex)
+                return $"{"".PadLeft(treeNode.HotPath ? 4 : 0)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
+            else
+                return FormatCountAndRange(treeNode, columnIndex);
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
@@ -314,6 +313,10 @@ namespace BeebPerf.ux
 
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
             AddChildRows(rowIndex + 1, treeNode);
+            if (_SelectedDataRow != null)
+                SelectRow(_SelectedDataRow);
+            else
+                ClearSelection();
             RefreshExecutionCounts();
             AutoGrowColumns();
         }
@@ -322,6 +325,10 @@ namespace BeebPerf.ux
         {
             RemoveChildRows(rowIndex + 1, treeNode);
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
+            if (_SelectedDataRow != null)
+                SelectRow(_SelectedDataRow);
+            else
+                ClearSelection();
             RefreshExecutionCounts();
             AutoGrowColumns();
         }
@@ -346,6 +353,11 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
+                    if (childNode == _SelectedDataRow)
+                    {
+                        ClearSelection();
+                        OnSelectionChange(this, treeNode: null);
+                    }
                     _DataRows.RemoveAt(index);
                     DecrementRowCount();
                     RemoveChildRows(index, childNode);
