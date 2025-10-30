@@ -113,10 +113,7 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.DynamicCPUAnalysis);
 
                     // populate routines
-                    foreach (var routine in _CPUAnalysis.HotRoutines)
-                    {
-                        routinesView.AddRoutine(routine);
-                    }
+                    routinesView.SetRoutines(_CPUAnalysis.HotRoutines);
 
                     int maxExecutionCount = 0;
                     foreach (var routine in _CPUAnalysis.HotRoutines)
@@ -131,15 +128,12 @@ namespace BeebPerf.ux
                     // populate call tree
                     callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
 
-                    if (_CPUAnalysis!.ProgramCallTree != null)
-                        callTreeView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
+                    CallTreeNode?[] callTrees = [
+                        _CPUAnalysis!.ProgramCallTree,
+                        _CPUAnalysis!.NonMaskableInterruptCallTree,
+                        _CPUAnalysis!.MaskableInterruptCallTree];
 
-                    if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                        callTreeView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
-
-                    if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                        callTreeView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
-
+                    callTreeView.SetCallTrees(callTrees);
                     callTreeView.ShowHotPaths();
 
                     // populate flame graph

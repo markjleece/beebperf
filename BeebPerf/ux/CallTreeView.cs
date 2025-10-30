@@ -20,12 +20,10 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System.ComponentModel;
-using System.Diagnostics;
 
 namespace BeebPerf.ux
 {
-    internal class CallTreeView : DataGridView
+    internal class CallTreeView : GridView<CallTreeNode>
     {
         private const int RoutineColumnIndex = 0;
         private const int SelfCPUColumnIndex = 1;
@@ -34,25 +32,11 @@ namespace BeebPerf.ux
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
 
-        public CallTreeView() : base()
+        public CallTreeView() : base(
+            DataGridViewAutoSizeColumnsMode.DisplayedCells, 
+            System.Windows.Forms.SelectionMode.One)
         {
-            AllowUserToAddRows = false;
-            AllowUserToDeleteRows = false;
-            AllowUserToResizeColumns = false;
-            AllowUserToResizeRows = false;
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
-            BackgroundColor = DefaultCellStyle.BackColor;
-            CellBorderStyle = DataGridViewCellBorderStyle.None;
-            CellFormatting += CellFormattingFunc;
             KeyDown += KeyDownFunc;
-            MultiSelect = false;
-            ReadOnly = true;
-            RowHeadersVisible = false;
-            RowTemplate.DefaultCellStyle.NullValue = null;
-            SelectionChanged += SelectionChangedFunc;
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            SortCompare += SortCompareFunc;
-            Sorted += SortedFunc;
 
             AutoGenerateColumns = false;
             Columns.Add("Routine", "Routine");
@@ -62,9 +46,7 @@ namespace BeebPerf.ux
             Columns.Add("Interrupts", "Interrupts [#cycles, %]");
             Columns.Add("ExecutionCount", "Execution count");
 
-            var cellTemplate = new CellTemplate();
-            foreach (DataGridViewColumn column in Columns)
-                column.CellTemplate = cellTemplate;
+            SetCellTemplate(new CellTemplate());
 
             SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
@@ -79,33 +61,91 @@ namespace BeebPerf.ux
             SetColumnHeaderToolTip(InterruptsColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
             SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times this routine was executed");
 
-            Columns[RoutineColumnIndex]!.SortMode = DataGridViewColumnSortMode.NotSortable;
+            SetColumnSortMode(RoutineColumnIndex, DataGridViewColumnSortMode.NotSortable);
         }
 
-        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
+        public void ShowHotPaths()
         {
-            Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
-        }
-
-        private void SetColumnHeaderToolTip(int columnIndex, string text)
-        {
-            Columns[columnIndex].HeaderCell.ToolTipText = text;
-        }
-
-        protected override void OnHandleCreated(EventArgs e)
-        {
-            // ensure selection is correctly reflected when window is created
-            _SuppressSelectionChangedEvent++;
-            base.OnHandleCreated(e);
-
-            BeginInvoke(new MethodInvoker(() =>
+            CollapseTree();
+            SortColumn(TotalCPUColumnIndex, SortOrder.Descending);
+            for (int index = 0; index < _DataRows.Count; index++)
             {
-                if (_SelectedTreeNode != null)
-                    SelectRoutine(_SelectedTreeNode.Routine, _SelectedTreeNode.CallStack);
-                else
-                    ClearSelection();
-                _SuppressSelectionChangedEvent--;
-            }));
+                var treeNode = _DataRows[index];
+                bool hotChild = false;
+                foreach (var childNode in treeNode.Children)
+                    hotChild |= childNode.HotPath;
+                if (hotChild)
+                    OpenTreeNode(index, treeNode);
+            }
+            RefreshExecutionCounts();
+            ScrollToTop();
+            Invalidate();
+        }
+
+        public void SetCallTrees(CallTreeNode?[] callTrees)
+        {
+            var callTreeList = new List<CallTreeNode>();
+            foreach (var callTree in callTrees)
+                if (callTree != null)
+                    callTreeList.Add(callTree);
+            SetRowsData(callTreeList);
+            RefreshExecutionCounts();
+        }
+
+        protected override void OnSelectionChange(object? sender, CallTreeNode? treeNode)
+        {
+            var form = (BeebPerfForm)GetParentForm();
+            if (treeNode != null)
+                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack, memoryAccess: null);
+            else
+                form.ClearSelectedRoutine(sender: this);
+        }
+
+        protected override int OnSortCompare(CallTreeNode a, CallTreeNode b, int columnIndex)
+        {
+            var sortKey1 = GetSortKey(columnIndex, a);
+            var sortKey2 = GetSortKey(columnIndex, b);
+
+            int comparison = 0;
+            while (comparison == 0 && sortKey1.Count > 0 && sortKey2.Count > 0)
+            {
+                comparison = sortKey1.Pop() - sortKey2.Pop();
+            }
+
+            if (comparison == 0)
+            {
+                if (sortKey1.Count > 0)
+                    comparison = 1;
+                else if (sortKey2.Count > 0)
+                    comparison = -1;
+
+                if (Columns[columnIndex]!.HeaderCell.SortGlyphDirection == SortOrder.Ascending)
+                    comparison *= -1;
+            }
+
+            return comparison;
+        }
+
+        protected override string OnFormatRowData(CallTreeNode treeNode, int columnIndex, int rowIndex)
+        {
+            return columnIndex switch
+            {
+               RoutineColumnIndex =>$"{"".PadLeft(treeNode.HotPath ? 4 : 0)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}",
+                _ => FormatCountAndRange(treeNode, columnIndex),
+            };
+        }
+
+        protected override (int value, int range) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
+        {
+            return columnIndex switch
+            {
+                SelfCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.SelfCycleCount, range: TotalCycleCount),
+                TotalCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.InclusiveCycleCount, range: TotalCycleCount),
+                ElapsedCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.ElapsedCycleCount, range: TotalCycleCount),
+                InterruptsColumnIndex => (value: treeNode.Routine.AggregateMetrics.ElapsedCycleCount - treeNode.Routine.AggregateMetrics.InclusiveCycleCount, range: treeNode.Routine.AggregateMetrics.ElapsedCycleCount),
+                ExecutionCountColumnIndex => (value: treeNode.Routine.AggregateMetrics.ExecutionCount, range: MaxExecutionCount),
+                _ => (value: -1, range: 1)
+            };
         }
 
         public void SelectRoutine(Routine routine, CallStack callStack)
@@ -131,19 +171,13 @@ namespace BeebPerf.ux
 
             int rowIndex = 0;
             treeNode = treeNodeStack.Pop();
-            while (treeNode != null && rowIndex < Rows.Count)
+            while (treeNode != null && rowIndex < _DataRows.Count)
             {
-                if (treeNode == Rows[rowIndex].Cells[0].Value!)
+                if (treeNode == _DataRows[rowIndex])
                 {
                     if (treeNodeStack.Count == 0)
                     {
-                        _SelectedTreeNode = treeNode;
-
-                        _SuppressSelectionChangedEvent++;
-                        Rows[rowIndex].Selected = true;
-                        _SuppressSelectionChangedEvent--;
-
-                        FirstDisplayedScrollingRowIndex = Math.Clamp(rowIndex - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                        SelectRow(treeNode);
                         return;
                     }
 
@@ -155,128 +189,22 @@ namespace BeebPerf.ux
             }
         }
 
-        public new void ClearSelection()
-        {
-            _SelectedTreeNode = null;
-
-            _SuppressSelectionChangedEvent++;
-            base.ClearSelection();
-            _SuppressSelectionChangedEvent--;
-        }
-
-        private void SelectionChangedFunc(object? sender, EventArgs e)
-        {
-            if (_SuppressSelectionChangedEvent > 0)
-                return;
-
-            BeebPerfForm form = (BeebPerfForm)GetParentForm();
-            if (SelectedRows.Count == 1)
-            {
-                var treeNode = (CallTreeNode)SelectedRows[0].Cells[0].Value!;
-                _SelectedTreeNode = treeNode;
-                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack, memoryAccess: null);
-            }
-            else
-            {
-                _SelectedTreeNode = null;
-                form.ClearSelectedRoutine(sender: this);
-            }
-        }
-
-        protected override void OnColumnHeaderMouseClick(DataGridViewCellMouseEventArgs e)
-        {
-            _SuppressSelectionChangedEvent++;
-            base.OnColumnHeaderMouseClick(e);
-            _SuppressSelectionChangedEvent--;
-        }
-
-        private void SortedFunc(Object? sender, EventArgs args)
-        {
-            // ensure selection is correctly reflected after a sort
-            if (Rows.Count == 0)
-                return;
-
-            if (_SelectedTreeNode != null)
-            {
-                foreach (DataGridViewRow row in Rows)
-                {
-                    if (_SelectedTreeNode != (CallTreeNode)row.Cells[0].Value!)
-                        continue;
-
-                    FirstDisplayedScrollingRowIndex = Math.Clamp(row.Index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
-                    break;
-                }
-            }
-            else
-            {
-                ClearSelection();
-                ScrollToTop();
-            }
-        }
-
-        public void AddCallTree(CallTreeNode treeNode)
-        {
-            _SuppressSelectionChangedEvent++;
-            Rows.Add(treeNode, treeNode, treeNode, treeNode, treeNode, treeNode);
-            _SuppressSelectionChangedEvent--;
-            
-            ClearSelection();
-            RefreshExecutionCounts();
-        }
-
-        public void Clear()
-        {
-            _SelectedTreeNode = null;
-            Rows.Clear();
-        }
-
-        private Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
-        }
-
         public void CollapseTree()
         {
-            for (int rowIndex = Rows.Count - 1; rowIndex >= 0; rowIndex--)
+            for (int rowIndex = _DataRows.Count - 1; rowIndex >= 0; rowIndex--)
             {
-                var treeNode = (CallTreeNode)Rows[rowIndex].Cells[0].Value!;
-                if (treeNode == _SelectedTreeNode)
+                var treeNode = _DataRows[rowIndex];
+                if (treeNode == _SelectedDataRow)
                     ClearSelection();
                 if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     CloseTreeNode(rowIndex, treeNode);
             }
         }
 
-        public void ShowHotPaths()
-        {
-            CollapseTree();
-
-            _SuppressSelectionChangedEvent++;
-            Sort(Columns[TotalCPUColumnIndex], ListSortDirection.Descending);
-            _SuppressSelectionChangedEvent--;
-
-            for (int rowIndex = 0; rowIndex < Rows.Count; rowIndex++)
-            {
-                var treeNode = (CallTreeNode)Rows[rowIndex].Cells[0].Value!;
-                bool hotChild = false;
-                foreach (var childNode in treeNode.Children)
-                    hotChild |= childNode.HotPath;
-                if (hotChild)
-                    OpenTreeNode(rowIndex, treeNode);
-            }
-            RefreshExecutionCounts();
-            ScrollToTop();
-            Invalidate();
-        }
-
         private CallTreeNode? FindTreeNode(Routine routine, CallStack callStack)
         {
-            foreach (DataGridViewRow row in Rows)
+            foreach (var treeNode in _DataRows)
             {
-                var treeNode = (CallTreeNode)row.Cells[0].Value!;
                 if (treeNode.Parent == null)
                 {
                     var found = FindTreeNode(treeNode, routine, callStack);
@@ -303,75 +231,14 @@ namespace BeebPerf.ux
         public int TotalCycleCount;
         public int MaxExecutionCount;
 
-        private void CellFormattingFunc(object? sender, DataGridViewCellFormattingEventArgs e)
-        {
-            if (e.Value == null)
-                return;
-
-            var treeNode = (CallTreeNode)e.Value;
-
-            switch (e.ColumnIndex)
-            {
-                case RoutineColumnIndex:
-                    int padding = treeNode.HotPath ? 4 : 0;
-                    e.Value = $"{"".PadLeft(padding)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
-                    e.FormattingApplied = true;
-                    break;
-
-                case SelfCPUColumnIndex:
-                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.SelfCycleCount, treeNode.Depth);
-                    e.FormattingApplied = true;
-                    break;
-
-                case TotalCPUColumnIndex:
-                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.InclusiveCycleCount, treeNode.Depth);
-                    e.FormattingApplied = true;
-                    break;
-
-                case ElapsedCPUColumnIndex:
-                    e.Value = FormatCPUMetric(treeNode.CPUMetrics.ElapsedCycleCount, treeNode.Depth);
-                    e.FormattingApplied = true;
-                    break;
-
-                case InterruptsColumnIndex:
-                    e.Value = FormatInterruptsMetric(treeNode.CPUMetrics.ElapsedCycleCount, treeNode.CPUMetrics.InclusiveCycleCount);
-                    e.FormattingApplied = true;
-                    break;
-
-                case ExecutionCountColumnIndex:
-                    e.Value = $"{"".PadLeft(2*treeNode.Depth)}{treeNode.CPUMetrics.ExecutionCount:N0}";
-                    e.FormattingApplied = true;
-                    break;
-
-                default:
-                    break;
-            }
-        }
-
         private void RefreshExecutionCounts()
         {
             int maxExecutionCount = 0;
-            foreach (DataGridViewRow row in Rows)
-            {
-                var treeNode = (CallTreeNode)row.Cells[ExecutionCountColumnIndex].Value!;
+            foreach (var treeNode in _DataRows)
                 if (maxExecutionCount < treeNode.CPUMetrics.ExecutionCount)
                     maxExecutionCount = treeNode.CPUMetrics.ExecutionCount;
-            }
             MaxExecutionCount = maxExecutionCount;
             InvalidateColumn(ExecutionCountColumnIndex);
-        }
-
-        private string FormatCPUMetric(int value, int indent)
-        {
-            var percentage = double.Min(100.0 * value / TotalCycleCount, 100.0);
-            return $"{"".PadLeft(2*indent)}{value:N0} ({percentage:F2}%)";
-        }
-
-        private string FormatInterruptsMetric(int elapsedCycleCount, int inclusiveCycleCount)
-        {
-            int interruptsCycleCount = elapsedCycleCount - inclusiveCycleCount;
-            var percentage = double.Min(100.0 * interruptsCycleCount / elapsedCycleCount, 100.0);
-            return $"{interruptsCycleCount:N0} ({percentage:F2}%)";
         }
 
         private void KeyDownFunc(object? sender, KeyEventArgs e)
@@ -383,19 +250,15 @@ namespace BeebPerf.ux
                 e.KeyCode == Keys.Space)
             {
                 var cell = SelectedRows[0].Cells[0];
-                var treeNode = (CallTreeNode)cell.Value!;
+                var treeNode = _DataRows[cell.RowIndex];
                 if (treeNode.HasChildren)
                 {
                     if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Add || e.KeyCode == Keys.Space) &&
                         treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
-                    {
                         OpenTreeNode(cell.RowIndex, treeNode);
-                    }
                     else if ((e.KeyCode == Keys.Left || e.KeyCode == Keys.Subtract || e.KeyCode == Keys.Space) &&
                         treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
-                    {
                         CloseTreeNode(cell.RowIndex, treeNode);
-                    }
                 }
                 e.Handled = true;
             }
@@ -409,8 +272,8 @@ namespace BeebPerf.ux
                 hti.ColumnIndex == 0 &&
                 hti.RowIndex >= 0)
             {
+                var treeNode = _DataRows[hti.RowIndex];
                 var cell = Rows[hti.RowIndex].Cells[hti.ColumnIndex];
-                var treeNode = (CallTreeNode)cell.Value!;
                 if (treeNode.HasChildren)
                 {
                     int cellX = e.X - hti.ColumnX;
@@ -418,14 +281,10 @@ namespace BeebPerf.ux
                         (cellX <= (treeNode.Depth + 1) * cell.Size.Height))
                     {
                         if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
-                        {
                             OpenTreeNode(hti.RowIndex, treeNode);
-                        }
                         else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
-                        {
                             CloseTreeNode(hti.RowIndex, treeNode);
-                        }
-                        return; // we don't want the selection to change)
+                        return; // we don't want the selection to change
                     }
                 }
             }
@@ -456,6 +315,8 @@ namespace BeebPerf.ux
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
             AddChildRows(rowIndex + 1, treeNode);
             RefreshExecutionCounts();
+            AutoGrowColumns();
+            Invalidate();
         }
 
         private void CloseTreeNode(int rowIndex, CallTreeNode treeNode)
@@ -463,6 +324,8 @@ namespace BeebPerf.ux
             RemoveChildRows(rowIndex + 1, treeNode);
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
             RefreshExecutionCounts();
+            AutoGrowColumns();
+            Invalidate();
         }
 
         private int AddChildRows(int index, CallTreeNode treeNode)
@@ -471,10 +334,8 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
-                    _SuppressSelectionChangedEvent++;
-                    Rows.Insert(index++, childNode, childNode, childNode, childNode, childNode, childNode);
-                    _SuppressSelectionChangedEvent--;
-
+                    _DataRows.Insert(index++, childNode);
+                    IncrementRowCount();
                     index = AddChildRows(index, childNode);
                 }
             }
@@ -487,10 +348,8 @@ namespace BeebPerf.ux
             {
                 foreach (var childNode in treeNode.Children)
                 {
-                    _SuppressSelectionChangedEvent++;
-                    Rows.RemoveAt(index);
-                    _SuppressSelectionChangedEvent--;
-
+                    _DataRows.RemoveAt(index);
+                    DecrementRowCount();
                     RemoveChildRows(index, childNode);
                 }
             }
@@ -518,43 +377,7 @@ namespace BeebPerf.ux
             return sortKey;
         }
 
-        private void SortCompareFunc(object? sender, DataGridViewSortCompareEventArgs e)
-        {
-            var columnIndex = e.Column.Index;
-            var treeNode1 = (CallTreeNode)e.CellValue1!;
-            var treeNode2 = (CallTreeNode)e.CellValue2!;
-
-            var sortKey1 = GetSortKey(columnIndex, treeNode1);
-            var sortKey2 = GetSortKey(columnIndex, treeNode2);
-
-            int comparison = 0;
-            while (comparison == 0 && sortKey1.Count > 0 && sortKey2.Count > 0)
-            {
-                comparison = sortKey1.Pop() - sortKey2.Pop();
-            }
-
-            if (comparison == 0)
-            {
-                if (sortKey1.Count > 0)
-                    comparison = 1;
-                else if (sortKey2.Count > 0)
-                    comparison = -1;
-
-                if (Columns[columnIndex]!.HeaderCell.SortGlyphDirection == SortOrder.Descending)
-                    comparison *= -1;
-            }
-
-            e.SortResult = comparison;
-            e.Handled = true;
-        }
-
-        private void ScrollToTop()
-        {
-            if (Rows.Count > 0)
-                FirstDisplayedScrollingRowIndex = 0;
-        }
-
-        public class CellTemplate : DataGridViewTextBoxCell
+        public class CellTemplate : GridViewCellTemplate
         {
             protected override Size GetPreferredSize(Graphics graphics, DataGridViewCellStyle cellStyle, int rowIndex, Size constraintSize)
             {
@@ -562,23 +385,24 @@ namespace BeebPerf.ux
                 if (ColumnIndex == RoutineColumnIndex)
                 {
                     var callTreeDateView = (CallTreeView)DataGridView!;
-                    var treeNode = (CallTreeNode)callTreeDateView.Rows[rowIndex]!.Cells[ColumnIndex].Value!;
+                    var treeNode = callTreeDateView._DataRows[rowIndex];
                     size.Width += RoutineColumnIndent(treeNode.Depth);
                 }
                 return size;
             }
 
-            protected override void Paint(Graphics graphics,
-                                          Rectangle clipBounds,
-                                          Rectangle cellBounds,
-                                          int rowIndex,
-                                          DataGridViewElementStates cellState,
-                                          object? value,
-                                          object? formattedValue,
-                                          string? errorText,
-                                          DataGridViewCellStyle cellStyle,
-                                          DataGridViewAdvancedBorderStyle advancedBorderStyle,
-                                          DataGridViewPaintParts paintParts)
+            protected override void Paint(
+                Graphics graphics,
+                Rectangle clipBounds,
+                Rectangle cellBounds,
+                int rowIndex,
+                DataGridViewElementStates cellState,
+                object? value,
+                object? formattedValue,
+                string? errorText,
+                DataGridViewCellStyle cellStyle,
+                DataGridViewAdvancedBorderStyle advancedBorderStyle,
+                DataGridViewPaintParts paintParts)
             {
                 var backPaintParts = paintParts &
                     (DataGridViewPaintParts.Border |
@@ -590,10 +414,11 @@ namespace BeebPerf.ux
                     value, formattedValue, errorText,
                     cellStyle, advancedBorderStyle, backPaintParts);
 
-                var treeNode = (CallTreeNode)value!;
-
+                var callTreeView = (CallTreeView)DataGridView!;
                 if (ColumnIndex == RoutineColumnIndex)
                 {
+                    var treeNode = callTreeView._DataRows[rowIndex];
+
                     if (treeNode.HasChildren)
                         PaintOpenCloseTriangle(treeNode, graphics, cellBounds, cellState, cellStyle);
 
@@ -607,68 +432,12 @@ namespace BeebPerf.ux
                         cellBounds.Width - textIndent,
                         cellBounds.Height);
                 }
-                else 
-                {
-                    Debug.Assert(
-                        ColumnIndex == SelfCPUColumnIndex ||
-                        ColumnIndex == TotalCPUColumnIndex ||
-                        ColumnIndex == ElapsedCPUColumnIndex ||
-                        ColumnIndex == InterruptsColumnIndex ||
-                        ColumnIndex == ExecutionCountColumnIndex);
-                    PaintBar(treeNode, graphics, cellBounds, cellState);
-                }
 
                 var forePaintParts = paintParts & DataGridViewPaintParts.ContentForeground;
                 base.Paint(
                         graphics, clipBounds, cellBounds, rowIndex, cellState,
                         value, formattedValue, errorText,
                         cellStyle, advancedBorderStyle, forePaintParts);
-            }
-
-            private void PaintBar(
-                CallTreeNode treeNode, 
-                Graphics graphics, 
-                Rectangle cellBounds, 
-                DataGridViewElementStates cellState)
-            {
-                var callTreeDateView = (CallTreeView)DataGridView!;
-                (int num, int den) ratio = ColumnIndex switch
-                {
-                    SelfCPUColumnIndex => (treeNode.CPUMetrics.SelfCycleCount, callTreeDateView.TotalCycleCount),
-                    TotalCPUColumnIndex => (treeNode.CPUMetrics.InclusiveCycleCount, callTreeDateView.TotalCycleCount),
-                    ElapsedCPUColumnIndex => (treeNode.CPUMetrics.ElapsedCycleCount, callTreeDateView.TotalCycleCount),
-                    InterruptsColumnIndex => (treeNode.CPUMetrics.ElapsedCycleCount - treeNode.CPUMetrics.InclusiveCycleCount, treeNode.CPUMetrics.ElapsedCycleCount),
-                    ExecutionCountColumnIndex => (treeNode.CPUMetrics.ExecutionCount, callTreeDateView.MaxExecutionCount),
-                    _ => (0, 0)
-                };
-
-                int width = 0;
-                int margin = cellBounds.Height / 8;
-
-                if (ratio.num > ratio.den)
-                    ratio.num = ratio.den;
-
-                if (ratio.num > 0 && ratio.den > 0)
-                {
-                    int maxWidth = cellBounds.Width - (margin * 2);
-                    width = (int)double.Ceiling((double)ratio.num * maxWidth / ratio.den);
-                }
-
-                var rect = new Rectangle(
-                    cellBounds.Right - margin - width,
-                    cellBounds.Y + margin,
-                    width,
-                    cellBounds.Height - margin * 2);
-
-                bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
-
-                var color = Blend(
-                    callTreeDateView.DefaultCellStyle.BackColor,
-                    callTreeDateView.DefaultCellStyle.SelectionBackColor,
-                    selected ? 0.75 : 0.25);
-
-                using var brush = new SolidBrush(color);
-                graphics.FillRectangle(brush, rect);
             }
 
             private void PaintOpenCloseTriangle(
@@ -678,8 +447,6 @@ namespace BeebPerf.ux
                 DataGridViewElementStates cellState,
                 DataGridViewCellStyle cellStyle)
             {
-                Debug.Assert(treeNode.HasChildren);
-                
                 int cellHeight = cellBounds.Height;
                 int centerX = cellBounds.Left + RoutineColumnIndent(treeNode.Depth) - cellHeight / 2;
                 float centerY = cellBounds.Top + cellHeight / 2;
@@ -753,17 +520,6 @@ namespace BeebPerf.ux
                 var cellHeight = callTreeDateView.Rows[0].Height;
                 return cellHeight + (nodeDepth * cellHeight);
             }
-
-            private Color Blend(Color first, Color second, double ratio)
-            {
-                int r = (int)(first.R * (1 - ratio) + second.R * ratio);
-                int g = (int)(first.G * (1 - ratio) + second.G * ratio);
-                int b = (int)(first.B * (1 - ratio) + second.B * ratio);
-                return Color.FromArgb(r, g, b);
-            }
         }
-
-        private CallTreeNode? _SelectedTreeNode;
-        private int _SuppressSelectionChangedEvent;
     }
 }

@@ -20,13 +20,12 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System;
 using System.Drawing.Drawing2D;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class CodeView : DataGridView
+    internal class CodeView : GridView<object>
     {
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
@@ -38,24 +37,10 @@ namespace BeebPerf.ux
         private const int BranchCountColumnIndex = 7;
         private const int ExecutionCountColumnIndex = 8;
 
-        public CodeView() : base()
+        public CodeView() : base(
+            DataGridViewAutoSizeColumnsMode.AllCells, 
+            System.Windows.Forms.SelectionMode.None)
         {
-            AllowUserToAddRows = false;
-            AllowUserToDeleteRows = false;
-            AllowUserToResizeColumns = false;
-            AllowUserToResizeRows = false;
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
-            BackgroundColor = DefaultCellStyle.BackColor;
-            CellBorderStyle = DataGridViewCellBorderStyle.None;
-            CellEnter += CellEnterFunc;
-            CellFormatting += CellFormattingFunc;
-            MultiSelect = false;
-            ReadOnly = true;
-            RowHeadersVisible = false;
-            RowTemplate.DefaultCellStyle.NullValue = null;
-            SelectionChanged += SelectionChangedFunc;
-
-            AutoGenerateColumns = false;
             Columns.Add("Address", "Address");
             Columns.Add("Label", "Label");
             Columns.Add("Instruction", "Instruction");
@@ -65,6 +50,8 @@ namespace BeebPerf.ux
             Columns.Add("TotalCPU", "Total CPU [#cycles, %");
             Columns.Add("BranchCount", "Branch count [#, %]");
             Columns.Add("ExecutionCount", "Execution count [#, %]");
+
+            SetCellTemplate(new CellTemplate());
 
             SetColumnAlignment(MemoryReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(MemoryWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
@@ -88,14 +75,6 @@ namespace BeebPerf.ux
             SetColumnVisibility(MemoryReadCountColumnIndex, false);
             SetColumnVisibility(MemoryWriteCountColumnIndex, false);
 
-            var cellRenderer = new CallTreeCellRenderer();
-            foreach (DataGridViewColumn column in Columns)
-            {
-                column.CellTemplate = cellRenderer;
-                column.SortMode = DataGridViewColumnSortMode.NotSortable;
-            }
-
-            _SelectionBackColor = DefaultCellStyle.SelectionBackColor;
             _InstructionStyle = new InstructionColors()
             {
                 MnemonicColor = Color.DarkGreen,
@@ -103,23 +82,64 @@ namespace BeebPerf.ux
                 LabelColor = Color.Black,
                 PunctuationColor = Color.DarkSlateGray
             };
-
-            DefaultCellStyle.SelectionBackColor = DefaultCellStyle.BackColor;
-            DefaultCellStyle.SelectionForeColor = DefaultCellStyle.ForeColor;
         }
 
-        private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
+        protected override void OnSelectionChange(object? sender, object? obj)
         {
-            ClearSelection();
         }
 
-        private void SelectionChangedFunc(object? sender, EventArgs e)
+        protected override int OnSortCompare(object a, object b, int columnIndex)
         {
-            ClearSelection();
+            return 0;
         }
 
-        class Ellipses {};
-        class FallThrough {};
+        protected override string OnFormatRowData(object obj, int columnIndex, int rowIndex)
+        {
+            if (obj is not InstructionMetrics)
+                return string.Empty;
+
+            var instructionMetrics = (InstructionMetrics)obj;
+            if (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex)
+            {
+                // is duplicate?
+                if (rowIndex > 0)
+                {
+                    var valueAbove = _DataRows[rowIndex - 1];
+                    if (valueAbove is InstructionMetrics)
+                    {
+                        var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
+                        if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
+                            return string.Empty;
+                    }
+                }
+            }
+
+            return columnIndex switch
+            {
+                AddressColumnIndex => instructionMetrics.Instruction.OpcodeAddress.ToString(),
+                LabelColumnIndex => FormatLabel(instructionMetrics.Instruction.OpcodeAddress.Address, withOffsets: false),
+                InstructionColumnIndex => FormatInstruction(instructionMetrics),
+                TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
+                _ => FormatCountAndRange(obj, columnIndex)
+            };
+        }
+
+        protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)
+        {
+            if (obj is not InstructionMetrics)
+                return (-1, 1);
+
+            var instructionMetrics = (InstructionMetrics)obj;
+            return columnIndex switch
+            {
+                TotalCPUColumnIndex => (value: instructionMetrics.InclusiveCycleCount, range: _TotalCycleCount),
+                ExecutionCountColumnIndex => (value: instructionMetrics.ExecutionCount, range: _MaxExecutionCount),
+                BranchCountColumnIndex => (value: instructionMetrics.BranchCount, range: instructionMetrics.ExecutionCount),
+                MemoryReadCountColumnIndex => (value: GetMemoryReadCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
+                MemoryWriteCountColumnIndex => (value: GetMemoryWriteCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
+                _ => (value: -1, range: 1)
+            };
+        }
 
         public void Initialize(
             Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
@@ -129,15 +149,16 @@ namespace BeebPerf.ux
         {
             _CalculateInstructionMetrics = calculateInstructionMetrics;
             _RoutinesByAddress = routinesByAddress;
-            _Labels = labels;
-            _LabelAddresses = labels!.Keys.ToList();
-            _LabelAddresses.Sort();
             _InstructionSet = instructionSet;
+            Labels = labels;
         }
+
+        class Ellipses { };
+        class FallThrough { };
 
         public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
         {
-            Rows.Clear();
+            var lines = new List<Object>();
 
             _MemoryAccess = memoryAccess;
             if (memoryAccess != null)
@@ -160,19 +181,19 @@ namespace BeebPerf.ux
                 {
                     // add ellipses
                     if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        Rows.Add(ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses, ellipses);
+                        lines.Add(ellipses);
 
                     // add fall-through
                     if (_RoutinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
                         if (routine_ != routine)
-                            Rows.Add(fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough, fallThrough);
+                            lines.Add(fallThrough);
 
                     // add instruction metrics
-                    Rows.Add(obj, obj, obj, obj, obj, obj, obj, obj, obj);
+                    lines.Add(obj);
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
 
                     // set tool-tip text
-                    Rows[^1].Cells[InstructionColumnIndex].ToolTipText = FormatToolTipText(obj.Instruction);
+//                    Rows[^1].Cells[InstructionColumnIndex].ToolTipText = FormatToolTipText(obj.Instruction);
                 }
             }
 
@@ -186,107 +207,16 @@ namespace BeebPerf.ux
             }
             _TotalCycleCount = totalCycles;
             _MaxExecutionCount = maxExecutionCount;
+
+            SetRowsData(lines);
         }
 
-        public void Clear()
+        public new void Clear()
         {
             SetColumnVisibility(MemoryReadCountColumnIndex, false);
             SetColumnVisibility(MemoryWriteCountColumnIndex, false);
             _MemoryAccess = null;
-            Rows.Clear();
-            Invalidate();
-        }
-
-        private void CellFormattingFunc(object? sender, DataGridViewCellFormattingEventArgs e)
-        {
-            if (e.Value == null)
-                return;
-
-            if (e.Value is not InstructionMetrics)
-            {
-                e.Value = string.Empty;
-                e.FormattingApplied = true;
-                return;
-            }
-
-            var instructionMetrics = (InstructionMetrics)e.Value!;
-            if (e.RowIndex > 0 && (e.ColumnIndex == AddressColumnIndex || e.ColumnIndex == LabelColumnIndex))
-            {
-                // is duplicate?
-                var valueAbove = Rows[e.RowIndex - 1].Cells[e.ColumnIndex].Value;
-                if (valueAbove is InstructionMetrics)
-                {
-                    var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
-                    if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
-                    {
-                        e.Value = string.Empty;
-                        e.FormattingApplied = true;
-                        return;
-                    }
-                }
-            }
-
-            e.Value = e.ColumnIndex switch {
-                AddressColumnIndex => instructionMetrics.Instruction.OpcodeAddress.ToString(),
-                LabelColumnIndex => _Labels.TryGetValue(instructionMetrics.Instruction.OpcodeAddress.Address, out var label) ? label : string.Empty,
-                InstructionColumnIndex => FormatInstruction(instructionMetrics),
-                BranchCountColumnIndex => FormatBranchCount(instructionMetrics),
-                TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
-                TotalCPUColumnIndex => FormatValue(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
-                ExecutionCountColumnIndex => FormatValue(instructionMetrics.ExecutionCount, _MaxExecutionCount),
-                MemoryReadCountColumnIndex => FormatMemoryReadCount(instructionMetrics),
-                MemoryWriteCountColumnIndex => FormatMemoryWriteCount(instructionMetrics),
-                _ => string.Empty };
-            e.FormattingApplied = true;
-        }
-
-        private string FormatMemoryReadCount(InstructionMetrics instructionMetrics)
-        {
-            int count = GetMemoryReadCount(instructionMetrics.Instruction);
-            if (count >= 0)
-                return FormatValue(count, instructionMetrics.ExecutionCount);
-            else
-                return string.Empty;
-        }
-
-        private string FormatMemoryWriteCount(InstructionMetrics instructionMetrics)
-        {
-            int count = GetMemoryWriteCount(instructionMetrics.Instruction);
-            if (count >= 0)
-                return FormatValue(count, instructionMetrics.ExecutionCount);
-            else
-                return string.Empty;
-        }
-
-        private string FormatBranchCount(InstructionMetrics instructionMetrics)
-        {
-            if (_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
-                return FormatValue(instructionMetrics.BranchCount, instructionMetrics.ExecutionCount);
-            else
-                return string.Empty;
-        }
-
-        private string FormatValue(int value, int range)
-        {
-            var percentage = double.Min(100.0 * value / range, 100);
-            return $"{value:N0} ({percentage:F2}%)";
-        }
-
-        private string FormatLabel(ushort address)
-        {
-            int index = _LabelAddresses.BinarySearch(address);
-            if (index >= 0)
-                return _Labels[address];
-            index = ~index - 1;
-            if (index >= 0)
-            {
-                ushort lowerAddress = _LabelAddresses[index];
-                int offset = address - lowerAddress;
-                if (offset < 0x100)
-                    return $"{_Labels[lowerAddress]}+{offset}";
-            }
-
-            return string.Empty;
+            base.Clear();
         }
 
         private string FormatToolTipText(CoreInstruction instruction)
@@ -330,7 +260,7 @@ namespace BeebPerf.ux
 
                 if (addressMode != InstructionSet.AddressMode.Immediate)
                 {
-                    string label = FormatLabel(operand);
+                    string label = FormatLabel(operand, withOffsets: true);
                     if (label.Length > 0)
                         formattedOperand = $"{label} ({formattedOperand})";
                 }
@@ -375,27 +305,7 @@ namespace BeebPerf.ux
             }
         }
 
-        private void SetColumnVisibility(int columnIndex, bool visibility)
-        {
-            Columns[columnIndex].Visible = visibility;
-        }
-
-        private void SetColumnHeaderText(int columnIndex, string text)
-        {
-            Columns[columnIndex].HeaderText = text;
-        }
-
-        private void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
-        {
-            Columns[columnIndex].DefaultCellStyle.Alignment = alignment;
-        }
-
-        private void SetColumnHeaderToolTip(int columnIndex, string text)
-        {
-            Columns[columnIndex].HeaderCell.ToolTipText = text;
-        }
-
-        public class CallTreeCellRenderer : DataGridViewTextBoxCell
+        public class CellTemplate : GridViewCellTemplate
         {
             protected override void Paint(
                 Graphics graphics,
@@ -410,26 +320,30 @@ namespace BeebPerf.ux
                 DataGridViewAdvancedBorderStyle advancedBorderStyle,
                 DataGridViewPaintParts paintParts)
             {
-                PaintBackground(graphics, cellBounds, value);
-                if (value! is InstructionMetrics)
+                var codeGridView = (CodeView)DataGridView!;
+                var obj = (object)codeGridView._DataRows[rowIndex];
+                PaintBackground(graphics, cellBounds, rowIndex, cellState, obj);
+                if (obj is InstructionMetrics)
                     PaintInstruction(
-                        graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
+                        graphics, clipBounds, cellBounds, rowIndex, cellState, obj, formattedValue, errorText,
                         cellStyle, advancedBorderStyle, paintParts);
-                else if (value! is Ellipses)
+                else if (obj is Ellipses)
                     PaintEllipses(graphics, cellBounds, cellStyle);
-                else if (value! is FallThrough)
+                else if (obj is FallThrough)
                     PaintFallThrough(graphics, rowIndex, cellStyle);
             }
 
             private void PaintBackground(
                 Graphics graphics,
                 Rectangle cellBounds,
-                object? value)
+                int rowIndex,
+                DataGridViewElementStates cellState,
+                object value)
             {
                 var codeGridView = (CodeView)DataGridView!;
                 var backColor = codeGridView.DefaultCellStyle.BackColor;
 
-                if (value! is InstructionMetrics)
+                if (value is InstructionMetrics)
                 {
                     var instructionMetrics = (InstructionMetrics)value!;
                     double hotness = Math.Clamp((double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount, 0.0, 1.0);
@@ -440,48 +354,8 @@ namespace BeebPerf.ux
                 using var brush = new SolidBrush(backColor);
                 graphics.FillRectangle(brush, cellBounds);
 
-                if (value! is InstructionMetrics)
-                {
-                    var instructionMetrics = (InstructionMetrics)value!;
-                    DrawBar(instructionMetrics, codeGridView, graphics, cellBounds, backColor);
-                }
-            }
-
-            private void DrawBar(
-                InstructionMetrics instructionMetrics,
-                CodeView codeGridView,
-                Graphics graphics,
-                Rectangle cellBounds,
-                Color backColor)
-            {
-                double ratio = ColumnIndex switch
-                {
-                    TotalCPUColumnIndex => (double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount,
-                    ExecutionCountColumnIndex => (double)instructionMetrics.ExecutionCount / codeGridView._MaxExecutionCount,
-                    BranchCountColumnIndex => (double)instructionMetrics.BranchCount / instructionMetrics.ExecutionCount,
-                    MemoryReadCountColumnIndex => (double)codeGridView.GetMemoryReadCount(instructionMetrics.Instruction) / instructionMetrics.ExecutionCount,
-                    MemoryWriteCountColumnIndex => (double)codeGridView.GetMemoryWriteCount(instructionMetrics.Instruction) / instructionMetrics.ExecutionCount,
-                    _ => -1
-                };
-
-                if (ratio < 0)
-                    return;
-                else if (ratio > 1.0)
-                    ratio = 1.0;
-
-                int margin = cellBounds.Height / 8;
-                int maxWidth = cellBounds.Width - (margin * 2);
-                int width = (int)double.Ceiling((double)ratio * maxWidth);
-
-                var rect = new Rectangle(
-                    cellBounds.Right - margin - width,
-                    cellBounds.Y + margin,
-                    width,
-                    cellBounds.Height - margin * 2);
-
-                var color = Blend(backColor, codeGridView._SelectionBackColor, 0.25);
-                using var brush = new SolidBrush(color);
-                graphics.FillRectangle(brush, rect);
+                if (value is InstructionMetrics)
+                    DrawBar(rowIndex, graphics, cellBounds, backColor, cellState);
             }
 
             private void PaintInstruction(
@@ -539,7 +413,7 @@ namespace BeebPerf.ux
 
                     if (addressMode != InstructionSet.AddressMode.Immediate)
                     {
-                        string label = codeGridView.FormatLabel(operand);
+                        string label = codeGridView.FormatLabel(operand, withOffsets: true);
                         if (label.Length > 0)
                         {
                             segments.Insert(1, new Segment { Text = label, Color = colors.LabelColor });
@@ -666,14 +540,6 @@ namespace BeebPerf.ux
                 public Color Color;
             };
 
-            private Color Blend(Color first, Color second, double ratio)
-            {
-                int r = (int)(first.R * (1 - ratio) + second.R * ratio);
-                int g = (int)(first.G * (1 - ratio) + second.G * ratio);
-                int b = (int)(first.B * (1 - ratio) + second.B * ratio);
-                return Color.FromArgb(r, g, b);
-            }
-
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
@@ -701,11 +567,8 @@ namespace BeebPerf.ux
             public Color PunctuationColor;
         }
 
-        private Dictionary<ushort, string> _Labels = new();
-        private List<ushort> _LabelAddresses = new();
         private InstructionSet? _InstructionSet;
         private InstructionColors _InstructionStyle;
-        private Color _SelectionBackColor;
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
         private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
