@@ -74,7 +74,6 @@ namespace BeebPerf.ux
         {
             SortColumn(SelfCPUColumnIndex, SortOrder.Descending);
             ScrollToTop();
-            Invalidate();
         }
 
         protected override void OnSelectionChange(object? sender, Routine? routine)

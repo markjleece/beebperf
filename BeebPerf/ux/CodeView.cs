@@ -84,15 +84,6 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override void OnSelectionChange(object? sender, object? obj)
-        {
-        }
-
-        protected override int OnSortCompare(object a, object b, int columnIndex)
-        {
-            return 0;
-        }
-
         protected override string OnFormatRowData(object obj, int columnIndex, int rowIndex)
         {
             if (obj is not InstructionMetrics)
@@ -193,7 +184,6 @@ namespace BeebPerf.ux
                     nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
 
                     // set tool-tip text
-//                    Rows[^1].Cells[InstructionColumnIndex].ToolTipText = FormatToolTipText(obj.Instruction);
                 }
             }
 
@@ -209,6 +199,7 @@ namespace BeebPerf.ux
             _MaxExecutionCount = maxExecutionCount;
 
             SetRowsData(lines);
+            SetToolTips(lines);
         }
 
         public new void Clear()
@@ -219,7 +210,19 @@ namespace BeebPerf.ux
             base.Clear();
         }
 
-        private string FormatToolTipText(CoreInstruction instruction)
+        private void SetToolTips(List<Object> lines)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i] is InstructionMetrics)
+                {
+                    var metrics = (InstructionMetrics)lines[i];
+                    Rows[i].Cells[InstructionColumnIndex].ToolTipText = FormatToolTip(metrics.Instruction);
+                }
+            }
+        }
+
+        private string FormatToolTip(CoreInstruction instruction)
         {
             byte opcode = instruction.Opcode;
 

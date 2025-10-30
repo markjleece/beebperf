@@ -75,7 +75,6 @@ namespace BeebPerf.ux
             SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
         }
 
-
         protected override void OnSelectionChange(object? sender, RoutineMemoryAccess? selection)
         {
             var form = (BeebPerfForm)GetParentForm();

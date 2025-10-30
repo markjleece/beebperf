@@ -296,6 +296,9 @@ namespace BeebPerf.ux
 
             if (sender != flameGraphView)
                 flameGraphView.SelectRoutine(routine, callStack);
+
+            if (sender != memoryRoutinesView)
+                memoryRoutinesView.ClearSelection();
         }
 
         public void ClearSelectedRoutine(Object? sender)

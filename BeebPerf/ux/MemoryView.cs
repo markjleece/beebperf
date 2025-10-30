@@ -19,7 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.CodeDom;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -92,7 +91,6 @@ namespace BeebPerf.ux
             else
                 form.ClearSelectedMemoryAddress(this);
         }
-
 
         protected override int OnSortCompare(MemoryAccess a, MemoryAccess b, int columnIndex)
         {

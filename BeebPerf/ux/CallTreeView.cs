@@ -79,7 +79,6 @@ namespace BeebPerf.ux
             }
             RefreshExecutionCounts();
             ScrollToTop();
-            Invalidate();
         }
 
         public void SetCallTrees(CallTreeNode?[] callTrees)
@@ -316,7 +315,6 @@ namespace BeebPerf.ux
             AddChildRows(rowIndex + 1, treeNode);
             RefreshExecutionCounts();
             AutoGrowColumns();
-            Invalidate();
         }
 
         private void CloseTreeNode(int rowIndex, CallTreeNode treeNode)
@@ -325,7 +323,6 @@ namespace BeebPerf.ux
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
             RefreshExecutionCounts();
             AutoGrowColumns();
-            Invalidate();
         }
 
         private int AddChildRows(int index, CallTreeNode treeNode)

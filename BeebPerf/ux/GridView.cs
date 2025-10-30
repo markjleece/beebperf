@@ -23,7 +23,7 @@ using System.Diagnostics;
 
 namespace BeebPerf.ux
 {
-    internal abstract class GridView<ROW_DATA_TYPE> : DataGridView 
+    internal class GridView<ROW_DATA_TYPE> : DataGridView 
         where ROW_DATA_TYPE : class
     {
         public GridView(
@@ -55,13 +55,24 @@ namespace BeebPerf.ux
             Scroll += ScrollFunc;
         }
 
-        protected abstract void OnSelectionChange(object? sender, ROW_DATA_TYPE? rowData);
+        protected virtual void OnSelectionChange(object? sender, ROW_DATA_TYPE? rowData)
+        {
+        }
 
-        protected abstract int OnSortCompare(ROW_DATA_TYPE a, ROW_DATA_TYPE b, int columnIndex);
+        protected virtual int OnSortCompare(ROW_DATA_TYPE a, ROW_DATA_TYPE b, int columnIndex)
+        {
+            return 0;
+        }
 
-        protected abstract string OnFormatRowData(ROW_DATA_TYPE rowData, int columnIndex, int rowIndex);
+        protected virtual string OnFormatRowData(ROW_DATA_TYPE rowData, int columnIndex, int rowIndex)
+        {
+            return string.Empty;
+        }
 
-        protected abstract (int value, int range) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex);
+        protected virtual (int value, int range) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
+        {
+            return (-1, 1);
+        }
 
         protected void SetCellTemplate(GridViewCellTemplate cellTemplate)
         {
@@ -165,7 +176,10 @@ namespace BeebPerf.ux
                 return;
 
             if (_SelectionMode == System.Windows.Forms.SelectionMode.None)
+            {
                 ClearSelection();
+                return;
+            }
 
             var form = (BeebPerfForm)GetParentForm();
             if (SelectedRows.Count == 1)
@@ -219,7 +233,6 @@ namespace BeebPerf.ux
             }
 
             AutoGrowColumns();
-            Invalidate();
         }
 
         protected void AutoGrowColumns()
@@ -227,6 +240,7 @@ namespace BeebPerf.ux
             foreach (DataGridViewColumn column in Columns)
                 column.MinimumWidth = column.Width;
             AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            Invalidate();
         }
 
         private void ScrollFunc(object? sender, ScrollEventArgs e)
@@ -327,6 +341,7 @@ namespace BeebPerf.ux
         {
             if (Rows.Count > 0)
                 FirstDisplayedScrollingRowIndex = 0;
+            Invalidate();
         }
 
         public class GridViewCellTemplate : DataGridViewTextBoxCell
