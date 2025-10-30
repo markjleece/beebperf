@@ -53,6 +53,9 @@ namespace BeebPerf.ux
 
             SetCellTemplate(new CellTemplate());
 
+            foreach (DataGridViewColumn column in Columns)
+                column.SortMode = DataGridViewColumnSortMode.NotSortable;
+
             SetColumnAlignment(MemoryReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(MemoryWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TailCallColumnIndex, DataGridViewContentAlignment.MiddleCenter);
@@ -84,24 +87,98 @@ namespace BeebPerf.ux
             };
         }
 
+        public void Initialize(
+            Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
+            Dictionary<CanonicalAddress, Routine> routinesByAddress,
+            Dictionary<ushort, string> labels,
+            InstructionSet instructionSet)
+        {
+            _CalculateInstructionMetrics = calculateInstructionMetrics;
+            _RoutinesByAddress = routinesByAddress;
+            _InstructionSet = instructionSet;
+            Labels = labels;
+        }
+
+        public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
+        {
+            // memory access
+            _MemoryAccess = memoryAccess;
+            if (memoryAccess != null)
+            {
+                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#, %]");
+                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#, %]");
+            }
+
+            SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
+            SetColumnVisibility(MemoryWriteCountColumnIndex, memoryAccess != null);
+
+            // get instruction metrics
+            var instructionMetrics = _CalculateInstructionMetrics!.Invoke(routine, callStack);
+
+            // populate view data
+            var dataRows = new List<Object>(instructionMetrics.Count);
+            if (instructionMetrics.Count > 0)
+            {
+                var ellipses = new Ellipses();
+                var fallThrough = new FallThrough();
+
+                CanonicalAddress nextAddress = instructionMetrics[0].Instruction.OpcodeAddress;
+                foreach (var obj in instructionMetrics)
+                {
+                    // add ellipses
+                    if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
+                        dataRows.Add(ellipses);
+
+                    // add fall-through
+                    if (_RoutinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
+                        if (routine_ != routine)
+                            dataRows.Add(fallThrough);
+
+                    // add instruction metrics
+                    dataRows.Add(obj);
+
+                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
+                }
+            }
+
+            // sum cycles and find max
+            int totalCycles = 0;
+            int maxExecutionCount = 0;
+            foreach (var instructionMetric in instructionMetrics)
+            {
+                totalCycles += instructionMetric.InclusiveCycleCount;
+                maxExecutionCount = Math.Max(maxExecutionCount, instructionMetric.ExecutionCount);
+            }
+            _TotalCycleCount = totalCycles;
+            _MaxExecutionCount = maxExecutionCount;
+
+            SetRowsData(dataRows);
+            SetToolTips(dataRows);
+        }
+
+        public new void Clear()
+        {
+            SetColumnVisibility(MemoryReadCountColumnIndex, false);
+            SetColumnVisibility(MemoryWriteCountColumnIndex, false);
+            _MemoryAccess = null;
+            base.Clear();
+        }
+
         protected override string OnFormatRowData(object obj, int columnIndex, int rowIndex)
         {
             if (obj is not InstructionMetrics)
                 return string.Empty;
 
             var instructionMetrics = (InstructionMetrics)obj;
-            if (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex)
+            if (rowIndex > 0 && (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex))
             {
                 // is duplicate?
-                if (rowIndex > 0)
+                var valueAbove = _DataRows[rowIndex - 1];
+                if (valueAbove is InstructionMetrics)
                 {
-                    var valueAbove = _DataRows[rowIndex - 1];
-                    if (valueAbove is InstructionMetrics)
-                    {
-                        var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
-                        if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
-                            return string.Empty;
-                    }
+                    var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
+                    if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
+                        return string.Empty;
                 }
             }
 
@@ -118,7 +195,7 @@ namespace BeebPerf.ux
         protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)
         {
             if (obj is not InstructionMetrics)
-                return (-1, 1);
+                return (value: -1, range: 1);
 
             var instructionMetrics = (InstructionMetrics)obj;
             return columnIndex switch
@@ -138,84 +215,6 @@ namespace BeebPerf.ux
                 return instructionMetrics.BranchCount;
             else
                 return -1;
-        }
-
-        public void Initialize(
-            Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
-            Dictionary<CanonicalAddress, Routine> routinesByAddress,
-            Dictionary<ushort, string> labels,
-            InstructionSet instructionSet)
-        {
-            _CalculateInstructionMetrics = calculateInstructionMetrics;
-            _RoutinesByAddress = routinesByAddress;
-            _InstructionSet = instructionSet;
-            Labels = labels;
-        }
-
-        class Ellipses { };
-        class FallThrough { };
-
-        public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
-        {
-            var lines = new List<Object>();
-
-            _MemoryAccess = memoryAccess;
-            if (memoryAccess != null)
-            {
-                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#, %]");
-                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#, %]");
-            }
-
-            SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
-            SetColumnVisibility(MemoryWriteCountColumnIndex, memoryAccess != null);
-
-            var instructionMetrics = _CalculateInstructionMetrics!.Invoke(routine, callStack);
-            if (instructionMetrics.Count > 0)
-            {
-                var ellipses = new Ellipses();
-                var fallThrough = new FallThrough();
-
-                CanonicalAddress nextAddress = instructionMetrics[0].Instruction.OpcodeAddress;
-                foreach (var obj in instructionMetrics)
-                {
-                    // add ellipses
-                    if (obj.Instruction.OpcodeAddress.CompareTo(nextAddress) > 0)
-                        lines.Add(ellipses);
-
-                    // add fall-through
-                    if (_RoutinesByAddress.TryGetValue(obj.Instruction.OpcodeAddress, out var routine_))
-                        if (routine_ != routine)
-                            lines.Add(fallThrough);
-
-                    // add instruction metrics
-                    lines.Add(obj);
-                    nextAddress = obj.Instruction.OpcodeAddress.Offset(_InstructionSet!.Size(obj.Instruction.Opcode));
-
-                    // set tool-tip text
-                }
-            }
-
-            // sum cycles and find max
-            int totalCycles = 0;
-            int maxExecutionCount = 0;
-            foreach (var instructionMetric in instructionMetrics)
-            {
-                totalCycles += instructionMetric.InclusiveCycleCount;
-                maxExecutionCount = Math.Max(maxExecutionCount, instructionMetric.ExecutionCount);
-            }
-            _TotalCycleCount = totalCycles;
-            _MaxExecutionCount = maxExecutionCount;
-
-            SetRowsData(lines);
-            SetToolTips(lines);
-        }
-
-        public new void Clear()
-        {
-            SetColumnVisibility(MemoryReadCountColumnIndex, false);
-            SetColumnVisibility(MemoryWriteCountColumnIndex, false);
-            _MemoryAccess = null;
-            base.Clear();
         }
 
         private void SetToolTips(List<Object> lines)
@@ -569,6 +568,14 @@ namespace BeebPerf.ux
             else
                 return -1;
         }
+
+        class Ellipses 
+        {
+        };
+
+        class FallThrough 
+        { 
+        };
 
         private class InstructionColors
         {

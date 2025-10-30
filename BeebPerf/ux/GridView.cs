@@ -55,6 +55,72 @@ namespace BeebPerf.ux
             Scroll += ScrollFunc;
         }
 
+        public void SetRowsData(List<ROW_DATA_TYPE> rowsData)
+        {
+            RowCount = 0;
+
+            _DataRows = rowsData;
+
+            foreach (DataGridViewColumn column in Columns)
+                column.MinimumWidth = 2;
+
+            _SuppressSelectionChangedEvent++;
+            RowCount = rowsData.Count;
+            _SuppressSelectionChangedEvent--;
+
+            ClearSelection();
+            Invalidate();
+        }
+
+        public void Clear()
+        {
+            _DataRows = [];
+            _SelectedDataRow = null;
+            RowCount = 0;
+            Invalidate();
+        }
+
+        public void SelectRow(ROW_DATA_TYPE rowData)
+        {
+            for (int index = 0; index < _DataRows.Count; index++)
+            {
+                if (!rowData.Equals(_DataRows[index]))
+                    continue;
+
+                _SuppressSelectionChangedEvent++;
+                Rows[index].Selected = true;
+                _SuppressSelectionChangedEvent--;
+
+                FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                return;
+            }
+
+            ClearSelection();
+        }
+
+        public new void ClearSelection()
+        {
+            _SelectedDataRow = null;
+
+            _SuppressSelectionChangedEvent++;
+            base.ClearSelection();
+            _SuppressSelectionChangedEvent--;
+        }
+
+        public Dictionary<ushort, string> Labels
+        {
+            get
+            {
+                return _Labels;
+            }
+            set
+            {
+                _Labels = value;
+                _LabelAddresses = value.Keys.ToList();
+                _LabelAddresses.Sort();
+            }
+        }
+
         protected virtual void OnSelectionChange(object? sender, ROW_DATA_TYPE? rowData)
         {
         }
@@ -71,7 +137,7 @@ namespace BeebPerf.ux
 
         protected virtual (int value, int range) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
         {
-            return (-1, 1);
+            return (value: -1, range: 1);
         }
 
         protected void SetCellTemplate(GridViewCellTemplate cellTemplate)
@@ -79,20 +145,6 @@ namespace BeebPerf.ux
             Debug.Assert(Columns.Count > 0);
             foreach (DataGridViewColumn column in Columns)
                 column.CellTemplate = cellTemplate;
-        }
-
-        public Dictionary<ushort, string> Labels
-        {
-            get
-            {
-                return _Labels;
-            }
-            set
-            {
-                _Labels = value;
-                _LabelAddresses = value.Keys.ToList();
-                _LabelAddresses.Sort();
-            }
         }
 
         protected void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
@@ -135,41 +187,6 @@ namespace BeebPerf.ux
             }));
         }
 
-        public void SelectRow(ROW_DATA_TYPE rowData)
-        {
-            for (int index = 0; index < _DataRows.Count; index++)
-            {
-                if (!rowData.Equals(_DataRows[index]))
-                    continue;
-
-                _SuppressSelectionChangedEvent++;
-                Rows[index].Selected = true;
-                _SuppressSelectionChangedEvent--;
-
-                FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
-                return;
-            }
-
-            ClearSelection();
-        }
-
-        public new void ClearSelection()
-        {
-            _SelectedDataRow = null;
-
-            _SuppressSelectionChangedEvent++;
-            base.ClearSelection();
-            _SuppressSelectionChangedEvent--;
-        }
-
-        protected Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
-        }
-
         private void SelectionChangedFunc(object? sender, EventArgs e)
         {
             if (_SuppressSelectionChangedEvent > 0)
@@ -195,18 +212,20 @@ namespace BeebPerf.ux
             }
         }
 
-        private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
-        {
-            if (_SelectionMode == System.Windows.Forms.SelectionMode.None)
-                ClearSelection();
-        }
-
         protected override void OnColumnHeaderMouseClick(DataGridViewCellMouseEventArgs e)
         {
             base.OnColumnHeaderMouseClick(e);
 
             bool descending = Columns[e.ColumnIndex].HeaderCell.SortGlyphDirection != SortOrder.Descending;
             SortColumn(e.ColumnIndex, descending ? SortOrder.Descending : SortOrder.Ascending);
+        }
+
+        protected Form GetParentForm()
+        {
+            Control control = this;
+            while (control is not Form)
+                control = control!.Parent!;
+            return (Form)control;
         }
 
         protected void SortColumn(int columnIndex, SortOrder sortOrder)
@@ -243,6 +262,12 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
+        private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (_SelectionMode == System.Windows.Forms.SelectionMode.None)
+                ClearSelection();
+        }
+
         private void ScrollFunc(object? sender, ScrollEventArgs e)
         {
             _ScrollTimer.Stop();
@@ -257,51 +282,12 @@ namespace BeebPerf.ux
             AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
         }
 
-        public void SetRowsData(List<ROW_DATA_TYPE> rowsData)
-        {
-            RowCount = 0;
-
-            _DataRows = rowsData;
-
-            foreach (DataGridViewColumn column in Columns)
-                column.MinimumWidth = 2;
-
-            _SuppressSelectionChangedEvent++;
-            RowCount = rowsData.Count;
-            _SuppressSelectionChangedEvent--;
-
-            ClearSelection();
-            Invalidate();
-        }
-
         private void CellValueNeededFunc(object? sender, DataGridViewCellValueEventArgs e)
         {
             if (e.RowIndex >= _DataRows.Count)
                 return;
 
             e.Value = OnFormatRowData(_DataRows[e.RowIndex], e.ColumnIndex, e.RowIndex);
-        }
-
-        public void Clear()
-        {
-            _DataRows = [];
-            _SelectedDataRow = null;
-            RowCount = 0;
-            Invalidate();
-        }
-
-        protected void IncrementRowCount()
-        {
-            _SuppressSelectionChangedEvent++;
-            RowCount++;
-            _SuppressSelectionChangedEvent--;
-        }
-
-        protected void DecrementRowCount()
-        {
-            _SuppressSelectionChangedEvent++;
-            RowCount--;
-            _SuppressSelectionChangedEvent--;
         }
 
         protected string FormatCountAndRange(int value, int range)
@@ -342,6 +328,19 @@ namespace BeebPerf.ux
             if (Rows.Count > 0)
                 FirstDisplayedScrollingRowIndex = 0;
             Invalidate();
+        }
+        protected void IncrementRowCount()
+        {
+            _SuppressSelectionChangedEvent++;
+            RowCount++;
+            _SuppressSelectionChangedEvent--;
+        }
+
+        protected void DecrementRowCount()
+        {
+            _SuppressSelectionChangedEvent++;
+            RowCount--;
+            _SuppressSelectionChangedEvent--;
         }
 
         public class GridViewCellTemplate : DataGridViewTextBoxCell

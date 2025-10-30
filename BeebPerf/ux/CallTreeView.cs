@@ -32,6 +32,8 @@ namespace BeebPerf.ux
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
 
+        public int TotalCycleCount;
+
         public CallTreeView() : base(
             DataGridViewAutoSizeColumnsMode.DisplayedCells, 
             System.Windows.Forms.SelectionMode.One)
@@ -142,7 +144,7 @@ namespace BeebPerf.ux
                 TotalCPUColumnIndex => (value: treeNode.CPUMetrics.InclusiveCycleCount, range: TotalCycleCount),
                 ElapsedCPUColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount, range: TotalCycleCount),
                 InterruptsColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount - treeNode.CPUMetrics.InclusiveCycleCount, range: treeNode.CPUMetrics.ElapsedCycleCount),
-                ExecutionCountColumnIndex => (value: treeNode.CPUMetrics.ExecutionCount, range: MaxExecutionCount),
+                ExecutionCountColumnIndex => (value: treeNode.CPUMetrics.ExecutionCount, range: _MaxExecutionCount),
                 _ => (value: -1, range: 1)
             };
         }
@@ -196,46 +198,6 @@ namespace BeebPerf.ux
                 if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     CloseTreeNode(rowIndex, treeNode);
             }
-        }
-
-        private CallTreeNode? FindTreeNode(Routine routine, CallStack callStack)
-        {
-            foreach (var treeNode in _DataRows)
-            {
-                if (treeNode.Parent == null)
-                {
-                    var found = FindTreeNode(treeNode, routine, callStack);
-                    if (found != null)
-                        return found;
-                }
-            }
-            return null;
-        }
-
-        private CallTreeNode? FindTreeNode(CallTreeNode treeNode, Routine routine, CallStack callStack)
-        {
-            if (treeNode.Routine == routine && callStack == treeNode.CallStack)
-                return treeNode;
-            foreach (var child in treeNode.Children)
-            {
-                var found = FindTreeNode(child, routine, callStack);
-                if (found != null)
-                    return found;
-            }
-            return null;
-        }
-
-        public int TotalCycleCount;
-        public int MaxExecutionCount;
-
-        private void RefreshExecutionCounts()
-        {
-            int maxExecutionCount = 0;
-            foreach (var treeNode in _DataRows)
-                if (maxExecutionCount < treeNode.CPUMetrics.ExecutionCount)
-                    maxExecutionCount = treeNode.CPUMetrics.ExecutionCount;
-            MaxExecutionCount = maxExecutionCount;
-            InvalidateColumn(ExecutionCountColumnIndex);
         }
 
         private void KeyDownFunc(object? sender, KeyEventArgs e)
@@ -363,6 +325,43 @@ namespace BeebPerf.ux
             }
         }
 
+        private CallTreeNode? FindTreeNode(Routine routine, CallStack callStack)
+        {
+            foreach (var treeNode in _DataRows)
+            {
+                if (treeNode.Parent == null)
+                {
+                    var found = FindTreeNode(treeNode, routine, callStack);
+                    if (found != null)
+                        return found;
+                }
+            }
+            return null;
+        }
+
+        private CallTreeNode? FindTreeNode(CallTreeNode treeNode, Routine routine, CallStack callStack)
+        {
+            if (treeNode.Routine == routine && callStack == treeNode.CallStack)
+                return treeNode;
+            foreach (var child in treeNode.Children)
+            {
+                var found = FindTreeNode(child, routine, callStack);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        private void RefreshExecutionCounts()
+        {
+            int maxExecutionCount = 0;
+            foreach (var treeNode in _DataRows)
+                if (maxExecutionCount < treeNode.CPUMetrics.ExecutionCount)
+                    maxExecutionCount = treeNode.CPUMetrics.ExecutionCount;
+            _MaxExecutionCount = maxExecutionCount;
+            InvalidateColumn(ExecutionCountColumnIndex);
+        }
+
         private Stack<int> GetSortKey(int columnIndex, CallTreeNode treeNode)
         {
             var sortKey = new Stack<int>();
@@ -426,7 +425,6 @@ namespace BeebPerf.ux
                 if (ColumnIndex == RoutineColumnIndex)
                 {
                     var treeNode = callTreeView._DataRows[rowIndex];
-
                     if (treeNode.HasChildren)
                         PaintOpenCloseTriangle(treeNode, graphics, cellBounds, cellState, cellStyle);
 
@@ -529,5 +527,7 @@ namespace BeebPerf.ux
                 return cellHeight + (nodeDepth * cellHeight);
             }
         }
+
+        private int _MaxExecutionCount;
     }
 }

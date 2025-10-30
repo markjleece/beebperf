@@ -32,6 +32,8 @@ namespace BeebPerf.ux
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
 
+        public int TotalCycleCount;
+
         public RoutinesView() : base(
             DataGridViewAutoSizeColumnsMode.DisplayedCells, 
             System.Windows.Forms.SelectionMode.One)
@@ -62,6 +64,12 @@ namespace BeebPerf.ux
         public void SetRoutines(List<Routine> routines)
         {
             SetRowsData(routines);
+
+            _MaxExecutionCount = 0;
+            foreach (var routine in routines)
+                if (_MaxExecutionCount < routine.AggregateMetrics.ExecutionCount)
+                    _MaxExecutionCount = routine.AggregateMetrics.ExecutionCount;
+
             SortColumn(SelfCPUColumnIndex, SortOrder.Descending);
         }
 
@@ -118,13 +126,10 @@ namespace BeebPerf.ux
                 TotalCPUColumnIndex => (value: routine.AggregateMetrics.InclusiveCycleCount, range: TotalCycleCount),
                 ElapsedCPUColumnIndex => (value: routine.AggregateMetrics.ElapsedCycleCount, range: TotalCycleCount),
                 InterruptsColumnIndex => (value: routine.AggregateMetrics.ElapsedCycleCount - routine.AggregateMetrics.InclusiveCycleCount, range: routine.AggregateMetrics.ElapsedCycleCount),
-                ExecutionCountColumnIndex => (value: routine.AggregateMetrics.ExecutionCount, range: MaxExecutionCount),
+                ExecutionCountColumnIndex => (value: routine.AggregateMetrics.ExecutionCount, range: _MaxExecutionCount),
                 _ => (value: -1, range: 1)
             };
         }
-
-        public int TotalCycleCount;
-        public int MaxExecutionCount;
 
         public class CellTemplate : GridViewCellTemplate
         {
@@ -160,5 +165,7 @@ namespace BeebPerf.ux
                 }
             }
         }
+
+        private int _MaxExecutionCount;
     }
 }

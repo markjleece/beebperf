@@ -60,17 +60,13 @@ namespace BeebPerf.ux
         {
             SetRowsData(memoryAccesses);
 
-            int totalReadCount = 0;
-            int totalWriteCount = 0;
-
+            _TotalReadCount = 0;
+            _TotalWriteCount = 0;
             foreach (var memoryAccess in memoryAccesses)
             {
-                totalReadCount += memoryAccess.ReadCount;
-                totalWriteCount += memoryAccess.WriteCount;
+                _TotalReadCount += memoryAccess.ReadCount;
+                _TotalWriteCount += memoryAccess.WriteCount;
             }
-
-            _TotalReadCount = totalReadCount;
-            _TotalWriteCount = totalWriteCount;
 
             SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
         }

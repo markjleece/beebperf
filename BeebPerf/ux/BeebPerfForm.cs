@@ -113,27 +113,15 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.DynamicCPUAnalysis);
 
                     // populate routines
-                    routinesView.SetRoutines(_CPUAnalysis.HotRoutines);
-
-                    int maxExecutionCount = 0;
-                    foreach (var routine in _CPUAnalysis.HotRoutines)
-                    {
-                        if (maxExecutionCount < routine.AggregateMetrics.ExecutionCount)
-                            maxExecutionCount = routine.AggregateMetrics.ExecutionCount;
-                    }
-
-                    routinesView.MaxExecutionCount = maxExecutionCount;
                     routinesView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
+                    routinesView.SetRoutines(_CPUAnalysis.HotRoutines);
 
                     // populate call tree
                     callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
-
-                    CallTreeNode?[] callTrees = [
+                    callTreeView.SetCallTrees([
                         _CPUAnalysis!.ProgramCallTree,
                         _CPUAnalysis!.NonMaskableInterruptCallTree,
-                        _CPUAnalysis!.MaskableInterruptCallTree];
-
-                    callTreeView.SetCallTrees(callTrees);
+                        _CPUAnalysis!.MaskableInterruptCallTree ]);
                     callTreeView.ShowHotPaths();
 
                     // populate flame graph
@@ -158,9 +146,6 @@ namespace BeebPerf.ux
                         _CPUAnalysis.RoutinesByAddress,
                         _Model.Labels,
                         _Model.InstructionSet!);
-
-                    // memory view
-                    memoryView.Labels = _Model.Labels;
                 }));
             });
 
@@ -177,6 +162,7 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
+                    memoryView.Labels = _Model.Labels;
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
                 }));
             });
@@ -253,6 +239,7 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
+                    memoryView.Labels = _Model.Labels;
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
                 }));
             });
