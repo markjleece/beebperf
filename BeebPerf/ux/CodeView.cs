@@ -125,11 +125,19 @@ namespace BeebPerf.ux
             {
                 TotalCPUColumnIndex => (value: instructionMetrics.InclusiveCycleCount, range: _TotalCycleCount),
                 ExecutionCountColumnIndex => (value: instructionMetrics.ExecutionCount, range: _MaxExecutionCount),
-                BranchCountColumnIndex => (value: instructionMetrics.BranchCount, range: instructionMetrics.ExecutionCount),
+                BranchCountColumnIndex => (value: GetInstructionBranchCount(instructionMetrics), range: instructionMetrics.ExecutionCount),
                 MemoryReadCountColumnIndex => (value: GetMemoryReadCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
                 MemoryWriteCountColumnIndex => (value: GetMemoryWriteCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
                 _ => (value: -1, range: 1)
             };
+        }
+
+        private int GetInstructionBranchCount(InstructionMetrics instructionMetrics)
+        {
+            if (_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+                return instructionMetrics.BranchCount;
+            else
+                return -1;
         }
 
         public void Initialize(

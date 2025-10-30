@@ -321,6 +321,9 @@ namespace BeebPerf.ux
             if (sender != flameGraphView)
                 flameGraphView.ClearSelection();
 
+            if (sender != memoryRoutinesView)
+                memoryRoutinesView.ClearSelection();
+
             codeView.Clear();
         }
 

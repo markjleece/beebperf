@@ -138,11 +138,12 @@ namespace BeebPerf.ux
         {
             return columnIndex switch
             {
-                SelfCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.SelfCycleCount, range: TotalCycleCount),
-                TotalCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.InclusiveCycleCount, range: TotalCycleCount),
-                ElapsedCPUColumnIndex => (value: treeNode.Routine.AggregateMetrics.ElapsedCycleCount, range: TotalCycleCount),
-                InterruptsColumnIndex => (value: treeNode.Routine.AggregateMetrics.ElapsedCycleCount - treeNode.Routine.AggregateMetrics.InclusiveCycleCount, range: treeNode.Routine.AggregateMetrics.ElapsedCycleCount),
-                ExecutionCountColumnIndex => (value: treeNode.Routine.AggregateMetrics.ExecutionCount, range: MaxExecutionCount),
+
+                SelfCPUColumnIndex => (value: treeNode.CPUMetrics.SelfCycleCount, range: TotalCycleCount),
+                TotalCPUColumnIndex => (value: treeNode.CPUMetrics.InclusiveCycleCount, range: TotalCycleCount),
+                ElapsedCPUColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount, range: TotalCycleCount),
+                InterruptsColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount - treeNode.CPUMetrics.InclusiveCycleCount, range: treeNode.CPUMetrics.ElapsedCycleCount),
+                ExecutionCountColumnIndex => (value: treeNode.CPUMetrics.ExecutionCount, range: MaxExecutionCount),
                 _ => (value: -1, range: 1)
             };
         }
