@@ -179,6 +179,7 @@ namespace BeebPerf.ux
                 if (!rowData.Equals(_DataRows[index]))
                     continue;
 
+                _SelectedDataRow = rowData;
                 Rows[index].Selected = true;
 
                 FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
@@ -191,7 +192,6 @@ namespace BeebPerf.ux
         private void ClearSelectionInternal()
         {
             _SelectedDataRow = null;
-
             base.ClearSelection();
         }
 

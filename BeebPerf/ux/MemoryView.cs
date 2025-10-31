@@ -67,17 +67,10 @@ namespace BeebPerf.ux
 
         public void SetMemoryAccesses(List<MemoryAccess> memoryAccesses)
         {
-            SetRowsData(memoryAccesses);
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _TotalReadCount = 0;
-            _TotalWriteCount = 0;
-            foreach (var memoryAccess in memoryAccesses)
-            {
-                _TotalReadCount += memoryAccess.ReadCount;
-                _TotalWriteCount += memoryAccess.WriteCount;
-            }
-
-            SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
+            SetMemoryAccessesInternal(memoryAccesses);
         }
 
         public void SelectMemoryAddress(CanonicalAddress address)
@@ -132,6 +125,21 @@ namespace BeebPerf.ux
                 WriteCountColumnIndex => (value: memoryAccess.WriteCount, range: _TotalWriteCount),
                 _ => (value: -1, range: 1)
             };
+        }
+
+        private void SetMemoryAccessesInternal(List<MemoryAccess> memoryAccesses)
+        {
+            SetRowsData(memoryAccesses);
+
+            _TotalReadCount = 0;
+            _TotalWriteCount = 0;
+            foreach (var memoryAccess in memoryAccesses)
+            {
+                _TotalReadCount += memoryAccess.ReadCount;
+                _TotalWriteCount += memoryAccess.WriteCount;
+            }
+
+            SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
         }
 
         private void SelectMemoryAddressInternal(CanonicalAddress address)

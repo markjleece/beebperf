@@ -40,6 +40,9 @@ namespace BeebPerf.ux
             Func<Routine, List<RoutineMetrics>> getCalleeMetrics,
             int totalCycleCount)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             _GetCallerMetrics = getCallerMetrics;
             _GetCalleeMetrics = getCalleeMetrics;
             _TotalCycleCount = totalCycleCount;
@@ -61,12 +64,6 @@ namespace BeebPerf.ux
             ClearInternal();
         }
 
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            LayoutRoutineCells();
-        }
-
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
@@ -85,6 +82,12 @@ namespace BeebPerf.ux
                 form.SetSelectedRoutine(routineCell.Routine, callStack: null, memoryAccess : null);
                 return;
             }
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            LayoutRoutineCells();
         }
 
         protected override void OnMouseMove(MouseEventArgs e)

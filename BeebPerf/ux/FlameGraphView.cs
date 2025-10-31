@@ -49,16 +49,18 @@ namespace BeebPerf.ux
 
         public void AddCallTree(CallTreeNode treeNode)
         {
-            _CallTrees.Add(treeNode);
-            _InvalidLayout = true;
-            Invalidate();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            AddCallTreeInternal(treeNode);
         }
 
         public void Clear()
         {
-            _CallTrees.Clear();
-            _InvalidLayout = true;
-            Invalidate();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ClearInternal();
         }
 
         public void SelectRoutine(Routine routine, CallStack callStack)
@@ -157,6 +159,20 @@ namespace BeebPerf.ux
 
             HideToolTip();
             RemoveFocus();
+        }
+
+        private void AddCallTreeInternal(CallTreeNode treeNode)
+        {
+            _CallTrees.Add(treeNode);
+            _InvalidLayout = true;
+            Invalidate();
+        }
+
+        private void ClearInternal()
+        {
+            _CallTrees.Clear();
+            _InvalidLayout = true;
+            Invalidate();
         }
 
         private void SelectRoutineInternal(Routine routine, CallStack callStack)

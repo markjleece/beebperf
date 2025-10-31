@@ -59,17 +59,10 @@ namespace BeebPerf.ux
 
         public void SetMemoryAccesses(List<RoutineMemoryAccess> memoryAccesses)
         {
-            SetRowsData(memoryAccesses);
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _TotalReadCount = 0;
-            _TotalWriteCount = 0;
-            foreach (var memoryAccess in memoryAccesses)
-            {
-                _TotalReadCount += memoryAccess.ReadCount;
-                _TotalWriteCount += memoryAccess.WriteCount;
-            }
-
-            SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
+            SetMemoryAccessesInternal(memoryAccesses);
         }
 
         public void SelectRoutine(Routine routine)
@@ -121,6 +114,22 @@ namespace BeebPerf.ux
                 _ => (value: -1, range: 1)
             };
         }
+
+        private void SetMemoryAccessesInternal(List<RoutineMemoryAccess> memoryAccesses)
+        {
+            SetRowsData(memoryAccesses);
+
+            _TotalReadCount = 0;
+            _TotalWriteCount = 0;
+            foreach (var memoryAccess in memoryAccesses)
+            {
+                _TotalReadCount += memoryAccess.ReadCount;
+                _TotalWriteCount += memoryAccess.WriteCount;
+            }
+
+            SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
+        }
+
         private void SelectRoutineInternal(Routine routine)
         {
             foreach (var memoryAccess in _DataRows)

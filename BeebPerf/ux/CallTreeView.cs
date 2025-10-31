@@ -68,12 +68,10 @@ namespace BeebPerf.ux
 
         public void SetCallTrees(CallTreeNode?[] callTrees)
         {
-            var callTreeList = new List<CallTreeNode>();
-            foreach (var callTree in callTrees)
-                if (callTree != null)
-                    callTreeList.Add(callTree);
-            SetRowsData(callTreeList);
-            RefreshExecutionCounts();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SetCallTreesInternal(callTrees);
         }
 
         public void ShowHotPaths()
@@ -99,7 +97,6 @@ namespace BeebPerf.ux
 
             CollapseTreeInternal();
         }
-
 
         protected override void OnSelectionChange(object? sender, CallTreeNode? treeNode)
         {
@@ -160,6 +157,16 @@ namespace BeebPerf.ux
             };
         }
 
+        private void SetCallTreesInternal(CallTreeNode?[] callTrees)
+        {
+            var callTreeList = new List<CallTreeNode>();
+            foreach (var callTree in callTrees)
+                if (callTree != null)
+                    callTreeList.Add(callTree);
+            SetRowsData(callTreeList);
+            RefreshExecutionCounts();
+        }
+
         private void SelectRoutineInternal(Routine routine, CallStack callStack)
         {
             // find tree node
@@ -210,6 +217,7 @@ namespace BeebPerf.ux
                     CloseTreeNode(rowIndex, treeNode);
             }
         }
+
         private void ShowHotPathsInternal()
         {
             CollapseTreeInternal();
