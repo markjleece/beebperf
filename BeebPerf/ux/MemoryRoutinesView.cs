@@ -19,6 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.model;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -71,13 +72,24 @@ namespace BeebPerf.ux
             SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
         }
 
+        public void SelectRoutine(Routine routine)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRoutineInternal(routine);
+        }
+
         protected override void OnSelectionChange(object? sender, RoutineMemoryAccess? selection)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             var form = (BeebPerfForm)GetParentForm();
             if (selection != null)
-                form.SetSelectedRoutine(this, selection.Routine, callStack: null, selection);
+                form.SetSelectedRoutine(selection.Routine, callStack: null, selection);
             else
-                form.ClearSelectedRoutine(this);
+                form.ClearSelectedRoutine();
         }
 
         protected override int OnSortCompare(RoutineMemoryAccess a, RoutineMemoryAccess b, int columnIndex)
@@ -109,8 +121,22 @@ namespace BeebPerf.ux
                 _ => (value: -1, range: 1)
             };
         }
+        private void SelectRoutineInternal(Routine routine)
+        {
+            foreach (var memoryAccess in _DataRows)
+            {
+                if (!routine.StartAddress.Equals(memoryAccess.Routine.StartAddress))
+                    continue;
+
+                SelectRow(memoryAccess);
+                return;
+            }
+
+            ClearSelection();
+        }
 
         private int _TotalReadCount;
         private int _TotalWriteCount;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

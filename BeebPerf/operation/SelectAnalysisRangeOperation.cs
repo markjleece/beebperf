@@ -19,52 +19,45 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-namespace BeebPerf.model
+using BeebPerf.model;
+using BeebPerf.ux;
+
+namespace BeebPerf.operation
 {
-    public class UndoRedoHistory
+    class SelectAnalysisRangeOperation : Operation
     {
-        public bool Execute(Operation op)
+        public SelectAnalysisRangeOperation(
+            BeebPerfForm form,
+            int newAnalysisFrom, int newAnalysisTo,
+            int prevAnalysisFrom, int prevAnalysisTo)
         {
-            bool success = op.Execute();
-            if (success)
-            {
-                _RedoHistory.Clear();
-                _UndoHistory.Push(op);
-            }
-            return success;
+            _Form = form;
+            _NewAnalysisFrom = newAnalysisFrom;
+            _PrevAnalysisFrom = prevAnalysisFrom;
+            _NewAnalysisTo = newAnalysisTo;
+            _PrevAnalysisTo = prevAnalysisTo;
         }
 
-        public bool CanUndo()
+        public override bool Execute()
         {
-            return _UndoHistory.Count > 0;
+            Redo();
+            return true;
         }
 
-        public bool CanRedo()
+        public override void Redo()
         {
-            return _RedoHistory.Count > 0;
+            _Form.SetAnalysisRangeInternal(_NewAnalysisFrom, _NewAnalysisTo);
         }
 
-        public void Undo()
+        public override void Undo()
         {
-            Operation op = _UndoHistory.Pop();
-            op.Undo();
-            _RedoHistory.Push(op);
+            _Form.SetAnalysisRangeInternal(_PrevAnalysisFrom, _PrevAnalysisTo);
         }
 
-        public void Redo()
-        {
-            Operation op = _RedoHistory.Pop();
-            op.Redo();
-            _UndoHistory.Push(op);
-        }
-
-        public void Clear()
-        {
-            _UndoHistory.Clear();
-            _RedoHistory.Clear();
-        }
-
-        private readonly Stack<Operation> _UndoHistory = new();
-        private readonly Stack<Operation> _RedoHistory = new();
+        private BeebPerfForm _Form;
+        private int _NewAnalysisFrom;
+        private int _PrevAnalysisFrom;
+        private int _NewAnalysisTo;
+        private int _PrevAnalysisTo;
     }
 }

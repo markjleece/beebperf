@@ -63,6 +63,30 @@ namespace BeebPerf.ux
 
         public void SetRoutines(List<Routine> routines)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SetRoutinesInternal(routines);
+        }
+
+        public void SelectRoutine(Routine routine)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRoutineInternal(routine);
+        }
+
+        public void ShowHotRoutines()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ShowHotRoutinesInternal();
+        }
+
+        private void SetRoutinesInternal(List<Routine> routines)
+        {
             SetRowsData(routines);
 
             _MaxExecutionCount = 0;
@@ -73,12 +97,12 @@ namespace BeebPerf.ux
             SortColumn(SelfCPUColumnIndex, SortOrder.Descending);
         }
 
-        public void SelectRoutine(Routine routine)
+        private void SelectRoutineInternal(Routine routine)
         {
             SelectRow(routine);
         }
 
-        public void ShowHotRoutines()
+        private void ShowHotRoutinesInternal()
         {
             SortColumn(SelfCPUColumnIndex, SortOrder.Descending);
             ScrollToTop();
@@ -86,11 +110,14 @@ namespace BeebPerf.ux
 
         protected override void OnSelectionChange(object? sender, Routine? routine)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             var form = (BeebPerfForm)GetParentForm();
             if (routine != null)
-                form.SetSelectedRoutine(sender: this, routine, callStack: null, memoryAccess: null);
+                form.SetSelectedRoutine(routine, callStack: null, memoryAccess: null);
             else
-                form.ClearSelectedRoutine(sender: this);
+                form.ClearSelectedRoutine();
         }
 
         protected override int OnSortCompare(Routine a, Routine b, int columnIndex)
@@ -167,5 +194,6 @@ namespace BeebPerf.ux
         }
 
         private int _MaxExecutionCount;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

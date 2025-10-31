@@ -47,20 +47,18 @@ namespace BeebPerf.ux
 
         public void SelectRoutine(Routine routine)
         {
-            _Routine = routine;
-            _Callers = _GetCallerMetrics!.Invoke(routine);
-            _Callees = _GetCalleeMetrics!.Invoke(routine);
-            LayoutRoutineCells();
-            Invalidate();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRoutineInternal(routine);
         }
 
         public void Clear()
         {
-            _Routine = null;
-            _Callers = new();
-            _Callees = new();
-            _RoutineCells.Clear();
-            Invalidate();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ClearInternal();
         }
 
         protected override void OnResize(EventArgs e)
@@ -73,15 +71,18 @@ namespace BeebPerf.ux
         {
             base.OnMouseClick(e);
 
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             foreach (var routineCell in _RoutineCells)
             {
                 if (!routineCell.Selectable || !routineCell.Rectangle.Contains(e.X, e.Y))
                     continue;
 
-                SelectRoutine(routineCell.Routine);
+                SelectRoutineInternal(routineCell.Routine);
 
                 BeebPerfForm form = (BeebPerfForm)GetParentForm();
-                form.SetSelectedRoutine(sender: this, routineCell.Routine, callStack: null, memoryAccess : null);
+                form.SetSelectedRoutine(routineCell.Routine, callStack: null, memoryAccess : null);
                 return;
             }
         }
@@ -111,6 +112,24 @@ namespace BeebPerf.ux
 
             HideToolTip();
             RemoveFocus();
+        }
+
+        private void SelectRoutineInternal(Routine routine)
+        {
+            _Routine = routine;
+            _Callers = _GetCallerMetrics!.Invoke(routine);
+            _Callees = _GetCalleeMetrics!.Invoke(routine);
+            LayoutRoutineCells();
+            Invalidate();
+        }
+
+        private void ClearInternal()
+        {
+            _Routine = null;
+            _Callers = new();
+            _Callees = new();
+            _RoutineCells.Clear();
+            Invalidate();
         }
 
         private void OnVisibleChanged(object? sender, EventArgs e)
@@ -451,6 +470,7 @@ namespace BeebPerf.ux
         private Routine? _Routine;
         private int _TotalCycleCount;
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
+        private ReentrancyGuard _ReentrancyGuard = new();
 
         private ToolTip _ToolTip = new ToolTip();
         private string _ToolTipText = string.Empty;

@@ -39,6 +39,8 @@ namespace BeebPerf.ux
             Resize += BeebPerfForm_Resize;
 
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
+
+            _SelectedTab = tabControl.SelectedTab;
         }
 
         private void BeebPerfForm_Resize(object? sender, EventArgs e)
@@ -56,9 +58,7 @@ namespace BeebPerf.ux
             RestoreAppState();
 
             if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
-            {
                 OpenPerfFile(_RecentFilePathName);
-            }
         }
 
         private void openButton_Click(object sender, EventArgs e)
@@ -73,33 +73,60 @@ namespace BeebPerf.ux
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                _RecentFilePathName = openFileDialog.FileName;
+                string filePathName = openFileDialog.FileName;
+                _RecentFilePathName = filePathName;
                 OpenPerfFile(openFileDialog.FileName);
             }
         }
 
-        private async void OpenPerfFile(string filePathName)
+        private void OpenPerfFile(string filePathName)
         {
-            var openOperation = new OpenOperation(filePathName, _Model);
-
             SetState(AppStateFlags.Loading);
-            bool success = await _UndoRedoHistory.Execute(openOperation);
-            ClearState(AppStateFlags.Loading);
 
-            if (success)
+            var readPerfFileTask = ReadPerfFileAsync(filePathName).ContinueWith((model) =>
             {
-                InstructionSet = _Model.InstructionSet;
-
-                SetState(AppStateFlags.StaticCPUAnalysis);
-                success = await _CPUAnalysis.StaticAnalysis(_Model);
-                ClearState(AppStateFlags.StaticCPUAnalysis);
-
-                if (success)
+                this.Invoke((Action)(() =>
                 {
+                    ClearState(AppStateFlags.Loading);
+
+                    _UndoRedoHistory.Clear();
+                    _Model = model.Result;
+                    _FilePathName = filePathName;
+                    InstructionSet = _Model.InstructionSet;
+
+                    StaticAnalysis();
+                }));
+            });
+        }
+
+        private async Task<Model> ReadPerfFileAsync(string filePathName)
+        {
+            return await Task.Run(() =>
+            {
+                var perfReader = new PerfReader();
+
+                Model? model = perfReader.ReadFile(filePathName);
+                if (model == null)
+                    throw new Exception($"An error occurred reading {filePathName}");
+
+                return model;
+            });
+        }
+
+        public void StaticAnalysis()
+        {
+            SetState(AppStateFlags.StaticCPUAnalysis);
+
+            var staticAnalysisTask = _CPUAnalysis.StaticAnalysis(_Model).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    ClearState(AppStateFlags.StaticCPUAnalysis);
+
                     timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
-                }
-            }
+                }));
+            });
         }
 
         public void DynamicAnalysis(int startCycleCount, int endCycleCount)
@@ -202,7 +229,7 @@ namespace BeebPerf.ux
 
         private void hotRoutinesButton_Click(object sender, EventArgs e)
         {
-            ClearSelectedRoutine(null);
+            ClearSelectedRoutine();
             if (tabControl.SelectedTab != routinesTabPage)
                 tabControl.SelectedTab = routinesTabPage;
             routinesView.ShowHotRoutines();
@@ -210,7 +237,7 @@ namespace BeebPerf.ux
 
         private void hotPathsButton_Click(object sender, EventArgs e)
         {
-            ClearSelectedRoutine(null);
+            ClearSelectedRoutine();
             if (tabControl.SelectedTab != callTreeTabPage)
                 tabControl.SelectedTab = callTreeTabPage;
             callTreeView.ShowHotPaths();
@@ -245,20 +272,42 @@ namespace BeebPerf.ux
             });
         }
 
-        private UndoRedoHistory _UndoRedoHistory = new();
-        private Model _Model = new();
-        private CPUAnalysis _CPUAnalysis = new();
-        private MemoryAnalysis _MemoryAnalysis = new();
-
         public void SetSelectedRoutine(
-            Object? sender, 
-            Routine routine, 
+            Routine? routine,
             CallStack? callStack,
             RoutineMemoryAccess? memoryAccess)
         {
             if (routine == _SelectedRoutine && callStack == _SelectedCallStack)
                 return;
 
+            var operation = new SelectRoutineOperation(
+                this,
+                routine, callStack, memoryAccess,
+                _SelectedRoutine, _SelectedCallStack, _SelectedMemoryAccess);
+
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void ClearSelectedRoutine()
+        {
+            if (_SelectedRoutine == null && _SelectedCallStack == null)
+                return;
+
+            var operation = new SelectRoutineOperation(
+                this,
+                null, null, null,
+                _SelectedRoutine, _SelectedCallStack, _SelectedMemoryAccess);
+
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SetSelectedRoutineInternal(
+            Routine routine, 
+            CallStack? callStack,
+            RoutineMemoryAccess? memoryAccess)
+        {
             if (callStack == null)
             {
                 var elements = routine.MetricsByStack.ToList();
@@ -268,54 +317,62 @@ namespace BeebPerf.ux
 
             _SelectedRoutine = routine;
             _SelectedCallStack = callStack;
+            _SelectedMemoryAccess = memoryAccess;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
             codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess); 
 
-            if (sender != routinesView)
-                routinesView.SelectRoutine(routine);
-
-            if (sender != callerCalleeView)
-                callerCalleeView.SelectRoutine(routine);
-
-            if (sender != callTreeView)
-                callTreeView.SelectRoutine(routine, callStack);
-
-            if (sender != flameGraphView)
-                flameGraphView.SelectRoutine(routine, callStack);
-
-            if (sender != memoryRoutinesView)
-                memoryRoutinesView.ClearSelection();
+            routinesView.SelectRoutine(routine);
+            callerCalleeView.SelectRoutine(routine);
+            callTreeView.SelectRoutine(routine, callStack);
+            flameGraphView.SelectRoutine(routine, callStack);
+            memoryRoutinesView.SelectRoutine(routine);
         }
 
-        public void ClearSelectedRoutine(Object? sender)
+        public void ClearSelectedRoutineInternal()
         {
-            if (_SelectedRoutine == null && _SelectedCallStack == null)
-                return;
-
             _SelectedRoutine = null;
             _SelectedCallStack = null;
 
-            if (sender != routinesView)
-                routinesView.ClearSelection();
-
-            if (sender != callerCalleeView)
-                callerCalleeView.Clear();
-
-            if (sender != callTreeView)
-                callTreeView.ClearSelection();
-
-            if (sender != flameGraphView)
-                flameGraphView.ClearSelection();
-
-            if (sender != memoryRoutinesView)
-                memoryRoutinesView.ClearSelection();
-
+            routinesView.ClearSelection();
+            callerCalleeView.Clear();
+            callTreeView.ClearSelection();
+            flameGraphView.ClearSelection();
+            memoryRoutinesView.ClearSelection();
             codeView.Clear();
         }
 
-        public void SetSelectedMemoryAddress(Object? sender, CanonicalAddress address)
+        public void SetAnalysisRange(int analysisFrom, int analysisTo)
         {
+            var operation = new SelectAnalysisRangeOperation(this, analysisFrom, analysisTo, _CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SetAnalysisRangeInternal(int analysisFrom, int analysisTo)
+        {
+            DynamicAnalysis(analysisFrom, analysisTo);
+            timelineView.SelectRange(analysisFrom, analysisTo);
+        }
+
+        public void SetSelectedMemoryAddress(CanonicalAddress address)
+        {
+            var operation = new SelectMemoryAddressOperation(this, address, _SelectedMemoryAddress);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void ClearSelectedMemoryAddress()
+        {
+            var operation = new SelectMemoryAddressOperation(this, null, _SelectedMemoryAddress);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SetSelectedMemoryAddressInternal(CanonicalAddress address)
+        {
+            _SelectedMemoryAddress = address;
+            memoryView.SelectMemoryAddress(address);
             SetState(AppStateFlags.DynamicMemoryAddressAnalysis);
             var memoryAnalysisTask = _MemoryAnalysis.DynamicAddressAnalysisAsync(address, _CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount).ContinueWith((success) =>
             {
@@ -325,19 +382,37 @@ namespace BeebPerf.ux
                     memoryRoutinesView.SetMemoryAccesses(_MemoryAnalysis.RoutineAccesses);
                 }));
             });
-
         }
 
-        public void ClearSelectedMemoryAddress(Object? sender)
+        public void ClearSelectedMemoryAddressInternal()
         {
+            _SelectedMemoryAddress = null;
+
+            memoryView.ClearSelection();
             if (_SelectedRoutine != null)
-                SetSelectedRoutine(sender, _SelectedRoutine, _SelectedCallStack, memoryAccess: null);
+                SetSelectedRoutine(_SelectedRoutine, _SelectedCallStack, memoryAccess: null);
 
             memoryRoutinesView.Clear();
         }
 
         private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
         {
+            if (_SuppressTabChange > 0)
+                return;
+
+            var operation = new SelectTabOperation(this, tabControl.SelectedTab, _SelectedTab);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SelectTabInternal(TabPage? tab)
+        {
+            _SuppressTabChange++;
+            tabControl.SelectedTab = tab;
+            _SuppressTabChange--;
+
+            _SelectedTab = tab;
+
             UpdateToolbarState();
 
             if (_SelectedRoutine != null)
@@ -469,7 +544,18 @@ namespace BeebPerf.ux
 
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
+        private RoutineMemoryAccess? _SelectedMemoryAccess;
+        private TabPage? _SelectedTab;
+        private CanonicalAddress? _SelectedMemoryAddress;
+
         private string _RecentFilePathName = string.Empty;
         private bool _ZeroPageMemoryAnalysis;
+        private int _SuppressTabChange;
+        private string? _FilePathName;
+
+        private UndoRedoHistory _UndoRedoHistory = new();
+        private Model _Model = new();
+        private CPUAnalysis _CPUAnalysis = new();
+        private MemoryAnalysis _MemoryAnalysis = new();
     }
 }

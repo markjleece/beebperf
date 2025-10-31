@@ -66,23 +66,6 @@ namespace BeebPerf.ux
             SetColumnSortMode(RoutineColumnIndex, DataGridViewColumnSortMode.NotSortable);
         }
 
-        public void ShowHotPaths()
-        {
-            CollapseTree();
-            SortColumn(TotalCPUColumnIndex, SortOrder.Descending);
-            for (int index = 0; index < _DataRows.Count; index++)
-            {
-                var treeNode = _DataRows[index];
-                bool hotChild = false;
-                foreach (var childNode in treeNode.Children)
-                    hotChild |= childNode.HotPath;
-                if (hotChild)
-                    OpenTreeNode(index, treeNode);
-            }
-            RefreshExecutionCounts();
-            ScrollToTop();
-        }
-
         public void SetCallTrees(CallTreeNode?[] callTrees)
         {
             var callTreeList = new List<CallTreeNode>();
@@ -93,13 +76,41 @@ namespace BeebPerf.ux
             RefreshExecutionCounts();
         }
 
+        public void ShowHotPaths()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ShowHotPathsInternal();
+        }
+
+        public void SelectRoutine(Routine routine, CallStack callStack)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRoutineInternal(routine, callStack);
+        }
+
+        public void CollapseTree()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            CollapseTreeInternal();
+        }
+
+
         protected override void OnSelectionChange(object? sender, CallTreeNode? treeNode)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             var form = (BeebPerfForm)GetParentForm();
             if (treeNode != null)
-                form.SetSelectedRoutine(sender: this, treeNode.Routine, treeNode.CallStack, memoryAccess: null);
+                form.SetSelectedRoutine(treeNode.Routine, treeNode.CallStack, memoryAccess: null);
             else
-                form.ClearSelectedRoutine(sender: this);
+                form.ClearSelectedRoutine();
         }
 
         protected override int OnSortCompare(CallTreeNode a, CallTreeNode b, int columnIndex)
@@ -149,7 +160,7 @@ namespace BeebPerf.ux
             };
         }
 
-        public void SelectRoutine(Routine routine, CallStack callStack)
+        private void SelectRoutineInternal(Routine routine, CallStack callStack)
         {
             // find tree node
             var treeNode = FindTreeNode(routine, callStack);
@@ -168,7 +179,7 @@ namespace BeebPerf.ux
             }
 
             // expand tree nodes root-to-tip, selecting the tip
-            CollapseTree();
+            CollapseTreeInternal();
 
             int rowIndex = 0;
             treeNode = treeNodeStack.Pop();
@@ -190,7 +201,7 @@ namespace BeebPerf.ux
             }
         }
 
-        public void CollapseTree()
+        private void CollapseTreeInternal()
         {
             for (int rowIndex = _DataRows.Count - 1; rowIndex >= 0; rowIndex--)
             {
@@ -199,6 +210,23 @@ namespace BeebPerf.ux
                     CloseTreeNode(rowIndex, treeNode);
             }
         }
+        private void ShowHotPathsInternal()
+        {
+            CollapseTreeInternal();
+            SortColumn(TotalCPUColumnIndex, SortOrder.Descending);
+            for (int index = 0; index < _DataRows.Count; index++)
+            {
+                var treeNode = _DataRows[index];
+                bool hotChild = false;
+                foreach (var childNode in treeNode.Children)
+                    hotChild |= childNode.HotPath;
+                if (hotChild)
+                    OpenTreeNode(index, treeNode);
+            }
+            RefreshExecutionCounts();
+            ScrollToTop();
+        }
+
 
         private void KeyDownFunc(object? sender, KeyEventArgs e)
         {
@@ -529,5 +557,6 @@ namespace BeebPerf.ux
         }
 
         private int _MaxExecutionCount;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

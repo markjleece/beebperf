@@ -33,6 +33,60 @@ namespace BeebPerf.ux
             Controls.Add(_ScrollBar);
         }
 
+        public void SelectRange(int analysisFrom, int analysisTo)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRangeInternal(analysisFrom, analysisTo);
+        }
+
+        public void SetDuration(int recordingDuration)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SetDurationInternal(recordingDuration);
+        }
+        public bool CanZoomIn()
+        {
+            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
+        }
+
+        public void ZoomIn()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ZoomInInternal();
+        }
+
+        public bool CanZoomOut()
+        {
+            return _ScrollBar.Enabled;
+        }
+
+        public void ZoomOut()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ZoomOutInternal();
+        }
+
+        public bool CanSelectAll()
+        {
+            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
+        }
+
+        public void SelectAll()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectAllInternal();
+        }
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
@@ -44,7 +98,7 @@ namespace BeebPerf.ux
             }
             else
             {
-                ZoomOut();
+                ZoomOutInternal();
             }
         }
 
@@ -139,7 +193,7 @@ namespace BeebPerf.ux
 
             _DragMode = DragMode.None;
 
-            DynamicAnalysis();
+            OnRangeChange();
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -403,12 +457,20 @@ namespace BeebPerf.ux
                 return $"{(value * 1e6):#.#}µs";
         }
 
-        public void SetDuration(int recordingDuration)
+        private void SelectRangeInternal(int analysisFrom, int analysisTo)
+        {
+            _AnalysisFrom = Math.Max(0, analysisFrom);
+            _AnalysisTo = Math.Min(_RecordingDuration, analysisTo);
+            ZoomOutInternal();
+            OnRangeChange();
+        }
+
+        private void SetDurationInternal(int recordingDuration)
         {
             _RecordingDuration = recordingDuration;
             _AnalysisFrom = 0;
             _AnalysisTo = recordingDuration;
-            ZoomOut();
+            ZoomOutInternal();
         }
 
         private void ScrollBar_Scroll(object? sender, ScrollEventArgs e)
@@ -424,13 +486,8 @@ namespace BeebPerf.ux
             UpdateTimeline();
         }
 
-        public bool CanZoomIn()
-        {
-            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
-        }
-
-        public void ZoomIn()
-        {
+        private void ZoomInInternal()
+        { 
             int margin = Font.Height * 4;
             int range = Width - margin * 2;
             int analysisSize = _AnalysisTo - _AnalysisFrom;
@@ -458,13 +515,8 @@ namespace BeebPerf.ux
             _ScrollBar.Enabled = true;
         }
 
-        public bool CanZoomOut()
-        {
-            return _ScrollBar.Enabled;
-        }
-
-        public void ZoomOut()
-        {
+        private void ZoomOutInternal()
+        { 
             int margin = Font.Height * 4;
             int range = Width - margin * 2;
             int extends = MulDiv(_RecordingDuration, margin, range);
@@ -481,17 +533,12 @@ namespace BeebPerf.ux
             _ScrollBar.Enabled = false;
         }
 
-        public bool CanSelectAll()
-        {
-            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
-        }
-
-        public void SelectAll()
+        private void SelectAllInternal()
         {
             _AnalysisFrom = 0;
             _AnalysisTo = _RecordingDuration;
-            ZoomOut();
-            DynamicAnalysis();
+            ZoomOutInternal();
+            OnRangeChange();
         }
 
         private void UpdateTimeline()
@@ -507,7 +554,7 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
-        public void ComputeTicks()
+        private void ComputeTicks()
         {
             _Ticks.Clear();
 
@@ -563,10 +610,13 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
-        private void DynamicAnalysis()
+        private void OnRangeChange()
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             var form = (BeebPerfForm)GetParentForm();
-            form.DynamicAnalysis(_AnalysisFrom, _AnalysisTo);
+            form.SetAnalysisRange(_AnalysisFrom, _AnalysisTo);
         }
 
         private int MulDiv(int a, int b, int c)
@@ -611,5 +661,6 @@ namespace BeebPerf.ux
         private int _DragOrigin;
         private List<Tick> _Ticks = [];
         private HScrollBar _ScrollBar;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

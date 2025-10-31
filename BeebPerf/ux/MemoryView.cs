@@ -19,6 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.model;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -79,13 +80,24 @@ namespace BeebPerf.ux
             SortColumn(ReadWriteCountColumnIndex, SortOrder.Descending);
         }
 
+        public void SelectMemoryAddress(CanonicalAddress address)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectMemoryAddressInternal(address);
+        }
+
         protected override void OnSelectionChange(object? sender, MemoryAccess? selectedMemoryAccess)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             var form = (BeebPerfForm)GetParentForm();
             if (selectedMemoryAccess != null)
-                form.SetSelectedMemoryAddress(this, selectedMemoryAccess.Address);
+                form.SetSelectedMemoryAddress(selectedMemoryAccess.Address);
             else
-                form.ClearSelectedMemoryAddress(this);
+                form.ClearSelectedMemoryAddress();
         }
 
         protected override int OnSortCompare(MemoryAccess a, MemoryAccess b, int columnIndex)
@@ -122,7 +134,20 @@ namespace BeebPerf.ux
             };
         }
 
+        private void SelectMemoryAddressInternal(CanonicalAddress address)
+        {
+            foreach (var memoryAccess in _DataRows)
+            {
+                if (memoryAccess.Address.Equals(address))
+                {
+                    SelectRow(memoryAccess);
+                    break;
+                }
+            }
+        }
+
         private int _TotalReadCount;
         private int _TotalWriteCount;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

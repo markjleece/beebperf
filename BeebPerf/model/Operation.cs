@@ -23,7 +23,7 @@ namespace BeebPerf.model
 {
     public abstract class Operation
     {
-        public abstract Task<bool> Execute();
+        public abstract bool Execute();
         public abstract void Undo();
         public abstract void Redo();
     }

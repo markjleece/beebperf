@@ -20,53 +20,38 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using BeebPerf.ux;
+using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.operation
 {
-    class OpenOperation : Operation
+    class SelectTabOperation : Operation
     {
-        public OpenOperation(string filePathName, Model model)
+        public SelectTabOperation(BeebPerfForm form, TabPage? newTab, TabPage? prevTab)
         {
-            _FilePathName = filePathName;
-            _Model = model;
-            _OldModel = model.Clone();
-            _NewModel = new();
+            _Form = form;
+            _NewTab = newTab;
+            _PrevTab = prevTab;
         }
 
-        public override async Task<bool> Execute()
+        public override bool Execute()
         {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    var perfReader = new PerfReader();
-                    Model? model = perfReader.ReadFile(_FilePathName);
-                    if (model == null)
-                        throw new Exception($"An error occurred reading {_FilePathName}");
-                    _NewModel = model;
-                    Redo();
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    return false;
-                }
-            });
+            Redo();
+            return true;
         }
 
         public override void Redo()
         {
-            _Model.Set(_NewModel);
+            _Form.SelectTabInternal(_NewTab);
         }
 
         public override void Undo()
         {
-            _Model.Set(_OldModel);
+            _Form.SelectTabInternal(_PrevTab);
         }
 
-        private string _FilePathName;
-        private Model _NewModel;
-        private Model _OldModel;
-        private Model _Model;
+        private BeebPerfForm _Form;
+        private TabPage? _NewTab;
+        private TabPage? _PrevTab;
     }
 }

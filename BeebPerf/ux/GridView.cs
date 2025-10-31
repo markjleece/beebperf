@@ -57,54 +57,34 @@ namespace BeebPerf.ux
 
         public void SetRowsData(List<ROW_DATA_TYPE> rowsData)
         {
-            RowCount = 0;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _DataRows = rowsData;
-
-            foreach (DataGridViewColumn column in Columns)
-                column.MinimumWidth = 2;
-
-            _SuppressSelectionChangedEvent++;
-            RowCount = rowsData.Count;
-            _SuppressSelectionChangedEvent--;
-
-            ClearSelection();
-            Invalidate();
+            SetRowsDataInternal(rowsData);
         }
 
         public void Clear()
         {
-            _DataRows = [];
-            _SelectedDataRow = null;
-            RowCount = 0;
-            Invalidate();
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ClearInternal();
         }
 
         public void SelectRow(ROW_DATA_TYPE rowData)
         {
-            for (int index = 0; index < _DataRows.Count; index++)
-            {
-                if (!rowData.Equals(_DataRows[index]))
-                    continue;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-                _SuppressSelectionChangedEvent++;
-                Rows[index].Selected = true;
-                _SuppressSelectionChangedEvent--;
-
-                FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
-                return;
-            }
-
-            ClearSelection();
+            SelectRowInternal(rowData);
         }
 
         public new void ClearSelection()
         {
-            _SelectedDataRow = null;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _SuppressSelectionChangedEvent++;
-            base.ClearSelection();
-            _SuppressSelectionChangedEvent--;
+            ClearSelectionInternal();
         }
 
         public Dictionary<ushort, string> Labels
@@ -119,6 +99,100 @@ namespace BeebPerf.ux
                 _LabelAddresses = value.Keys.ToList();
                 _LabelAddresses.Sort();
             }
+        }
+
+        protected void SortColumn(int columnIndex, SortOrder sortOrder)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SortColumnInternal(columnIndex, sortOrder);
+        }
+
+        protected void IncrementRowCount()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            RowCount++;
+        }
+
+        protected void DecrementRowCount()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            RowCount--;
+        }
+
+        protected void AutoGrowColumns()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            AutoGrowColumnsInternal();
+        }
+
+        protected void ScrollToTop()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            ScrollToTopInternal();
+        }
+
+        protected Form GetParentForm()
+        {
+            Control control = this;
+            while (control is not Form)
+                control = control!.Parent!;
+            return (Form)control;
+        }
+
+        private void SetRowsDataInternal(List<ROW_DATA_TYPE> rowsData)
+        {
+            RowCount = 0;
+
+            _DataRows = rowsData;
+
+            foreach (DataGridViewColumn column in Columns)
+                column.MinimumWidth = 2;
+
+            RowCount = rowsData.Count;
+
+            ClearSelectionInternal();
+            Invalidate();
+        }
+
+        private void ClearInternal()
+        {
+            _DataRows = [];
+            _SelectedDataRow = null;
+            RowCount = 0;
+            Invalidate();
+        }
+
+        private void SelectRowInternal(ROW_DATA_TYPE rowData)
+        {
+            for (int index = 0; index < _DataRows.Count; index++)
+            {
+                if (!rowData.Equals(_DataRows[index]))
+                    continue;
+
+                Rows[index].Selected = true;
+
+                FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                return;
+            }
+
+            ClearSelectionInternal();
+        }
+
+        private void ClearSelectionInternal()
+        {
+            _SelectedDataRow = null;
+
+            base.ClearSelection();
         }
 
         protected virtual void OnSelectionChange(object? sender, ROW_DATA_TYPE? rowData)
@@ -149,33 +223,49 @@ namespace BeebPerf.ux
 
         protected void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             Columns[columnIndex]!.DefaultCellStyle.Alignment = alignment;
         }
 
         protected void SetColumnSortMode(int columnIndex, DataGridViewColumnSortMode sortMode)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             Columns[columnIndex].SortMode = sortMode;
         }
 
         protected void SetColumnHeaderToolTip(int columnIndex, string text)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             Columns[columnIndex].HeaderCell.ToolTipText = text;
         }
 
         protected void SetColumnVisibility(int columnIndex, bool visibility)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             Columns[columnIndex].Visible = visibility;
         }
 
         protected void SetColumnHeaderText(int columnIndex, string text)
         {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             Columns[columnIndex].HeaderText = text;
         }
 
         protected override void OnHandleCreated(EventArgs e)
         {
-            _SuppressSelectionChangedEvent++;
+            _SuppressSelectionChangeEvent = true;
             base.OnHandleCreated(e);
+            _SuppressSelectionChangeEvent = false;
 
             BeginInvoke(new MethodInvoker(() =>
             {
@@ -183,18 +273,20 @@ namespace BeebPerf.ux
                     SelectRow(_SelectedDataRow);
                 else
                     ClearSelection();
-                _SuppressSelectionChangedEvent--;
             }));
         }
 
         private void SelectionChangedFunc(object? sender, EventArgs e)
         {
-            if (_SuppressSelectionChangedEvent > 0)
+            if (_SuppressSelectionChangeEvent)
                 return;
+
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
             if (_SelectionMode == System.Windows.Forms.SelectionMode.None)
             {
-                ClearSelection();
+                ClearSelectionInternal();
                 return;
             }
 
@@ -217,18 +309,10 @@ namespace BeebPerf.ux
             base.OnColumnHeaderMouseClick(e);
 
             bool descending = Columns[e.ColumnIndex].HeaderCell.SortGlyphDirection != SortOrder.Descending;
-            SortColumn(e.ColumnIndex, descending ? SortOrder.Descending : SortOrder.Ascending);
+            SortColumnInternal(e.ColumnIndex, descending ? SortOrder.Descending : SortOrder.Ascending);
         }
 
-        protected Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
-        }
-
-        protected void SortColumn(int columnIndex, SortOrder sortOrder)
+        private void SortColumnInternal(int columnIndex, SortOrder sortOrder)
         {
             if (Rows.Count == 0 || Columns[columnIndex].SortMode == DataGridViewColumnSortMode.NotSortable)
                 return;
@@ -243,18 +327,18 @@ namespace BeebPerf.ux
 
             if (_SelectedDataRow != null)
             {
-                SelectRow(_SelectedDataRow);
+                SelectRowInternal(_SelectedDataRow);
             }
             else
             {
-                ClearSelection();
-                ScrollToTop();
+                ClearSelectionInternal();
+                ScrollToTopInternal();
             }
 
-            AutoGrowColumns();
+            AutoGrowColumnsInternal();
         }
 
-        protected void AutoGrowColumns()
+        private void AutoGrowColumnsInternal()
         {
             foreach (DataGridViewColumn column in Columns)
                 column.MinimumWidth = column.Width;
@@ -265,7 +349,7 @@ namespace BeebPerf.ux
         private void CellEnterFunc(object? sender, DataGridViewCellEventArgs e)
         {
             if (_SelectionMode == System.Windows.Forms.SelectionMode.None)
-                ClearSelection();
+                ClearSelectionInternal();
         }
 
         private void ScrollFunc(object? sender, ScrollEventArgs e)
@@ -323,24 +407,11 @@ namespace BeebPerf.ux
             return string.Empty;
         }
 
-        protected void ScrollToTop()
+        private void ScrollToTopInternal()
         {
             if (Rows.Count > 0)
                 FirstDisplayedScrollingRowIndex = 0;
             Invalidate();
-        }
-        protected void IncrementRowCount()
-        {
-            _SuppressSelectionChangedEvent++;
-            RowCount++;
-            _SuppressSelectionChangedEvent--;
-        }
-
-        protected void DecrementRowCount()
-        {
-            _SuppressSelectionChangedEvent++;
-            RowCount--;
-            _SuppressSelectionChangedEvent--;
         }
 
         public class GridViewCellTemplate : DataGridViewTextBoxCell
@@ -435,10 +506,11 @@ namespace BeebPerf.ux
 
         protected List<ROW_DATA_TYPE> _DataRows = [];
         protected ROW_DATA_TYPE? _SelectedDataRow;
-        private int _SuppressSelectionChangedEvent;
         private Dictionary<ushort, string> _Labels = new();
         private List<ushort> _LabelAddresses = new();
         private System.Windows.Forms.Timer _ScrollTimer;
         private SelectionMode _SelectionMode;
+        private ReentrancyGuard _ReentrancyGuard = new();
+        private bool _SuppressSelectionChangeEvent;
     }
 }

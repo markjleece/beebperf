@@ -19,52 +19,39 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-namespace BeebPerf.model
+namespace BeebPerf.ux
 {
-    public class UndoRedoHistory
+    public sealed class ReentrancyGuard
     {
-        public bool Execute(Operation op)
+        public IDisposable? TryEnter()
         {
-            bool success = op.Execute();
-            if (success)
+            if (_Entered)
+                return null;
+
+            _Entered = true;
+            return new ReentrancyToken(this);
+        }
+
+        private void Exit()
+        {
+            _Entered = false;
+        }
+
+        private sealed class ReentrancyToken : IDisposable
+        {
+            public ReentrancyToken(ReentrancyGuard guard)
             {
-                _RedoHistory.Clear();
-                _UndoHistory.Push(op);
+                _Guard = guard;
             }
-            return success;
+
+            public void Dispose()
+            {
+                _Guard.Exit();
+            }
+
+            private ReentrancyGuard _Guard;
         }
 
-        public bool CanUndo()
-        {
-            return _UndoHistory.Count > 0;
-        }
-
-        public bool CanRedo()
-        {
-            return _RedoHistory.Count > 0;
-        }
-
-        public void Undo()
-        {
-            Operation op = _UndoHistory.Pop();
-            op.Undo();
-            _RedoHistory.Push(op);
-        }
-
-        public void Redo()
-        {
-            Operation op = _RedoHistory.Pop();
-            op.Redo();
-            _UndoHistory.Push(op);
-        }
-
-        public void Clear()
-        {
-            _UndoHistory.Clear();
-            _RedoHistory.Clear();
-        }
-
-        private readonly Stack<Operation> _UndoHistory = new();
-        private readonly Stack<Operation> _RedoHistory = new();
+        private bool _Entered;
     }
 }

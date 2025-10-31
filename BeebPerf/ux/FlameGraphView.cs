@@ -63,26 +63,18 @@ namespace BeebPerf.ux
 
         public void SelectRoutine(Routine routine, CallStack callStack)
         {
-            if (_SelectedRoutine == routine && _SelectedCallStack == callStack)
-                return;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _SelectedRoutine = routine;
-            _SelectedCallStack = callStack;
-
-            _InvalidLayout = true;
-            Invalidate();
+            SelectRoutineInternal(routine, callStack);
         }
 
         public void ClearSelection()
         {
-            if (_SelectedRoutine == null && _SelectedCallStack == null)
-                return;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
 
-            _SelectedRoutine = null;
-            _SelectedCallStack = null;
-
-            _InvalidLayout = true;
-            Invalidate();
+            ClearSelectionInternal();
         }
 
         public void FlipView()
@@ -114,6 +106,9 @@ namespace BeebPerf.ux
         {
             base.OnMouseClick(e);
 
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             BeebPerfForm form = (BeebPerfForm)GetParentForm();
 
             foreach (var routineCell in _RoutineCells)
@@ -124,16 +119,16 @@ namespace BeebPerf.ux
                 if (_SelectedRoutine != routineCell.Routine ||
                     _SelectedCallStack != routineCell.CallStack)
                 {
-                    SelectRoutine(routineCell.Routine, routineCell.CallStack);
-                    form.SetSelectedRoutine(sender: this, routineCell.Routine, routineCell.CallStack, memoryAccess: null);
+                    SelectRoutineInternal(routineCell.Routine, routineCell.CallStack);
+                    form.SetSelectedRoutine(routineCell.Routine, routineCell.CallStack, memoryAccess: null);
                 }
                 return;
             }
 
             if (_SelectedRoutine != null)
             {
-                ClearSelection();
-                form.ClearSelectedRoutine(sender: this);
+                ClearSelectionInternal();
+                form.ClearSelectedRoutine();
             }
         }
 
@@ -162,6 +157,30 @@ namespace BeebPerf.ux
 
             HideToolTip();
             RemoveFocus();
+        }
+
+        private void SelectRoutineInternal(Routine routine, CallStack callStack)
+        {
+            if (_SelectedRoutine == routine && _SelectedCallStack == callStack)
+                return;
+
+            _SelectedRoutine = routine;
+            _SelectedCallStack = callStack;
+
+            _InvalidLayout = true;
+            Invalidate();
+        }
+
+        private void ClearSelectionInternal()
+        {
+            if (_SelectedRoutine == null && _SelectedCallStack == null)
+                return;
+
+            _SelectedRoutine = null;
+            _SelectedCallStack = null;
+
+            _InvalidLayout = true;
+            Invalidate();
         }
 
         private void OnVisibleChanged(object? sender, EventArgs e)
@@ -629,6 +648,7 @@ namespace BeebPerf.ux
         private int _TotalCycleCount;
         private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         private bool _InvalidLayout;
+        private ReentrancyGuard _ReentrancyGuard = new();
 
         private ToolTip _ToolTip = new ToolTip();
         private string _ToolTipText = string.Empty;
