@@ -123,7 +123,7 @@ namespace BeebPerf.ux
                 {
                     ClearState(AppStateFlags.StaticCPUAnalysis);
 
-                    timelineView.SetDuration(_CPUAnalysis.EndCycleCount);
+                    timelineView.Duration = _CPUAnalysis.EndCycleCount;
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
                 }));
             });
@@ -184,7 +184,7 @@ namespace BeebPerf.ux
                 _Model.Labels,
                 _Model.Snapshot.Memory);
 
-            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount, _ZeroPageMemoryAnalysis).ContinueWith((success) =>
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount, memoryZeroPageCheckBox.Checked).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {
@@ -223,11 +223,24 @@ namespace BeebPerf.ux
 
         private void selectAllButton_Click(object sender, EventArgs e)
         {
-            timelineView.SelectAll();
-            UpdateToolbarState();
+            SetAnalysisRange(analysisFrom: 0, analysisTo: timelineView.Duration);
         }
 
         private void hotRoutinesButton_Click(object sender, EventArgs e)
+        {
+            var operation = new ShowHotRoutinesOperation(
+                this,
+                tabControl.SelectedTab,
+                _SelectedRoutine,
+                _SelectedCallStack,
+                _SelectedMemoryAccess,
+                _SelectedMemoryAddress);
+
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void ShowHotRoutinesInternal()
         {
             ClearSelectedRoutine();
             if (tabControl.SelectedTab != routinesTabPage)
@@ -237,6 +250,20 @@ namespace BeebPerf.ux
 
         private void hotPathsButton_Click(object sender, EventArgs e)
         {
+            var operation = new ShowHotPathsOperation(
+                this,
+                tabControl.SelectedTab,
+                _SelectedRoutine,
+                _SelectedCallStack,
+                _SelectedMemoryAccess,
+                _SelectedMemoryAddress);
+
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void ShowHotPathsInternal()
+        {
             ClearSelectedRoutine();
             if (tabControl.SelectedTab != callTreeTabPage)
                 tabControl.SelectedTab = callTreeTabPage;
@@ -244,6 +271,13 @@ namespace BeebPerf.ux
         }
 
         private void flipViewButton_Click(object sender, EventArgs e)
+        {
+            var operation = new FlipFlameGraphOperation(this);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void FlipFlameGraphInternal()
         {
             flameGraphView.FlipView();
         }
@@ -258,10 +292,22 @@ namespace BeebPerf.ux
 
         private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            _ZeroPageMemoryAnalysis = memoryZeroPageCheckBox.Checked;
+            if (_SuppressCheckBoxChange > 0)
+                return;
+
+            var operation = new ShowZeroPageAddressesOperation(this, memoryZeroPageCheckBox.Checked);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SelectZeroPageMemoryAnalysis(bool zeroPageAnalysis)
+        {
+            _SuppressCheckBoxChange++;
+            memoryZeroPageCheckBox.Checked = zeroPageAnalysis;
+            _SuppressCheckBoxChange--;
 
             SetState(AppStateFlags.DynamicMemoryAnalysis);
-            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, _ZeroPageMemoryAnalysis).ContinueWith((success) =>
+            var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount, zeroPageAnalysis).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {
@@ -352,7 +398,10 @@ namespace BeebPerf.ux
         public void SetAnalysisRangeInternal(int analysisFrom, int analysisTo)
         {
             DynamicAnalysis(analysisFrom, analysisTo);
-            timelineView.SelectRange(analysisFrom, analysisTo);
+            if (analysisFrom == 0 && analysisTo == timelineView.Duration)
+                timelineView.SelectAll();
+            else
+                timelineView.SelectRange(analysisFrom, analysisTo);
         }
 
         public void SetSelectedMemoryAddress(CanonicalAddress address)
@@ -380,6 +429,8 @@ namespace BeebPerf.ux
                 {
                     ClearState(AppStateFlags.DynamicMemoryAddressAnalysis);
                     memoryRoutinesView.SetMemoryAccesses(_MemoryAnalysis.RoutineAccesses);
+                    if (_SelectedRoutine != null)
+                        memoryRoutinesView.SelectRoutine(_SelectedRoutine);
                 }));
             });
         }
@@ -390,7 +441,7 @@ namespace BeebPerf.ux
 
             memoryView.ClearSelection();
             if (_SelectedRoutine != null)
-                SetSelectedRoutine(_SelectedRoutine, _SelectedCallStack, memoryAccess: null);
+                SetSelectedRoutineInternal(_SelectedRoutine, _SelectedCallStack, memoryAccess: null);
 
             memoryRoutinesView.Clear();
         }
@@ -454,8 +505,8 @@ namespace BeebPerf.ux
         private void UpdateToolbarState()
         {
             openButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
-            undoButton.Enabled = _UndoRedoHistory.CanUndo();
-            redoButton.Enabled = _UndoRedoHistory.CanRedo();
+            undoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanUndo();
+            redoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanRedo();
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
             selectAllButton.Enabled = timelineView.CanSelectAll();
@@ -469,7 +520,7 @@ namespace BeebPerf.ux
         {
             if (state == AppStateFlags.Loading)
             {
-                timelineView.SetDuration(0);
+                timelineView.Duration = 0;
                 routinesView.Clear();
                 callTreeView.Clear();
                 flameGraphView.Clear();
@@ -483,7 +534,6 @@ namespace BeebPerf.ux
                 callTreeView.Clear();
                 flameGraphView.Clear();
                 codeView.Clear();
-                memoryView.Clear();
             }
 
             if (state == AppStateFlags.DynamicMemoryAnalysis)
@@ -493,7 +543,6 @@ namespace BeebPerf.ux
 
             if (state == AppStateFlags.DynamicMemoryAddressAnalysis)
             {
-                // TODO: disable memoryView selection
                 memoryRoutinesView.Clear();
                 codeView.Clear();
             }
@@ -549,8 +598,8 @@ namespace BeebPerf.ux
         private CanonicalAddress? _SelectedMemoryAddress;
 
         private string _RecentFilePathName = string.Empty;
-        private bool _ZeroPageMemoryAnalysis;
         private int _SuppressTabChange;
+        private int _SuppressCheckBoxChange;
         private string? _FilePathName;
 
         private UndoRedoHistory _UndoRedoHistory = new();

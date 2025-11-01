@@ -41,13 +41,12 @@ namespace BeebPerf.ux
             SelectRangeInternal(analysisFrom, analysisTo);
         }
 
-        public void SetDuration(int recordingDuration)
+        public int Duration
         {
-            using var token = _ReentrancyGuard.TryEnter();
-            if (token == null) return;
-
-            SetDurationInternal(recordingDuration);
+            get => _RecordingDuration;
+            set => SetDurationInternal(value);
         }
+
         public bool CanZoomIn()
         {
             return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
