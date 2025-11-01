@@ -70,5 +70,29 @@ namespace BeebPerf.Properties {
                 this["RecentFilePathName"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        public int WindowLayout {
+            get {
+                return ((int)(this["WindowLayout"]));
+            }
+            set {
+                this["WindowLayout"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        public int SplitterDistance {
+            get {
+                return ((int)(this["SplitterDistance"]));
+            }
+            set {
+                this["SplitterDistance"] = value;
+            }
+        }
     }
 }

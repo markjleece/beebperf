@@ -239,4 +239,10 @@
   <data name="hotRoutinesButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\hotRoutines.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="columnLayoutButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ColumnLayout.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="rowLayoutButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\RowLayout.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>

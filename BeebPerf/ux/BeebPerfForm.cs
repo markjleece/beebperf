@@ -290,6 +290,20 @@ namespace BeebPerf.ux
         {
         }
 
+        private void columnLayoutButton_Click(object sender, EventArgs e)
+        {
+            splitContainer.Orientation = Orientation.Vertical;
+            splitContainer.SplitterDistance = splitContainer.Width / 2;
+            UpdateToolbarState();
+        }
+
+        private void rowLayoutButton_Click(object sender, EventArgs e)
+        {
+            splitContainer.Orientation = Orientation.Horizontal;
+            splitContainer.SplitterDistance = splitContainer.Height / 2;
+            UpdateToolbarState();
+        }
+
         private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             if (_SuppressCheckBoxChange > 0)
@@ -481,6 +495,8 @@ namespace BeebPerf.ux
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
             Properties.Settings.Default.RecentFilePathName = _RecentFilePathName;
+            Properties.Settings.Default.WindowLayout = (int)splitContainer.Orientation;
+            Properties.Settings.Default.SplitterDistance = splitContainer.SplitterDistance;
             Properties.Settings.Default.Save();
         }
 
@@ -491,6 +507,14 @@ namespace BeebPerf.ux
             var location = Properties.Settings.Default.WindowLocation;
             var size = Properties.Settings.Default.WindowSize;
             var state = Properties.Settings.Default.WindowState;
+            var orientation = Properties.Settings.Default.WindowLayout;
+            var splitterDistance = Properties.Settings.Default.SplitterDistance;
+
+            if (orientation < 0)
+                orientation = (int)Orientation.Horizontal;
+
+            if (splitterDistance < 0)
+                splitterDistance = Height / 2;
 
             var screenBounds = Screen.FromPoint(location).WorkingArea;
             if (!screenBounds.Contains(new Rectangle(location, size)))
@@ -500,6 +524,8 @@ namespace BeebPerf.ux
             Location = location;
             Size = size;
             WindowState = (FormWindowState)state;
+            splitContainer.Orientation = (Orientation)orientation;
+            splitContainer.SplitterDistance = splitterDistance;
         }
 
         private void UpdateToolbarState()
@@ -514,6 +540,8 @@ namespace BeebPerf.ux
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
+            columnLayoutButton.Checked = (splitContainer.Orientation == Orientation.Vertical);
+            rowLayoutButton.Checked = (splitContainer.Orientation == Orientation.Horizontal);
         }
 
         private void SetState(AppStateFlags state)

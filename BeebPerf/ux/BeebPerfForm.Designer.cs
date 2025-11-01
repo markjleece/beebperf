@@ -46,6 +46,8 @@ namespace BeebPerf.ux
             hotPathsButton = new ToolStripButton();
             flipViewButton = new ToolStripButton();
             toolStripSeparator4 = new ToolStripSeparator();
+            columnLayoutButton = new ToolStripButton();
+            rowLayoutButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
@@ -82,7 +84,26 @@ namespace BeebPerf.ux
             // toolStrip
             // 
             toolStrip.ImageScalingSize = new Size(24, 24);
-            toolStrip.Items.AddRange(new ToolStripItem[] { openButton, toolStripSeparator1, undoButton, redoButton, toolStripSeparator2, zoomInButton, zoomOutButton, selectAllButton, toolStripSeparator3, hotRoutinesButton, hotPathsButton, flipViewButton, toolStripSeparator4, settingsButton, helpButton });
+            toolStrip.Items.AddRange(new ToolStripItem[] 
+            { 
+                openButton, 
+                toolStripSeparator1, 
+                undoButton, 
+                redoButton, 
+                toolStripSeparator2, 
+                zoomInButton, 
+                zoomOutButton, 
+                selectAllButton, 
+                toolStripSeparator3, 
+                hotRoutinesButton, 
+                hotPathsButton, 
+                flipViewButton, 
+                toolStripSeparator4, 
+                columnLayoutButton, 
+                rowLayoutButton, 
+                settingsButton, 
+                helpButton
+            });
             toolStrip.Location = new Point(0, 0);
             toolStrip.Name = "toolStrip";
             toolStrip.Size = new Size(1745, 33);
@@ -206,6 +227,28 @@ namespace BeebPerf.ux
             toolStripSeparator4.Name = "toolStripSeparator4";
             toolStripSeparator4.Size = new Size(6, 33);
             // 
+            // columnLayoutButton
+            // 
+            columnLayoutButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            columnLayoutButton.Image = (Image)resources.GetObject("columnLayoutButton.Image");
+            columnLayoutButton.ImageTransparentColor = Color.Magenta;
+            columnLayoutButton.Name = "columnLayoutButton";
+            columnLayoutButton.Size = new Size(34, 28);
+            columnLayoutButton.Text = "Horizontal layout";
+            columnLayoutButton.ToolTipText = "Arrange windows Horizontally";
+            columnLayoutButton.Click += columnLayoutButton_Click;
+            // 
+            // rowLayoutButton
+            // 
+            rowLayoutButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            rowLayoutButton.Image = (Image)resources.GetObject("rowLayoutButton.Image");
+            rowLayoutButton.ImageTransparentColor = Color.Magenta;
+            rowLayoutButton.Name = "rowLayoutButton";
+            rowLayoutButton.Size = new Size(34, 28);
+            rowLayoutButton.Text = "Vertical layout";
+            rowLayoutButton.ToolTipText = "Arrange windows vertically";
+            rowLayoutButton.Click += rowLayoutButton_Click;
+            // 
             // settingsButton
             // 
             settingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -246,11 +289,9 @@ namespace BeebPerf.ux
             splitContainer.Dock = DockStyle.Fill;
             splitContainer.Location = new Point(0, 133);
             splitContainer.Name = "splitContainer";
-            splitContainer.Orientation = Orientation.Horizontal;
             splitContainer.Panel1.Controls.Add(tabControl);
             splitContainer.Panel2.Controls.Add(codeView);
             splitContainer.Size = new Size(1745, 977);
-            splitContainer.SplitterDistance = 486;
             splitContainer.TabIndex = 2;
             // 
             // tabControl
@@ -463,6 +504,8 @@ namespace BeebPerf.ux
         private ToolStripButton hotPathsButton;
         private ToolStripButton flipViewButton;
         private ToolStripSeparator toolStripSeparator4;
+        private ToolStripButton rowLayoutButton;
+        private ToolStripButton columnLayoutButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
         private ToolStripButton openButton;

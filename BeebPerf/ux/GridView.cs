@@ -409,7 +409,7 @@ namespace BeebPerf.ux
 
         private void ScrollToTopInternal()
         {
-            if (Rows.Count > 0)
+            if (Rows.Count > 0 && Height > 0)
                 FirstDisplayedScrollingRowIndex = 0;
             Invalidate();
         }
