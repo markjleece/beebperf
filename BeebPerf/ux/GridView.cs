@@ -458,7 +458,7 @@ namespace BeebPerf.ux
             DataGridViewCellStyle cellStyle)
         {
             var padding = cellStyle.Padding;
-            int contentPadding = Font.Height / 4;
+            int contentPadding = cellStyle.Font.Height / 4;
             var textRect = new Rectangle(
                 cellBounds.X + padding.Left + contentPadding,
                 cellBounds.Y + padding.Top,
@@ -467,7 +467,7 @@ namespace BeebPerf.ux
 
             if (column.SortMode == DataGridViewColumnSortMode.Automatic ||
                 column.SortMode == DataGridViewColumnSortMode.Programmatic)
-                textRect.Width -= Font.Height / 2;
+                textRect.Width -= cellStyle.Font.Height / 2;
 
             var textFormat = new StringFormat
             {
@@ -479,13 +479,12 @@ namespace BeebPerf.ux
                     _ => StringAlignment.Near
                 },
                 LineAlignment = StringAlignment.Center,
-                Trimming = StringTrimming.EllipsisCharacter,
-                FormatFlags = StringFormatFlags.NoWrap
+                FormatFlags = StringFormatFlags.NoWrap,
+                Trimming = StringTrimming.None
             };
 
             using var textBrush = new SolidBrush(SystemColors.ControlText);
             var text = column.HeaderText;
-            var textSize = TextRenderer.MeasureText(text, cellStyle.Font);
             graphics.DrawString(text, cellStyle.Font, textBrush, textRect, textFormat);
         }
 
@@ -524,7 +523,11 @@ namespace BeebPerf.ux
             protected override Size GetPreferredSize(Graphics graphics, DataGridViewCellStyle cellStyle, int rowIndex, Size constraintSize)
             {
                 var column = OwningColumn!;
-                var textSize = TextRenderer.MeasureText(column.HeaderText, cellStyle.Font);
+                var textSize = TextRenderer.MeasureText(
+                    column.HeaderText,
+                    cellStyle.Font,
+                    new Size(int.MaxValue, int.MaxValue),
+                    TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
                 int glyphWidth = 0;
                 if (column.SortMode == DataGridViewColumnSortMode.Automatic ||
@@ -533,7 +536,7 @@ namespace BeebPerf.ux
 
                 int contentPadding = cellStyle.Font.Height / 4;
 
-                return new Size(textSize.Width + 2 * contentPadding + glyphWidth + cellStyle.Padding.Horizontal + 2, cellStyle.Font.Height + cellStyle.Padding.Vertical);
+                return new Size(textSize.Width + 2 * contentPadding + glyphWidth + cellStyle.Padding.Horizontal, cellStyle.Font.Height + cellStyle.Padding.Vertical);
             }
         }
 
