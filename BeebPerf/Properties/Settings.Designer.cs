@@ -73,7 +73,7 @@ namespace BeebPerf.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public int WindowLayout {
             get {
                 return ((int)(this["WindowLayout"]));
@@ -85,13 +85,25 @@ namespace BeebPerf.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("-1")]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public int SplitterDistance {
             get {
                 return ((int)(this["SplitterDistance"]));
             }
             set {
                 this["SplitterDistance"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DisplaySettings {
+            get {
+                return ((string)(this["DisplaySettings"]));
+            }
+            set {
+                this["DisplaySettings"] = value;
             }
         }
     }

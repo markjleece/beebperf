@@ -824,7 +824,8 @@ namespace BeebPerf
                         continue;
 
                     if (!calleeMetrics.ContainsKey(child))
-                        calleeMetrics[child] = child.Routine.MetricsByStack[child].Clone();
+                        if (child.Routine.MetricsByStack.TryGetValue(child, out var metrics))
+                            calleeMetrics[child] = metrics.Clone();
                 }
             }
 

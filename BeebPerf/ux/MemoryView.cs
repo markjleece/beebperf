@@ -37,14 +37,12 @@ namespace BeebPerf.ux
             DataGridViewAutoSizeColumnsMode.DisplayedCells, 
             System.Windows.Forms.SelectionMode.One)
         {
-            Columns.Add("Address", "Address");
-            Columns.Add("Page", "Page");
-            Columns.Add("Label", "Label");
-            Columns.Add("ReadWriteCount", "Reads/Writes [#, %]");
-            Columns.Add("ReadCount", "Reads [#, %]");
-            Columns.Add("WriteCount", "Writes [#, %]");
-
-            SetCellTemplate(new GridViewCellTemplate());
+            AddColumn("Address", "Address", cellTemplate: null);
+            AddColumn("Page", "Page", cellTemplate: null);
+            AddColumn("Label", "Label", cellTemplate: null);
+            AddColumn("ReadWriteCount", "Reads/Writes [#, %]", cellTemplate: null);
+            AddColumn("ReadCount", "Reads [#, %]", cellTemplate: null);
+            AddColumn("WriteCount", "Writes [#, %]", cellTemplate: null);
 
             SetColumnAlignment(ReadWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);

@@ -38,14 +38,13 @@ namespace BeebPerf.ux
             DataGridViewAutoSizeColumnsMode.DisplayedCells, 
             System.Windows.Forms.SelectionMode.One)
         {
-            Columns.Add("Routine", "Routine");
-            Columns.Add("SelfCPU", "Self CPU [#cycles, %]");
-            Columns.Add("TotalCPU", "Total CPU [#cycles, %]");
-            Columns.Add("ElapsedCPU", "Elapsed CPU [#cycles, %]");
-            Columns.Add("Interrupts", "Interrupts [#cycles, %]");
-            Columns.Add("ExecutionCount", "Execution count");
-
-            SetCellTemplate(new CellTemplate());
+            var cellTemplate = new CellTemplate();
+            AddColumn("Routine", "Routine", cellTemplate);
+            AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
+            AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
+            AddColumn("ElapsedCPU", "Elapsed CPU [#cycles, %]", cellTemplate);
+            AddColumn("Interrupts", "Interrupts [#cycles, %]", cellTemplate);
+            AddColumn("ExecutionCount", "Execution count", cellTemplate);
 
             SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);

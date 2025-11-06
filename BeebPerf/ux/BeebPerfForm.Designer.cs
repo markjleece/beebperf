@@ -53,14 +53,14 @@ namespace BeebPerf.ux
             timelineView = new TimelineView();
             splitContainer = new SplitContainer();
             memoryContainer = new Panel();
-            tabControl = new TabControl();
-            callTreeTabPage = new TabPage();
+            tabControl = new TabControlEx();
+            callTreeTabPage = new Panel();
             callTreeView = new CallTreeView();
-            callerCalleeTabPage = new TabPage();
-            routinesTabPage = new TabPage();
+            callerCalleeTabPage = new Panel();
+            routinesTabPage = new Panel();
             routinesView = new RoutinesView();
-            flameGraphTabPage = new TabPage();
-            memoryTabPage = new TabPage();
+            flameGraphTabPage = new Panel();
+            memoryTabPage = new Panel();
             codeView = new CodeView();
             callerCalleeView = new CallerCalleeView();
             flameGraphView = new FlameGraphView();
@@ -256,8 +256,8 @@ namespace BeebPerf.ux
             settingsButton.ImageTransparentColor = Color.Magenta;
             settingsButton.Name = "settingsButton";
             settingsButton.Size = new Size(34, 28);
-            settingsButton.Text = "Settings";
-            settingsButton.ToolTipText = "Settings";
+            settingsButton.Text = "_Settings";
+            settingsButton.ToolTipText = "_Settings";
             settingsButton.Click += settingsButton_Click;
             // 
             // helpButton
@@ -301,10 +301,10 @@ namespace BeebPerf.ux
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(flameGraphTabPage);
             tabControl.Controls.Add(memoryTabPage);
+            tabControl.SelectedIndex = 0;
             tabControl.Dock = DockStyle.Fill;
             tabControl.Location = new Point(0, 0);
             tabControl.Name = "tabControl";
-            tabControl.SelectedIndex = 0;
             tabControl.Size = new Size(1745, 486);
             tabControl.TabIndex = 0;
             tabControl.TabStop = false;
@@ -324,13 +324,10 @@ namespace BeebPerf.ux
             // callTreeTabPage
             // 
             callTreeTabPage.Controls.Add(callTreeView);
-            callTreeTabPage.Location = new Point(4, 34);
             callTreeTabPage.Name = "callTreeTabPage";
             callTreeTabPage.Padding = new Padding(3);
-            callTreeTabPage.Size = new Size(1737, 448);
             callTreeTabPage.TabIndex = 1;
             callTreeTabPage.Text = "Call Tree";
-            callTreeTabPage.UseVisualStyleBackColor = true;
             // 
             // callTreeView
             // 
@@ -346,13 +343,10 @@ namespace BeebPerf.ux
             // callerCalleeTabPage
             // 
             callerCalleeTabPage.Controls.Add(callerCalleeView);
-            callerCalleeTabPage.Location = new Point(4, 34);
             callerCalleeTabPage.Name = "callerCalleeTabPage";
             callerCalleeTabPage.Padding = new Padding(3);
-            callerCalleeTabPage.Size = new Size(1737, 448);
             callerCalleeTabPage.TabIndex = 2;
             callerCalleeTabPage.Text = "Caller / Callee";
-            callerCalleeTabPage.UseVisualStyleBackColor = true;
             // 
             // callerCalleeView
             // 
@@ -366,13 +360,10 @@ namespace BeebPerf.ux
             // routinesTabPage
             // 
             routinesTabPage.Controls.Add(routinesView);
-            routinesTabPage.Location = new Point(4, 34);
             routinesTabPage.Name = "routinesTabPage";
             routinesTabPage.Padding = new Padding(3);
-            routinesTabPage.Size = new Size(1737, 448);
             routinesTabPage.TabIndex = 3;
             routinesTabPage.Text = "Routines";
-            routinesTabPage.UseVisualStyleBackColor = true;
             // 
             // routinesView
             // 
@@ -388,13 +379,10 @@ namespace BeebPerf.ux
             // flameGraphTabPage
             // 
             flameGraphTabPage.Controls.Add(flameGraphView);
-            flameGraphTabPage.Location = new Point(4, 34);
             flameGraphTabPage.Name = "flameGraphTabPage";
             flameGraphTabPage.Padding = new Padding(3);
-            flameGraphTabPage.Size = new Size(1737, 448);
             flameGraphTabPage.TabIndex = 4;
             flameGraphTabPage.Text = "Flame Graph";
-            flameGraphTabPage.UseVisualStyleBackColor = true;
             // 
             // callerCalleeView
             // 
@@ -409,13 +397,10 @@ namespace BeebPerf.ux
             // 
             memoryTabPage.Controls.Add(memoryRoutinesView);
             memoryTabPage.Controls.Add(memoryContainer);
-            memoryTabPage.Location = new Point(4, 34);
             memoryTabPage.Name = "memoryTabPage";
             memoryTabPage.Padding = new Padding(3);
-            memoryTabPage.Size = new Size(1737, 448);
             memoryTabPage.TabIndex = 5;
             memoryTabPage.Text = "Memory";
-            memoryTabPage.UseVisualStyleBackColor = true;
             // 
             // memoryContainer
             // 
@@ -488,7 +473,6 @@ namespace BeebPerf.ux
             ResumeLayout(false);
             PerformLayout();
         }
-
         #endregion
 
         private ToolStrip toolStrip;
@@ -511,12 +495,12 @@ namespace BeebPerf.ux
         private ToolStripButton openButton;
         private TimelineView timelineView;
         private SplitContainer splitContainer;
-        private TabControl tabControl;
-        private TabPage callTreeTabPage;
-        private TabPage callerCalleeTabPage;
-        private TabPage routinesTabPage;
-        private TabPage flameGraphTabPage;
-        private TabPage memoryTabPage;
+        private TabControlEx tabControl;
+        private Panel callTreeTabPage;
+        private Panel callerCalleeTabPage;
+        private Panel routinesTabPage;
+        private Panel flameGraphTabPage;
+        private Panel memoryTabPage;
         private RoutinesView routinesView;
         private CallTreeView callTreeView;
         private CodeView codeView;

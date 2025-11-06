@@ -19,7 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Data.Common;
 using System.Diagnostics;
+using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
 {
@@ -40,6 +42,8 @@ namespace BeebPerf.ux
             CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellValueNeeded += CellValueNeededFunc;
             CellEnter += CellEnterFunc;
+            EnableHeadersVisualStyles = false;
+            CellPainting += GridView_CellPainting;
 
             MultiSelect = false;
             ReadOnly = true;
@@ -99,6 +103,21 @@ namespace BeebPerf.ux
                 _LabelAddresses = value.Keys.ToList();
                 _LabelAddresses.Sort();
             }
+        }
+
+        protected void AddColumn(string columnName, string headerText, GridViewCellTemplate? cellTemplate)
+        {
+            int columnIndex = Columns.Add(columnName, headerText);
+            var column = Columns[columnIndex];
+
+            if (cellTemplate == null)
+                cellTemplate = new GridViewCellTemplate();
+
+            column.CellTemplate = cellTemplate;
+
+            var headerCell = new GridViewHeaderCell();
+            headerCell.Value = headerText;
+            column.HeaderCell = headerCell;
         }
 
         protected void SortColumn(int columnIndex, SortOrder sortOrder)
@@ -212,13 +231,6 @@ namespace BeebPerf.ux
         protected virtual (int value, int range) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
         {
             return (value: -1, range: 1);
-        }
-
-        protected void SetCellTemplate(GridViewCellTemplate cellTemplate)
-        {
-            Debug.Assert(Columns.Count > 0);
-            foreach (DataGridViewColumn column in Columns)
-                column.CellTemplate = cellTemplate;
         }
 
         protected void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
@@ -412,6 +424,117 @@ namespace BeebPerf.ux
             if (Rows.Count > 0 && Height > 0)
                 FirstDisplayedScrollingRowIndex = 0;
             Invalidate();
+        }
+
+        private void GridView_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex > -1 || e.ColumnIndex < 0)
+                return;
+
+            // draw column header
+            Graphics graphics = e.Graphics!;
+            using var backBrush = new SolidBrush(SystemColors.Control);
+            graphics.FillRectangle(backBrush, e.CellBounds);
+
+            var column = Columns[e.ColumnIndex];
+            PaintHeaderText(column, graphics, e.CellBounds, e.CellStyle!);
+
+            if (column.HeaderCell.SortGlyphDirection == SortOrder.Ascending ||
+                column.HeaderCell.SortGlyphDirection == SortOrder.Descending)
+            {
+                PaintSortGlyph(column, graphics, e.CellBounds, e.CellStyle!);
+            }
+
+            using var borderPen = new Pen(Color.Gray);
+            graphics.DrawRectangle(borderPen, e.CellBounds.X, e.CellBounds.Y, e.CellBounds.Width - 1, e.CellBounds.Height - 1);
+
+            e.Handled = true;
+        }
+
+        private void PaintHeaderText(
+            DataGridViewColumn column, 
+            Graphics graphics, 
+            Rectangle cellBounds,
+            DataGridViewCellStyle cellStyle)
+        {
+            var padding = cellStyle.Padding;
+            int contentPadding = Font.Height / 4;
+            var textRect = new Rectangle(
+                cellBounds.X + padding.Left + contentPadding,
+                cellBounds.Y + padding.Top,
+                cellBounds.Width - padding.Horizontal - 2 * contentPadding,
+                cellBounds.Height - padding.Vertical);
+
+            if (column.SortMode == DataGridViewColumnSortMode.Automatic ||
+                column.SortMode == DataGridViewColumnSortMode.Programmatic)
+                textRect.Width -= Font.Height / 2;
+
+            var textFormat = new StringFormat
+            {
+                Alignment = column.DefaultCellStyle.Alignment switch
+                {
+                    DataGridViewContentAlignment.MiddleLeft => StringAlignment.Near,
+                    DataGridViewContentAlignment.MiddleRight => StringAlignment.Far,
+                    DataGridViewContentAlignment.MiddleCenter => StringAlignment.Center,
+                    _ => StringAlignment.Near
+                },
+                LineAlignment = StringAlignment.Center,
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap
+            };
+
+            using var textBrush = new SolidBrush(SystemColors.ControlText);
+            var text = column.HeaderText;
+            var textSize = TextRenderer.MeasureText(text, cellStyle.Font);
+            graphics.DrawString(text, cellStyle.Font, textBrush, textRect, textFormat);
+        }
+
+        private void PaintSortGlyph(
+            DataGridViewColumn column,
+            Graphics graphics,
+            Rectangle cellBounds,
+            DataGridViewCellStyle cellStyle)
+        {
+            int glyphSize = cellBounds.Height / 3;
+
+            var cx = cellBounds.Right - cellStyle.Padding.Right - glyphSize;
+            var cy = cellBounds.Y + cellBounds.Height / 2;
+
+            if (column.HeaderCell.SortGlyphDirection == SortOrder.Descending)
+                glyphSize = -glyphSize;
+
+            var points = new Point[]
+            {
+                new Point(cx, cy - glyphSize / 4),
+                new Point(cx + glyphSize / 2, cy + glyphSize / 4),
+                new Point(cx - glyphSize / 2, cy + glyphSize / 4)
+            };
+
+            graphics.SmoothingMode = SmoothingMode.HighQuality;
+
+            using var glyphBrush = new SolidBrush(SystemColors.ControlText);
+            using var glyphPen = new Pen(SystemColors.ControlText);
+
+            graphics.FillPolygon(glyphBrush, points);
+            graphics.DrawPolygon(glyphPen, points);
+        }
+
+        public class GridViewHeaderCell : DataGridViewColumnHeaderCell
+        {
+            protected override Size GetPreferredSize(Graphics graphics, DataGridViewCellStyle cellStyle, int rowIndex, Size constraintSize)
+            {
+                var column = OwningColumn!;
+                var textSize = TextRenderer.MeasureText(column.HeaderText, cellStyle.Font);
+
+                int glyphWidth = 0;
+                if (column.SortMode == DataGridViewColumnSortMode.Automatic ||
+                    column.SortMode == DataGridViewColumnSortMode.Programmatic)
+                    glyphWidth = cellStyle.Font.Height / 2;
+
+                int contentPadding = cellStyle.Font.Height / 4;
+
+                return new Size(textSize.Width + 2 * contentPadding + glyphWidth + cellStyle.Padding.Horizontal + 2, cellStyle.Font.Height + cellStyle.Padding.Vertical);
+            }
         }
 
         public class GridViewCellTemplate : DataGridViewTextBoxCell

@@ -29,7 +29,7 @@ namespace BeebPerf.operation
     {
         public ShowHotRoutinesOperation(
             BeebPerfForm form,
-            TabPage? prevSelectedTab,
+            Panel? prevSelectedTab,
             Routine? prevSelectedRoutine,
             CallStack? prevSelectedCallStack,
             RoutineMemoryAccess? prevSelectedMemoryAccess,
@@ -69,7 +69,7 @@ namespace BeebPerf.operation
         }
 
         private BeebPerfForm _Form;
-        private TabPage? _PrevSelectedTab;
+        private Panel? _PrevSelectedTab;
         private Routine? _PrevSelectedRoutine;
         private CallStack? _PrevSelectedCallStack;
         private RoutineMemoryAccess? _PrevSelectedMemoryAccess;

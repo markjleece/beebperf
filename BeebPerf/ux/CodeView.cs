@@ -41,17 +41,16 @@ namespace BeebPerf.ux
             DataGridViewAutoSizeColumnsMode.AllCells, 
             System.Windows.Forms.SelectionMode.None)
         {
-            Columns.Add("Address", "Address");
-            Columns.Add("Label", "Label");
-            Columns.Add("Instruction", "Instruction");
-            Columns.Add("MemoryReadCount", "Memory reads [#]");
-            Columns.Add("MemoryWriteCount", "Memory writes [#]");
-            Columns.Add("TailCall", "Tail call");
-            Columns.Add("TotalCPU", "Total CPU [#cycles, %");
-            Columns.Add("BranchCount", "Branch count [#, %]");
-            Columns.Add("ExecutionCount", "Execution count [#, %]");
-
-            SetCellTemplate(new CellTemplate());
+            var cellTemplate = new CellTemplate();
+            AddColumn("Address", "Address", cellTemplate);
+            AddColumn("Label", "Label", cellTemplate);
+            AddColumn("Instruction", "Instruction", cellTemplate);
+            AddColumn("MemoryReadCount", "Memory reads [#]", cellTemplate);
+            AddColumn("MemoryWriteCount", "Memory writes [#]", cellTemplate);
+            AddColumn("TailCall", "Tail call", cellTemplate);
+            AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
+            AddColumn("BranchCount", "Branch count [#, %]", cellTemplate);
+            AddColumn("ExecutionCount", "Execution count [#, %]", cellTemplate);
 
             foreach (DataGridViewColumn column in Columns)
                 column.SortMode = DataGridViewColumnSortMode.NotSortable;

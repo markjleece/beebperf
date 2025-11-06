@@ -29,7 +29,7 @@ namespace BeebPerf.model
         {
             CallStack = callStack;
             Routine = callStack.Routine;
-            CPUMetrics = callStack.Routine.MetricsByStack[callStack];
+            CPUMetrics = callStack.Routine.MetricsByStack.TryGetValue(callStack, out var metrics) ? metrics : new CPUMetrics();
         }
 
         public enum SortField

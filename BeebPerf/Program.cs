@@ -19,6 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using Microsoft.Win32;
+using System.Runtime.InteropServices;
+
 namespace BeebPerf
 {
     public static class Program
@@ -26,8 +29,6 @@ namespace BeebPerf
         [STAThread]
         static void Main()
         {
-            // To customize application configuration such as set high DPI settings or default font,
-            // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
             Application.Run(new ux.BeebPerfForm());
         }

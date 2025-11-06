@@ -1,5 +1,6 @@
 // --------------------------------------------------------------
-// BeebPerf - A BBC Micro Profiler
+// An Adventure In Time - A Doctor Who fan game for the BBC Micro
+// Model B
 //
 // Copyright (C) 2025  Mark John Leece
 //
@@ -21,37 +22,44 @@
 
 using BeebPerf.model;
 using BeebPerf.ux;
-using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.operation
 {
-    class SelectTabOperation : Operation
+    class EditSettingsOperation : Operation
     {
-        public SelectTabOperation(BeebPerfForm form, Panel? newTab, Panel? prevTab)
+        public EditSettingsOperation(BeebPerfForm form)
         {
             _Form = form;
-            _NewTab = newTab;
-            _PrevTab = prevTab;
+            _PrevSettings = form.DisplaySettings;
+            _NewSettings = new();
         }
 
         public override bool Execute()
         {
-            Redo();
-            return true;
+            EditSettingsDialog dialog = new(_PrevSettings);
+            dialog.Owner = _Form;
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                _NewSettings = dialog.Settings!;
+                Redo();
+                return true;
+            }
+
+            return false;
         }
 
         public override void Redo()
         {
-            _Form.SelectTabInternal(_NewTab);
+            _Form.DisplaySettings = _NewSettings;
         }
 
         public override void Undo()
         {
-            _Form.SelectTabInternal(_PrevTab);
+            _Form.DisplaySettings = _PrevSettings;
         }
 
         private BeebPerfForm _Form;
-        private Panel? _NewTab;
-        private Panel? _PrevTab;
+        private DisplaySettings _NewSettings;
+        private DisplaySettings _PrevSettings;
     }
 }

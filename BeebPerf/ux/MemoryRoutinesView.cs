@@ -35,12 +35,10 @@ namespace BeebPerf.ux
             DataGridViewAutoSizeColumnsMode.DisplayedCells,
             System.Windows.Forms.SelectionMode.One)
         {
-            Columns.Add("Routine", "Routine");
-            Columns.Add("ReadWriteCount", "Reads/Writes [#, %]");
-            Columns.Add("ReadCount", "Reads [#, %]");
-            Columns.Add("WriteCount", "Writes [#, %]");
-
-            SetCellTemplate(new GridViewCellTemplate());
+            AddColumn("Routine", "Routine", cellTemplate: null);
+            AddColumn("ReadWriteCount", "Reads/Writes [#, %]", cellTemplate: null);
+            AddColumn("ReadCount", "Reads [#, %]", cellTemplate: null);
+            AddColumn("WriteCount", "Writes [#, %]", cellTemplate: null);
 
             SetColumnAlignment(ReadWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
@@ -52,9 +50,9 @@ namespace BeebPerf.ux
             SetColumnHeaderToolTip(WriteCountColumnIndex, "Total number of memory writes");
 
             SetColumnSortMode(RoutineColumnIndex, DataGridViewColumnSortMode.NotSortable);
-            SetColumnSortMode(ReadWriteCountColumnIndex, DataGridViewColumnSortMode.Automatic);
-            SetColumnSortMode(ReadCountColumnIndex, DataGridViewColumnSortMode.Automatic);
-            SetColumnSortMode(WriteCountColumnIndex, DataGridViewColumnSortMode.Automatic);
+            SetColumnSortMode(ReadWriteCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
+            SetColumnSortMode(ReadCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
+            SetColumnSortMode(WriteCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
         }
 
         public void SetMemoryAccesses(List<RoutineMemoryAccess> memoryAccesses)

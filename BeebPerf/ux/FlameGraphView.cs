@@ -396,7 +396,7 @@ namespace BeebPerf.ux
                 if (_SelectedRoutine != null)
                 {
                     if (_SelectedCallStack != null)
-                        displayedCycleCount = _SelectedRoutine.MetricsByStack[_SelectedCallStack].InclusiveCycleCount;
+                        displayedCycleCount = _SelectedRoutine.MetricsByStack.TryGetValue(_SelectedCallStack, out var metrics) ? metrics.InclusiveCycleCount : 0;
                     else
                         displayedCycleCount = _SelectedRoutine.AggregateMetrics.InclusiveCycleCount;
                 }

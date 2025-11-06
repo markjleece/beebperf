@@ -43,6 +43,15 @@ namespace BeebPerf.ux
             _SelectedTab = tabControl.SelectedTab;
         }
 
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+
+            RestoreAppState();
+
+            ThemeManager.SetTheme(this, DisplaySettings.Theme);
+        }
+
         private void BeebPerfForm_Resize(object? sender, EventArgs e)
         {
             ResizeSpinner();
@@ -55,8 +64,6 @@ namespace BeebPerf.ux
 
         private void BeebPerfForm_Load(object sender, EventArgs e)
         {
-            RestoreAppState();
-
             if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
                 OpenPerfFile(_RecentFilePathName);
         }
@@ -284,6 +291,9 @@ namespace BeebPerf.ux
 
         private void settingsButton_Click(object sender, EventArgs e)
         {
+            var operation = new EditSettingsOperation(this);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
         }
 
         private void helpButton_Click(object sender, EventArgs e)
@@ -372,7 +382,7 @@ namespace BeebPerf.ux
             {
                 var elements = routine.MetricsByStack.ToList();
                 elements.Sort((a, b) => (b.Value.InclusiveCycleCount - a.Value.InclusiveCycleCount));
-                callStack = elements[0].Key;
+                callStack = elements.Count > 0 ? elements[0].Key : null;
             }
 
             _SelectedRoutine = routine;
@@ -384,8 +394,9 @@ namespace BeebPerf.ux
 
             routinesView.SelectRoutine(routine);
             callerCalleeView.SelectRoutine(routine);
-            callTreeView.SelectRoutine(routine, callStack);
-            flameGraphView.SelectRoutine(routine, callStack);
+            callTreeView.SelectRoutine(routine, callStack!);
+            flameGraphView.SelectRoutine(routine, callStack!);
+            
             memoryRoutinesView.SelectRoutine(routine);
         }
 
@@ -470,7 +481,7 @@ namespace BeebPerf.ux
                 UpdateToolbarState();
         }
 
-        public void SelectTabInternal(TabPage? tab)
+        public void SelectTabInternal(Panel? tab)
         {
             _SuppressTabChange++;
             tabControl.SelectedTab = tab;
@@ -491,12 +502,14 @@ namespace BeebPerf.ux
         {
             var bounds = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
             var windowState = (WindowState == FormWindowState.Minimized) ? FormWindowState.Normal : WindowState;
+            var displaySettings = DisplaySettings.Serialize(this.DisplaySettings!);
             Properties.Settings.Default.WindowLocation = bounds.Location;
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
             Properties.Settings.Default.RecentFilePathName = _RecentFilePathName;
             Properties.Settings.Default.WindowLayout = (int)splitContainer.Orientation;
             Properties.Settings.Default.SplitterDistance = splitContainer.SplitterDistance;
+            Properties.Settings.Default.DisplaySettings = displaySettings;
             Properties.Settings.Default.Save();
         }
 
@@ -509,6 +522,12 @@ namespace BeebPerf.ux
             var state = Properties.Settings.Default.WindowState;
             var orientation = Properties.Settings.Default.WindowLayout;
             var splitterDistance = Properties.Settings.Default.SplitterDistance;
+
+            var displaySettings = Properties.Settings.Default.DisplaySettings;
+            if (displaySettings.Length > 0)
+                DisplaySettings = DisplaySettings.Deserialize(displaySettings)!;
+            else
+                DisplaySettings = new DisplaySettings();
 
             if (orientation < 0)
                 orientation = (int)Orientation.Horizontal;
@@ -615,6 +634,8 @@ namespace BeebPerf.ux
             spinner.Location = splitContainer.Location + (tabControl.Size / 2) - (spinner.Size / 2);
         }
 
+        public DisplaySettings DisplaySettings = new();
+
         public AppStateFlags AppState;
         public Image FlameImage;
         public InstructionSet? InstructionSet;
@@ -622,7 +643,7 @@ namespace BeebPerf.ux
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;
         private RoutineMemoryAccess? _SelectedMemoryAccess;
-        private TabPage? _SelectedTab;
+        private Panel? _SelectedTab;
         private CanonicalAddress? _SelectedMemoryAddress;
 
         private string _RecentFilePathName = string.Empty;
