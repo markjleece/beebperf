@@ -22,6 +22,7 @@
 using BeebPerf.model;
 using System.Drawing.Drawing2D;
 using static BeebPerf.MemoryAnalysis;
+using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
@@ -76,14 +77,6 @@ namespace BeebPerf.ux
 
             SetColumnVisibility(MemoryReadCountColumnIndex, false);
             SetColumnVisibility(MemoryWriteCountColumnIndex, false);
-
-            _InstructionStyle = new InstructionColors()
-            {
-                MnemonicColor = Color.DarkGreen,
-                AddressColor = Color.DarkBlue,
-                LabelColor = Color.Black,
-                PunctuationColor = Color.DarkSlateGray
-            };
         }
 
         public void Initialize(
@@ -406,28 +399,25 @@ namespace BeebPerf.ux
                 }
 
                 List<Segment> segments = new();
-                var colors = codeGridView._InstructionStyle;
+                segments.Add(new Segment { Value = mnemonic, Type = Setting.Mnemonic });
 
-                segments.Add(new Segment { Text = mnemonic.PadRight(5), Color = colors.MnemonicColor });
-
-                string hexOperand = string.Empty;
                 if (opSize > 1)
                 {
+                    Object address = operand;
                     if (opSize == 2)
-                        hexOperand = $"&{operand:X2}";
-                    else if (opSize == 3)
-                        hexOperand = $"&{operand:X4}";
+                        address = (byte)operand;
 
-                    segments.Add(new Segment { Text = hexOperand, Color = colors.AddressColor });
+                    var type = addressMode == InstructionSet.AddressMode.Immediate ? Setting.Literal : Setting.Address;
+                    segments.Add(new Segment { Value = address, Type = type });
 
                     if (addressMode != InstructionSet.AddressMode.Immediate)
                     {
                         string label = codeGridView.FormatLabel(operand, withOffsets: true);
                         if (label.Length > 0)
                         {
-                            segments.Insert(1, new Segment { Text = label, Color = colors.LabelColor });
-                            segments.Insert(2, new Segment { Text = " (", Color = colors.PunctuationColor });
-                            segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
+                            segments.Insert(1, new Segment { Value = label, Type = Setting.Label });
+                            segments.Insert(2, new Segment { Value = " (", Type = Setting.Punctuation });
+                            segments.Add(new Segment { Value = ")", Type = Setting.Punctuation });
                         }
                     }
                 }
@@ -435,36 +425,36 @@ namespace BeebPerf.ux
                 switch (addressMode)
                 {
                     case InstructionSet.AddressMode.Accumulator:
-                        segments.Add(new Segment { Text = "A", Color = colors.MnemonicColor });
+                        segments.Add(new Segment { Value = "A", Type = Setting.Mnemonic });
                         break;
 
                     case InstructionSet.AddressMode.Immediate:
-                        segments.Insert(1, new Segment { Text = "#", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Value = "#", Type = Setting.Punctuation });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageX:
                     case InstructionSet.AddressMode.AbsoluteX:
-                        segments.Add(new Segment { Text = ",X", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Value = ",X", Type = Setting.Punctuation });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageY:
                     case InstructionSet.AddressMode.AbsoluteY:
-                        segments.Add(new Segment { Text = ",Y", Color = colors.PunctuationColor });
+                        segments.Add(new Segment { Value = ",Y", Type = Setting.Punctuation });
                         break;
 
                     case InstructionSet.AddressMode.Indirect:
-                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment { Text = ")", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
+                        segments.Add(new Segment { Value = ")", Type = Setting.Punctuation });
                         break;
 
                     case InstructionSet.AddressMode.IndirectX:
-                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment { Text = ",X)", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
+                        segments.Add(new Segment { Value = ",X)", Type = Setting.Punctuation });
                         break;
 
                     case InstructionSet.AddressMode.IndirectY:
-                        segments.Insert(1, new Segment { Text = "(", Color = colors.PunctuationColor });
-                        segments.Add(new Segment { Text = "),Y", Color = colors.PunctuationColor });
+                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
+                        segments.Add(new Segment { Value = "),Y", Type = Setting.Punctuation });
                         break;
                     default:
                         break;
@@ -473,17 +463,24 @@ namespace BeebPerf.ux
                 int xPos = cellBounds.X;
                 int yPos = cellBounds.Y;
 
+                var form = (BeebPerfForm)codeGridView.FindForm()!;
+                var displaySettings = form.DisplaySettings;
+
                 foreach (var segment in segments)
                 {
+                    var text = displaySettings.Format(segment.Type, segment.Value);
+                    using var font = displaySettings.GetFont(segment.Type, cellStyle.Font);
+
                     Size measure = TextRenderer.MeasureText(
-                        segment.Text,
-                        cellStyle.Font,
+                        text,
+                        font,
                         new Size(int.MaxValue, int.MaxValue),
                         TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
-                    using var brush = new SolidBrush(segment.Color);
+                    using var brush = new SolidBrush(displaySettings.GetColor(segment.Type));
+
                     int heightAdjust = (cellBounds.Height - measure.Height) / 2;
-                    graphics.DrawString(segment.Text, cellStyle.Font, brush, xPos, yPos + heightAdjust);
+                    graphics.DrawString(text, font, brush, xPos, yPos + heightAdjust);
 
                     xPos += measure.Width;
                 }
@@ -545,8 +542,8 @@ namespace BeebPerf.ux
 
             private struct Segment
             {
-                public string Text;
-                public Color Color;
+                public Object Value;
+                public DisplaySettings.Setting Type;
             };
 
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
@@ -576,16 +573,7 @@ namespace BeebPerf.ux
         { 
         };
 
-        private class InstructionColors
-        {
-            public Color MnemonicColor;
-            public Color AddressColor;
-            public Color LabelColor;
-            public Color PunctuationColor;
-        }
-
         private InstructionSet? _InstructionSet;
-        private InstructionColors _InstructionStyle;
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
         private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;

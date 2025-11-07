@@ -46,10 +46,7 @@ namespace BeebPerf.ux
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-
             RestoreAppState();
-
-            ThemeManager.SetTheme(this, DisplaySettings.Theme);
         }
 
         private void BeebPerfForm_Resize(object? sender, EventArgs e)
@@ -510,6 +507,7 @@ namespace BeebPerf.ux
             Properties.Settings.Default.WindowLayout = (int)splitContainer.Orientation;
             Properties.Settings.Default.SplitterDistance = splitContainer.SplitterDistance;
             Properties.Settings.Default.DisplaySettings = displaySettings;
+            Properties.Settings.Default.ColorTheme = (int)ColorTheme.Get();
             Properties.Settings.Default.Save();
         }
 
@@ -522,6 +520,9 @@ namespace BeebPerf.ux
             var state = Properties.Settings.Default.WindowState;
             var orientation = Properties.Settings.Default.WindowLayout;
             var splitterDistance = Properties.Settings.Default.SplitterDistance;
+            var colorTheme = Properties.Settings.Default.ColorTheme;
+
+            ColorTheme.Set(this, (ColorThemeType)colorTheme);
 
             var displaySettings = Properties.Settings.Default.DisplaySettings;
             if (displaySettings.Length > 0)

@@ -562,7 +562,6 @@ namespace BeebPerf.ux
             cancelButton.TabIndex = 0;
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
-            cancelButton.Click += CancelButton_Click;
             // 
             // EditSettingsDialog
             // 

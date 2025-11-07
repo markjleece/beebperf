@@ -106,5 +106,17 @@ namespace BeebPerf.Properties {
                 this["DisplaySettings"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int ColorTheme {
+            get {
+                return ((int)(this["ColorTheme"]));
+            }
+            set {
+                this["ColorTheme"] = value;
+            }
+        }
     }
 }

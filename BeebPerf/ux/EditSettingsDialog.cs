@@ -23,7 +23,6 @@
 using BeebPerf.model;
 using System.Drawing.Text;
 using System.Text.RegularExpressions;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace BeebPerf.ux
 {
@@ -36,7 +35,6 @@ namespace BeebPerf.ux
             _SuppressChangeEvents++;
 
             _Settings = settings.Clone();
-            _OriginalTheme = settings.Theme;
 
             InitializeComponent();
 
@@ -61,9 +59,8 @@ namespace BeebPerf.ux
             SetComboBoxOptions(colorThemeComboBox, ["System", "Dark", "Light"]);
             _SuppressChangeEvents--;
 
-            bool canSetTheme = ThemeManager.CanSetTheme();
-            colorThemeComboBox.SelectedIndex = canSetTheme ? (int)settings.Theme : (int)ThemeManager.ThemeType.System;
-            colorThemeComboBox.Enabled = canSetTheme;
+            colorThemeComboBox.SelectedIndex = (int)ColorTheme.Get();
+            colorThemeComboBox.Enabled = ColorTheme.CanSet();
 
             sampleCodePanel.Invalidate();
         }
@@ -71,11 +68,6 @@ namespace BeebPerf.ux
         private void OkButton_Click(object sender, EventArgs e)
         {
             Settings = _Settings;
-        }
-
-        private void CancelButton_Click(object sender, EventArgs e)
-        {
-            ThemeManager.SetTheme(this, _OriginalTheme);
         }
 
         private void TextScalingComboBox_SelectedIndexChanged(object? sender, EventArgs e)
@@ -108,10 +100,8 @@ namespace BeebPerf.ux
             if (_SuppressChangeEvents > 0)
                 return;
 
-            _Settings.Theme = (ThemeManager.ThemeType)colorThemeComboBox.SelectedIndex;
-            var themeSettings = _Settings.ThemeSettings;
-
-            ThemeManager.SetTheme(this, _Settings.Theme);
+            ColorTheme.Set(this, (ColorThemeType)colorThemeComboBox.SelectedIndex);
+            var themeSettings = _Settings.ColorThemeSettings;
 
             _SuppressChangeEvents++;
 
@@ -149,7 +139,7 @@ namespace BeebPerf.ux
                 return;
 
             var comboBox = (ComboBox)sender!;
-            var themeSettings = _Settings.ThemeSettings;
+            var themeSettings = _Settings.ColorThemeSettings;
             themeSettings.AddressSettings.Format = (DisplaySettings.AddressFormat)comboBox.SelectedIndex;
 
             sampleCodePanel.Invalidate();
@@ -161,7 +151,7 @@ namespace BeebPerf.ux
                 return;
 
             var comboBox = (ComboBox)sender!;
-            var themeSettings = _Settings.ThemeSettings;
+            var themeSettings = _Settings.ColorThemeSettings;
             themeSettings.MnemonicSettings.Format = (DisplaySettings.MnemonicFormat)comboBox.SelectedIndex;
 
             sampleCodePanel.Invalidate();
@@ -173,7 +163,7 @@ namespace BeebPerf.ux
                 return;
 
             var comboBox = (ComboBox)sender!;
-            var themeSettings = _Settings.ThemeSettings;
+            var themeSettings = _Settings.ColorThemeSettings;
             themeSettings.LiteralSettings.Format = (DisplaySettings.LiteralFormat)comboBox.SelectedIndex;
 
             sampleCodePanel.Invalidate();
@@ -193,7 +183,7 @@ namespace BeebPerf.ux
                     button.BackColor = colorDialog.Color;
 
                     var color = colorDialog.Color;
-                    var themeSettings = _Settings.ThemeSettings;
+                    var themeSettings = _Settings.ColorThemeSettings;
                     if (button == addressColorButton)
                         themeSettings.AddressSettings.Color = color;
                     else if (button == mnemonicColorButton)
@@ -217,7 +207,7 @@ namespace BeebPerf.ux
 
             var checkBox = (CheckBox)sender;
             bool isChecked = checkBox.Checked;
-            var themeSettings = _Settings.ThemeSettings;
+            var themeSettings = _Settings.ColorThemeSettings;
             if (checkBox == addressBoldCheckBox)
                 themeSettings.AddressSettings.Bold = isChecked;
             else if (checkBox == mnemonicBoldCheckBox)
@@ -239,7 +229,7 @@ namespace BeebPerf.ux
 
             var checkBox = (CheckBox)sender;
             bool isChecked = checkBox.Checked;
-            var themeSettings = _Settings.ThemeSettings;
+            var themeSettings = _Settings.ColorThemeSettings;
             if (checkBox == addressItalicCheckBox)
                 themeSettings.AddressSettings.Italic = isChecked;
             else if (checkBox == mnemonicItalicCheckBox)
@@ -320,6 +310,5 @@ namespace BeebPerf.ux
 
         private DisplaySettings _Settings;
         private int _SuppressChangeEvents;
-        private ThemeManager.ThemeType _OriginalTheme;
     }
 }

@@ -21,18 +21,20 @@
 
 using BeebPerf.model;
 using Microsoft.Win32;
+using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 
 namespace BeebPerf
 {
-    public static class ThemeManager
+    public enum ColorThemeType
     {
-        public enum ThemeType
-        {
-            System = 0,
-            Dark = 1,
-            Light = 2
-        }
+        System = 0,
+        Dark = 1,
+        Light = 2
+    }
+
+    public static class ColorTheme
+    {
 
         [DllImport("user32.dll")]
         static public extern bool RedrawWindow([In] IntPtr hWnd, [In] IntPtr lprcUpdate, [In] IntPtr hrgnUpdate, [In] uint flags);
@@ -43,21 +45,47 @@ namespace BeebPerf
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         private static extern int SetWindowTheme(IntPtr hWnd, string pszSubAppName, string? pszSubIdList);
 
-
-        public static bool CanSetTheme()
+        public static bool CanSet()
         {
             return (Environment.OSVersion.Version.Major >= 10);
         }
 
-        public static void SetTheme(Form form, ThemeType theme)
+        public static ColorThemeType Get()
         {
-            if (!CanSetTheme())
+            return CanSet() ? _CurrentTheme : ColorThemeType.Light;
+        }
+
+        public static bool IsLightMode()
+        {
+            if (!CanSet())
+                return true;
+            else if (_CurrentTheme == ColorThemeType.System)
+                return !IsSystemInDarkMode();
+            else
+                return (_CurrentTheme == ColorThemeType.Light);
+        }
+
+        public static bool IsDarkMode()
+        {
+            if (!CanSet())
+                return false;
+            else if (_CurrentTheme == ColorThemeType.System)
+                return IsSystemInDarkMode();
+            else
+                return (_CurrentTheme == ColorThemeType.Dark);
+        }
+
+        public static void Set(Form form, ColorThemeType theme)
+        {
+            if (!CanSet())
                 return;
 
-            bool darkMode = (theme == ThemeType.Dark) || (theme == ThemeType.System && IsSystemInDarkMode());
+            _CurrentTheme = theme;
+
+            bool darkMode = IsDarkMode();
 
 #pragma warning disable WFO5001
-            var colorMode = darkMode ? SystemColorMode.Dark : SystemColorMode.Classic;
+        var colorMode = darkMode ? SystemColorMode.Dark : SystemColorMode.Classic;
             Application.SetColorMode(colorMode);
 #pragma warning restore WFO5001
 
@@ -106,5 +134,7 @@ namespace BeebPerf
             foreach (Control child in control.Controls)
                 ApplyTheme(child, darkMode);
         }
+
+        private static ColorThemeType _CurrentTheme;
     }
 }

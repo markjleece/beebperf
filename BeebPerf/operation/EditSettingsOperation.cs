@@ -31,6 +31,7 @@ namespace BeebPerf.operation
         {
             _Form = form;
             _PrevSettings = form.DisplaySettings;
+            _PrevColorTheme = ColorTheme.Get();
             _NewSettings = new();
         }
 
@@ -41,24 +42,30 @@ namespace BeebPerf.operation
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 _NewSettings = dialog.Settings!;
+                _NewColorTheme = ColorTheme.Get();
                 Redo();
                 return true;
             }
 
+            ColorTheme.Set(_Form, _PrevColorTheme);
             return false;
         }
 
         public override void Redo()
         {
             _Form.DisplaySettings = _NewSettings;
+            ColorTheme.Set(_Form, _NewColorTheme);
         }
 
         public override void Undo()
         {
             _Form.DisplaySettings = _PrevSettings;
+            ColorTheme.Set(_Form, _PrevColorTheme);
         }
 
         private BeebPerfForm _Form;
+        private ColorThemeType _NewColorTheme;
+        private ColorThemeType _PrevColorTheme;
         private DisplaySettings _NewSettings;
         private DisplaySettings _PrevSettings;
     }

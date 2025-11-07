@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
@@ -35,8 +36,8 @@ namespace BeebPerf.ux
                 return;
             }
 
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            var color = (themeSettings.ThemeType == ThemeManager.ThemeType.Light) ? Color.White : Color.Black;
+            var themeSettings = DisplaySettings!.ColorThemeSettings;
+            var color = (themeSettings.ColorTheme == ColorThemeType.Light) ? Color.White : Color.Black;
             using var brush = new SolidBrush(color);
             e.Graphics.FillRectangle(brush, e.ClipRectangle);
         }
@@ -57,7 +58,8 @@ namespace BeebPerf.ux
             foreach (var instruction in _Instructions)
             {
                 addressColumnWidth = Math.Max(addressColumnWidth, MeasureSegmentWidth(instruction.AddressSegment) + padding);
-                labelColumnWidth = Math.Max(labelColumnWidth, MeasureSegmentWidth(instruction.LabelSegment) + padding);
+                if (instruction.LabelSegment != null)
+                    labelColumnWidth = Math.Max(labelColumnWidth, MeasureSegmentWidth((Segment)instruction.LabelSegment) + padding);
             }
 
             // paint instructions
@@ -79,13 +81,10 @@ namespace BeebPerf.ux
             }
         }
 
-        private int MeasureSegmentWidth(Segment? segment)
+        private int MeasureSegmentWidth(Segment segment)
         {
-            if (segment == null)
-                return 0;
-
-            var text = FormatSegmentText(segment.Value);
-            using Font font = GetSegmentFont((Segment)segment);
+            var text = DisplaySettings!.Format(segment.Type, segment.Value);
+            using var font = DisplaySettings!.GetFont(segment.Type, Font);
 
             Size measure = TextRenderer.MeasureText(
                 text,
@@ -100,8 +99,9 @@ namespace BeebPerf.ux
         {
             foreach (var segment in segments)
             {
-                var text = FormatSegmentText(segment);
-                using Font font = GetSegmentFont(segment);
+                var text = DisplaySettings!.Format(segment.Type, segment.Value);
+                var color = DisplaySettings!.GetColor(segment.Type);
+                using var font = DisplaySettings!.GetFont(segment.Type, Font);
 
                 Size measure = TextRenderer.MeasureText(
                     text,
@@ -109,137 +109,16 @@ namespace BeebPerf.ux
                     new Size(int.MaxValue, int.MaxValue),
                     TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
 
-                using var brush = new SolidBrush(GetSegmentColor(segment));
-                graphics.DrawString(text, font, brush, position);
+                using var brush = new SolidBrush(color);
+                graphics.DrawString(text, font!, brush, position);
 
                 position.X += measure.Width;
             }
         }
 
-        private string FormatSegmentText(Segment segment)
-        {
-            return segment.Type switch 
-            { 
-                SegmentType.Label => (string)segment.Value,
-                SegmentType.Address => FormatHexadecimal((int)segment.Value),
-                SegmentType.Literal => FormatLiteral((int)segment.Value),
-                SegmentType.Mnemonic => FormatMnemonic((string)segment.Value),
-                SegmentType.Punctuation => (string)segment.Value,
-                _ => string.Empty
-            };
-        }
-
-        private Color GetSegmentColor(Segment segment)
-        {
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            return segment.Type switch
-            {
-                SegmentType.Label => themeSettings.LabelSettings.Color,
-                SegmentType.Address => themeSettings.AddressSettings.Color,
-                SegmentType.Literal => themeSettings.LiteralSettings.Color,
-                SegmentType.Mnemonic => themeSettings.MnemonicSettings.Color,
-                SegmentType.Punctuation => themeSettings.PunctuationSettings.Color,
-                _ => Color.FromArgb(0),
-            };
-        }
-
-        private Font GetSegmentFont(Segment segment)
-        {
-            int fontSize = (int)float.Round(Font.SizeInPoints * DisplaySettings!.FontScaling / 100.0f);
-
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            bool bold = false;
-            bool italic = false;
-        
-            switch (segment.Type)
-            {
-                case SegmentType.Label:
-                    bold = themeSettings.LabelSettings.Bold;
-                    italic = themeSettings.LabelSettings.Italic;
-                    break;
-
-                case SegmentType.Literal:
-                    bold = themeSettings.LiteralSettings.Bold;
-                    italic = themeSettings.LiteralSettings.Italic;
-                    break;
-
-                case SegmentType.Mnemonic:
-                    bold = themeSettings.MnemonicSettings.Bold;
-                    italic = themeSettings.MnemonicSettings.Italic;
-                    break;
-
-                case SegmentType.Address:
-                    bold = themeSettings.AddressSettings.Bold;
-                    italic = themeSettings.AddressSettings.Italic;
-                    break;
-
-                case SegmentType.Punctuation:
-                    bold = themeSettings.PunctuationSettings.Bold;
-                    italic = themeSettings.PunctuationSettings.Italic;
-                    break;
-
-                default:
-                    break;
-            }
-
-            FontStyle fontStyle = FontStyle.Regular;
-            if (bold)
-                fontStyle |= FontStyle.Bold;
-            if (italic)
-                fontStyle |= FontStyle.Italic;
-
-            string fontName = Font.FontFamily.Name;
-            if (DisplaySettings.CodeFont.Length > 0)
-                fontName = DisplaySettings.CodeFont;
-
-            return new Font(fontName, fontSize, fontStyle);
-        }
-
-        private string FormatMnemonic(string value)
-        {
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            value = themeSettings.MnemonicSettings.Format switch
-            {
-                DisplaySettings.MnemonicFormat.Uppercase => value.ToUpper(),
-                DisplaySettings.MnemonicFormat.Lowercase => value.ToLower(),
-                _ => value
-            };
-
-            return value.PadRight(5, ' ');
-        }
-
-        private string FormatHexadecimal(int value)
-        {
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            return themeSettings.AddressSettings.Format switch
-            {
-                DisplaySettings.AddressFormat.AndUppercase => $"&{value:X2}",
-                DisplaySettings.AddressFormat.AndLowercase => $"&{value:x2}",
-                DisplaySettings.AddressFormat.DollarUppercase => $"${value:X2}",
-                DisplaySettings.AddressFormat.DollarLowercase => $"${value:x2}",
-                DisplaySettings.AddressFormat.OxUppercase => $"0x{value:X2}",
-                DisplaySettings.AddressFormat.OxLowercase => $"0x{value:x2}",
-                _ => string.Empty
-            };
-        }
-
-        private string FormatLiteral(int value)
-        {
-            var themeSettings = DisplaySettings!.ThemeSettings;
-            return themeSettings.LiteralSettings.Format switch
-            {
-                DisplaySettings.LiteralFormat.Hexadecimal => FormatHexadecimal(value),
-                DisplaySettings.LiteralFormat.Decimal => value.ToString(),
-                DisplaySettings.LiteralFormat.Binary => Convert.ToString(value, 2),
-                _ => string.Empty
-            };
-        }
-
-        private enum SegmentType { Label, Address, Mnemonic, Literal, Punctuation, }
-
         private readonly struct Segment
         {
-            public SegmentType Type { get; init; }
+            public Setting Type { get; init; }
             public Object Value { get; init; }
         };
 
@@ -253,34 +132,34 @@ namespace BeebPerf.ux
         private static readonly Instruction[] _Instructions = [
             new()
             {
-                AddressSegment = new() { Type = SegmentType.Address, Value = 0x2A6E },
-                LabelSegment = new() { Type = SegmentType.Label, Value = "loop" },
+                AddressSegment = new() { Type = Setting.Address, Value = 0x2A6E },
+                LabelSegment = new() { Type = Setting.Label, Value = "loop" },
                 InstructionSegments = [
-                    new() { Type = SegmentType.Mnemonic, Value = "LDA" },
-                    new() { Type = SegmentType.Label, Value = "gameObject" },
-                    new() { Type = SegmentType.Punctuation, Value = "(" },
-                    new() { Type = SegmentType.Address, Value = 0x08A0 },
-                    new() { Type = SegmentType.Punctuation, Value = "),X" },
+                    new() { Type = Setting.Mnemonic, Value = "LDA" },
+                    new() { Type = Setting.Label, Value = "gameObject" },
+                    new() { Type = Setting.Punctuation, Value = "(" },
+                    new() { Type = Setting.Address, Value = 0x08A0 },
+                    new() { Type = Setting.Punctuation, Value = "),X" },
                 ]
             },
             new()
             {
-                AddressSegment = new Segment { Type = SegmentType.Address, Value = 0x2A71 },
+                AddressSegment = new Segment { Type = Setting.Address, Value = 0x2A71 },
                 InstructionSegments = [
-                    new() { Type = SegmentType.Mnemonic, Value = "AND" },
-                    new() { Type = SegmentType.Punctuation, Value = "#" },
-                    new() { Type = SegmentType.Literal, Value = 192 }
+                    new() { Type = Setting.Mnemonic, Value = "AND" },
+                    new() { Type = Setting.Punctuation, Value = "#" },
+                    new() { Type = Setting.Literal, Value = (byte)192 }
                 ]
             },
             new()
             {
-                AddressSegment = new Segment { Type = SegmentType.Address, Value = 0x2A73 },
+                AddressSegment = new Segment { Type = Setting.Address, Value = 0x2A73 },
                 InstructionSegments = [
-                    new() { Type = SegmentType.Mnemonic, Value = "BEQ" },
-                    new() { Type = SegmentType.Label, Value = "func" },
-                    new() { Type = SegmentType.Punctuation, Value = "(" },
-                    new() { Type = SegmentType.Address, Value = 0x21B2 },
-                    new() { Type = SegmentType.Punctuation, Value = ")" },
+                    new() { Type = Setting.Mnemonic, Value = "BEQ" },
+                    new() { Type = Setting.Label, Value = "func" },
+                    new() { Type = Setting.Punctuation, Value = "(" },
+                    new() { Type = Setting.Address, Value = 0x21B2 },
+                    new() { Type = Setting.Punctuation, Value = ")" },
                 ]
             }
         ];

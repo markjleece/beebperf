@@ -19,7 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using Microsoft.Win32;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -29,33 +28,23 @@ namespace BeebPerf.model
     {
         public const int ThemeCount = 3;
 
-        static public string Serialize(DisplaySettings settings)
-        {
-            return JsonSerializer.Serialize(settings);
-        }
-
-        static public DisplaySettings? Deserialize(string json)
-        {
-            return JsonSerializer.Deserialize<DisplaySettings>(json);
-        }
-
         public DisplaySettings()
         {
-            Theme = ThemeManager.ThemeType.System;
+            // default settings
             FontScaling = 100;
             CodeFont = string.Empty;
-            LightSettings = new()
+            LightColorThemeSettings = new()
             {
-                ThemeType = ThemeManager.ThemeType.Light,
+                ColorTheme = ColorThemeType.Light,
                 LabelSettings = new() { Color = Color.Black, Bold = false, Italic = false },
                 AddressSettings = new() { Color = Color.DarkCyan, Bold = false, Italic = false, Format = AddressFormat.AndUppercase },
                 LiteralSettings = new() { Color = Color.DarkMagenta, Bold = false, Italic = false, Format = LiteralFormat.Hexadecimal },
                 MnemonicSettings = new() { Color = Color.Blue, Bold = false, Italic = false, Format = MnemonicFormat.Uppercase },
                 PunctuationSettings = new() { Color = Color.Gray, Bold = false, Italic = false }
             };
-            DarkSettings = new()
+            DarkColorThemeSettings = new()
             {
-                ThemeType = ThemeManager.ThemeType.Dark,
+                ColorTheme = ColorThemeType.Dark,
                 LabelSettings = new() { Color = Color.White, Bold = false, Italic = false },
                 AddressSettings = new() { Color = Color.Cyan, Bold = false, Italic = false, Format = AddressFormat.AndUppercase },
                 LiteralSettings = new() { Color = Color.Magenta, Bold = false, Italic = false, Format = LiteralFormat.Hexadecimal },
@@ -68,12 +57,100 @@ namespace BeebPerf.model
         {
             return new()
             {
-                Theme = Theme,
                 FontScaling = FontScaling,
                 CodeFont = CodeFont,
-                LightSettings = LightSettings.Clone(),
-                DarkSettings = DarkSettings.Clone(),
+                LightColorThemeSettings = LightColorThemeSettings.Clone(),
+                DarkColorThemeSettings = DarkColorThemeSettings.Clone(),
             };
+        }
+
+        public ColorThemeSettingsType ColorThemeSettings
+        {
+            get => ColorTheme.IsLightMode() ? LightColorThemeSettings : DarkColorThemeSettings;
+        }
+
+        public Font GetFont(Setting setting, Font baseFont)
+        {
+            int fontSize = (int)float.Round(baseFont.SizeInPoints * FontScaling / 100.0f);
+
+            var settings = ColorThemeSettings[setting];
+            FontStyle fontStyle = FontStyle.Regular;
+            if (settings!.Bold)
+                fontStyle |= FontStyle.Bold;
+            if (settings!.Italic)
+                fontStyle |= FontStyle.Italic;
+
+            string fontName = baseFont.Name;
+            if (CodeFont.Length > 0)
+                fontName = CodeFont;
+
+            return new Font(fontName, fontSize, fontStyle);
+        }
+
+        public Color GetColor(Setting setting)
+        {
+            return ColorThemeSettings[setting]!.Color;
+        }
+
+        public string Format(Setting setting, object value)
+        {
+            switch (setting)
+            {
+                case Setting.Address:
+                    return FormatAddress(value);
+
+                case Setting.Mnemonic:
+                    var text = (string)value;
+                    text = ColorThemeSettings.MnemonicSettings.Format switch
+                    {
+                        MnemonicFormat.Uppercase => text.ToUpper(),
+                        MnemonicFormat.Lowercase => text.ToLower(),
+                        _ => text
+                    };
+                    return text.PadRight(5, ' ');
+
+                case Setting.Literal:
+                    int integer = Convert.ToInt32(value);
+                    return ColorThemeSettings.LiteralSettings.Format switch
+                    {
+                        LiteralFormat.Hexadecimal => FormatAddress(value),
+                        LiteralFormat.Decimal => integer.ToString(),
+                        LiteralFormat.Binary => Convert.ToString(integer, 2),
+                        _ => string.Empty
+                    };
+
+                case Setting.Label:
+                case Setting.Punctuation:
+                    return (string)value;
+
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private string FormatAddress(Object value)
+        {
+            int integer = Convert.ToInt32(value);
+            bool zeroPage = value is byte;
+            return ColorThemeSettings.AddressSettings.Format switch
+            {
+                AddressFormat.AndUppercase => zeroPage ? $"&{integer:X2}" : $"&{integer:X4}",
+                AddressFormat.AndLowercase => zeroPage ? $"&{integer:x2}" : $"&{integer:x4}",
+                AddressFormat.DollarUppercase => zeroPage ? $"${integer:X2}" : $"${integer:X4}",
+                AddressFormat.DollarLowercase => zeroPage ? $"${integer:x2}" : $"${integer:x4}",
+                AddressFormat.OxUppercase => zeroPage ? $"0x{integer:X2}" : $"0x{integer:X4}",
+                AddressFormat.OxLowercase => zeroPage ? $"0x{integer:x2}" : $"0x{integer:x4}",
+                _ => string.Empty
+            };
+        }
+
+        public enum Setting
+        { 
+            Label,
+            Address,
+            Mnemonic,
+            Literal,
+            Punctuation
         }
 
         public enum AddressFormat
@@ -171,13 +248,13 @@ namespace BeebPerf.model
             public LiteralFormat Format { get; set; }
         }
 
-        public class ThemeSettingsType
+        public class ColorThemeSettingsType
         {
-            public ThemeSettingsType Clone()
+            public ColorThemeSettingsType Clone()
             {
-                return new ThemeSettingsType
+                return new ColorThemeSettingsType
                 {
-                    ThemeType = ThemeType,
+                    ColorTheme = ColorTheme,
                     MnemonicSettings = MnemonicSettings.Clone(),
                     AddressSettings = AddressSettings.Clone(),
                     LiteralSettings = LiteralSettings.Clone(),
@@ -186,7 +263,23 @@ namespace BeebPerf.model
                 };
             }
 
-            public required ThemeManager.ThemeType ThemeType { get; set; }
+            public CommonSettingsType? this[Setting indexer]
+            {
+                get
+                {
+                    return indexer switch
+                    {
+                        Setting.Label => LabelSettings,
+                        Setting.Address => AddressSettings,
+                        Setting.Mnemonic => MnemonicSettings,
+                        Setting.Literal => LiteralSettings,
+                        Setting.Punctuation => PunctuationSettings,
+                        _ => null
+                    };
+                }
+            }
+
+            public required ColorThemeType ColorTheme { get; set; }
             public required MnemonicSettingsType MnemonicSettings { get; set; }
             public required AddressSettingsType AddressSettings { get; set; }
             public required LiteralSettingsType LiteralSettings { get; set; }
@@ -194,29 +287,26 @@ namespace BeebPerf.model
             public required CommonSettingsType LabelSettings { get; set; }
         }
 
-        public ThemeSettingsType ThemeSettings
+        static public string Serialize(DisplaySettings settings)
         {
-            get
+            return JsonSerializer.Serialize(settings);
+        }
+
+        static public DisplaySettings? Deserialize(string json)
+        {
+            try
             {
-                if (Theme == ThemeManager.ThemeType.System)
-                    return IsLightSystemTheme() ? LightSettings : DarkSettings;
-                else 
-                    return (Theme == ThemeManager.ThemeType.Light) ? LightSettings : DarkSettings;
+                return JsonSerializer.Deserialize<DisplaySettings>(json);
+            }
+            catch
+            {
+                return new DisplaySettings();
             }
         }
 
-        private bool IsLightSystemTheme()
-        {
-            const string keyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
-            using var key = Registry.CurrentUser.OpenSubKey(keyPath);
-            var value = key?.GetValue("AppsUseLightTheme");
-            return (value is int intValue && intValue == 1);
-        }
-
-        public ThemeManager.ThemeType Theme { get; set; }
         public int FontScaling { get; set; }
         public string CodeFont { get; set; }
-        public ThemeSettingsType LightSettings { get; set; }
-        public ThemeSettingsType DarkSettings { get; set; }
+        public ColorThemeSettingsType LightColorThemeSettings { get; set; }
+        public ColorThemeSettingsType DarkColorThemeSettings { get; set; }
     }
 }
