@@ -56,6 +56,7 @@ namespace BeebPerf.ux
             foreach (DataGridViewColumn column in Columns)
                 column.SortMode = DataGridViewColumnSortMode.NotSortable;
 
+            SetColumnAlignment(AddressColumnIndex, DataGridViewContentAlignment.MiddleCenter);
             SetColumnAlignment(MemoryReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(MemoryWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TailCallColumnIndex, DataGridViewContentAlignment.MiddleCenter);
@@ -232,15 +233,15 @@ namespace BeebPerf.ux
             {
                 var size = base.GetPreferredSize(graphics, cellStyle, rowIndex, constraintSize);
 
-                var codeGridView = (CodeView)DataGridView!;
-                var obj = (object)codeGridView._DataRows[rowIndex];
+                var codeView = (CodeView)DataGridView!;
+                var obj = (object)codeView._DataRows[rowIndex];
                 if (obj is InstructionMetrics &&
                     (ColumnIndex == AddressColumnIndex ||
                      ColumnIndex == LabelColumnIndex ||
                      ColumnIndex == InstructionColumnIndex))
                 {
-                    int measure = PaintCode((InstructionMetrics)obj, graphics, cellBounds: null, cellStyle, rowIndex, measureOnly: true);
-                    int padding = cellStyle.Font.Height / 2;
+                    int measure = PaintCode(codeView, (InstructionMetrics)obj, graphics, cellBounds: null, cellStyle, rowIndex, measureOnly: true);
+                    int padding = cellStyle.Font.Height;
                     size.Width = measure + padding + cellStyle.Padding.Horizontal;
                 }
 
@@ -260,38 +261,38 @@ namespace BeebPerf.ux
                 DataGridViewAdvancedBorderStyle advancedBorderStyle,
                 DataGridViewPaintParts paintParts)
             {
-                var codeGridView = (CodeView)DataGridView!;
-                var obj = (object)codeGridView._DataRows[rowIndex];
-                PaintBackground(graphics, cellBounds, rowIndex, cellState, obj);
+                var codeView = (CodeView)DataGridView!;
+                var obj = (object)codeView._DataRows[rowIndex];
+                PaintBackground(codeView, graphics, cellBounds, rowIndex, cellState, obj);
                 if (obj is InstructionMetrics)
                     if (ColumnIndex == AddressColumnIndex ||
                         ColumnIndex == LabelColumnIndex ||
                         ColumnIndex == InstructionColumnIndex)
-                        PaintCode((InstructionMetrics)obj, graphics, cellBounds, cellStyle, rowIndex, measureOnly: false);
+                        PaintCode(codeView, (InstructionMetrics)obj, graphics, cellBounds, cellStyle, rowIndex, measureOnly: false);
                     else
                         base.Paint(
                             graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
                             cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
                 else if (obj is Ellipses)
-                    PaintEllipses(graphics, cellBounds, cellStyle);
+                    PaintEllipses(codeView, graphics, cellBounds, cellStyle);
                 else if (obj is FallThrough)
-                    PaintFallThrough(graphics, rowIndex, cellStyle);
+                    PaintFallThrough(codeView, graphics, rowIndex, cellStyle);
             }
 
             private void PaintBackground(
+                CodeView codeView,
                 Graphics graphics,
                 Rectangle cellBounds,
                 int rowIndex,
                 DataGridViewElementStates cellState,
                 object value)
             {
-                var codeGridView = (CodeView)DataGridView!;
-                var backColor = codeGridView.DefaultCellStyle.BackColor;
+                var backColor = codeView.DefaultCellStyle.BackColor;
 
                 if (value is InstructionMetrics)
                 {
                     var instructionMetrics = (InstructionMetrics)value!;
-                    double hotness = Math.Clamp((double)instructionMetrics.InclusiveCycleCount / codeGridView._TotalCycleCount, 0.0, 1.0);
+                    double hotness = Math.Clamp((double)instructionMetrics.InclusiveCycleCount / codeView._TotalCycleCount, 0.0, 1.0);
                     Color hotColor = backColor.GetBrightness() > 0.5 ? ColorLightRed : Color.DarkRed;
                     backColor = Blend(backColor, hotColor, hotness);
                 }
@@ -304,6 +305,7 @@ namespace BeebPerf.ux
             }
 
             private int PaintCode(
+                CodeView codeView,
                 InstructionMetrics instructionMetrics,
                 Graphics graphics,
                 Rectangle? cellBounds,
@@ -314,8 +316,7 @@ namespace BeebPerf.ux
                 if (rowIndex > 0 && (ColumnIndex == AddressColumnIndex || ColumnIndex == LabelColumnIndex))
                 {
                     // is duplicate?
-                    var codeGridView = (CodeView)DataGridView!;
-                    var valueAbove = codeGridView._DataRows[rowIndex - 1];
+                    var valueAbove = codeView._DataRows[rowIndex - 1];
                     if (valueAbove is InstructionMetrics)
                     {
                         var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
@@ -324,16 +325,17 @@ namespace BeebPerf.ux
                     }
                 }
 
-                if (ColumnIndex == AddressColumnIndex)
-                    return PaintAddress(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
-                else if (ColumnIndex == LabelColumnIndex)
-                    return PaintLabel(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
-                else if (ColumnIndex == InstructionColumnIndex)
-                    return PaintInstruction(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
-                return 0;
+                return ColumnIndex switch
+                {
+                    LabelColumnIndex => PaintLabel(codeView, instructionMetrics, graphics, cellBounds, cellStyle, measureOnly),
+                    AddressColumnIndex => PaintAddress(codeView, instructionMetrics, graphics, cellBounds, cellStyle, measureOnly),
+                    InstructionColumnIndex => PaintInstruction(codeView, instructionMetrics, graphics, cellBounds, cellStyle, measureOnly),
+                    _ => 0
+                };
             }
 
             private int PaintAddress(
+                CodeView codeView,
                 InstructionMetrics instructionMetrics,
                 Graphics graphics,
                 Rectangle? cellBounds,
@@ -341,34 +343,34 @@ namespace BeebPerf.ux
                 bool measureOnly)
             {
                 ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
-                return PaintCodeElement(Setting.Address, address, indent: 0, graphics, cellBounds, cellStyle, measureOnly);
+                return PaintCodeElement(codeView, Setting.Address, address, indent: 0, graphics, cellBounds, cellStyle, measureOnly);
             }
 
             private int PaintLabel(
+                CodeView codeView,
                 InstructionMetrics instructionMetrics,
                 Graphics graphics,
                 Rectangle? cellBounds,
                 DataGridViewCellStyle cellStyle,
                 bool measureOnly)
             {
-                var codeGridView = (CodeView)DataGridView!;
                 ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
-                string label = codeGridView.FormatLabel(address, withOffset: false);
-                return PaintCodeElement(Setting.Label, label, indent: 0, graphics, cellBounds, cellStyle, measureOnly);
+                string label = codeView.FormatLabel(address, withOffset: false);
+                return PaintCodeElement(codeView, Setting.Label, label, indent: 0, graphics, cellBounds, cellStyle, measureOnly);
             }
 
             private int PaintInstruction(
+                CodeView codeView,
                 InstructionMetrics instructionMetrics,
                 Graphics graphics,
                 Rectangle? cellBounds,
                 DataGridViewCellStyle cellStyle,
                 bool measureOnly)
             {
-                var codeGridView = (CodeView)DataGridView!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
 
-                var instructionSet = codeGridView._InstructionSet!;
+                var instructionSet = codeView._InstructionSet!;
                 int opSize = instructionSet.Size(opcode);
                 string mnemonic = instructionSet.Mnemonic(opcode);
                 InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
@@ -380,7 +382,7 @@ namespace BeebPerf.ux
                 }
 
                 List<Segment> segments = new();
-                segments.Add(new Segment { Value = mnemonic, Type = Setting.Mnemonic });
+                segments.Add(new Segment { Type = Setting.Mnemonic, Value = mnemonic });
 
                 if (opSize > 1)
                 {
@@ -389,16 +391,16 @@ namespace BeebPerf.ux
                         address = (byte)operand;
 
                     var type = (addressMode == InstructionSet.AddressMode.Immediate) ? Setting.Literal : Setting.Address;
-                    segments.Add(new Segment { Value = address, Type = type });
+                    segments.Add(new Segment { Type = type, Value = address });
 
                     if (addressMode != InstructionSet.AddressMode.Immediate)
                     {
-                        string label = codeGridView.FormatLabel(operand, withOffset: true);
+                        string label = codeView.FormatLabel(operand, withOffset: true);
                         if (label.Length > 0)
                         {
-                            segments.Insert(1, new Segment { Value = label, Type = Setting.Label });
-                            segments.Insert(2, new Segment { Value = " (", Type = Setting.Punctuation });
-                            segments.Add(new Segment { Value = ")", Type = Setting.Punctuation });
+                            segments.Insert(1, new Segment { Type = Setting.Label, Value = label });
+                            segments.Insert(2, new Segment { Type = Setting.Punctuation, Value = " (" });
+                            segments.Add(new Segment { Type = Setting.Punctuation, Value = ")" });
                         }
                     }
                 }
@@ -406,36 +408,36 @@ namespace BeebPerf.ux
                 switch (addressMode)
                 {
                     case InstructionSet.AddressMode.Accumulator:
-                        segments.Add(new Segment { Value = "A", Type = Setting.Mnemonic });
+                        segments.Add(new Segment { Type = Setting.Mnemonic, Value = "A" });
                         break;
 
                     case InstructionSet.AddressMode.Immediate:
-                        segments.Insert(1, new Segment { Value = "#", Type = Setting.Punctuation });
+                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "#" });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageX:
                     case InstructionSet.AddressMode.AbsoluteX:
-                        segments.Add(new Segment { Value = ",X", Type = Setting.Punctuation });
+                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X" });
                         break;
 
                     case InstructionSet.AddressMode.ZeroPageY:
                     case InstructionSet.AddressMode.AbsoluteY:
-                        segments.Add(new Segment { Value = ",Y", Type = Setting.Punctuation });
+                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",Y",  });
                         break;
 
                     case InstructionSet.AddressMode.Indirect:
-                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
-                        segments.Add(new Segment { Value = ")", Type = Setting.Punctuation });
+                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "("  });
+                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ")" });
                         break;
 
                     case InstructionSet.AddressMode.IndirectX:
-                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
-                        segments.Add(new Segment { Value = ",X)", Type = Setting.Punctuation });
+                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
+                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X)" });
                         break;
 
                     case InstructionSet.AddressMode.IndirectY:
-                        segments.Insert(1, new Segment { Value = "(", Type = Setting.Punctuation });
-                        segments.Add(new Segment { Value = "),Y", Type = Setting.Punctuation });
+                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
+                        segments.Add(new Segment { Type = Setting.Punctuation, Value = "),Y" });
                         break;
                     default:
                         break;
@@ -443,7 +445,7 @@ namespace BeebPerf.ux
 
                 int measureWidth = 0;
                 foreach (var segment in segments)
-                    measureWidth += PaintCodeElement(segment.Type, segment.Value, indent: measureWidth, graphics, cellBounds, cellStyle, measureOnly);
+                    measureWidth += PaintCodeElement(codeView, segment.Type, segment.Value, indent: measureWidth, graphics, cellBounds, cellStyle, measureOnly);
 
                 if (!measureOnly && instructionMetrics.CodeModified)
                 {
@@ -456,6 +458,7 @@ namespace BeebPerf.ux
             }
 
             private int PaintCodeElement(
+                CodeView codeView,
                 Setting setting,
                 Object value,
                 int indent,
@@ -464,8 +467,7 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 bool measureOnly)
             {
-                var codeGridView = (CodeView)DataGridView!;
-                var form = (BeebPerfForm)codeGridView.FindForm()!;
+                var form = (BeebPerfForm)codeView.FindForm()!;
                 var displaySettings = form.DisplaySettings;
 
                 var text = displaySettings.Format(setting, value);
@@ -476,29 +478,48 @@ namespace BeebPerf.ux
                 if (!measureOnly)
                 {
                     Rectangle bounds = (Rectangle)cellBounds!;
-                    int heightAdjust = (bounds.Height - measure.Height) / 2;
+
+                    var format = new StringFormat();
+                    if (cellStyle.Alignment == DataGridViewContentAlignment.MiddleCenter)
+                    {
+                        format.Alignment |= StringAlignment.Center;
+                        indent = (bounds.Width - indent) / 2;
+                    }
+                    else if (cellStyle.Alignment == DataGridViewContentAlignment.MiddleRight)
+                    {
+                        format.Alignment |= StringAlignment.Far;
+                        indent = bounds.Width - indent;
+                    }
+
+                    int heightAdjust = (bounds.Height - font.Height) / 2;
                     using var brush = new SolidBrush(displaySettings.GetColor(setting));
-                    graphics.DrawString(text, font, brush, bounds.X + indent, bounds.Y + heightAdjust);
+                    graphics.DrawString(text, font, brush, bounds.X + indent, bounds.Y + heightAdjust, format);
                 }
 
                 return measure.Width;
             }
 
-            private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
+            private void PaintEllipses(
+                CodeView codeView,
+                Graphics graphics, 
+                Rectangle cellBounds, 
+                DataGridViewCellStyle cellStyle)
             {
                 if (ColumnIndex == AddressColumnIndex || ColumnIndex == InstructionColumnIndex)
                     graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
             }
 
-            private void PaintFallThrough(Graphics graphics, int rowIndex, DataGridViewCellStyle cellStyle)
+            private void PaintFallThrough(
+                CodeView codeView,
+                Graphics graphics, 
+                int rowIndex, 
+                DataGridViewCellStyle cellStyle)
             {
-                var codeGridView = (CodeView)DataGridView!;
-
-                int lastColumnIndex = codeGridView.Columns[^1].Index;
-                var lastCellBounds = codeGridView.GetCellDisplayRectangle(lastColumnIndex, rowIndex, cutOverflow: false);
+                int lastColumnIndex = codeView.Columns[^1].Index;
+                var lastCellBounds = codeView.GetCellDisplayRectangle(lastColumnIndex, rowIndex, cutOverflow: false);
                 var rowBounds = new Rectangle(0, lastCellBounds.Y, lastCellBounds.Right, lastCellBounds.Height);
                 if (rowBounds.IsEmpty)
-                    rowBounds = codeGridView.GetRowDisplayRectangle(rowIndex, cutOverflow: false);
+                    rowBounds = codeView.GetRowDisplayRectangle(rowIndex, cutOverflow: false);
 
                 using var font = new Font(cellStyle.Font, FontStyle.Italic);
                 var text = "fall-through";
@@ -534,8 +555,8 @@ namespace BeebPerf.ux
 
             private struct Segment
             {
-                public Object Value;
                 public DisplaySettings.Setting Type;
+                public Object Value;
             };
 
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
