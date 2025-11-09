@@ -477,9 +477,7 @@ namespace BeebPerf.ux
 
                 if (!measureOnly)
                 {
-                    Rectangle bounds = (Rectangle)cellBounds!;
-
-                    StringFormat format = new()
+                    StringFormat stringFormat = new()
                     {
                         FormatFlags = StringFormatFlags.NoWrap | StringFormatFlags.NoClip,
                         LineAlignment = StringAlignment.Center,
@@ -493,6 +491,7 @@ namespace BeebPerf.ux
                         }
                     };
 
+                    Rectangle bounds = (Rectangle)cellBounds!;
                     bounds.X += cellStyle.Padding.Left;
                     bounds.Y += cellStyle.Padding.Top;
                     bounds.Width -= cellStyle.Padding.Horizontal;
@@ -505,7 +504,7 @@ namespace BeebPerf.ux
                         bounds.Width -= indent;
 
                     using var brush = new SolidBrush(displaySettings.GetColor(setting));
-                    graphics.DrawString(text, font, brush, bounds, format);
+                    graphics.DrawString(text, font, brush, bounds, stringFormat);
                 }
 
                 return measure.Width;
