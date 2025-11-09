@@ -479,21 +479,33 @@ namespace BeebPerf.ux
                 {
                     Rectangle bounds = (Rectangle)cellBounds!;
 
-                    var format = new StringFormat();
-                    if (cellStyle.Alignment == DataGridViewContentAlignment.MiddleCenter)
+                    StringFormat format = new()
                     {
-                        format.Alignment |= StringAlignment.Center;
-                        indent = (bounds.Width - indent) / 2;
-                    }
-                    else if (cellStyle.Alignment == DataGridViewContentAlignment.MiddleRight)
-                    {
-                        format.Alignment |= StringAlignment.Far;
-                        indent = bounds.Width - indent;
-                    }
+                        FormatFlags = StringFormatFlags.NoWrap | StringFormatFlags.NoClip,
+                        LineAlignment = StringAlignment.Center,
+                        Trimming = StringTrimming.EllipsisCharacter,
+                        Alignment = cellStyle.Alignment switch
+                        {
+                            DataGridViewContentAlignment.MiddleLeft => StringAlignment.Near,
+                            DataGridViewContentAlignment.MiddleCenter => StringAlignment.Center,
+                            DataGridViewContentAlignment.MiddleRight => StringAlignment.Far,
+                            _ => StringAlignment.Near,
+                        }
+                    };
 
-                    int heightAdjust = (bounds.Height - font.Height) / 2;
+                    bounds.X += cellStyle.Padding.Left;
+                    bounds.Y += cellStyle.Padding.Top;
+                    bounds.Width -= cellStyle.Padding.Horizontal;
+                    bounds.Height -= cellStyle.Padding.Vertical;
+
+                    if (cellStyle.Alignment == DataGridViewContentAlignment.MiddleLeft)
+                        bounds.X += indent;
+
+                    if (cellStyle.Alignment != DataGridViewContentAlignment.MiddleCenter)
+                        bounds.Width -= indent;
+
                     using var brush = new SolidBrush(displaySettings.GetColor(setting));
-                    graphics.DrawString(text, font, brush, bounds.X + indent, bounds.Y + heightAdjust, format);
+                    graphics.DrawString(text, font, brush, bounds, format);
                 }
 
                 return measure.Width;
