@@ -31,6 +31,7 @@ namespace BeebPerf.ux
             _ScrollBar.Scroll += ScrollBar_Scroll;
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
+            Layout += LayoutFunc;
         }
 
         public void SelectRange(int analysisFrom, int analysisTo)
@@ -538,6 +539,14 @@ namespace BeebPerf.ux
             _AnalysisTo = _RecordingDuration;
             ZoomOutInternal();
             OnRangeChange();
+        }
+
+        private void LayoutFunc(object? sender, LayoutEventArgs e)
+        {
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
+            UpdateDurationText();
+            UpdateTimeline();
         }
 
         private void UpdateTimeline()

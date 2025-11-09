@@ -21,6 +21,7 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using System.Windows.Forms;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -41,6 +42,7 @@ namespace BeebPerf.ux
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
 
             _SelectedTab = tabControl.SelectedTab;
+            _BaseFont = Font;
         }
 
         protected override void OnHandleCreated(EventArgs e)
@@ -288,7 +290,7 @@ namespace BeebPerf.ux
 
         private void settingsButton_Click(object sender, EventArgs e)
         {
-            var operation = new EditSettingsOperation(this);
+            var operation = new EditSettingsOperation(this, _BaseFont);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
@@ -546,6 +548,53 @@ namespace BeebPerf.ux
             WindowState = (FormWindowState)state;
             splitContainer.Orientation = (Orientation)orientation;
             splitContainer.SplitterDistance = splitterDistance;
+
+            if (DisplaySettings.FontScaling != 100)
+                ApplyFontScaling(this, DisplaySettings.FontScaling);
+        }
+
+        public void ApplyFontScaling(Control control, int fontScaling)
+        {
+            int fontSize = (int)float.Round(_BaseFont.SizeInPoints * fontScaling / 100.0f);
+            Font font = new Font(_BaseFont.Name, fontSize, FontStyle.Regular);
+            SuspendLayout();
+            ApplyFontToAllControls(control, font);
+            ResumeLayout();
+            PerformLayout();
+        }
+
+        private void ApplyFontToAllControls(Control control, Font font)
+        {
+            if (control.Font.Style != font.Style)
+                control.Font = new Font(font, control.Font.Style);
+            else
+                control.Font = font;
+
+            if (control is DataGridView)
+            {
+                var dataGridView = (DataGridView)control;
+                int baseHeight = TextRenderer.MeasureText("Sample", font).Height;
+                int rowHeight = baseHeight + 6;
+
+                dataGridView.RowTemplate.Height = rowHeight;
+
+                for (int i = 0; i < dataGridView.Rows.Count; i++)
+                {
+                    if ((dataGridView.Rows.GetRowState(i) & DataGridViewElementStates.Displayed) != 0 ||
+                        (dataGridView.Rows.GetRowState(i) & DataGridViewElementStates.Selected) != 0)
+                    {
+                        DataGridViewRow row = dataGridView.Rows[i];
+                        row.Height = rowHeight;
+                    }
+                }
+
+                dataGridView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            }
+
+            foreach (Control child in control.Controls)
+            {
+                ApplyFontToAllControls(child, font);
+            }
         }
 
         private void UpdateToolbarState()
@@ -656,5 +705,6 @@ namespace BeebPerf.ux
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
         private MemoryAnalysis _MemoryAnalysis = new();
+        private Font _BaseFont;
     }
 }

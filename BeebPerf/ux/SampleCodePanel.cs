@@ -64,7 +64,8 @@ namespace BeebPerf.ux
 
             // paint instructions
             int indent = Font.Height / 2;
-            int lineHeight = (int)double.Round((double)Font.Height * DisplaySettings.FontScaling / 100.0);
+            int baseHeight = TextRenderer.MeasureText("Sample", Font).Height;
+            int lineHeight = baseHeight + 6;
             var position = new Point(indent, Math.Max(0, (Height - _Instructions.Length * lineHeight) / 2));
             foreach (var instruction in _Instructions)
             {

@@ -30,10 +30,11 @@ namespace BeebPerf.ux
     {
         public DisplaySettings? Settings;
 
-        internal EditSettingsDialog(DisplaySettings settings)
+        internal EditSettingsDialog(DisplaySettings settings, Font baseFont)
         {
             _SuppressChangeEvents++;
 
+            _BaseFont = baseFont;
             _Settings = settings.Clone();
 
             InitializeComponent();
@@ -63,6 +64,26 @@ namespace BeebPerf.ux
             colorThemeComboBox.Enabled = ColorTheme.CanSet();
 
             sampleCodePanel.Invalidate();
+
+            ApplyFontScaling(this, settings.FontScaling);
+        }
+
+        private void ApplyFontScaling(Control control, int fontScaling)
+        {
+            int fontSize = (int)float.Round(_BaseFont.SizeInPoints * fontScaling / 100.0f);
+            Font font = new Font(_BaseFont.Name, fontSize, FontStyle.Regular);
+            ApplyFontToAllControls(control, font);
+        }
+
+        private void ApplyFontToAllControls(Control control, Font font)
+        {
+            if (control.Font.Style != font.Style)
+                control.Font = new Font(font, control.Font.Style);
+            else
+                control.Font = font;
+
+            foreach (Control child in control.Controls)
+                ApplyFontToAllControls(child, font);
         }
 
         private void OkButton_Click(object sender, EventArgs e)
@@ -77,8 +98,10 @@ namespace BeebPerf.ux
 
             var value = (string)textScalingComboBox.SelectedItem!;
             var match = Regex.Match(value, @"\d+");
-            _Settings.FontScaling = match.Success ? int.Parse(match.Value) : 100;
+            var textScaling = match.Success ? int.Parse(match.Value) : 100;
+            _Settings.FontScaling = textScaling;
 
+            ApplyFontScaling(sampleCodePanel, textScaling);
             sampleCodePanel.Invalidate();
         }
 
@@ -310,5 +333,6 @@ namespace BeebPerf.ux
 
         private DisplaySettings _Settings;
         private int _SuppressChangeEvents;
+        private Font _BaseFont;
     }
 }

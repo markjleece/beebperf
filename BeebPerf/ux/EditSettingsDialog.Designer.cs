@@ -539,13 +539,13 @@ namespace BeebPerf.ux
             sampleCodePanel.BorderStyle = BorderStyle.FixedSingle;
             sampleCodePanel.Location = new Point(12, 739);
             sampleCodePanel.Name = "sampleCodePanel";
-            sampleCodePanel.Size = new Size(592, 101);
+            sampleCodePanel.Size = new Size(592, 123);
             sampleCodePanel.TabIndex = 18;
             // 
             // okButton
             // 
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point(374, 846);
+            okButton.Location = new Point(374, 868);
             okButton.Name = "okButton";
             okButton.Size = new Size(112, 34);
             okButton.TabIndex = 0;
@@ -556,7 +556,7 @@ namespace BeebPerf.ux
             // cancelButton
             // 
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new Point(492, 846);
+            cancelButton.Location = new Point(492, 868);
             cancelButton.Name = "cancelButton";
             cancelButton.Size = new Size(112, 34);
             cancelButton.TabIndex = 0;
@@ -569,7 +569,7 @@ namespace BeebPerf.ux
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = cancelButton;
-            ClientSize = new Size(616, 892);
+            ClientSize = new Size(616, 914);
             Controls.Add(sampleCodePanel);
             Controls.Add(punctuationGroupBox);
             Controls.Add(literalGroupBox);

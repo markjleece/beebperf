@@ -313,7 +313,6 @@ namespace BeebPerf.ux
             // 
             dataGridViewCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle.BackColor = SystemColors.Window;
-            dataGridViewCellStyle.Font = new Font("Segoe UI", 9F);
             dataGridViewCellStyle.ForeColor = SystemColors.ControlText;
             dataGridViewCellStyle.Format = "N2";
             dataGridViewCellStyle.NullValue = null;
@@ -331,7 +330,6 @@ namespace BeebPerf.ux
             // 
             // callTreeView
             // 
-            callTreeView.ColumnHeadersHeight = 34;
             callTreeView.DefaultCellStyle = dataGridViewCellStyle;
             callTreeView.Dock = DockStyle.Fill;
             callTreeView.Location = new Point(3, 3);
@@ -367,7 +365,6 @@ namespace BeebPerf.ux
             // 
             // routinesView
             // 
-            routinesView.ColumnHeadersHeight = 34;
             routinesView.DefaultCellStyle = dataGridViewCellStyle;
             routinesView.Dock = DockStyle.Fill;
             routinesView.Location = new Point(3, 3);

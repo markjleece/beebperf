@@ -71,8 +71,6 @@ namespace BeebPerf.model
 
         public Font GetFont(Setting setting, Font baseFont)
         {
-            int fontSize = (int)float.Round(baseFont.SizeInPoints * FontScaling / 100.0f);
-
             var settings = ColorThemeSettings[setting];
             FontStyle fontStyle = FontStyle.Regular;
             if (settings!.Bold)
@@ -84,7 +82,7 @@ namespace BeebPerf.model
             if (CodeFont.Length > 0)
                 fontName = CodeFont;
 
-            return new Font(fontName, fontSize, fontStyle);
+            return new Font(fontName, baseFont.SizeInPoints, fontStyle);
         }
 
         public Color GetColor(Setting setting)

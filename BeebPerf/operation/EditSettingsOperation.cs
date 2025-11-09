@@ -27,9 +27,10 @@ namespace BeebPerf.operation
 {
     class EditSettingsOperation : Operation
     {
-        public EditSettingsOperation(BeebPerfForm form)
+        public EditSettingsOperation(BeebPerfForm form, Font baseFont)
         {
             _Form = form;
+            _BaseFont = baseFont;
             _PrevSettings = form.DisplaySettings;
             _PrevColorTheme = ColorTheme.Get();
             _NewSettings = new();
@@ -37,7 +38,7 @@ namespace BeebPerf.operation
 
         public override bool Execute()
         {
-            EditSettingsDialog dialog = new(_PrevSettings);
+            EditSettingsDialog dialog = new(_PrevSettings, _BaseFont);
             dialog.Owner = _Form;
             if (dialog.ShowDialog() == DialogResult.OK)
             {
@@ -55,15 +56,18 @@ namespace BeebPerf.operation
         {
             _Form.DisplaySettings = _NewSettings;
             ColorTheme.Set(_Form, _NewColorTheme);
+            _Form.ApplyFontScaling(_Form, _NewSettings.FontScaling);
         }
 
         public override void Undo()
         {
             _Form.DisplaySettings = _PrevSettings;
             ColorTheme.Set(_Form, _PrevColorTheme);
+            _Form.ApplyFontScaling(_Form, _PrevSettings.FontScaling);
         }
 
         private BeebPerfForm _Form;
+        private Font _BaseFont;
         private ColorThemeType _NewColorTheme;
         private ColorThemeType _PrevColorTheme;
         private DisplaySettings _NewSettings;
