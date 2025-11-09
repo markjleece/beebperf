@@ -109,7 +109,7 @@ namespace BeebPerf.ux
             {
                 AddressColumnIndex => memoryAccess.Address.ToString(),
                 PageColumnIndex => memoryAccess.Address.Page.ToString(),
-                LabelColumnIndex => FormatLabel(memoryAccess.Address.Address, withOffsets: true),
+                LabelColumnIndex => FormatLabel(memoryAccess.Address.Address, withOffset: true),
                 _ => FormatCountAndRange(memoryAccess, columnIndex),
             };
         }

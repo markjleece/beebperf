@@ -146,6 +146,7 @@ namespace BeebPerf.ux
 
             SetRowsData(dataRows);
             SetToolTips(dataRows);
+            ResizeColumns();
         }
 
         public new void Clear()
@@ -154,6 +155,15 @@ namespace BeebPerf.ux
             SetColumnVisibility(MemoryWriteCountColumnIndex, false);
             _MemoryAccess = null;
             base.Clear();
+            ResizeColumns();
+        }
+
+        private void ResizeColumns()
+        {
+            foreach (DataGridViewColumn column in Columns)
+                column.MinimumWidth = 2;
+            AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+            Invalidate();
         }
 
         protected override string OnFormatRowData(object obj, int columnIndex, int rowIndex)
@@ -161,27 +171,7 @@ namespace BeebPerf.ux
             if (obj is not InstructionMetrics)
                 return string.Empty;
 
-            var instructionMetrics = (InstructionMetrics)obj;
-            if (rowIndex > 0 && (columnIndex == AddressColumnIndex || columnIndex == LabelColumnIndex))
-            {
-                // is duplicate?
-                var valueAbove = _DataRows[rowIndex - 1];
-                if (valueAbove is InstructionMetrics)
-                {
-                    var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
-                    if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
-                        return string.Empty;
-                }
-            }
-
-            return columnIndex switch
-            {
-                AddressColumnIndex => instructionMetrics.Instruction.OpcodeAddress.ToString(),
-                LabelColumnIndex => FormatLabel(instructionMetrics.Instruction.OpcodeAddress.Address, withOffsets: false),
-                InstructionColumnIndex => FormatInstruction(instructionMetrics),
-                TailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
-                _ => FormatCountAndRange(obj, columnIndex)
-            };
+            return FormatCountAndRange(obj, columnIndex);
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)
@@ -236,79 +226,24 @@ namespace BeebPerf.ux
             return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
         }
 
-        private string FormatInstruction(InstructionMetrics instructionMetrics)
-        {
-            var instruction = instructionMetrics.Instruction;
-            byte opcode = instruction.Opcode;
-            ushort operand = instruction.Operand;
-
-            var instructionSet = _InstructionSet!;
-
-            InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
-            if (addressMode == InstructionSet.AddressMode.Relative)
-            {
-                int branchAddress = instruction.OpcodeAddress.Address;
-                operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
-            }
-
-            string formattedOperand = string.Empty;
-            int opSize = instructionSet.Size(opcode);
-            if (opSize > 1)
-            {
-                if (opSize == 2)
-                    formattedOperand = $"&{operand:X2}";
-                else if (opSize == 3)
-                    formattedOperand = $"&{operand:X4}";
-
-                if (addressMode != InstructionSet.AddressMode.Immediate)
-                {
-                    string label = FormatLabel(operand, withOffsets: true);
-                    if (label.Length > 0)
-                        formattedOperand = $"{label} ({formattedOperand})";
-                }
-            }
-
-            string mnemonic = instructionSet.Mnemonic(opcode).PadRight(5);
-            switch (addressMode)
-            {
-                case InstructionSet.AddressMode.Implied:
-                    return $"{mnemonic}";
-
-                case InstructionSet.AddressMode.Accumulator:
-                    return $"{mnemonic}A";
-
-                case InstructionSet.AddressMode.Immediate:
-                    return $"{mnemonic}#{formattedOperand}";
-
-                case InstructionSet.AddressMode.ZeroPage:
-                case InstructionSet.AddressMode.Relative:
-                case InstructionSet.AddressMode.Absolute:
-                    return $"{mnemonic}{formattedOperand}";
-
-                case InstructionSet.AddressMode.ZeroPageX:
-                case InstructionSet.AddressMode.AbsoluteX:
-                    return $"{mnemonic}{formattedOperand},X";
-
-                case InstructionSet.AddressMode.ZeroPageY:
-                case InstructionSet.AddressMode.AbsoluteY:
-                    return $"{mnemonic}{formattedOperand},Y";
-
-                case InstructionSet.AddressMode.Indirect:
-                    return $"{mnemonic}({formattedOperand})";
-
-                case InstructionSet.AddressMode.IndirectX:
-                    return $"{mnemonic}({formattedOperand},X)";
-
-                case InstructionSet.AddressMode.IndirectY:
-                    return $"{mnemonic}({formattedOperand}),Y";
-
-                default:
-                    return "???";
-            }
-        }
-
         public class CellTemplate : GridViewCellTemplate
         {
+            protected override Size GetPreferredSize(Graphics graphics, DataGridViewCellStyle cellStyle, int rowIndex, Size constraintSize)
+            {
+                var size = base.GetPreferredSize(graphics, cellStyle, rowIndex, constraintSize);
+
+                var codeGridView = (CodeView)DataGridView!;
+                var obj = (object)codeGridView._DataRows[rowIndex];
+                if (obj is InstructionMetrics)
+                    if (ColumnIndex == AddressColumnIndex ||
+                        ColumnIndex == LabelColumnIndex ||
+                        ColumnIndex == InstructionColumnIndex)
+                        size.Width = cellStyle.Padding.Horizontal + PaintCode((InstructionMetrics)obj, graphics, cellBounds: null, cellStyle, rowIndex, measureOnly: true);
+
+                return size;
+            }
+
+
             protected override void Paint(
                 Graphics graphics,
                 Rectangle clipBounds,
@@ -326,9 +261,14 @@ namespace BeebPerf.ux
                 var obj = (object)codeGridView._DataRows[rowIndex];
                 PaintBackground(graphics, cellBounds, rowIndex, cellState, obj);
                 if (obj is InstructionMetrics)
-                    PaintInstruction(
-                        graphics, clipBounds, cellBounds, rowIndex, cellState, obj, formattedValue, errorText,
-                        cellStyle, advancedBorderStyle, paintParts);
+                    if (ColumnIndex == AddressColumnIndex ||
+                        ColumnIndex == LabelColumnIndex ||
+                        ColumnIndex == InstructionColumnIndex)
+                        PaintCode((InstructionMetrics)obj, graphics, cellBounds, cellStyle, rowIndex, measureOnly: false);
+                    else
+                        base.Paint(
+                            graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
+                            cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
                 else if (obj is Ellipses)
                     PaintEllipses(graphics, cellBounds, cellStyle);
                 else if (obj is FallThrough)
@@ -360,30 +300,68 @@ namespace BeebPerf.ux
                     DrawBar(rowIndex, graphics, cellBounds, backColor, cellState);
             }
 
-            private void PaintInstruction(
+            private int PaintCode(
+                InstructionMetrics instructionMetrics,
                 Graphics graphics,
-                Rectangle clipBounds,
-                Rectangle cellBounds,
-                int rowIndex,
-                DataGridViewElementStates cellState,
-                object? value,
-                object? formattedValue,
-                string? errorText,
+                Rectangle? cellBounds,
                 DataGridViewCellStyle cellStyle,
-                DataGridViewAdvancedBorderStyle advancedBorderStyle,
-                DataGridViewPaintParts paintParts)
+                int rowIndex,
+                bool measureOnly)
             {
-                if (ColumnIndex != InstructionColumnIndex)
+                if (rowIndex > 0 && (ColumnIndex == AddressColumnIndex || ColumnIndex == LabelColumnIndex))
                 {
-                    base.Paint(
-                        graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
-                        cellStyle, advancedBorderStyle, paintParts & DataGridViewPaintParts.ContentForeground);
-                    return;
+                    // is duplicate?
+                    var codeGridView = (CodeView)DataGridView!;
+                    var valueAbove = codeGridView._DataRows[rowIndex - 1];
+                    if (valueAbove is InstructionMetrics)
+                    {
+                        var instructionMetricsAbove = (InstructionMetrics)valueAbove!;
+                        if (instructionMetricsAbove.Instruction.OpcodeAddress.Equals(instructionMetrics.Instruction.OpcodeAddress))
+                            return 0;
+                    }
                 }
 
-                var codeGridView = (CodeView)DataGridView!;
+                if (ColumnIndex == AddressColumnIndex)
+                    return PaintAddress(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
+                else if (ColumnIndex == LabelColumnIndex)
+                    return PaintLabel(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
+                else if (ColumnIndex == InstructionColumnIndex)
+                    return PaintInstruction(instructionMetrics, graphics, cellBounds, cellStyle, measureOnly);
+                return 0;
+            }
 
-                var instructionMetrics = (InstructionMetrics)value!;
+            private int PaintAddress(
+                InstructionMetrics instructionMetrics,
+                Graphics graphics,
+                Rectangle? cellBounds,
+                DataGridViewCellStyle cellStyle,
+                bool measureOnly)
+            {
+                ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
+                return PaintCodeElement(Setting.Address, address, indent: 0, includePadding: true, graphics, cellBounds, cellStyle, measureOnly);
+            }
+
+            private int PaintLabel(
+                InstructionMetrics instructionMetrics,
+                Graphics graphics,
+                Rectangle? cellBounds,
+                DataGridViewCellStyle cellStyle,
+                bool measureOnly)
+            {
+                var codeGridView = (CodeView)DataGridView!;
+                ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
+                string label = codeGridView.FormatLabel(address, withOffset: false);
+                return PaintCodeElement(Setting.Label, label, indent: 0, includePadding: true, graphics, cellBounds, cellStyle, measureOnly);
+            }
+
+            private int PaintInstruction(
+                InstructionMetrics instructionMetrics,
+                Graphics graphics,
+                Rectangle? cellBounds,
+                DataGridViewCellStyle cellStyle,
+                bool measureOnly)
+            {
+                var codeGridView = (CodeView)DataGridView!;
                 byte opcode = instructionMetrics.Instruction.Opcode;
                 ushort operand = instructionMetrics.Instruction.Operand;
 
@@ -404,15 +382,15 @@ namespace BeebPerf.ux
                 if (opSize > 1)
                 {
                     Object address = operand;
-                    if (opSize == 2)
+                    if (opSize == 2 && addressMode != InstructionSet.AddressMode.Relative)
                         address = (byte)operand;
 
-                    var type = addressMode == InstructionSet.AddressMode.Immediate ? Setting.Literal : Setting.Address;
+                    var type = (addressMode == InstructionSet.AddressMode.Immediate) ? Setting.Literal : Setting.Address;
                     segments.Add(new Segment { Value = address, Type = type });
 
                     if (addressMode != InstructionSet.AddressMode.Immediate)
                     {
-                        string label = codeGridView.FormatLabel(operand, withOffsets: true);
+                        string label = codeGridView.FormatLabel(operand, withOffset: true);
                         if (label.Length > 0)
                         {
                             segments.Insert(1, new Segment { Value = label, Type = Setting.Label });
@@ -460,37 +438,64 @@ namespace BeebPerf.ux
                         break;
                 }
 
-                int xPos = cellBounds.X;
-                int yPos = cellBounds.Y;
+                int measureWidth = 0;
+                for (var i = 0; i < segments.Count; i++)
+                {
+                    var segment = segments[i];
+                    bool includePadding = (i == segments.Count - 1);
+                    measureWidth += PaintCodeElement(segment.Type, segment.Value, indent: measureWidth, includePadding, graphics, cellBounds, cellStyle, measureOnly);
+                }
 
+                if (!measureOnly && instructionMetrics.CodeModified)
+                {
+                    Rectangle bounds = (Rectangle)cellBounds!;
+                    using var pen = new Pen(cellStyle.ForeColor);
+                    graphics.DrawLine(pen, bounds.Left, bounds.Top, bounds.Left, bounds.Bottom);
+                }
+
+                return measureWidth;
+            }
+
+            private int PaintCodeElement(
+                Setting setting,
+                Object value,
+                int indent,
+                bool includePadding,
+                Graphics graphics,
+                Rectangle? cellBounds,
+                DataGridViewCellStyle cellStyle,
+                bool measureOnly)
+            {
+                var codeGridView = (CodeView)DataGridView!;
                 var form = (BeebPerfForm)codeGridView.FindForm()!;
                 var displaySettings = form.DisplaySettings;
 
-                foreach (var segment in segments)
+                var text = displaySettings.Format(setting, value);
+                using var font = displaySettings.GetFont(setting, cellStyle.Font);
+
+                TextFormatFlags flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
+                if (!includePadding) 
+                    flags |= TextFormatFlags.NoPadding;
+                Size measure = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), flags);
+
+                if (!measureOnly)
                 {
-                    var text = displaySettings.Format(segment.Type, segment.Value);
-                    using var font = displaySettings.GetFont(segment.Type, cellStyle.Font);
+                    Rectangle bounds = (Rectangle)cellBounds!;
+                    using var brush = new SolidBrush(displaySettings.GetColor(setting));
+                    int heightAdjust = (bounds.Height - measure.Height) / 2;
+                    StringFormat format = new()
+                    {
+                        Alignment = StringAlignment.Near,
+                        Trimming = StringTrimming.None,
+                        FormatFlags = StringFormatFlags.NoWrap | StringFormatFlags.NoClip
+                    };
 
-                    Size measure = TextRenderer.MeasureText(
-                        text,
-                        font,
-                        new Size(int.MaxValue, int.MaxValue),
-                        TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-
-                    using var brush = new SolidBrush(displaySettings.GetColor(segment.Type));
-
-                    int heightAdjust = (cellBounds.Height - measure.Height) / 2;
-                    graphics.DrawString(text, font, brush, xPos, yPos + heightAdjust);
-
-                    xPos += measure.Width;
+                    graphics.DrawString(text, font, brush, bounds.X + indent, bounds.Y + heightAdjust, format);
                 }
 
-                if (instructionMetrics.CodeModified)
-                {
-                    using var pen = new Pen(cellStyle.ForeColor);
-                    graphics.DrawLine(pen, cellBounds.Left, cellBounds.Top, cellBounds.Left, cellBounds.Bottom);
-                }
+                return measure.Width;
             }
+
 
             private void PaintEllipses(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle)
             {

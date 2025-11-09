@@ -401,14 +401,14 @@ namespace BeebPerf.ux
             return FormatCountAndRange(countAndRange.value, countAndRange.range);
         }
 
-        protected string FormatLabel(ushort address, bool withOffsets)
+        protected string FormatLabel(ushort address, bool withOffset)
         {
             int index = _LabelAddresses.BinarySearch(address);
             if (index >= 0)
                 return _Labels[address];
 
             index = ~index - 1;
-            if (index >= 0 && withOffsets)
+            if (index >= 0 && withOffset)
             {
                 ushort lowerAddress = _LabelAddresses[index];
                 int offset = address - lowerAddress;
