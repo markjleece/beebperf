@@ -48,6 +48,7 @@ namespace BeebPerf.ux
         {
             base.OnHandleCreated(e);
             RestoreAppState();
+            ResizeSpinner();
         }
 
         private void BeebPerfForm_Resize(object? sender, EventArgs e)
