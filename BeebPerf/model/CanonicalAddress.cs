@@ -75,25 +75,15 @@ namespace BeebPerf.model
             {
                 int address = (_PageAddress & 0xFFFF);
                 int page = (_PageAddress >> 16);
-                switch ((MemoryPage)page)
+                return (MemoryPage)page switch
                 {
-                    case MemoryPage.WholeRam:
-                    case MemoryPage.HiddenRam:
-                        return (ushort)address;
-
-                    case MemoryPage.ShadowRam:
-                        return (ushort)(address - 0x3000);
-
-                    case MemoryPage.PrivateRam:
-                        return (ushort)(address - 0x8000);
-
-                    case MemoryPage.FilingSystemRam:
-                        return (ushort)(address - 0xC000);
-
-                    default:
-                        Debug.Assert(page < 16);
-                        return (ushort)(address - 0x8000);
-                }
+                    MemoryPage.WholeRam => (ushort)address,
+                    MemoryPage.HiddenRam => (ushort)address,
+                    MemoryPage.ShadowRam => (ushort)(address - 0x3000),
+                    MemoryPage.PrivateRam => (ushort)(address - 0x8000),
+                    MemoryPage.FilingSystemRam => (ushort)(address - 0xC000),
+                    _ => (ushort)(address - 0x8000)
+                };
             }
         }
 

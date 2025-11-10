@@ -20,7 +20,6 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
-using System.Net;
 
 namespace BeebPerf
 {

@@ -428,85 +428,51 @@ namespace BeebPerf
             {
                 case BBCModelType.B:
                     if (address >= 0x8000 && address < 0xC000)
-                    {
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    }
                     else
-                    {
                         page = MemoryPage.WholeRam;
-                    }
                     break;
 
                 case BBCModelType.BPlus:
                     if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
-                    {
                         page = MemoryPage.ShadowRam;
-                    }
                     else if (address >= 0x8000 && address < 0xB000 && _PrivateRamSelected)
-                    {
                         page = MemoryPage.PrivateRam;
-                    }
                     else if (address >= 0x8000 && address < 0xC000)
-                    {
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    }
                     else
-                    {
                         page = MemoryPage.WholeRam;
-                    }
                     break;
                     
                 case BBCModelType.IntegraB:
                     if (address < 0x8000)
-                    {
                         if (address >= 0x3000 && _ShadowRamEnabled && !_ShadowRamSelected)
-                        {
                             page = MemoryPage.ShadowRam;
-                        }
                         else
-                        {
                             page = MemoryPage.WholeRam;
-                        }
-                    }
                     else if (_PrivateRamSelected && (
                         (_PrivateRam8kArea && address < 0x8400) ||
                         (_PrivateRam4kArea && address < 0x9000) ||
                         (_PrivateRam1kArea && address >= 0x9000 && address < 0xB000)))
-                    {
                         page = MemoryPage.PrivateRam;
-                    }
                     else if (address < 0xC000)
-                    {
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    }
                     else
-                    {
                         page = MemoryPage.WholeRam;
-                    }
                     break;
 
                 case BBCModelType.Master128:
                 case BBCModelType.MasterET:
                     if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
-                    {
                         page = MemoryPage.ShadowRam;
-                    }
                     else if (address >= 0x8000 && address < 0x9000 && _PrivateRamSelected)
-                    {
                         page = MemoryPage.PrivateRam;
-                    }
                     else if (address >= 0x8000 && address < 0xC000)
-                    {
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    }
                     else if (address >= 0xC000 && address < 0xE000)
-                    {
                         page = MemoryPage.FilingSystemRam;
-                    }
                     else
-                    {
                         page = MemoryPage.WholeRam;
-                    }
                     break;
 
                 default:

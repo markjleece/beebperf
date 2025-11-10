@@ -19,9 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using Microsoft.Win32;
-using System.Runtime.InteropServices;
-
 namespace BeebPerf
 {
     public static class Program
