@@ -23,13 +23,16 @@ using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
 {
-    internal interface IGridView<out ROW_DATA_TYPE>
+    internal interface IGridView
     {
-        public void SetRowHeight(int height);
         public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
+        public void Clear();
+        public void ClearSelection();
+        public Dictionary<ushort, string> Labels { get; set; }
+        public void SetRowHeight(int height);
     }
 
-    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView<ROW_DATA_TYPE>
+    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView
         where ROW_DATA_TYPE : class
     {
         public GridView(
@@ -64,17 +67,25 @@ namespace BeebPerf.ux
             Scroll += ScrollFunc;
         }
 
-        public void SetRowHeight(int height)
-        {
-            RowTemplate.Height = height;
-        }
-
-        public void SetRowsData(List<ROW_DATA_TYPE> rowsData)
+        protected void SetRowsData(List<ROW_DATA_TYPE> rowsData)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
             SetRowsDataInternal(rowsData);
+        }
+
+        protected void SelectRow(ROW_DATA_TYPE rowData)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectRowInternal(rowData);
+        }
+
+        public void SetRowHeight(int height)
+        {
+            RowTemplate.Height = height;
         }
 
         public void Clear()
@@ -83,14 +94,6 @@ namespace BeebPerf.ux
             if (token == null) return;
 
             ClearInternal();
-        }
-
-        public void SelectRow(ROW_DATA_TYPE rowData)
-        {
-            using var token = _ReentrancyGuard.TryEnter();
-            if (token == null) return;
-
-            SelectRowInternal(rowData);
         }
 
         public new void ClearSelection()

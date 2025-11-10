@@ -568,9 +568,9 @@ namespace BeebPerf.ux
             else
                 control.Font = font;
 
-            if (control is IGridView<Object>)
+            if (control is IGridView)
             {
-                var gridView = (IGridView<Object>)control;
+                var gridView = (IGridView)control;
 
                 int fontHeight = TextRenderer.MeasureText("Sample", font).Height;
                 int rowHeight;
