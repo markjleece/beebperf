@@ -21,7 +21,6 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
-using System.Windows.Forms;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -549,8 +548,7 @@ namespace BeebPerf.ux
             splitContainer.Orientation = (Orientation)orientation;
             splitContainer.SplitterDistance = splitterDistance;
 
-            if (DisplaySettings.FontScaling != 100)
-                ApplyFontScaling(this, DisplaySettings.FontScaling);
+            ApplyFontScaling(this, DisplaySettings.FontScaling);
         }
 
         public void ApplyFontScaling(Control control, int fontScaling)
@@ -570,25 +568,19 @@ namespace BeebPerf.ux
             else
                 control.Font = font;
 
-            if (control is DataGridView)
+            if (control is IGridView<Object>)
             {
-                var dataGridView = (DataGridView)control;
-                int baseHeight = TextRenderer.MeasureText("Sample", font).Height;
-                int rowHeight = baseHeight + 6;
+                var gridView = (IGridView<Object>)control;
 
-                dataGridView.RowTemplate.Height = rowHeight;
+                int fontHeight = TextRenderer.MeasureText("Sample", font).Height;
+                int rowHeight;
+                if (control is CodeView)
+                    rowHeight = (int)float.Round(fontHeight * DisplaySettings.LineSpacing / 100.0f);
+                else
+                    rowHeight = fontHeight + 6;
 
-                for (int i = 0; i < dataGridView.Rows.Count; i++)
-                {
-                    if ((dataGridView.Rows.GetRowState(i) & DataGridViewElementStates.Displayed) != 0 ||
-                        (dataGridView.Rows.GetRowState(i) & DataGridViewElementStates.Selected) != 0)
-                    {
-                        DataGridViewRow row = dataGridView.Rows[i];
-                        row.Height = rowHeight;
-                    }
-                }
-
-                dataGridView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+                gridView.SetRowHeight(rowHeight);
+                gridView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             }
 
             foreach (Control child in control.Controls)

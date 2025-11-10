@@ -54,6 +54,8 @@ namespace BeebPerf.ux
             colorThemeComboBox = new ComboBox();
             textScalingComboBox = new ComboBox();
             textScalingLabel = new Label();
+            lineSpacingLabel = new Label();
+            lineSpacingComboBox = new ComboBox();
             colorThemeLabel = new Label();
             codeFontComboBox = new ComboBox();
             codeFontLabel = new Label();
@@ -101,6 +103,8 @@ namespace BeebPerf.ux
             // 
             // generalGroupBox
             // 
+            generalGroupBox.Controls.Add(lineSpacingComboBox);
+            generalGroupBox.Controls.Add(lineSpacingLabel);
             generalGroupBox.Controls.Add(colorThemeComboBox);
             generalGroupBox.Controls.Add(textScalingComboBox);
             generalGroupBox.Controls.Add(textScalingLabel);
@@ -110,7 +114,7 @@ namespace BeebPerf.ux
             generalGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             generalGroupBox.Location = new Point(12, 12);
             generalGroupBox.Name = "generalGroupBox";
-            generalGroupBox.Size = new Size(592, 146);
+            generalGroupBox.Size = new Size(592, 187);
             generalGroupBox.TabIndex = 1;
             generalGroupBox.TabStop = false;
             generalGroupBox.Text = "General";
@@ -126,6 +130,16 @@ namespace BeebPerf.ux
             colorThemeComboBox.TabIndex = 4;
             colorThemeComboBox.SelectedIndexChanged += ColorThemeComboBox_SelectedIndexChanged;
             // 
+            // textScalingLabel
+            // 
+            textScalingLabel.AutoSize = true;
+            textScalingLabel.Font = new Font("Segoe UI", 9F);
+            textScalingLabel.Location = new Point(6, 104);
+            textScalingLabel.Name = "textScalingLabel";
+            textScalingLabel.Size = new Size(101, 25);
+            textScalingLabel.TabIndex = 1;
+            textScalingLabel.Text = "Text scaling";
+            // 
             // textScalingComboBox
             // 
             textScalingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -137,15 +151,26 @@ namespace BeebPerf.ux
             textScalingComboBox.TabIndex = 3;
             textScalingComboBox.SelectedIndexChanged += TextScalingComboBox_SelectedIndexChanged;
             // 
-            // textScalingLabel
+            // lineSpacingLabel
             // 
-            textScalingLabel.AutoSize = true;
-            textScalingLabel.Font = new Font("Segoe UI", 9F);
-            textScalingLabel.Location = new Point(6, 104);
-            textScalingLabel.Name = "textScalingLabel";
-            textScalingLabel.Size = new Size(101, 25);
-            textScalingLabel.TabIndex = 1;
-            textScalingLabel.Text = "Text scaling";
+            lineSpacingLabel.AutoSize = true;
+            lineSpacingLabel.Font = new Font("Segoe UI", 9F);
+            lineSpacingLabel.Location = new Point(6, 144);
+            lineSpacingLabel.Name = "lineSpacingLabel";
+            lineSpacingLabel.Size = new Size(109, 25);
+            lineSpacingLabel.TabIndex = 5;
+            lineSpacingLabel.Text = "Line spacing";
+            // 
+            // lineSpacingComboBox
+            // 
+            lineSpacingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            lineSpacingComboBox.Font = new Font("Segoe UI", 9F);
+            lineSpacingComboBox.FormattingEnabled = true;
+            lineSpacingComboBox.Location = new Point(152, 141);
+            lineSpacingComboBox.Name = "lineSpacingComboBox";
+            lineSpacingComboBox.Size = new Size(182, 33);
+            lineSpacingComboBox.TabIndex = 6;
+            lineSpacingComboBox.SelectedIndexChanged += LineSpacingComboBox_SelectedIndexChanged;
             // 
             // colorThemeLabel
             // 
@@ -189,7 +214,7 @@ namespace BeebPerf.ux
             addressGroupBox.Controls.Add(addressFormatLabel);
             addressGroupBox.Controls.Add(addressFormatComboBox);
             addressGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            addressGroupBox.Location = new Point(12, 164);
+            addressGroupBox.Location = new Point(12, 205);
             addressGroupBox.Name = "addressGroupBox";
             addressGroupBox.Size = new Size(592, 115);
             addressGroupBox.TabIndex = 2;
@@ -269,7 +294,7 @@ namespace BeebPerf.ux
             mnemonicGroupBox.Controls.Add(mnemonicFormatLabel);
             mnemonicGroupBox.Controls.Add(mnemonicBoldCheckBox);
             mnemonicGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            mnemonicGroupBox.Location = new Point(12, 285);
+            mnemonicGroupBox.Location = new Point(12, 326);
             mnemonicGroupBox.Name = "mnemonicGroupBox";
             mnemonicGroupBox.Size = new Size(592, 112);
             mnemonicGroupBox.TabIndex = 3;
@@ -347,7 +372,7 @@ namespace BeebPerf.ux
             labelGroupBox.Controls.Add(labelColorLabel);
             labelGroupBox.Controls.Add(labelBoldCheckBox);
             labelGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            labelGroupBox.Location = new Point(12, 403);
+            labelGroupBox.Location = new Point(12, 444);
             labelGroupBox.Name = "labelGroupBox";
             labelGroupBox.Size = new Size(592, 103);
             labelGroupBox.TabIndex = 16;
@@ -416,7 +441,7 @@ namespace BeebPerf.ux
             literalGroupBox.Controls.Add(literalFormatLabel);
             literalGroupBox.Controls.Add(literalBoldCheckBox);
             literalGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            literalGroupBox.Location = new Point(12, 512);
+            literalGroupBox.Location = new Point(12, 553);
             literalGroupBox.Name = "literalGroupBox";
             literalGroupBox.Size = new Size(592, 112);
             literalGroupBox.TabIndex = 16;
@@ -484,7 +509,7 @@ namespace BeebPerf.ux
             punctuationGroupBox.Controls.Add(punctuationColorLabel);
             punctuationGroupBox.Controls.Add(punctuationBoldCheckBox);
             punctuationGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            punctuationGroupBox.Location = new Point(12, 630);
+            punctuationGroupBox.Location = new Point(12, 671);
             punctuationGroupBox.Name = "punctuationGroupBox";
             punctuationGroupBox.Size = new Size(592, 103);
             punctuationGroupBox.TabIndex = 17;
@@ -537,7 +562,7 @@ namespace BeebPerf.ux
             // sampleCodePanel
             // 
             sampleCodePanel.BorderStyle = BorderStyle.FixedSingle;
-            sampleCodePanel.Location = new Point(12, 739);
+            sampleCodePanel.Location = new Point(12, 780);
             sampleCodePanel.Name = "sampleCodePanel";
             sampleCodePanel.Size = new Size(592, 123);
             sampleCodePanel.TabIndex = 18;
@@ -545,7 +570,7 @@ namespace BeebPerf.ux
             // okButton
             // 
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point(374, 868);
+            okButton.Location = new Point(374, 909);
             okButton.Name = "okButton";
             okButton.Size = new Size(112, 34);
             okButton.TabIndex = 0;
@@ -556,7 +581,7 @@ namespace BeebPerf.ux
             // cancelButton
             // 
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new Point(492, 868);
+            cancelButton.Location = new Point(492, 909);
             cancelButton.Name = "cancelButton";
             cancelButton.Size = new Size(112, 34);
             cancelButton.TabIndex = 0;
@@ -569,7 +594,7 @@ namespace BeebPerf.ux
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = cancelButton;
-            ClientSize = new Size(616, 914);
+            ClientSize = new Size(616, 955);
             Controls.Add(sampleCodePanel);
             Controls.Add(punctuationGroupBox);
             Controls.Add(literalGroupBox);
@@ -607,6 +632,8 @@ namespace BeebPerf.ux
         private ComboBox colorThemeComboBox;
         private Label textScalingLabel;
         private ComboBox textScalingComboBox;
+        private Label lineSpacingLabel;
+        private ComboBox lineSpacingComboBox;
         private Label codeFontLabel;
         private ComboBox codeFontComboBox;
 

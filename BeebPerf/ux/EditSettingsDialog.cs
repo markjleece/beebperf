@@ -53,6 +53,9 @@ namespace BeebPerf.ux
             SetComboBoxOptions(textScalingComboBox, ["50%", "60%", "70%", "80%", "90%", "100%", "110%", "120%", "130%", "140%", "150%"]);
             textScalingComboBox.SelectedItem = settings.FontScaling.ToString() + '%';
 
+            SetComboBoxOptions(lineSpacingComboBox, ["80%", "90%", "100%", "110%", "120%", "130%", "140%"]);
+            lineSpacingComboBox.SelectedItem = settings.LineSpacing.ToString() + '%';
+
             SetComboBoxOptions(addressFormatComboBox, ["&A42B", "&a42b", "$A42B", "$a42b", "0xA42B", "0xa42b"]);
             SetComboBoxOptions(mnemonicFormatComboBox, ["Uppercase", "Lowercase"]);
             SetComboBoxOptions(literalFormatComboBox, ["Hexadecimal", "Decimal", "Binary"]);
@@ -104,6 +107,19 @@ namespace BeebPerf.ux
             ApplyFontScaling(sampleCodePanel, textScaling);
             sampleCodePanel.Invalidate();
         }
+
+        private void LineSpacingComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (_SuppressChangeEvents > 0)
+                return;
+
+            var value = (string)lineSpacingComboBox.SelectedItem!;
+            var match = Regex.Match(value, @"\d+");
+            var lineSpacing = match.Success ? int.Parse(match.Value) : 100;
+            _Settings.LineSpacing = lineSpacing;
+            sampleCodePanel.Invalidate();
+        }
+        
 
         private void CodeFontComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {

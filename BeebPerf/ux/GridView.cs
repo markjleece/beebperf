@@ -19,13 +19,17 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Data.Common;
-using System.Diagnostics;
 using System.Drawing.Drawing2D;
 
 namespace BeebPerf.ux
 {
-    internal class GridView<ROW_DATA_TYPE> : DataGridView 
+    internal interface IGridView<out ROW_DATA_TYPE>
+    {
+        public void SetRowHeight(int height);
+        public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
+    }
+
+    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView<ROW_DATA_TYPE>
         where ROW_DATA_TYPE : class
     {
         public GridView(
@@ -38,16 +42,17 @@ namespace BeebPerf.ux
             AllowUserToResizeRows = false;
             AutoGenerateColumns = false;
             AutoSizeColumnsMode = autoSizeMode;
+            AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
             BackgroundColor = DefaultCellStyle.BackColor;
             CellBorderStyle = DataGridViewCellBorderStyle.None;
             CellValueNeeded += CellValueNeededFunc;
             CellEnter += CellEnterFunc;
+            CellPainting += CellPaintingFunc;
             EnableHeadersVisualStyles = false;
-            CellPainting += GridView_CellPainting;
-
             MultiSelect = false;
             ReadOnly = true;
             RowHeadersVisible = false;
+            RowHeightInfoNeeded += RowHeightInfoNeededFunc;
             RowTemplate.DefaultCellStyle.NullValue = null;
             SelectionChanged += SelectionChangedFunc;
             SelectionMode = DataGridViewSelectionMode.FullRowSelect;
@@ -57,6 +62,11 @@ namespace BeebPerf.ux
             _ScrollTimer = new System.Windows.Forms.Timer { Interval = 500 };
             _ScrollTimer.Tick += ScrollTimerTickFunc;
             Scroll += ScrollFunc;
+        }
+
+        public void SetRowHeight(int height)
+        {
+            RowTemplate.Height = height;
         }
 
         public void SetRowsData(List<ROW_DATA_TYPE> rowsData)
@@ -386,6 +396,12 @@ namespace BeebPerf.ux
             e.Value = OnFormatRowData(_DataRows[e.RowIndex], e.ColumnIndex, e.RowIndex);
         }
 
+        private void RowHeightInfoNeededFunc(object? sender, DataGridViewRowHeightInfoNeededEventArgs e)
+        {
+            e.Height = RowTemplate.Height;
+            e.MinimumHeight = RowTemplate.Height;
+        }
+
         protected string FormatCountAndRange(int value, int range)
         {
             var percentage = double.Min(100.0 * value / range, 100.0);
@@ -426,7 +442,7 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
-        private void GridView_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        private void CellPaintingFunc(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex > -1 || e.ColumnIndex < 0)
                 return;

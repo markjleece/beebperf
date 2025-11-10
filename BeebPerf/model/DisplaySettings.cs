@@ -32,6 +32,7 @@ namespace BeebPerf.model
         {
             // default settings
             FontScaling = 100;
+            LineSpacing = 120;
             CodeFont = string.Empty;
             LightColorThemeSettings = new()
             {
@@ -58,6 +59,7 @@ namespace BeebPerf.model
             return new()
             {
                 FontScaling = FontScaling,
+                LineSpacing = LineSpacing,
                 CodeFont = CodeFont,
                 LightColorThemeSettings = LightColorThemeSettings.Clone(),
                 DarkColorThemeSettings = DarkColorThemeSettings.Clone(),
@@ -303,6 +305,7 @@ namespace BeebPerf.model
         }
 
         public int FontScaling { get; set; }
+        public int LineSpacing { get; set; }
         public string CodeFont { get; set; }
         public ColorThemeSettingsType LightColorThemeSettings { get; set; }
         public ColorThemeSettingsType DarkColorThemeSettings { get; set; }
