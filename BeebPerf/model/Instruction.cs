@@ -44,6 +44,12 @@ namespace BeebPerf.model
             set => _FlagsAndCycleCount = (byte)((value ? 0x40 : 0x00) | (_FlagsAndCycleCount & 0x0F));
         }
 
+        public bool IsBeginDisplayEvent
+        {
+            get => (_FlagsAndCycleCount & 0x20) != 0;
+            set => _FlagsAndCycleCount = (byte)((value ? 0x20 : 0x00) | (_FlagsAndCycleCount & 0x0F));
+        }
+
         public int CycleCount
         {
             get => (_FlagsAndCycleCount & 0x0F);

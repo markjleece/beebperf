@@ -211,58 +211,64 @@ namespace BeebPerf
                 ushort opcodeAddress = 0;
                 Instruction instruction = new Instruction();
 
-                byte addressHi = ReadByte(dataStream);
-                if (addressHi > 0x80)
+                // read marker
+                byte marker = ReadByte(dataStream);
+                if (marker > 0x80)
                 {
-                    // single-byte encoding (most common)
-                    int diff = addressHi - 0xC0;
+                    // instruction: Single-byte relative address encoding (most common)
+                    int diff = marker - 0xC0;
                     Debug.Assert(Math.Abs(diff) <= 63);
                     opcodeAddress = (ushort)(_LastOpcodeAddress + diff);
                 }
-                else if (addressHi < 0x80)
+                else if (marker < 0x80)
                 {
-                    // two-byte encoding
-                    opcodeAddress = (ushort)((addressHi << 8) | ReadByte(dataStream));
+                    // instruction: Two-byte address encoding
+                    opcodeAddress = (ushort)((marker << 8) | ReadByte(dataStream));
                 }
-                else // if (addressHi == 0x80)
+                else // if (marker == 0x80)
                 {
-                    addressHi = ReadByte(dataStream);
-                    if (addressHi >= 0x80)
+                    marker = ReadByte(dataStream);
+                    if (marker < 0x80)
                     {
-                        // three-byte encoding
-                        opcodeAddress = (ushort)((addressHi << 8) | ReadByte(dataStream));
-                    }
-                    else
-                    {
-                        // interrupt
-                        Debug.Assert(addressHi == 0 || addressHi == 1);
+                        // event:
+                        var eventType = (EventType)marker;
+                        if (eventType == EventType.MaskableInterruptEvent ||
+                            eventType == EventType.NonMaskableInterruptEvent)
+                        {
+                            // mark as interrupt
+                            instruction.IsInterrupt = true;
 
-                        // mark as interrupt
-                        instruction.IsInterrupt = true;
+                            // non-maskable interrupt
+                            instruction.NonMaskableInterrupt = (eventType == EventType.NonMaskableInterruptEvent);
 
-                        // non-maskable interrupt
-                        instruction.NonMaskableInterrupt = (addressHi == 1);
+                            // interrupt service routine address
+                            ushort isrAddress = ReadShort(dataStream);
+                            instruction.ISRAddress = ToCanonicalAddress(model, isrAddress);
 
-                        // interrupt service routine address
-                        ushort isrAddress = ReadShort(dataStream);
-                        instruction.ISRAddress = ToCanonicalAddress(model, isrAddress);
+                            // interrupted opcode address
+                            ushort interruptedAddress = ReadShort(dataStream);
+                            instruction.InterruptedAddress = ToCanonicalAddress(model, interruptedAddress);
 
-                        // interrupted opcode address
-                        ushort interruptedAddress = ReadShort(dataStream);
-                        instruction.InterruptedAddress = ToCanonicalAddress(model, interruptedAddress);
+                            // cycle count
+                            int cycles = ReadByte(dataStream);
+                            Debug.Assert(cycles == 7);
+                            instruction.CycleCount = cycles;
 
-                        // cycle count
-                        int cycles = ReadByte(dataStream);
-                        Debug.Assert(cycles == 7);
-                        instruction.CycleCount = cycles;
+                            // stack pointer
+                            instruction.StackPointer = ReadByte(dataStream);
 
-                        // stack pointer
-                        instruction.StackPointer = ReadByte(dataStream);
-
-                        model.Instructions[_InstructionCount++] = instruction;
+                            model.Instructions[_InstructionCount++] = instruction;
+                        }
+                        else if (eventType == EventType.BeginDisplayEvent)
+                        {
+                            instruction.IsBeginDisplayEvent = true;
+                        }
 
                         continue;
                     }
+
+                    // Instruction: Three-byte address encoding
+                    opcodeAddress = (ushort)((marker << 8) | ReadByte(dataStream));
                 }
 
                 _LastOpcodeAddress = opcodeAddress;
@@ -533,6 +539,13 @@ namespace BeebPerf
         private static byte ReadByte(Stream ms)
         {
             return (byte)ms.ReadByte();
+        }
+
+        private enum EventType
+        {
+            MaskableInterruptEvent = 0,
+            NonMaskableInterruptEvent = 1,
+            BeginDisplayEvent = 2
         }
 
         private InstructionSet? _InstructionSet;

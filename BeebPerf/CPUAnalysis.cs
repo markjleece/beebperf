@@ -75,30 +75,33 @@ namespace BeebPerf
 
             foreach (var instruction in _Instructions)
             {
-                if (instruction.IsInterrupt)
+                if (instruction.IsInstruction)
+                {
+                    if (instruction.Opcode == 0x20/*JSR*/)
+                    {
+                        CreateRoutine(instruction.DestinationAddress, RoutineType.JSR);
+                        jsrReturnAddresses.Add(instruction.OpcodeAddress.Offset(3));
+                    }
+                    else if (instruction.Opcode == 0x60/*RTS*/)
+                    {
+                        CanonicalAddress destinationAddress = instruction.DestinationAddress;
+                        rtsReturnAddresses.Add(instruction.DestinationAddress);
+                    }
+                    else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
+                    {
+                        CanonicalAddress destination = instruction.DestinationAddress;
+                        if ((instruction.Opcode & 0x0F) == 0) // is branch?
+                        {
+                            int branchedAddress = unchecked(instruction.OpcodeAddress.Address + 2 + (sbyte)instruction.Operand);
+                            destination = new CanonicalAddress((ushort)branchedAddress, instruction.OpcodeAddress.Page);
+                        }
+                        branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
+                    }
+                }
+                else if (instruction.IsInterrupt)
                 {
                     RoutineType routineType = instruction.NonMaskableInterrupt ? RoutineType.NonMaskableISR : RoutineType.NonMaskableISR;
                     CreateRoutine(instruction.ISRAddress, routineType);
-                }
-                else if (instruction.Opcode == 0x20/*JSR*/)
-                {
-                    CreateRoutine(instruction.DestinationAddress, RoutineType.JSR);
-                    jsrReturnAddresses.Add(instruction.OpcodeAddress.Offset(3));
-                }
-                else if (instruction.Opcode == 0x60/*RTS*/)
-                {
-                    CanonicalAddress destinationAddress = instruction.DestinationAddress;
-                    rtsReturnAddresses.Add(instruction.DestinationAddress);
-                }
-                else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
-                {
-                    CanonicalAddress destination = instruction.DestinationAddress;
-                    if ((instruction.Opcode & 0x0F) == 0) // is branch?
-                    {
-                        int branchedAddress = unchecked(instruction.OpcodeAddress.Address + 2 + (sbyte)instruction.Operand);
-                        destination = new CanonicalAddress((ushort)branchedAddress, instruction.OpcodeAddress.Page);
-                    }
-                    branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
                 }
             }
 
