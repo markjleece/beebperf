@@ -24,6 +24,14 @@ using System.Runtime.InteropServices;
 
 namespace BeebPerf.model
 {
+    public enum InstructionType
+    {
+        Instruction = 0x00,
+        MaskableInterrupt = 0x10,
+        NonMaskableInterrupt = 0x20,
+        BeginDisplayEvent = 0x30
+    }
+
     [StructLayout(LayoutKind.Explicit)]
     public struct Instruction
     {
@@ -32,28 +40,21 @@ namespace BeebPerf.model
             if (Marshal.SizeOf<Instruction>() != 12) throw new InvalidOperationException();
         }
 
-        public bool IsInterrupt
-        {
-            get => (_FlagsAndCycleCount & 0x80) != 0;
-            set => _FlagsAndCycleCount = (byte)((value ? 0x80 : 0x00) | (_FlagsAndCycleCount & 0x0F));
-        }
+        public bool IsInstruction => (Type == InstructionType.Instruction);
+        public bool IsMaskableInterrupt => (Type == InstructionType.MaskableInterrupt);
+        public bool IsNonMaskableInterrupt => (Type == InstructionType.NonMaskableInterrupt);
+        public bool IsBeginDisplayEvent => (Type == InstructionType.BeginDisplayEvent);
 
-        public bool IsInstruction
+        public InstructionType Type
         {
-            get => (_FlagsAndCycleCount & 0x40) != 0;
-            set => _FlagsAndCycleCount = (byte)((value ? 0x40 : 0x00) | (_FlagsAndCycleCount & 0x0F));
-        }
-
-        public bool IsBeginDisplayEvent
-        {
-            get => (_FlagsAndCycleCount & 0x20) != 0;
-            set => _FlagsAndCycleCount = (byte)((value ? 0x20 : 0x00) | (_FlagsAndCycleCount & 0x0F));
+            get => (InstructionType)(_TypeAndCycleCount & 0xF0);
+            set => _TypeAndCycleCount = (byte)(((byte)value & 0xF0)| (_TypeAndCycleCount & 0x0F));
         }
 
         public int CycleCount
         {
-            get => (_FlagsAndCycleCount & 0x0F);
-            set => _FlagsAndCycleCount = (byte)((_FlagsAndCycleCount & 0xF0) | (value & 0x0F));
+            get => (_TypeAndCycleCount & 0x0F);
+            set => _TypeAndCycleCount = (byte)((_TypeAndCycleCount & 0xF0) | (value & 0x0F));
         }
 
         public byte StackPointer
@@ -62,30 +63,16 @@ namespace BeebPerf.model
             set => _StackPointer = value;
         }
 
-        public bool NonMaskableInterrupt
-        {
-            get
-            {
-                Debug.Assert(IsInterrupt);
-                return (_NonMaskableInterrupt != 0);
-            }
-            set
-            {
-                Debug.Assert(IsInterrupt);
-                _NonMaskableInterrupt = (byte)(value ? 1 : 0);
-            }
-        }
-
         public CanonicalAddress ISRAddress
         {
             get
             {
-                Debug.Assert(IsInterrupt);
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
                 return new CanonicalAddress(_ISRAddress, (MemoryPage)_ISRAddressPage);
             }
             set
             {
-                Debug.Assert(IsInterrupt);
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
                 _ISRAddress = value.Address;
                 _ISRAddressPage = (byte)value.Page;
             }
@@ -95,12 +82,12 @@ namespace BeebPerf.model
         {
             get
             {
-                Debug.Assert(IsInterrupt);
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
                 return new CanonicalAddress(_InterruptedAddress, (MemoryPage)_InterruptedAddressPage);
             }
             set
             {
-                Debug.Assert(IsInterrupt);
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
                 _InterruptedAddress = value.Address;
                 _InterruptedAddressPage = (byte)value.Page;
             }
@@ -208,7 +195,7 @@ namespace BeebPerf.model
         }
 
         // common fields
-        [FieldOffset(0)] private byte _FlagsAndCycleCount;
+        [FieldOffset(0)] private byte _TypeAndCycleCount;
         [FieldOffset(1)] private byte _StackPointer;
 
         // interrupt fields

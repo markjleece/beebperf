@@ -98,10 +98,13 @@ namespace BeebPerf
                         branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
                     }
                 }
-                else if (instruction.IsInterrupt)
+                else if (instruction.IsMaskableInterrupt)
                 {
-                    RoutineType routineType = instruction.NonMaskableInterrupt ? RoutineType.NonMaskableISR : RoutineType.NonMaskableISR;
-                    CreateRoutine(instruction.ISRAddress, routineType);
+                    CreateRoutine(instruction.ISRAddress, RoutineType.MaskableISR);
+                }
+                else if (instruction.IsNonMaskableInterrupt)
+                {
+                    CreateRoutine(instruction.ISRAddress, RoutineType.NonMaskableISR);
                 }
             }
 
@@ -309,7 +312,7 @@ namespace BeebPerf
                             currentStackFrame = currentStackFrame.Parent;
                     }
                 }
-                else if (instruction.IsInterrupt && !isLastInstruction)
+                else if ((instruction.IsMaskableInterrupt || instruction.IsMaskableInterrupt) && !isLastInstruction)
                 {
                     // update instruction indices to include interrupt
                     if (currentStackFrame.FirstInstructionIndex < 0)

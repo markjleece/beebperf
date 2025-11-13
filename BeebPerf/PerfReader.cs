@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Diagnostics;
 using BeebPerf.model;
+using System.CodeDom;
 
 namespace BeebPerf
 {
@@ -236,10 +237,12 @@ namespace BeebPerf
                             eventType == EventType.NonMaskableInterruptEvent)
                         {
                             // mark as interrupt
-                            instruction.IsInterrupt = true;
-
-                            // non-maskable interrupt
-                            instruction.NonMaskableInterrupt = (eventType == EventType.NonMaskableInterruptEvent);
+                            instruction.Type = eventType switch
+                            {
+                                EventType.MaskableInterruptEvent => InstructionType.MaskableInterrupt,
+                                EventType.NonMaskableInterruptEvent => InstructionType.NonMaskableInterrupt,
+                                _ => throw new NotImplementedException()
+                            };
 
                             // interrupt service routine address
                             ushort isrAddress = ReadShort(dataStream);
@@ -261,7 +264,7 @@ namespace BeebPerf
                         }
                         else if (eventType == EventType.BeginDisplayEvent)
                         {
-                            instruction.IsBeginDisplayEvent = true;
+                            instruction.Type = InstructionType.BeginDisplayEvent;
                         }
 
                         continue;
@@ -274,7 +277,7 @@ namespace BeebPerf
                 _LastOpcodeAddress = opcodeAddress;
 
                 // mark as an instruction
-                instruction.IsInstruction = true;
+                instruction.Type = InstructionType.Instruction;
 
                 // opcode address
                 instruction.OpcodeAddress = ToCanonicalAddress(model, opcodeAddress);
