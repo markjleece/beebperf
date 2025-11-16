@@ -132,6 +132,16 @@ namespace BeebPerf
             model.Snapshot.AccessControlRegister = accessControlRegister;
             AccessControlRegisterChange(model, accessControlRegister);
 
+            byte screenAddress = ReadByte(dataStream);
+            model.Snapshot.ScreenAddress = screenAddress switch
+            {
+                0 => 0x4000,
+                1 => 0x6000,
+                2 => 0x3000,
+                3 => 0x5800,
+                _ => throw new NotImplementedException()
+            };
+
             if (hasHiddenRam)
             {
                 byte hiddenRamAddress = ReadByte(dataStream);
@@ -140,6 +150,7 @@ namespace BeebPerf
             }
 
             model.Snapshot.VideoULARegister = ReadByte(dataStream);
+
             byte[] palette = new byte[16];
             dataStream.ReadExactly(palette);
             model.Snapshot.VideoULAPalette = palette;
@@ -259,14 +270,13 @@ namespace BeebPerf
 
                             // stack pointer
                             instruction.StackPointer = ReadByte(dataStream);
-
-                            model.Instructions[_InstructionCount++] = instruction;
                         }
                         else if (eventType == EventType.BeginDisplayEvent)
                         {
                             instruction.Type = InstructionType.BeginDisplayEvent;
                         }
 
+                        model.Instructions[_InstructionCount++] = instruction;
                         continue;
                     }
 

@@ -101,6 +101,7 @@ namespace BeebPerf.ux
                     InstructionSet = _Model.InstructionSet;
 
                     StaticAnalysis();
+                    VideoAnalysis();
                 }));
             });
         }
@@ -197,6 +198,19 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
                     memoryView.Labels = _Model.Labels;
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
+                }));
+            });
+        }
+
+        public void VideoAnalysis()
+        {
+            SetState(AppStateFlags.VideoAnalysis);
+
+            var dynamicAnalysisTask = _VideoAnalysis.AnalysisAsync(_Model.Instructions, InstructionSet!, _Model).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    ClearState(AppStateFlags.VideoAnalysis);
                 }));
             });
         }
@@ -641,7 +655,8 @@ namespace BeebPerf.ux
                 state == AppStateFlags.StaticCPUAnalysis ||
                 state == AppStateFlags.DynamicCPUAnalysis ||
                 state == AppStateFlags.DynamicMemoryAnalysis ||
-                state == AppStateFlags.DynamicMemoryAddressAnalysis)
+                state == AppStateFlags.DynamicMemoryAddressAnalysis ||
+                state == AppStateFlags.VideoAnalysis)
                 spinner.Visible = true;
 
             AppState |= state;
@@ -658,7 +673,8 @@ namespace BeebPerf.ux
                  AppStateFlags.StaticCPUAnalysis | 
                  AppStateFlags.DynamicCPUAnalysis | 
                  AppStateFlags.DynamicMemoryAnalysis |
-                 AppStateFlags.DynamicMemoryAddressAnalysis)) == 0)
+                 AppStateFlags.DynamicMemoryAddressAnalysis |
+                 AppStateFlags.VideoAnalysis)) == 0)
                 spinner.Visible = false;
         }
 
@@ -668,7 +684,8 @@ namespace BeebPerf.ux
             StaticCPUAnalysis = 0x02,
             DynamicCPUAnalysis = 0x04,
             DynamicMemoryAnalysis = 0x8,
-            DynamicMemoryAddressAnalysis = 0x10
+            DynamicMemoryAddressAnalysis = 0x10,
+            VideoAnalysis = 0x20,
         }
 
         private void ResizeSpinner()
@@ -698,6 +715,7 @@ namespace BeebPerf.ux
         private Model _Model = new();
         private CPUAnalysis _CPUAnalysis = new();
         private MemoryAnalysis _MemoryAnalysis = new();
+        private VideoAnalysis _VideoAnalysis = new();
         private Font _BaseFont;
     }
 }
