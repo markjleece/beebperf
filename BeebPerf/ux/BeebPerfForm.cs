@@ -97,7 +97,7 @@ namespace BeebPerf.ux
 
                     _UndoRedoHistory.Clear();
                     _Model = model.Result;
-                    _FilePathName = filePathName;
+                    FilePathName = filePathName;
                     InstructionSet = _Model.InstructionSet;
 
                     StaticAnalysis();
@@ -316,15 +316,15 @@ namespace BeebPerf.ux
 
         private void columnLayoutButton_Click(object sender, EventArgs e)
         {
-            splitContainer.Orientation = Orientation.Vertical;
-            splitContainer.SplitterDistance = splitContainer.Width / 2;
+            secondarySplitContainer.Orientation = Orientation.Vertical;
+            secondarySplitContainer.SplitterDistance = secondarySplitContainer.Width / 2;
             UpdateToolbarState();
         }
 
         private void rowLayoutButton_Click(object sender, EventArgs e)
         {
-            splitContainer.Orientation = Orientation.Horizontal;
-            splitContainer.SplitterDistance = splitContainer.Height / 2;
+            secondarySplitContainer.Orientation = Orientation.Horizontal;
+            secondarySplitContainer.SplitterDistance = secondarySplitContainer.Height / 2;
             UpdateToolbarState();
         }
 
@@ -521,8 +521,9 @@ namespace BeebPerf.ux
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
             Properties.Settings.Default.RecentFilePathName = _RecentFilePathName;
-            Properties.Settings.Default.WindowLayout = (int)splitContainer.Orientation;
-            Properties.Settings.Default.SplitterDistance = splitContainer.SplitterDistance;
+            Properties.Settings.Default.WindowLayout = (int)secondarySplitContainer.Orientation;
+            Properties.Settings.Default.PrimarySplitterDistance = primarySplitContainer.SplitterDistance;
+            Properties.Settings.Default.SecondarySplitterDistance = secondarySplitContainer.SplitterDistance;
             Properties.Settings.Default.DisplaySettings = displaySettings;
             Properties.Settings.Default.ColorTheme = (int)ColorTheme.Get();
             Properties.Settings.Default.Save();
@@ -536,7 +537,8 @@ namespace BeebPerf.ux
             var size = Properties.Settings.Default.WindowSize;
             var state = Properties.Settings.Default.WindowState;
             var orientation = Properties.Settings.Default.WindowLayout;
-            var splitterDistance = Properties.Settings.Default.SplitterDistance;
+            var primarySplitterDistance = Properties.Settings.Default.PrimarySplitterDistance;
+            var secondarySplitterDistance = Properties.Settings.Default.SecondarySplitterDistance;
             var colorTheme = Properties.Settings.Default.ColorTheme;
 
             ColorTheme.Set(this, (ColorThemeType)colorTheme);
@@ -550,8 +552,11 @@ namespace BeebPerf.ux
             if (orientation < 0)
                 orientation = (int)Orientation.Horizontal;
 
-            if (splitterDistance < 0)
-                splitterDistance = Height / 2;
+            if (primarySplitterDistance <= 0)
+                primarySplitterDistance = Height / 4; // 1/4 height
+
+            if (secondarySplitterDistance <= 0)
+                secondarySplitterDistance = 3 * Height / 8; // 3/8 height
 
             var screenBounds = Screen.FromPoint(location).WorkingArea;
             if (!screenBounds.Contains(new Rectangle(location, size)))
@@ -561,8 +566,9 @@ namespace BeebPerf.ux
             Location = location;
             Size = size;
             WindowState = (FormWindowState)state;
-            splitContainer.Orientation = (Orientation)orientation;
-            splitContainer.SplitterDistance = splitterDistance;
+            primarySplitContainer.SplitterDistance = primarySplitterDistance;
+            secondarySplitContainer.Orientation = (Orientation)orientation;
+            secondarySplitContainer.SplitterDistance = secondarySplitterDistance;
 
             ApplyFontScaling(this, DisplaySettings.FontScaling);
         }
@@ -571,6 +577,7 @@ namespace BeebPerf.ux
         {
             int fontSize = (int)float.Round(_BaseFont.SizeInPoints * fontScaling / 100.0f);
             Font font = new Font(_BaseFont.Name, fontSize, FontStyle.Regular);
+            primarySplitContainer.Panel1MinSize = font.Height * TimelineView.MinHeight;
             SuspendLayout();
             ApplyFontToAllControls(control, font);
             ResumeLayout();
@@ -617,8 +624,8 @@ namespace BeebPerf.ux
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
-            columnLayoutButton.Checked = (splitContainer.Orientation == Orientation.Vertical);
-            rowLayoutButton.Checked = (splitContainer.Orientation == Orientation.Horizontal);
+            columnLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Vertical);
+            rowLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Horizontal);
         }
 
         private void SetState(AppStateFlags state)
@@ -692,10 +699,49 @@ namespace BeebPerf.ux
         private void ResizeSpinner()
         {
             spinner.Size = new Size(DeviceDpi, DeviceDpi);
-            spinner.Location = splitContainer.Location + (tabControl.Size / 2) - (spinner.Size / 2);
+            spinner.Location = secondarySplitContainer.Location + (tabControl.Size / 2) - (spinner.Size / 2);
         }
 
         public DisplaySettings DisplaySettings = new();
+
+        public string? FilePathName
+        {
+            get => _FilePathName;
+            set
+            {
+                if (value != _FilePathName)
+                {
+                    _FilePathName = value;
+                    UpdateCaptionText();
+                }
+            }
+        }
+
+        public string? StatusText
+        {
+            get => _StatusText;
+            set
+            {
+                if (value != _StatusText)
+                {
+                    _StatusText = value;
+                    UpdateCaptionText();
+                }
+            }
+        }
+
+        private void UpdateCaptionText()
+        {
+            string caption = "BeepPref";
+            if (_FilePathName != null && _FilePathName.Length > 0)
+                caption += $" - {_FilePathName}";
+            if (_StatusText != null && _StatusText.Length > 0)
+                caption += $" - {_StatusText}";
+            Text = caption;
+        }
+
+        private string? _FilePathName;
+        private string? _StatusText;
 
         public AppStateFlags AppState;
         public Image FlameImage;
@@ -710,7 +756,6 @@ namespace BeebPerf.ux
         private string _RecentFilePathName = string.Empty;
         private int _SuppressTabChange;
         private int _SuppressCheckBoxChange;
-        private string? _FilePathName;
 
         private UndoRedoHistory _UndoRedoHistory = new();
         private Model _Model = new();

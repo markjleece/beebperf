@@ -86,15 +86,30 @@ namespace BeebPerf.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int SplitterDistance {
+        public int PrimarySplitterDistance {
             get {
-                return ((int)(this["SplitterDistance"]));
+                return ((int)(this["PrimarySplitterDistance"]));
             }
             set {
-                this["SplitterDistance"] = value;
+                this["PrimarySplitterDistance"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int SecondarySplitterDistance
+        {
+            get
+            {
+                return ((int)(this["SecondarySplitterDistance"]));
+            }
+            set
+            {
+                this["SecondarySplitterDistance"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]

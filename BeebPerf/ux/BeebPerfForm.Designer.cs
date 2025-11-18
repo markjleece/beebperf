@@ -51,7 +51,8 @@ namespace BeebPerf.ux
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
-            splitContainer = new SplitContainer();
+            primarySplitContainer = new SplitContainer();
+            secondarySplitContainer = new SplitContainer();
             memoryContainer = new Panel();
             tabControl = new TabControlEx();
             callTreeTabPage = new Panel();
@@ -70,10 +71,14 @@ namespace BeebPerf.ux
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)splitContainer).BeginInit();
-            splitContainer.Panel1.SuspendLayout();
-            splitContainer.Panel2.SuspendLayout();
-            splitContainer.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)primarySplitContainer).BeginInit();
+            primarySplitContainer.Panel1.SuspendLayout();
+            primarySplitContainer.Panel2.SuspendLayout();
+            primarySplitContainer.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)secondarySplitContainer).BeginInit();
+            secondarySplitContainer.Panel1.SuspendLayout();
+            secondarySplitContainer.Panel2.SuspendLayout();
+            secondarySplitContainer.SuspendLayout();
             tabControl.SuspendLayout();
             callTreeTabPage.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)callTreeView).BeginInit();
@@ -278,21 +283,30 @@ namespace BeebPerf.ux
             // 
             // timelineView
             // 
-            timelineView.Dock = DockStyle.Top;
-            timelineView.Location = new Point(0, 33);
+            timelineView.BorderStyle = BorderStyle.FixedSingle;
+            timelineView.Dock = DockStyle.Fill;
             timelineView.Name = "timelineView";
-            timelineView.Size = new Size(1745, 84+128);
             timelineView.TabIndex = 1;
             // 
-            // splitContainer
+            // primarySplitContainer
             // 
-            splitContainer.Dock = DockStyle.Fill;
-            splitContainer.Location = new Point(0, 133);
-            splitContainer.Name = "splitContainer";
-            splitContainer.Panel1.Controls.Add(tabControl);
-            splitContainer.Panel2.Controls.Add(codeView);
-            splitContainer.Size = new Size(1745, 977);
-            splitContainer.TabIndex = 2;
+            primarySplitContainer.Dock = DockStyle.Fill;
+            primarySplitContainer.Location = new Point(0, 0);
+            primarySplitContainer.Name = "primarySplitContainer";
+            primarySplitContainer.Panel1.Controls.Add(timelineView);
+            primarySplitContainer.Panel2.Controls.Add(secondarySplitContainer);
+            primarySplitContainer.Orientation = Orientation.Horizontal;
+            primarySplitContainer.TabIndex = 2;
+            // 
+            // secondarySplitContainer
+            // 
+            secondarySplitContainer.Dock = DockStyle.Fill;
+            secondarySplitContainer.BorderStyle = BorderStyle.FixedSingle;
+            secondarySplitContainer.Location = new Point(0, 0);
+            secondarySplitContainer.Name = "secondarySplitContainer";
+            secondarySplitContainer.Panel1.Controls.Add(tabControl);
+            secondarySplitContainer.Panel2.Controls.Add(codeView);
+            secondarySplitContainer.TabIndex = 2;
             // 
             // tabControl
             // 
@@ -450,18 +464,21 @@ namespace BeebPerf.ux
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1745, 1110);
             Controls.Add(spinner);
-            Controls.Add(splitContainer);
-            Controls.Add(timelineView);
+            Controls.Add(primarySplitContainer);
             Controls.Add(toolStrip);
             Name = "BeebPerfForm";
             Text = "BeebPerf";
             Load += BeebPerfForm_Load;
             toolStrip.ResumeLayout(false);
             toolStrip.PerformLayout();
-            splitContainer.Panel1.ResumeLayout(false);
-            splitContainer.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)splitContainer).EndInit();
-            splitContainer.ResumeLayout(false);
+            secondarySplitContainer.Panel1.ResumeLayout(false);
+            secondarySplitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)secondarySplitContainer).EndInit();
+            secondarySplitContainer.ResumeLayout(false);
+            primarySplitContainer.Panel1.ResumeLayout(false);
+            primarySplitContainer.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)primarySplitContainer).EndInit();
+            primarySplitContainer.ResumeLayout(false);
             tabControl.ResumeLayout(false);
             callTreeTabPage.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)callTreeView).EndInit();
@@ -491,7 +508,8 @@ namespace BeebPerf.ux
         private ToolStripButton helpButton;
         private ToolStripButton openButton;
         private TimelineView timelineView;
-        private SplitContainer splitContainer;
+        private SplitContainer primarySplitContainer;
+        private SplitContainer secondarySplitContainer;
         private TabControlEx tabControl;
         private Panel callTreeTabPage;
         private Panel callerCalleeTabPage;

@@ -25,6 +25,8 @@ namespace BeebPerf.ux
 {
     internal class TimelineView : Panel
     {
+        public static int MinHeight = 7; // seven characters high
+
         public TimelineView() : base()
         {
             DoubleBuffered = true;
@@ -239,15 +241,10 @@ namespace BeebPerf.ux
             if (graphics.IsVisible(centerRect))
                 graphics.FillRectangle(centerBrush, centerRect);
 
-            // draw header text
-            using var textBrush = new SolidBrush(ForeColor);
-            graphics.DrawString(_DurationText, Font, textBrush, new PointF(0, 0));
-
             // draw top and bottom lines
             using var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
             using var brush = new SolidBrush(ForeColor);
 
-            graphics.DrawLine(pen, 0, _TimelineRect.Top, Width, _TimelineRect.Top);
             graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
 
             // draw handles
@@ -274,6 +271,9 @@ namespace BeebPerf.ux
 
         private void DrawThumbnails(Graphics graphics)
         {
+            if (_ThumbnailRect.Height == 0)
+                return;
+
             StringFormat textFormat = new StringFormat
             {
                 Alignment = StringAlignment.Center,
@@ -507,25 +507,12 @@ namespace BeebPerf.ux
                 _ => throw new NotImplementedException(),
             };
 
-            string newText = $"Duration: {FormatCycles(_RecordingDuration)}";
+            string durationText = $"Duration: {FormatCycles(_RecordingDuration)}";
             if (cycles != _RecordingDuration)
-                newText += $" ({FormatCycles(cycles)} selected)";
+                durationText += $" ({FormatCycles(cycles)} selected)";
 
-            if (newText == _DurationText)
-                return;
-
-            var maxExtents = new Size(int.MaxValue, int.MaxValue);
-            var previousSize = TextRenderer.MeasureText(_DurationText, Font, maxExtents, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-            var newSize = TextRenderer.MeasureText(newText, Font, maxExtents, TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
-
-            var origin = new Point(0, 0);
-            var previousRect = new Rectangle(origin, previousSize);
-            var newRect = new Rectangle(origin, newSize);
-            if (newText != _DurationText)
-            {
-                Invalidate(Union(previousRect, newRect));
-                _DurationText = newText;
-            }
+            var form = (BeebPerfForm)GetParentForm();
+            form.StatusText = durationText;
         }
 
         private string FormatCycles(int value)
@@ -644,21 +631,15 @@ namespace BeebPerf.ux
 
         private void UpdateTimeline()
         {
-            int margin = Font.Height;
+            int dividerHeight = Math.Max(2, Font.Height / 8);
+            int rulerHeight = 3 * Font.Height / 2;
+            int thumbnailHeight = Height - _ScrollBar.Height - rulerHeight - dividerHeight;
 
-            int thumbNailHeight = Font.Height * 5;
+            if (thumbnailHeight < 0)
+                thumbnailHeight = 0;
 
-            _TimelineRect = new Rectangle(
-                0,
-                margin,
-                Width,
-                Height - margin - _ScrollBar.Height - thumbNailHeight);
-
-            _ThumbnailRect = new Rectangle(
-                0,
-                _TimelineRect.Bottom,
-                Width,
-                Height - _ScrollBar.Height - _TimelineRect.Bottom);
+            _TimelineRect = new Rectangle(0, 0, Width, rulerHeight);
+            _ThumbnailRect = new Rectangle(0, rulerHeight + dividerHeight, Width, thumbnailHeight);
 
             ComputeTicks();
             Invalidate();
@@ -764,7 +745,6 @@ namespace BeebPerf.ux
         private int _DisplayTo;
         private int _AnalysisFrom;
         private int _AnalysisTo;
-        private string _DurationText = string.Empty;
         private Rectangle _TimelineRect;
         private Rectangle _ThumbnailRect;
         private Rectangle _LeftHandleRect;
