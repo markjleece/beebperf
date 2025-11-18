@@ -19,6 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using static BeebPerf.VideoAnalysis;
+
 namespace BeebPerf.ux
 {
     internal class TimelineView : Panel
@@ -32,6 +34,16 @@ namespace BeebPerf.ux
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
             Layout += LayoutFunc;
+        }
+
+        public List<FrameBitmap> FrameBitmaps
+        {
+            get => _FrameBitmaps;
+            set
+            {
+                _FrameBitmaps = value;
+                Invalidate();
+            }
         }
 
         public void SelectRange(int analysisFrom, int analysisTo)
@@ -249,10 +261,91 @@ namespace BeebPerf.ux
             DrawRulerForeground(graphics, pen, brush);
             graphics.Restore(state);
 
+            state = graphics.Save();
             graphics.IntersectClip(centerRect);
             using var highlightPen = new Pen(Blend(SystemColors.Highlight, BackColor, 0.5));
             using var highlightBrush = new SolidBrush(BackColor);
             DrawRulerForeground(graphics, highlightPen, highlightBrush);
+            graphics.Restore(state);
+
+            // draw thumbnails (pixels in src image are 1/2 width)
+            DrawThumbnails(graphics);
+        }
+
+        private void DrawThumbnails(Graphics graphics)
+        {
+            StringFormat textFormat = new StringFormat
+            {
+                Alignment = StringAlignment.Center,
+                LineAlignment = StringAlignment.Center,
+            };
+
+            using var blackBrush = new SolidBrush(Color.Black);
+            using var greyPen = new Pen(Color.Gray);
+            using var textBrush = new SolidBrush(ForeColor);
+
+            int frameHeight = _ThumbnailRect.Height - Font.Height;
+            int frameWidth = 4 * frameHeight / 3;
+            int fromLeft = CyclesToPixels(0);
+            int frameSkipCount = 0;
+
+            for (int i = 0; i < FrameBitmaps.Count; i++)
+            {
+                FrameBitmap frameBitmap = FrameBitmaps[i];
+                int pixels = CyclesToPixels(frameBitmap.StartCycleCount);
+                if (pixels < fromLeft || pixels > Width)
+                {
+                    frameSkipCount++;
+                    continue;
+                }
+
+                if (frameSkipCount > 0)
+                {
+                    frameSkipCount = 0;
+                    frameBitmap = FrameBitmaps[--i];
+                    pixels = CyclesToPixels(frameBitmap.StartCycleCount);
+                }
+
+                if (pixels < Width && pixels + frameWidth > 0)
+                {
+                    double aspectRatio = 0.5 * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
+                    int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
+                    int indent = (frameWidth - bitmapWidth) / 2;
+
+                    var imageRect = new Rectangle(
+                        pixels + indent,
+                        _ThumbnailRect.Top,
+                        bitmapWidth,
+                        frameHeight);
+
+                    var frameRect = new Rectangle(
+                        pixels,
+                        _ThumbnailRect.Top,
+                        frameWidth,
+                        frameHeight);
+
+                    graphics.FillRectangle(blackBrush, frameRect);
+                    graphics.DrawImage(frameBitmap.Bitmap, imageRect);
+                    graphics.DrawRectangle(greyPen, frameRect);
+
+                    var textRect = new Rectangle(
+                        pixels,
+                        _ThumbnailRect.Top + frameHeight,
+                        frameWidth,
+                        Font.Height);
+
+                    graphics.DrawString($"{frameBitmap.FrameNumber}", Font, textBrush, textRect, textFormat);
+
+                    frameRect = new Rectangle(
+                        frameRect.Left,
+                        frameRect.Top,
+                        frameRect.Width + 1, 
+                        frameHeight + 1);
+                    graphics.ExcludeClip(frameRect);
+                }
+
+                fromLeft = pixels + frameWidth;
+            }
         }
 
         private void DrawRulerForeground(Graphics graphics, Pen pen, Brush brush)
@@ -552,11 +645,20 @@ namespace BeebPerf.ux
         private void UpdateTimeline()
         {
             int margin = Font.Height;
+
+            int thumbNailHeight = Font.Height * 5;
+
             _TimelineRect = new Rectangle(
                 0,
                 margin,
                 Width,
-                Height - margin - _ScrollBar.Height);
+                Height - margin - _ScrollBar.Height - thumbNailHeight);
+
+            _ThumbnailRect = new Rectangle(
+                0,
+                _TimelineRect.Bottom,
+                Width,
+                Height - _ScrollBar.Height - _TimelineRect.Bottom);
 
             ComputeTicks();
             Invalidate();
@@ -625,6 +727,8 @@ namespace BeebPerf.ux
 
             var form = (BeebPerfForm)GetParentForm();
             form.SetAnalysisRange(_AnalysisFrom, _AnalysisTo);
+
+            Invalidate(_ThumbnailRect);
         }
 
         private int MulDiv(int a, int b, int c)
@@ -662,6 +766,7 @@ namespace BeebPerf.ux
         private int _AnalysisTo;
         private string _DurationText = string.Empty;
         private Rectangle _TimelineRect;
+        private Rectangle _ThumbnailRect;
         private Rectangle _LeftHandleRect;
         private Rectangle _RightHandleRect;
         private DragMode _DragMode;
@@ -670,5 +775,6 @@ namespace BeebPerf.ux
         private List<Tick> _Ticks = [];
         private HScrollBar _ScrollBar;
         private ReentrancyGuard _ReentrancyGuard = new();
+        private List<FrameBitmap> _FrameBitmaps = [];
     }
 }

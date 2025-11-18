@@ -281,7 +281,7 @@ namespace BeebPerf.ux
             timelineView.Dock = DockStyle.Top;
             timelineView.Location = new Point(0, 33);
             timelineView.Name = "timelineView";
-            timelineView.Size = new Size(1745, 84);
+            timelineView.Size = new Size(1745, 84+128);
             timelineView.TabIndex = 1;
             // 
             // splitContainer

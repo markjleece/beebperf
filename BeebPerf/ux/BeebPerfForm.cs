@@ -211,6 +211,7 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.VideoAnalysis);
+                    timelineView.FrameBitmaps = _VideoAnalysis.FrameBitmaps;
                 }));
             });
         }

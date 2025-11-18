@@ -78,7 +78,7 @@ namespace BeebPerf
 
             FrameBitmaps = new();
             _BitmapData = [];
-            _ULAPalette = new byte[16];
+            _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
             _ULARegister = model.Snapshot.VideoULARegister;
 
             _CtrlR0_HorizontalTotal = model.Snapshot.VideoCtrlRegisters[0];
@@ -110,9 +110,10 @@ namespace BeebPerf
 
         public void GenerateFrameBitmaps()
         {
-            FrameBitmaps = new();
+            _DisplayEnabled = false;
+            _FrameCount = 1;
 
-            StartFrame(-1);
+            FrameBitmaps = new();
 
             int cycleCount = 0;
             foreach (var instruction in _Instructions)
@@ -130,25 +131,25 @@ namespace BeebPerf
                 }
                 else if (instruction.IsBeginDisplayEvent)
                 {
-                    EndFrame(cycleCount);
                     StartFrame(cycleCount);
                 }
 
                 cycleCount += instruction.CycleCount;
 
-                DisplayMemory(cycleCount);
+                if (_DisplayEnabled)
+                    DisplayMemory(cycleCount);
             }
-
-            EndFrame(cycleCount);
         }
 
         private void StartFrame(int cycleCount)
         {
-            _FirstFrame = (cycleCount < 0);
-            _BitmapCycleTime = cycleCount;
-            _BitmapData = new uint[80 * 256];
+            Debug.Assert(!_DisplayEnabled);
+            _DisplayEnabled = true;
+
             _BitmapWidth = 0;
             _BitmapHeight = 0;
+            _StartCycleCount = cycleCount;
+            _BitmapData = new uint[80 * 256];
 
             _BlankSpace = false;
             _RowCounter = 0;
@@ -161,33 +162,74 @@ namespace BeebPerf
 
         private void EndFrame(int cycleCount)
         {
-            if (_FirstFrame)
+            Debug.Assert(cycleCount - _StartCycleCount < 480000);
+
+            Debug.Assert(_DisplayEnabled);
+            _DisplayEnabled = false;
+
+            Bitmap bitmap = new Bitmap(_BitmapWidth, _BitmapHeight, PixelFormat.Format4bppIndexed);
+            bitmap.Palette = _ColorPalette;
+
+            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            System.Drawing.Imaging.BitmapData? data = null;
+
+            try
             {
-                _FirstFrame = false;
-                return;
+                data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+                unsafe
+                {
+                    fixed (uint* src = _BitmapData)
+                    {
+                        byte* dst = (byte*)data.Scan0;
+
+                        if (data.Stride != 80 * sizeof(uint))
+                        {
+                            for (int i = 0; i < _BitmapHeight; i++)
+                            {
+                                Buffer.MemoryCopy(
+                                    src + (i * 80),
+                                    dst + (i * data.Stride),
+                                    data.Width / 2,
+                                    data.Width / 2);
+                            }
+                        }
+                        else
+                        {
+                            Buffer.MemoryCopy(
+                                dst,
+                                (void*)data.Scan0,
+                                _BitmapData.Length * sizeof(uint),
+                                _BitmapData.Length * sizeof(uint));
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (data != null)
+                    bitmap.UnlockBits(data);
             }
 
-            // crop bitmap
             FrameBitmaps.Add(new()
             {
-                StartCycleTime = _BitmapCycleTime,
-                EndCycleTime = cycleCount,
-                Bitmap = Create4bppBitmap(_BitmapWidth, _BitmapHeight, _BitmapData),
+                FrameNumber = _FrameCount++,
+                StartCycleCount = _StartCycleCount,
+                EndCycleCount = cycleCount,
+                Bitmap = bitmap
             });
         }
 
-        private void MemoryWrite(CanonicalAddress canonicalAddress, byte value)
+        private void MemoryWrite(CanonicalAddress memoryAddress, byte value)
         {
-            ushort address = canonicalAddress.Address;
+            ushort address = memoryAddress.Address;
 
             // TODO shadow ram
-            if (canonicalAddress.Page != MemoryPage.WholeRam || address < _ScreenAddress)
+            if (memoryAddress.Page != MemoryPage.WholeRam || address < _ScreenAddress)
                 return;
 
             if (address < 0x8000)
             {
                 _Memory[address] = value;
-                return;
             }
             else if (address == 0xFE00)
             {
@@ -248,6 +290,7 @@ namespace BeebPerf
             }
             else if (address == 0xFE21)
             {
+                _RegisterModified |= (value != _ULAPalette[value >> 4]);
                 _ULAPalette[value >> 4] = value;
             }
             else if (address == 0xFE42) // set data direction
@@ -281,6 +324,8 @@ namespace BeebPerf
 
         private void DisplayMemory(int cycleCount)
         {
+            Debug.Assert(_DisplayEnabled);
+
             int characterCount = (cycleCount >> _CharacterClockShift) - (_LastCycleCount >> _CharacterClockShift);
 
             _LastCycleCount = cycleCount;
@@ -300,6 +345,9 @@ namespace BeebPerf
                     {
                         _ScanlineCounter = 0;
                         _RowCounter++;
+
+                        if (_RowCounter == _CtrlR6_VerticalDisplayed)
+                            EndFrame(cycleCount);
                     }
 
                     _BlankSpace = (_RowCounter >= _CtrlR6_VerticalDisplayed);
@@ -340,7 +388,7 @@ namespace BeebPerf
             _CharacterClockShift = 1 - characterClockRate;
 
             _ScreenStartAddress = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
-            int horzMultiplier = 0;
+            int horizontalMultiplier;
 
             switch ((_ULARegister >> 2) & 0x7)
             {
@@ -348,43 +396,51 @@ namespace BeebPerf
                     _BitsPerPixel = 1;
                     Build4bppLookupTbl();
                     _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horzMultiplier = 1;
+                    horizontalMultiplier = 1;
                     break;
 
                 case 6: // Mode 1 (4 color, medium res)
                     _BitsPerPixel = 2;
                     Build8bppLookupTbl();
                     _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horzMultiplier = 2;
+                    horizontalMultiplier = 1;
                     break;
 
                 case 5: // Mode 2 (16 colors, low res)
                     _BitsPerPixel = 4;
                     Build16bppLookupTbl();
                     _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horzMultiplier = 4;
+                    horizontalMultiplier = 1;
                     break;
 
                 case 2: // Mode 4 & 6 (2 color, medium res)
                     _BitsPerPixel = 1;
                     Build8bppLookupTbl();
                     _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                    horzMultiplier = 2;
+                    horizontalMultiplier = 2;
                     break;
 
                 case 1: // Mode 5 (4 color, low res)
                     _BitsPerPixel = 2;
                     Build16bppLookupTbl();
                     _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                    horzMultiplier = 4;
+                    horizontalMultiplier = 2;
+                    break;
+
+                case 0: // Mode 8 (16 color, very low res)
+                    _BitsPerPixel = 4;
+                    Build32bppLookupTbl();
+                    _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                    horizontalMultiplier = 2;
                     break;
 
                 default:
                     _WriteBitmapDataFunc = WriteBitmapData_Void;
-                    throw new NotImplementedException();
+                    horizontalMultiplier = 1;
+                    break;
             }
 
-            int bitmapWidth = horzMultiplier * (_CtrlR1_HorizontalDisplayed * 8) / _BitsPerPixel;
+            int bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
             int bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + 1);
 
             _BitmapWidth = Math.Max(_BitmapWidth, bitmapWidth);
@@ -393,6 +449,7 @@ namespace BeebPerf
 
         private void WriteBitmapData_Void(byte value)
         {
+            // nothing
         }
 
         private void WriteBitmapData_32bits(byte value)
@@ -420,10 +477,11 @@ namespace BeebPerf
         private void Build4bppLookupTbl()
         {
             Debug.Assert(_BitsPerPixel == 1);
+            int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
                 int shiftRegister = value;
-                for (int i = 0; i < 8; i += 2)
+                for (int i = 0; i < shiftCount; i += 2)
                 {
                     // first lookup / shift
                     int firstIndex =
@@ -471,7 +529,7 @@ namespace BeebPerf
         private void Build8bppLookupTbl()
         {
             Debug.Assert(_BitsPerPixel == 1 || _BitsPerPixel == 2);
-            int shiftCount = 8 / _BitsPerPixel; // 8 or 4 times
+            int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
                 int shiftRegister = value;
@@ -507,7 +565,7 @@ namespace BeebPerf
         private void Build16bppLookupTbl()
         {
             Debug.Assert(_BitsPerPixel == 2 || _BitsPerPixel == 4);
-            int shiftCount = 8 / _BitsPerPixel; // 4 or 2 times
+            int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
                 int shiftRegister = value;
@@ -540,62 +598,55 @@ namespace BeebPerf
             }
         }
 
-        public static Bitmap Create4bppBitmap(int width, int height, uint[] pixelData)
+        private void Build32bppLookupTbl()
         {
-            Bitmap bitmap = new Bitmap(width, height, PixelFormat.Format4bppIndexed);
-            bitmap.Palette = _ColorPalette;
-
-            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
-            System.Drawing.Imaging.BitmapData? data = null;
-
-            try
+            Debug.Assert(_BitsPerPixel == 4);
+            int shiftCount = 8 / _BitsPerPixel;
+            for (int value = 0; value < 256; value++)
             {
-                data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
-                unsafe
+                int shiftRegister = value;
+                for (int i = 0; i < shiftCount; i++)
                 {
-                    fixed (uint* src = pixelData)
-                    {
-                        byte* dst = (byte*)data.Scan0;
+                    // lookup / shift
+                    int index =
+                        ((shiftRegister >> 4) & 0x8) |
+                        ((shiftRegister >> 3) & 0x4) |
+                        ((shiftRegister >> 2) & 0x2) |
+                        (shiftRegister & 0x1);
 
-                        if (width != data.Stride)
-                        {
-                            for (int i = 0; i < height; i++)
-                            {
-                                Buffer.MemoryCopy(
-                                    src + (i * 80),
-                                    dst + (i * data.Stride),
-                                    data.Width / 2,
-                                    data.Width / 2);
-                            }
-                        }
-                        else
-                        {
-                            Buffer.MemoryCopy(
-                                dst,
-                                (void*)data.Scan0,
-                                pixelData.Length * sizeof(uint),
-                                pixelData.Length * sizeof(uint));
-                        }
+                    int entry = _ULAPalette[index] & 0xF;
+
+                    if (entry > 0x7) // apply flash?
+                    {
+                        entry &= 0x7;
+                        if ((_ULARegister & 0x1) != 0)
+                            entry ^= 0x7;
+                    }
+
+                    shiftRegister = (shiftRegister << 1) | 0x1;
+
+                    unsafe
+                    {
+                        var pixelQuad = (ushort)((entry << 12) | (entry << 8) | (entry << 4) | entry);
+                        var pixelOct = (uint)(pixelQuad << 16 | pixelQuad);
+                        _BitmapDataTbl[value].Words[i] = pixelOct;
                     }
                 }
             }
-            finally
-            {
-                if (data != null)
-                    bitmap.UnlockBits(data);
-            }
-
-            return bitmap;
         }
 
         public class FrameBitmap
         {
-            public int StartCycleTime;
-            public int EndCycleTime;
+            public int FrameNumber; // 1, 2, 3...
+            public int StartCycleCount;
+            public int EndCycleCount;
             public Bitmap? Bitmap;
         }
 
         public List<FrameBitmap> FrameBitmaps = [];
+
+        private Instruction[] _Instructions = [];
+        private InstructionSet? _InstructionSet;
 
         private byte _ULARegister;
         private byte[] _ULAPalette = [];
@@ -625,13 +676,10 @@ namespace BeebPerf
         private int _ScreenStartAddress;
         private uint[] _BitmapData = [];
         private int _BitsPerPixel;
-        private int _BitmapCycleTime;
-
-        private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
+        private int _FrameCount;
+        private int _StartCycleCount;
         private int _LastCycleCount;
-        private Instruction[] _Instructions = [];
-        private InstructionSet? _InstructionSet;
-        private bool _FirstFrame;
+        private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
         private int _BitmapWidth;
         private int _BitmapHeight;
         private bool _TeletextMode;
@@ -639,6 +687,7 @@ namespace BeebPerf
         private byte _SystemVIA_DataDirection;
         private byte _ScreenAddressLatch;
         private bool _BlankSpace;
+        private bool _DisplayEnabled;
 
         [StructLayout(LayoutKind.Explicit)]
         public unsafe struct BitmapData
