@@ -330,8 +330,29 @@ namespace BeebPerf
 
             _LastCycleCount = cycleCount;
 
-            for (int i = 0; i < characterCount; i++) // need to deal with interlacing
+            for (int i = 0; i < characterCount; i++) // TODO: Need to deal with interlacing
             {
+                if (!_BlankSpace)
+                {
+                    // read display memory
+                    byte value = 0;
+                    if (_ScanlineCounter < 8)
+                    {
+                        // calc memory address
+                        int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
+                        int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
+
+                        if (memoryAddress > 0x8000)
+                            memoryAddress -= _ScreenSize;
+
+                        // read memory
+                        value = _Memory[memoryAddress];
+                    }
+
+                    // write pixel data with delegate
+                    _WriteBitmapDataFunc(value);
+                }
+
                 // advance counters
                 _ColumnCounter++;
                 _BlankSpace |= (_ColumnCounter == _CtrlR1_HorizontalDisplayed);
@@ -352,27 +373,6 @@ namespace BeebPerf
 
                     _BlankSpace = (_RowCounter >= _CtrlR6_VerticalDisplayed);
                 }
-
-                if (_BlankSpace)
-                    continue;
-
-                byte value = 0;
-
-                if (_ScanlineCounter < 8)
-                {
-                    // calc memory address
-                    int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
-                    int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
-
-                    if (memoryAddress > 0x8000)
-                        memoryAddress -= _ScreenSize;
-
-                    // read memory
-                    value = _Memory[memoryAddress];
-                }
-
-                // write pixel data with delegate
-                _WriteBitmapDataFunc(value);
             }
         }
 

@@ -241,10 +241,8 @@ namespace BeebPerf.ux
             if (graphics.IsVisible(centerRect))
                 graphics.FillRectangle(centerBrush, centerRect);
 
-            // draw top and bottom lines
+            // draw ruler line
             using var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
-            using var brush = new SolidBrush(ForeColor);
-
             graphics.DrawLine(pen, 0, _TimelineRect.Bottom - 1, Width, _TimelineRect.Bottom - 1);
 
             // draw handles
@@ -255,6 +253,7 @@ namespace BeebPerf.ux
             // draw ruler ticks and text
             var state = graphics.Save();
             graphics.ExcludeClip(centerRect);
+            using var brush = new SolidBrush(ForeColor);
             DrawRulerForeground(graphics, pen, brush);
             graphics.Restore(state);
 
@@ -265,7 +264,7 @@ namespace BeebPerf.ux
             DrawRulerForeground(graphics, highlightPen, highlightBrush);
             graphics.Restore(state);
 
-            // draw thumbnails (pixels in src image are 1/2 width)
+            // draw thumbnails
             DrawThumbnails(graphics);
         }
 
@@ -308,16 +307,7 @@ namespace BeebPerf.ux
 
                 if (pixels < Width && pixels + frameWidth > 0)
                 {
-                    double aspectRatio = 0.5 * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
-                    int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
-                    int indent = (frameWidth - bitmapWidth) / 2;
-
-                    var imageRect = new Rectangle(
-                        pixels + indent,
-                        _ThumbnailRect.Top,
-                        bitmapWidth,
-                        frameHeight);
-
+                    // paint background and border
                     var frameRect = new Rectangle(
                         pixels,
                         _ThumbnailRect.Top,
@@ -325,9 +315,21 @@ namespace BeebPerf.ux
                         frameHeight);
 
                     graphics.FillRectangle(blackBrush, frameRect);
-                    graphics.DrawImage(frameBitmap.Bitmap, imageRect);
                     graphics.DrawRectangle(greyPen, frameRect);
 
+                    // paint thumbnail image
+                    double aspectRatio = 0.5 * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
+                    int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
+                    int indent = (frameWidth - bitmapWidth) / 2;
+                    var imageRect = new Rectangle(
+                        pixels + indent + 2,
+                        _ThumbnailRect.Top + 2,
+                        bitmapWidth - 3,
+                        frameHeight - 3);
+
+                    graphics.DrawImage(frameBitmap.Bitmap, imageRect);
+
+                    // paint frame number
                     var textRect = new Rectangle(
                         pixels,
                         _ThumbnailRect.Top + frameHeight,
@@ -336,11 +338,13 @@ namespace BeebPerf.ux
 
                     graphics.DrawString($"{frameBitmap.FrameNumber}", Font, textBrush, textRect, textFormat);
 
+                    // exclude thumbnail from clipping area
                     frameRect = new Rectangle(
                         frameRect.Left,
                         frameRect.Top,
                         frameRect.Width + 1, 
                         frameHeight + 1);
+
                     graphics.ExcludeClip(frameRect);
                 }
 
