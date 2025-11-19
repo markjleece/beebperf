@@ -36,7 +36,8 @@ namespace BeebPerf.ux
             FlameImage = (Image)resources.GetObject("flame.Image")!;
 
             FormClosing += BeebPerfForm_FormClosing;
-            Resize += BeebPerfForm_Resize;
+            Resize += Spinner_Resize;
+            tabControl.Resize += Spinner_Resize;
 
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
 
@@ -51,7 +52,7 @@ namespace BeebPerf.ux
             ResizeSpinner();
         }
 
-        private void BeebPerfForm_Resize(object? sender, EventArgs e)
+        private void Spinner_Resize(object? sender, EventArgs e)
         {
             ResizeSpinner();
         }
@@ -699,7 +700,8 @@ namespace BeebPerf.ux
         private void ResizeSpinner()
         {
             spinner.Size = new Size(DeviceDpi, DeviceDpi);
-            spinner.Location = secondarySplitContainer.Location + (tabControl.Size / 2) - (spinner.Size / 2);
+            var point = PointToClient(tabControl.PointToScreen(Point.Empty));
+            spinner.Location = point + (tabControl.Size / 2) - (spinner.Size / 2);
         }
 
         public DisplaySettings DisplaySettings = new();

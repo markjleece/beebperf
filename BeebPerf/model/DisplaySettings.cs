@@ -115,7 +115,7 @@ namespace BeebPerf.model
                     {
                         LiteralFormat.Hexadecimal => FormatAddress(value),
                         LiteralFormat.Decimal => integer.ToString(),
-                        LiteralFormat.Binary => Convert.ToString(integer, 2),
+                        LiteralFormat.Binary => Convert.ToString(integer, 2).PadLeft(8, '0'),
                         _ => string.Empty
                     };
 
