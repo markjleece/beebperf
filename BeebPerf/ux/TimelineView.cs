@@ -318,7 +318,7 @@ namespace BeebPerf.ux
                     graphics.DrawRectangle(greyPen, frameRect);
 
                     // paint thumbnail image
-                    double aspectRatio = 0.5 * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
+                    double aspectRatio = frameBitmap.AspectRatio * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
                     int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
                     int indent = (frameWidth - bitmapWidth) / 2;
                     var imageRect = new Rectangle(
@@ -361,7 +361,7 @@ namespace BeebPerf.ux
                     TickSize.Major => _TimelineRect.Height,
                     TickSize.Medium => _TimelineRect.Height / 2,
                     TickSize.Minor => _TimelineRect.Height / 4,
-                    _ => throw new NotImplementedException()
+                    _ => throw new ArgumentOutOfRangeException()
                 };
 
                 int xPos = SecondsToPixels(tick.Position);
@@ -508,7 +508,7 @@ namespace BeebPerf.ux
                 DragMode.LeftHandle => _AnalysisTo - PixelsToCycles(_LeftHandleRect.Right - 1),
                 DragMode.RightHandle => PixelsToCycles(_RightHandleRect.Left) - _AnalysisFrom,
                 DragMode.Range => PixelsToCycles(_RightHandleRect.Left) - PixelsToCycles(_LeftHandleRect.Right - 1),
-                _ => throw new NotImplementedException(),
+                _ => throw new ArgumentOutOfRangeException()
             };
 
             string durationText = $"Duration: {FormatCycles(_RecordingDuration)}";

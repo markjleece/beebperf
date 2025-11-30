@@ -22,7 +22,6 @@
 using BeebPerf.model;
 using System.Diagnostics;
 using System.Drawing.Imaging;
-using System.Runtime.InteropServices;
 
 namespace BeebPerf
 {
@@ -39,8 +38,8 @@ namespace BeebPerf
                 Color.Magenta,
                 Color.Cyan,
                 Color.White,
-                Color.Black,    // flashing black-white
-                Color.Red,      // flashing red-cyan
+                Color.Black,   // flashing black-white
+                Color.Red,     // flashing red-cyan
                 Color.Green,   // flashing green-magenta
                 Color.Yellow,  // flashing yellow-blue
                 Color.Blue,    // flashing blue-yellow
@@ -54,6 +53,13 @@ namespace BeebPerf
         public VideoAnalysis()
         {
             _WriteBitmapDataFunc = WriteBitmapData_Void;
+            _ReadScreenDataFunc = ReadScreenData_Void;
+
+            for (int i = 0; i < 256; i++)
+                _CRTBitmapTbl[i] = new byte[8];
+
+            // TODO: put on separate thread or embed bitmaps in exe
+            InitialiseMode7Font(GetSolutionFolder() + "\\teletext.fnt");
         }
 
         public async Task<bool> AnalysisAsync(
@@ -77,7 +83,7 @@ namespace BeebPerf
             _InstructionSet = instructionSet;
 
             FrameBitmaps = new();
-            _BitmapData = [];
+            _CRTBitmap = new byte[_CRTMaxBitmapHeight * _CRTBitmapStride];
             _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
             _ULARegister = model.Snapshot.VideoULARegister;
 
@@ -141,23 +147,130 @@ namespace BeebPerf
             }
         }
 
+        private delegate byte ReadScreenData();
+        private delegate void WriteBitmapData(byte value);
+        private void UpdateVideo()
+        {
+            _RegisterModified = false;
+
+            int characterClockRate = (_ULARegister >> 4) & 0x01;
+            _CharacterClockShift = 1 - characterClockRate;
+
+            bool interlacedSync = (_CtrlR8_InterlaceAndDelay & 0x1) != 0;
+            _CRTBitmapScanlineOffsetIncrement = (interlacedSync ? 2 : 1) * _CRTBitmapStride;
+            _CRTBitmapScanlineOffsetReset = (interlacedSync ? _FrameCount % 2 : 0) * _CRTBitmapStride;
+
+            bool interlacedVideo = (_CtrlR8_InterlaceAndDelay & 0x2) != 0;
+            _ScanlineCounterIncrement = interlacedVideo ? 2 : 1;
+            _ScanlineCounterReset = interlacedVideo ? _FrameCount % 2 : 0;
+
+            _ScanlinesPerCharAdjust = (interlacedSync && interlacedVideo) ? 2 : 1;
+
+            _TeletextMode = ((_ULARegister >> 1) & 0x01) != 0;
+
+            if (_TeletextMode)
+                _ScreenStartAddress = (((_CtrlR12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CtrlR13_ScreenStartLow;
+            else
+                _ScreenStartAddress = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
+
+            _ReadScreenDataFunc = _TeletextMode ? ReadScreenData_Teletext : ReadScreenData_NonTeletext;
+
+            int horizontalMultiplier;
+            int bitmapWidth, bitmapHeight;
+            if (!_TeletextMode)
+            {
+                switch ((_ULARegister >> 2) & 0x7)
+                {
+                    case 7: // Mode 0 & 3 (2 pixelColor, high res)
+                        _BitsPerPixel = 1;
+                        Build4bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                        horizontalMultiplier = 1;
+                        break;
+
+                    case 6: // Mode 1 (4 pixelColor, medium res)
+                        _BitsPerPixel = 2;
+                        Build8bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                        horizontalMultiplier = 1;
+                        break;
+
+                    case 5: // Mode 2 (16 colors, low res)
+                        _BitsPerPixel = 4;
+                        Build16bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                        horizontalMultiplier = 1;
+                        break;
+
+                    case 2: // Mode 4 & 6 (2 pixelColor, medium res)
+                        _BitsPerPixel = 1;
+                        Build8bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                        horizontalMultiplier = 2;
+                        break;
+
+                    case 1: // Mode 5 (4 pixelColor, low res)
+                        _BitsPerPixel = 2;
+                        Build16bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                        horizontalMultiplier = 2;
+                        break;
+
+                    case 0: // Mode 8 (16 pixelColor, very low res)
+                        _BitsPerPixel = 4;
+                        Build32bppLookupTbl();
+                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                        horizontalMultiplier = 2;
+                        break;
+
+                    default:
+                        _WriteBitmapDataFunc = WriteBitmapData_Void;
+                        horizontalMultiplier = 1;
+                        break;
+                }
+
+                bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
+                bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust);
+            }
+            else
+            {
+                _WriteBitmapDataFunc = WriteBitmapData_Mode7;
+
+                bitmapWidth = 480;
+                bitmapHeight = 500;
+            }
+
+            _CRTBitmapWidth = Math.Max(_CRTBitmapWidth, bitmapWidth);
+            _CRTBitmapHeight = Math.Max(_CRTBitmapHeight, bitmapHeight);
+        }
+
         private void StartFrame(int cycleCount)
         {
             Debug.Assert(!_DisplayEnabled);
             _DisplayEnabled = true;
 
-            _BitmapWidth = 0;
-            _BitmapHeight = 0;
+            _CRTBitmapWidth = 0;
+            _CRTBitmapHeight = 0;
+
             _StartCycleCount = cycleCount;
-            _BitmapData = new uint[80 * 256];
+            _LastCycleCount = cycleCount;
 
             _BlankSpace = false;
             _RowCounter = 0;
             _ColumnCounter = 0;
-            _ScanlineCounter = 0;
-            _BitmapScanlineOffset = 0;
+
+            _Mode7State.Mode7FlashOn = false;
+
+            if (--_Mode7State.Mode7FlashTrigger < 0)
+            {
+                _Mode7State.Mode7FlashTrigger = _Mode7State.Mode7FlashOn ? Mode7_FlashOffFrameCount : Mode7_FlashOnFrameCount;
+                _Mode7State.Mode7FlashOn = !_Mode7State.Mode7FlashOn; // toggle flash state
+            }
 
             UpdateVideo();
+
+            _ScanlineCounter = _ScanlineCounterReset;
+            _CRTBitmapScanlineOffset = _CRTBitmapScanlineOffsetReset;
         }
 
         private void EndFrame(int cycleCount)
@@ -167,7 +280,7 @@ namespace BeebPerf
             Debug.Assert(_DisplayEnabled);
             _DisplayEnabled = false;
 
-            Bitmap bitmap = new Bitmap(_BitmapWidth, _BitmapHeight, PixelFormat.Format4bppIndexed);
+            Bitmap bitmap = new Bitmap(_CRTBitmapWidth, _CRTBitmapHeight, PixelFormat.Format4bppIndexed);
             bitmap.Palette = _ColorPalette;
 
             Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
@@ -178,16 +291,16 @@ namespace BeebPerf
                 data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
                 unsafe
                 {
-                    fixed (uint* src = _BitmapData)
+                    fixed (byte* src = _CRTBitmap)
                     {
                         byte* dst = (byte*)data.Scan0;
 
-                        if (data.Stride != 80 * sizeof(uint))
+                        if (data.Stride != _CRTBitmapStride)
                         {
-                            for (int i = 0; i < _BitmapHeight; i++)
+                            for (int i = 0; i < _CRTBitmapHeight; i++)
                             {
                                 Buffer.MemoryCopy(
-                                    src + (i * 80),
+                                    src + (i * _CRTBitmapStride),
                                     dst + (i * data.Stride),
                                     data.Width / 2,
                                     data.Width / 2);
@@ -198,8 +311,8 @@ namespace BeebPerf
                             Buffer.MemoryCopy(
                                 dst,
                                 (void*)data.Scan0,
-                                _BitmapData.Length * sizeof(uint),
-                                _BitmapData.Length * sizeof(uint));
+                                _CRTBitmap.Length,
+                                _CRTBitmap.Length);
                         }
                     }
                 }
@@ -212,6 +325,7 @@ namespace BeebPerf
 
             FrameBitmaps.Add(new()
             {
+                AspectRatio = _TeletextMode ? _CRTAspectRatio_Teletext : _CRTAspectRatio_NonTeletext,
                 FrameNumber = _FrameCount++,
                 StartCycleCount = _StartCycleCount,
                 EndCycleCount = cycleCount,
@@ -314,7 +428,7 @@ namespace BeebPerf
                         1 => 0x6000,
                         2 => 0x3000,
                         3 => 0x5800,
-                        _ => throw new NotImplementedException()
+                        _ => throw new ArgumentOutOfRangeException()
                     };
 
                     _ScreenSize = 0x8000 - _ScreenAddress;
@@ -334,22 +448,7 @@ namespace BeebPerf
             {
                 if (!_BlankSpace)
                 {
-                    // read display memory
-                    byte value = 0;
-                    if (_ScanlineCounter < 8)
-                    {
-                        // calc memory address
-                        int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
-                        int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
-
-                        if (memoryAddress > 0x8000)
-                            memoryAddress -= _ScreenSize;
-
-                        // read memory
-                        value = _Memory[memoryAddress];
-                    }
-
-                    // write pixel data with delegate
+                    byte value = _ReadScreenDataFunc();
                     _WriteBitmapDataFunc(value);
                 }
 
@@ -359,12 +458,12 @@ namespace BeebPerf
                 if (_ColumnCounter == _CtrlR0_HorizontalTotal + 1)
                 {
                     _ColumnCounter = 0;
-                    _BitmapScanlineOffset += 80;
+                    _CRTBitmapScanlineOffset += _CRTBitmapScanlineOffsetIncrement;
 
-                    _ScanlineCounter++;
-                    if (_ScanlineCounter == (_CtrlR9_ScanLinesPerChar + 1))
+                    _ScanlineCounter += _ScanlineCounterIncrement;
+                    if (_ScanlineCounter >= (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust))
                     {
-                        _ScanlineCounter = 0;
+                        _ScanlineCounter = _ScanlineCounterReset;
                         _RowCounter++;
 
                         if (_RowCounter == _CtrlR6_VerticalDisplayed)
@@ -376,101 +475,259 @@ namespace BeebPerf
             }
         }
 
-        private delegate void WriteBitmapData(byte value);
-
-        private void UpdateVideo()
+        private byte ReadScreenData_Void()
         {
-            _RegisterModified = false;
+            return 0;
+        }
 
-            _TeletextMode = ((_ULARegister >> 1) & 0x01) != 0;
+        private byte ReadScreenData_Teletext()
+        {
+            int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
 
-            int characterClockRate = (_ULARegister >> 4) & 0x01;
-            _CharacterClockShift = 1 - characterClockRate;
+            if (characterAddress > 0x8000)
+                characterAddress -= _ScreenSize;
 
-            _ScreenStartAddress = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
-            int horizontalMultiplier;
+            return _Memory[characterAddress];
+        }
 
-            switch ((_ULARegister >> 2) & 0x7)
-            {
-                case 7: // Mode 0 & 3 (2 color, high res)
-                    _BitsPerPixel = 1;
-                    Build4bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horizontalMultiplier = 1;
-                    break;
+        private byte ReadScreenData_NonTeletext()
+        {
+            if (_ScanlineCounter >= 8)
+                return 0;
 
-                case 6: // Mode 1 (4 color, medium res)
-                    _BitsPerPixel = 2;
-                    Build8bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horizontalMultiplier = 1;
-                    break;
+            int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
+            int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
 
-                case 5: // Mode 2 (16 colors, low res)
-                    _BitsPerPixel = 4;
-                    Build16bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                    horizontalMultiplier = 1;
-                    break;
+            if (memoryAddress > 0x8000)
+                memoryAddress -= _ScreenSize;
 
-                case 2: // Mode 4 & 6 (2 color, medium res)
-                    _BitsPerPixel = 1;
-                    Build8bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                    horizontalMultiplier = 2;
-                    break;
-
-                case 1: // Mode 5 (4 color, low res)
-                    _BitsPerPixel = 2;
-                    Build16bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                    horizontalMultiplier = 2;
-                    break;
-
-                case 0: // Mode 8 (16 color, very low res)
-                    _BitsPerPixel = 4;
-                    Build32bppLookupTbl();
-                    _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                    horizontalMultiplier = 2;
-                    break;
-
-                default:
-                    _WriteBitmapDataFunc = WriteBitmapData_Void;
-                    horizontalMultiplier = 1;
-                    break;
-            }
-
-            int bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
-            int bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + 1);
-
-            _BitmapWidth = Math.Max(_BitmapWidth, bitmapWidth);
-            _BitmapHeight = Math.Max(_BitmapHeight, bitmapHeight);
+            return _Memory[memoryAddress];
         }
 
         private void WriteBitmapData_Void(byte value)
         {
-            // nothing
         }
 
         private void WriteBitmapData_32bits(byte value)
         {
-            unsafe
-            {
-                int index = _BitmapScanlineOffset + _ColumnCounter;
-                _BitmapData[index] = _BitmapDataTbl[value].Words[0];
-            }
+            int index = _CRTBitmapScanlineOffset + (_ColumnCounter << 2);
+            Buffer.BlockCopy(_CRTBitmapTbl[value], 0, _CRTBitmap, index, 4);
         }
 
         private void WriteBitmapData_64bits(byte value)
         {
-            unsafe
+            int index = _CRTBitmapScanlineOffset + (_ColumnCounter << 3);
+            Buffer.BlockCopy(_CRTBitmapTbl[value], 0, _CRTBitmap, index, 8);
+        }
+
+        private void UpdateMode7StateBegin(byte value)
+        {
+            if (_ColumnCounter == 0) // first char in row?
             {
-                int index = _BitmapScanlineOffset + (_ColumnCounter << 1);
-                fixed (uint* words = _BitmapDataTbl[value].Words)
+                _Mode7State.ForeColor = 7;
+                _Mode7State.ForeColorPending = 7;
+                _Mode7State.BackColor = 0;
+                _Mode7State.NextFlash = false;
+                _Mode7State.DoubleHeight = false;
+                _Mode7State.NextGraphics = false;
+                _Mode7State.Mosaic = false;
+                _Mode7State.NextHoldGraphics = false;
+                _Mode7State.NextHoldGraphicsChar = 32;
+                _Mode7State.NextHoldMosaic = false;
+            }
+
+            _Mode7State.HoldGraphics = _Mode7State.NextHoldGraphics;
+            _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
+            _Mode7State.HoldMosaic = _Mode7State.NextHoldMosaic;
+            _Mode7State.Graphics = _Mode7State.NextGraphics;
+            _Mode7State.Flash = _Mode7State.NextFlash;
+
+            if (value < 32)
+                value += 128; // some programs use 7-bit control codes!
+
+            if ((value & 32) != 0 && _Mode7State.Graphics)
+            {
+                _Mode7State.NextHoldGraphicsChar = value;
+                _Mode7State.NextHoldMosaic = _Mode7State.Mosaic;
+            }
+
+            uint[][] characterScanlines;
+
+            if ((value >= 128) && (value <= 159))
+            {
+                if (!_Mode7State.HoldGraphics && value != 158) 
+                    _Mode7State.NextHoldGraphicsChar = 32; // SAA5050 teletext rendering bug
+
+                switch (value)
                 {
-                    _BitmapData[index] = words[0];
-                    _BitmapData[index + 1] = words[1];
+                    case 129: // alphanumeric red
+                    case 130: // alphanumeric green
+                    case 131: // alphanumeric yellow
+                    case 132: // alphanumeric blue
+                    case 133: // alphanumeric magenta
+                    case 134: // alphanumeric cyan
+                    case 135: // alphanumeric white
+                        _Mode7State.ForeColorPending = (byte)(value - 128);
+                        _Mode7State.NextGraphics = false;
+                        _Mode7State.NextHoldGraphicsChar = 32; // space
+                        break;
+
+                    case 136: // flash
+                        _Mode7State.NextFlash = true;
+                        break;
+
+                    case 137: // steady
+                        _Mode7State.NextFlash = false;
+                        _Mode7State.Flash = false;
+                        break;
+
+                    case 140: // normal height
+                        if (_Mode7State.DoubleHeight)
+                        {
+                            _Mode7State.NextHoldGraphicsChar = 32;
+                            _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
+                        }
+                        _Mode7State.DoubleHeight = false;
+                        break;
+
+                    case 141: // double height
+                        if (!_Mode7State.DoubleHeight)
+                        {
+                            _Mode7State.NextHoldGraphicsChar = 32;
+                            _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
+                        }
+                        _Mode7State.DoubleHeight = true;
+                        break;
+
+                    case 145: // graphics red
+                    case 146: // graphics green
+                    case 147: // graphics yellow
+                    case 148: // graphics blue
+                    case 149: // graphics magenta
+                    case 150: // graphics cyan
+                    case 151: // graphics white
+                        _Mode7State.ForeColorPending = (byte)(value - 144);
+                        _Mode7State.NextGraphics = true;
+                        break;
+
+                    case 152: // conceal display
+                        _Mode7State.ForeColor = _Mode7State.BackColor;
+                        _Mode7State.ForeColorPending = _Mode7State.BackColor;
+                        break;
+
+                    case 153: // contiguous graphics
+                        _Mode7State.Mosaic = false;
+                        break;
+
+                    case 154: // mosaic graphics
+                        _Mode7State.Mosaic = true;
+                        break;
+
+                    case 156: // black background
+                        _Mode7State.BackColor = 0;
+                        break;
+
+                    case 157: // new background
+                        _Mode7State.BackColor = _Mode7State.ForeColor;
+                        break;
+
+                    case 158: // hold graphics
+                        _Mode7State.NextHoldGraphics = true;
+                        _Mode7State.HoldGraphics = true;
+                        break;
+
+                    case 159: // release graphics
+                        _Mode7State.NextHoldGraphics = false;
+                        break;
                 }
+
+                if (_Mode7State.HoldGraphics && _Mode7State.Graphics)
+                {
+                    characterScanlines = _Mode7State.HoldMosaic ? _Mode7MosaicFont : _Mode7GraphicFont;
+                    value = _Mode7State.HoldGraphicsChar;
+                }
+                else
+                {
+                    characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
+                    value = 32; // space
+                }
+            }
+            else
+            {
+                characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
+            }
+
+            Mode7CharacterHeight height;
+            if (_Mode7State.DoubleHeight)
+            {
+                height = _Mode7State.LineChars[_ColumnCounter].Height switch
+                {
+                    Mode7CharacterHeight.Normal => Mode7CharacterHeight.Double_Upper,
+                    Mode7CharacterHeight.Double_Upper => Mode7CharacterHeight.Double_Lower,
+                    Mode7CharacterHeight.Double_Lower => Mode7CharacterHeight.Double_Upper,
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+            }
+            else
+            {
+                height = Mode7CharacterHeight.Normal;
+            }
+
+            value &= 0x7F;
+
+            if (value >= 32)
+                value -= 32;
+            else
+                value = 0;
+
+            byte foreground;
+            if (_Mode7State.Flash && !_Mode7State.Mode7FlashOn)
+                foreground = _Mode7State.BackColor;
+            else
+                foreground = _Mode7State.ForeColor;
+
+            _Mode7State.ForeColor = _Mode7State.ForeColorPending;
+
+            _Mode7State.LineChars[_ColumnCounter] = new Mode7Character()
+            {
+                Height = height,
+                FontBitmap = characterScanlines[value],
+                ForeColor = foreground,
+                BackColor = _Mode7State.BackColor
+            };
+        }
+
+        private void WriteBitmapData_Mode7(byte value)
+        {
+            if (_ColumnCounter >= 40)
+                return;
+
+            if (_ScanlineCounter <= 1) // first scanline?
+                UpdateMode7StateBegin(value);
+
+            var character = _Mode7State.LineChars[_ColumnCounter];
+
+            int scanlineIndex = character.Height switch
+            {
+                Mode7CharacterHeight.Normal => _ScanlineCounter,
+                Mode7CharacterHeight.Double_Upper => _ScanlineCounter >> 1,
+                Mode7CharacterHeight.Double_Lower => 10 + (_ScanlineCounter >> 1),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+            uint bitmap = character.FontBitmap[scanlineIndex];
+
+            int index = _CRTBitmapScanlineOffset + (_ColumnCounter * 6);
+
+            uint pixelMask = 0x800;
+            while (pixelMask != 0)
+            {
+                uint hiColor = ((bitmap & pixelMask) != 0) ? character.ForeColor : character.BackColor;
+                pixelMask >>= 1;
+
+                uint loColor = ((bitmap & pixelMask) != 0) ? character.ForeColor : character.BackColor;
+                pixelMask >>= 1;
+
+                _CRTBitmap[index++] = (byte)((hiColor << 4) | loColor);
             }
         }
 
@@ -480,6 +737,8 @@ namespace BeebPerf
             int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
+                var bitmapTbl = _CRTBitmapTbl[value];
+
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i += 2)
                 {
@@ -491,7 +750,9 @@ namespace BeebPerf
                         (shiftRegister & 0x1);
 
                     int firstEntry = _ULAPalette[firstIndex] & 0xF;
-                    if (firstEntry > 0x7) // apply flash?
+                    firstEntry ^= 0x7;
+
+                    if (firstEntry > 0x7) // flashing color?
                     {
                         firstEntry &= 0x7;
                         if ((_ULARegister & 0x1) != 0)
@@ -508,7 +769,9 @@ namespace BeebPerf
                         (shiftRegister & 0x1);
 
                     int secondEntry = _ULAPalette[secondIndex] & 0xF;
-                    if (secondEntry > 0x7) // apply flash?
+                    secondEntry ^= 0x7;
+
+                    if (secondEntry > 0x7) // flashing color?
                     {
                         secondEntry &= 0x7;
                         if ((_ULARegister & 0x1) != 0)
@@ -517,11 +780,8 @@ namespace BeebPerf
 
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
-                    unsafe
-                    {
-                        byte pixelPair = (byte)((firstEntry << 4) | secondEntry);
-                        _BitmapDataTbl[value].Bytes[i >> 1] = pixelPair;
-                    }
+                    byte pixelPair = (byte)((firstEntry << 4) | secondEntry);
+                    bitmapTbl[i >> 1] = pixelPair;
                 }
             }
         }
@@ -532,6 +792,8 @@ namespace BeebPerf
             int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
+                var bitmapTbl = _CRTBitmapTbl[value];
+
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
@@ -543,8 +805,9 @@ namespace BeebPerf
                         (shiftRegister & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
+                    entry ^= 0x7;
 
-                    if (entry > 0x7) // apply flash?
+                    if (entry > 0x7) // flashing color?
                     {
                         entry &= 0x7;
                         if ((_ULARegister & 0x1) != 0)
@@ -553,11 +816,8 @@ namespace BeebPerf
 
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
-                    unsafe
-                    {
-                        byte pixelPair = (byte)((entry << 4) | entry);
-                        _BitmapDataTbl[value].Bytes[i] = pixelPair;
-                    }
+                    byte pixelPair = (byte)((entry << 4) | entry);
+                    bitmapTbl[i] = pixelPair;
                 }
             }
         }
@@ -568,6 +828,8 @@ namespace BeebPerf
             int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
+                var bitmapTbl = _CRTBitmapTbl[value];
+
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
@@ -579,8 +841,9 @@ namespace BeebPerf
                         (shiftRegister & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
+                    entry ^= 0x7;
 
-                    if (entry > 0x7) // apply flash?
+                    if (entry > 0x7) // flashing color?
                     {
                         entry &= 0x7;
                         if ((_ULARegister & 0x1) != 0)
@@ -589,11 +852,10 @@ namespace BeebPerf
 
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
-                    unsafe
-                    {
-                        var pixelQuad = (ushort)((entry << 12) | (entry << 8) | (entry << 4) | entry);
-                        _BitmapDataTbl[value].Shorts[i] = pixelQuad;
-                    }
+                    var pixelPair = (byte)((entry << 4) | entry);
+                    int j = i << 1;
+                    bitmapTbl[j++] = pixelPair;
+                    bitmapTbl[j] = pixelPair;
                 }
             }
         }
@@ -604,6 +866,8 @@ namespace BeebPerf
             int shiftCount = 8 / _BitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
+                var bitmapTbl = _CRTBitmapTbl[value];
+
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
@@ -615,8 +879,9 @@ namespace BeebPerf
                         (shiftRegister & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
+                    entry ^= 0x7;
 
-                    if (entry > 0x7) // apply flash?
+                    if (entry > 0x7) // flashing color?
                     {
                         entry &= 0x7;
                         if ((_ULARegister & 0x1) != 0)
@@ -625,14 +890,114 @@ namespace BeebPerf
 
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
-                    unsafe
+                    var pixelPair = (byte)((entry << 4) | entry);
+                    int j = i << 2;
+                    bitmapTbl[j++] = pixelPair;
+                    bitmapTbl[j++] = pixelPair;
+                    bitmapTbl[j++] = pixelPair;
+                    bitmapTbl[j] = pixelPair;
+                }
+            }
+        }
+
+        private bool InitialiseMode7Font(string fileName)
+        {
+            for (int ch = 0; ch <= 127 - 32; ch++)
+            {
+                _Mode7TextFont[ch] = new uint[20];
+                _Mode7GraphicFont[ch] = new uint[20];
+                _Mode7MosaicFont[ch] = new uint[20];
+            }
+
+            try
+            {
+                using var fs = File.OpenRead(fileName);
+
+                for (int ch = 0; ch < 96; ch++)
+                {
+                    for (int i = 0; i < 2; i++)
+                        _Mode7TextFont[ch][i] = 0;
+
+                    for (int i = 2; i < 20; i++)
                     {
-                        var pixelQuad = (ushort)((entry << 12) | (entry << 8) | (entry << 4) | entry);
-                        var pixelOct = (uint)(pixelQuad << 16 | pixelQuad);
-                        _BitmapDataTbl[value].Words[i] = pixelOct;
+                        int loByte = fs.ReadByte();
+                        if (loByte == -1)
+                            throw new EndOfStreamException();
+
+                        int hiByte = fs.ReadByte();
+                        if (hiByte == -1)
+                            throw new EndOfStreamException();
+
+                        _Mode7TextFont[ch][i] = (uint)((hiByte << 8) | loByte);
                     }
                 }
             }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            for (int ch = 0; ch < 96; ch++)
+            {
+                if ((ch & 32) == 0)
+                {
+                    // graphic fonts
+                    uint top = 0;
+                    uint middle = 0;
+                    uint bottom = 0;
+
+                    if ((ch & 0x01) != 0) top |= 0x0FC0; 
+                    if ((ch & 0x02) != 0) top |= 0x003F;
+                    if ((ch & 0x04) != 0) middle |= 0x0FC0;
+                    if ((ch & 0x08) != 0) middle |= 0x003F;
+                    if ((ch & 0x10) != 0) bottom |= 0x0FC0;
+                    if ((ch & 0x40) != 0) bottom |= 0x003F;
+
+                    for (int i = 0; i < 6; i++)
+                        _Mode7GraphicFont[ch][i] = top;
+
+                    for (int i = 6; i < 14; i++)
+                        _Mode7GraphicFont[ch][i] = middle;
+
+                    for (int i = 14; i < 20; i++)
+                        _Mode7GraphicFont[ch][i] = bottom;
+
+                    // mosaic fonts
+                    top &= 0x03CF;
+                    middle &= 0x03CF;
+                    bottom &= 0x03CF;
+
+                    for (int i = 0; i < 4; i++)
+                        _Mode7MosaicFont[ch][i] = top;
+
+                    for (int i = 4; i < 6; i++)
+                        _Mode7MosaicFont[ch][i] = 0;
+
+                    for (int i = 6; i < 12; i++)
+                        _Mode7MosaicFont[ch][i] = middle;
+
+                    for (int i = 12; i < 14; i++)
+                        _Mode7MosaicFont[ch][i] = 0;
+
+                    for (int i = 14; i < 18; i++)
+                        _Mode7MosaicFont[ch][i] = bottom;
+
+                    for (int i = 18; i < 20; i++)
+                        _Mode7MosaicFont[ch][i] = 0;
+                }
+            }
+
+            return true;
+        }
+
+        static private string GetSolutionFolder()
+        {
+            var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+            while (directory != null && directory.GetFiles("*.sln").Length == 0)
+            {
+                directory = directory.Parent;
+            }
+            return (directory != null) ? directory.FullName : string.Empty;
         }
 
         public class FrameBitmap
@@ -641,16 +1006,25 @@ namespace BeebPerf
             public int StartCycleCount;
             public int EndCycleCount;
             public Bitmap? Bitmap;
+            public float AspectRatio;
         }
 
         public List<FrameBitmap> FrameBitmaps = [];
 
         private Instruction[] _Instructions = [];
         private InstructionSet? _InstructionSet;
+        private WriteBitmapData _WriteBitmapDataFunc;
+        private ReadScreenData _ReadScreenDataFunc;
+        private byte[] _Memory = [];
+        private byte[] _ShadowRAM = [];
+        private byte _SystemVIA_DataDirection;
+        private byte _ScreenAddressLatch;
+        private int _StartCycleCount;
+        private int _LastCycleCount;
+        private bool _RegisterModified;
 
-        private byte _ULARegister;
-        private byte[] _ULAPalette = [];
-
+        // 6845...
+        private bool _DisplayEnabled;
         private byte _CtrlR0_HorizontalTotal;
         private byte _CtrlR1_HorizontalDisplayed;
         private byte _CtrlR4_VerticalTotal;
@@ -660,43 +1034,91 @@ namespace BeebPerf
         private byte _CtrlR12_ScreenStartHigh;
         private byte _CtrlR13_ScreenStartLow;
         private byte _CtrlWriteRegister;
-
-        private bool _RegisterModified;
-
-        private WriteBitmapData _WriteBitmapDataFunc;
-        private byte[] _Memory = [];
-        private byte[] _ShadowRAM = [];
-
-        private int _ScanlineCounter;
         private int _ColumnCounter;
         private int _RowCounter;
-        private int _BitmapScanlineOffset;
+        private int _ScanlineCounter;
+        private int _ScanlineCounterIncrement;
+        private int _ScanlineCounterReset;
         private int _ScreenSize;
         private int _ScreenAddress;
         private int _ScreenStartAddress;
-        private uint[] _BitmapData = [];
-        private int _BitsPerPixel;
         private int _FrameCount;
-        private int _StartCycleCount;
-        private int _LastCycleCount;
-        private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
-        private int _BitmapWidth;
-        private int _BitmapHeight;
-        private bool _TeletextMode;
-        private static ColorPalette _ColorPalette;
-        private byte _SystemVIA_DataDirection;
-        private byte _ScreenAddressLatch;
-        private bool _BlankSpace;
-        private bool _DisplayEnabled;
 
-        [StructLayout(LayoutKind.Explicit)]
-        public unsafe struct BitmapData
+        // ULA...
+        private byte _ULARegister;
+        private byte[] _ULAPalette = [];
+        private int _BitsPerPixel;
+        private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
+        private bool _TeletextMode;
+        private bool _BlankSpace;
+        private int _ScanlinesPerCharAdjust;
+        private static ColorPalette _ColorPalette;
+
+        // CRT bitmap...
+        private const int _CRTMaxBitmapWidth = 640;
+        private const int _CRTMaxBitmapHeight = 512;
+        private const int _CRTBitmapStride = 640 / 2;
+        private const float _CRTAspectRatio_Teletext = 0.813f;
+        private const float _CRTAspectRatio_NonTeletext = 0.46f;
+
+        private int _CRTBitmapWidth;
+        private int _CRTBitmapHeight;
+        private int _CRTBitmapScanlineOffset;
+        private int _CRTBitmapScanlineOffsetIncrement;
+        private int _CRTBitmapScanlineOffsetReset;
+        private byte[] _CRTBitmap = [];
+        private byte[][] _CRTBitmapTbl = new byte[256][];
+
+        // mode 7...
+        private uint[][] _Mode7TextFont = new uint[96][];
+        private uint[][] _Mode7GraphicFont = new uint[96][];
+        private uint[][] _Mode7MosaicFont = new uint[96][];
+
+        private enum Mode7CharacterHeight
         {
-            [FieldOffset(0)] public fixed byte Bytes[8];
-            [FieldOffset(0)] public fixed ushort Shorts[4];
-            [FieldOffset(0)] public fixed uint Words[2];
+            Normal = 0,
+            Double_Upper = 1,
+            Double_Lower = 2
         }
 
-        private BitmapData[] _BitmapDataTbl = new BitmapData[256];
+        private struct Mode7Character
+        {
+            public byte ForeColor;
+            public byte BackColor;
+            public uint[] FontBitmap;
+            public Mode7CharacterHeight Height;
+        }
+
+        private struct Mode7State
+        {
+            public Mode7State()
+            {
+                Mode7FlashOn = true;
+                LineChars = new Mode7Character[40];
+            }
+
+            public byte ForeColor;
+            public byte ForeColorPending;
+            public byte BackColor;
+            public bool Flash;
+            public bool NextFlash;
+            public bool DoubleHeight;
+            public bool Graphics;
+            public bool NextGraphics;
+            public bool Mosaic;
+            public bool HoldGraphics;
+            public bool NextHoldGraphics;
+            public byte HoldGraphicsChar;
+            public byte NextHoldGraphicsChar;
+            public bool HoldMosaic;
+            public bool NextHoldMosaic;
+            public bool Mode7FlashOn;
+            public int Mode7FlashTrigger;
+            public Mode7Character[] LineChars;
+        }
+
+        private Mode7State _Mode7State = new();
+        private const int Mode7_FlashOffFrameCount = 13;
+        private const int Mode7_FlashOnFrameCount = 37;
     }
 }

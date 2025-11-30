@@ -105,7 +105,7 @@ namespace BeebPerf.model
                     {
                         MnemonicFormat.Uppercase => text.ToUpper(),
                         MnemonicFormat.Lowercase => text.ToLower(),
-                        _ => text
+                        _ => throw new ArgumentOutOfRangeException()
                     };
                     return text.PadRight(5, ' ');
 
@@ -116,7 +116,7 @@ namespace BeebPerf.model
                         LiteralFormat.Hexadecimal => FormatAddress(value),
                         LiteralFormat.Decimal => integer.ToString(),
                         LiteralFormat.Binary => Convert.ToString(integer, 2).PadLeft(8, '0'),
-                        _ => string.Empty
+                        _ => throw new ArgumentOutOfRangeException()
                     };
 
                 case Setting.Label:
@@ -140,7 +140,7 @@ namespace BeebPerf.model
                 AddressFormat.DollarLowercase => zeroPage ? $"${integer:x2}" : $"${integer:x4}",
                 AddressFormat.OxUppercase => zeroPage ? $"0x{integer:X2}" : $"0x{integer:X4}",
                 AddressFormat.OxLowercase => zeroPage ? $"0x{integer:x2}" : $"0x{integer:x4}",
-                _ => string.Empty
+                _ => throw new ArgumentOutOfRangeException()
             };
         }
 
@@ -274,7 +274,7 @@ namespace BeebPerf.model
                         Setting.Mnemonic => MnemonicSettings,
                         Setting.Literal => LiteralSettings,
                         Setting.Punctuation => PunctuationSettings,
-                        _ => null
+                        _ => throw new ArgumentOutOfRangeException()
                     };
                 }
             }

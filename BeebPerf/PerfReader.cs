@@ -139,7 +139,7 @@ namespace BeebPerf
                 1 => 0x6000,
                 2 => 0x3000,
                 3 => 0x5800,
-                _ => throw new NotImplementedException()
+                _ => throw new ArgumentOutOfRangeException()
             };
 
             if (hasHiddenRam)
@@ -252,7 +252,7 @@ namespace BeebPerf
                             {
                                 EventType.MaskableInterruptEvent => InstructionType.MaskableInterrupt,
                                 EventType.NonMaskableInterruptEvent => InstructionType.NonMaskableInterrupt,
-                                _ => throw new NotImplementedException()
+                                _ => throw new ArgumentOutOfRangeException()
                             };
 
                             // interrupt service routine address

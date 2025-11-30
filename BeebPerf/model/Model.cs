@@ -37,7 +37,7 @@ namespace BeebPerf.model
                 BBCModelType.B => CPUType._6502,
                 BBCModelType.IntegraB => CPUType._6502,
                 BBCModelType.BPlus => CPUType._6502,
-                _ => CPUType._6502
+                _ => throw new ArgumentOutOfRangeException()
             });
             Labels = new();
             Instructions = new Instruction[executionCount];
