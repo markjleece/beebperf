@@ -27,6 +27,9 @@ namespace BeebPerf
 {
     public class VideoAnalysis
     {
+        private delegate byte ReadScreenData();
+        private delegate void WriteBitmapData(byte value);
+
         static VideoAnalysis()
         {
             Color[] colors = [
@@ -58,8 +61,7 @@ namespace BeebPerf
             for (int i = 0; i < 256; i++)
                 _CRTBitmapTbl[i] = new byte[8];
 
-            // TODO: put on separate thread or embed bitmaps in exe
-            InitialiseMode7Font(GetSolutionFolder() + "\\teletext.fnt");
+            CreateMode7Fonts(GetSolutionFolder() + "\\teletext.fnt");
         }
 
         public async Task<bool> AnalysisAsync(
@@ -79,11 +81,6 @@ namespace BeebPerf
             InstructionSet instructionSet,
             Model model)
         {
-            _Instructions = instructions;
-            _InstructionSet = instructionSet;
-
-            FrameBitmaps = new();
-            _CRTBitmap = new byte[_CRTMaxBitmapHeight * _CRTBitmapStride];
             _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
             _ULARegister = model.Snapshot.VideoULARegister;
 
@@ -109,30 +106,31 @@ namespace BeebPerf
             _ScreenStartAddress = 0;
             _RegisterModified = true;
 
-            GenerateFrameBitmaps();
+            GenerateFrameBitmaps(instructions, instructionSet);
 
             return true;
         }
 
-        public void GenerateFrameBitmaps()
+        private void GenerateFrameBitmaps(
+            Instruction[] instructions,
+            InstructionSet instructionSet)
         {
-            _DisplayEnabled = false;
+            _DisplayFrame = false;
             _FrameCount = 1;
-
-            FrameBitmaps = new();
+            _CRTBitmap = new byte[_CRTMaxBitmapHeight * _CRTBitmapStride];
 
             int cycleCount = 0;
-            foreach (var instruction in _Instructions)
+            foreach (var instruction in instructions)
             {
                 if (instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
-                    byte memoryAccess = _InstructionSet!.MemoryAccess(opcode);
+                    byte memoryAccess = instructionSet.MemoryAccess(opcode);
                     if ((memoryAccess & 0x2/*write*/) != 0)
                     {
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
                         if (_RegisterModified)
-                            UpdateVideo();
+                            UpdateVideoState();
                     }
                 }
                 else if (instruction.IsBeginDisplayEvent)
@@ -142,14 +140,12 @@ namespace BeebPerf
 
                 cycleCount += instruction.CycleCount;
 
-                if (_DisplayEnabled)
+                if (_DisplayFrame)
                     DisplayMemory(cycleCount);
             }
         }
 
-        private delegate byte ReadScreenData();
-        private delegate void WriteBitmapData(byte value);
-        private void UpdateVideo()
+        private void UpdateVideoState()
         {
             _RegisterModified = false;
 
@@ -224,13 +220,14 @@ namespace BeebPerf
                         break;
 
                     default:
-                        _WriteBitmapDataFunc = WriteBitmapData_Void;
-                        horizontalMultiplier = 1;
-                        break;
+                        throw new NotImplementedException();
                 }
 
                 bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
                 bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust);
+
+                if (bitmapWidth > _CRTMaxBitmapWidth || bitmapHeight > _CRTMaxBitmapHeight)
+                    _DisplayFrame = false; // unsupported overscan
             }
             else
             {
@@ -240,14 +237,19 @@ namespace BeebPerf
                 bitmapHeight = 500;
             }
 
-            _CRTBitmapWidth = Math.Max(_CRTBitmapWidth, bitmapWidth);
-            _CRTBitmapHeight = Math.Max(_CRTBitmapHeight, bitmapHeight);
+            if (_CRTBitmapWidth < bitmapWidth)
+                _CRTBitmapWidth = bitmapWidth;
+
+            if (_CRTBitmapHeight < bitmapHeight)
+                _CRTBitmapHeight = bitmapHeight;
         }
 
         private void StartFrame(int cycleCount)
         {
-            Debug.Assert(!_DisplayEnabled);
-            _DisplayEnabled = true;
+            if (_DisplayFrame)
+                EndFrame(cycleCount); // shouldn't happen
+
+            _DisplayFrame = true;
 
             _CRTBitmapWidth = 0;
             _CRTBitmapHeight = 0;
@@ -259,15 +261,13 @@ namespace BeebPerf
             _RowCounter = 0;
             _ColumnCounter = 0;
 
-            _Mode7State.Mode7FlashOn = false;
-
             if (--_Mode7State.Mode7FlashTrigger < 0)
             {
                 _Mode7State.Mode7FlashTrigger = _Mode7State.Mode7FlashOn ? Mode7_FlashOffFrameCount : Mode7_FlashOnFrameCount;
                 _Mode7State.Mode7FlashOn = !_Mode7State.Mode7FlashOn; // toggle flash state
             }
 
-            UpdateVideo();
+            UpdateVideoState();
 
             _ScanlineCounter = _ScanlineCounterReset;
             _CRTBitmapScanlineOffset = _CRTBitmapScanlineOffsetReset;
@@ -277,50 +277,37 @@ namespace BeebPerf
         {
             Debug.Assert(cycleCount - _StartCycleCount < 480000);
 
-            Debug.Assert(_DisplayEnabled);
-            _DisplayEnabled = false;
-
             Bitmap bitmap = new Bitmap(_CRTBitmapWidth, _CRTBitmapHeight, PixelFormat.Format4bppIndexed);
             bitmap.Palette = _ColorPalette;
 
-            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
-            System.Drawing.Imaging.BitmapData? data = null;
-
-            try
+            if (_DisplayFrame)
             {
-                data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
-                unsafe
+                Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+                System.Drawing.Imaging.BitmapData? data = null;
+                try
                 {
-                    fixed (byte* src = _CRTBitmap)
+                    data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+                    unsafe
                     {
-                        byte* dst = (byte*)data.Scan0;
-
-                        if (data.Stride != _CRTBitmapStride)
+                        fixed (byte* src = _CRTBitmap)
                         {
+                            byte* dst = (byte*)data.Scan0;
                             for (int i = 0; i < _CRTBitmapHeight; i++)
                             {
                                 Buffer.MemoryCopy(
                                     src + (i * _CRTBitmapStride),
                                     dst + (i * data.Stride),
-                                    data.Width / 2,
-                                    data.Width / 2);
+                                    data.Stride,
+                                    data.Stride);
                             }
-                        }
-                        else
-                        {
-                            Buffer.MemoryCopy(
-                                dst,
-                                (void*)data.Scan0,
-                                _CRTBitmap.Length,
-                                _CRTBitmap.Length);
                         }
                     }
                 }
-            }
-            finally
-            {
-                if (data != null)
-                    bitmap.UnlockBits(data);
+                finally
+                {
+                    if (data != null)
+                        bitmap.UnlockBits(data);
+                }
             }
 
             FrameBitmaps.Add(new()
@@ -331,6 +318,8 @@ namespace BeebPerf
                 EndCycleCount = cycleCount,
                 Bitmap = bitmap
             });
+
+            _DisplayFrame = false;
         }
 
         private void MemoryWrite(CanonicalAddress memoryAddress, byte value)
@@ -438,8 +427,6 @@ namespace BeebPerf
 
         private void DisplayMemory(int cycleCount)
         {
-            Debug.Assert(_DisplayEnabled);
-
             int characterCount = (cycleCount >> _CharacterClockShift) - (_LastCycleCount >> _CharacterClockShift);
 
             _LastCycleCount = cycleCount;
@@ -525,15 +512,16 @@ namespace BeebPerf
             if (_ColumnCounter == 0) // first char in row?
             {
                 _Mode7State.ForeColor = 7;
-                _Mode7State.ForeColorPending = 7;
                 _Mode7State.BackColor = 0;
-                _Mode7State.NextFlash = false;
+                _Mode7State.ForeColorPending = 7;
                 _Mode7State.DoubleHeight = false;
-                _Mode7State.NextGraphics = false;
-                _Mode7State.Mosaic = false;
+
                 _Mode7State.NextHoldGraphics = false;
                 _Mode7State.NextHoldGraphicsChar = 32;
                 _Mode7State.NextHoldMosaic = false;
+                _Mode7State.NextGraphics = false;
+                _Mode7State.NextFlash = false;
+                _Mode7State.Mosaic = false;
             }
 
             _Mode7State.HoldGraphics = _Mode7State.NextHoldGraphics;
@@ -553,7 +541,7 @@ namespace BeebPerf
 
             uint[][] characterScanlines;
 
-            if ((value >= 128) && (value <= 159))
+            if (value >= 128 && value <= 159)
             {
                 if (!_Mode7State.HoldGraphics && value != 158) 
                     _Mode7State.NextHoldGraphicsChar = 32; // SAA5050 teletext rendering bug
@@ -584,7 +572,7 @@ namespace BeebPerf
                     case 140: // normal height
                         if (_Mode7State.DoubleHeight)
                         {
-                            _Mode7State.NextHoldGraphicsChar = 32;
+                            _Mode7State.NextHoldGraphicsChar = 32; // space
                             _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
                         }
                         _Mode7State.DoubleHeight = false;
@@ -593,7 +581,7 @@ namespace BeebPerf
                     case 141: // double height
                         if (!_Mode7State.DoubleHeight)
                         {
-                            _Mode7State.NextHoldGraphicsChar = 32;
+                            _Mode7State.NextHoldGraphicsChar = 32; // space
                             _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
                         }
                         _Mode7State.DoubleHeight = true;
@@ -643,13 +631,13 @@ namespace BeebPerf
 
                 if (_Mode7State.HoldGraphics && _Mode7State.Graphics)
                 {
-                    characterScanlines = _Mode7State.HoldMosaic ? _Mode7MosaicFont : _Mode7GraphicFont;
                     value = _Mode7State.HoldGraphicsChar;
+                    characterScanlines = _Mode7State.HoldMosaic ? _Mode7MosaicFont : _Mode7GraphicFont;
                 }
                 else
                 {
-                    characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
                     value = 32; // space
+                    characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
                 }
             }
             else
@@ -657,8 +645,10 @@ namespace BeebPerf
                 characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
             }
 
-            Mode7CharacterHeight height;
-            if (_Mode7State.DoubleHeight)
+            value &= 0x7F; // clear top bit
+
+            Mode7CharacterHeight height = _Mode7State.DoubleHeight ? Mode7CharacterHeight.Double_Upper : Mode7CharacterHeight.Normal;
+            if (_Mode7State.DoubleHeight && _RowCounter > 0)
             {
                 height = _Mode7State.LineChars[_ColumnCounter].Height switch
                 {
@@ -668,33 +658,24 @@ namespace BeebPerf
                     _ => throw new ArgumentOutOfRangeException()
                 };
             }
-            else
-            {
-                height = Mode7CharacterHeight.Normal;
-            }
 
-            value &= 0x7F;
+            int scanline = Math.Max(value - 32, 0);
 
-            if (value >= 32)
-                value -= 32;
-            else
-                value = 0;
-
-            byte foreground;
+            byte foreColor;
             if (_Mode7State.Flash && !_Mode7State.Mode7FlashOn)
-                foreground = _Mode7State.BackColor;
+                foreColor = _Mode7State.BackColor;
             else
-                foreground = _Mode7State.ForeColor;
-
-            _Mode7State.ForeColor = _Mode7State.ForeColorPending;
+                foreColor = _Mode7State.ForeColor;
 
             _Mode7State.LineChars[_ColumnCounter] = new Mode7Character()
             {
                 Height = height,
-                FontBitmap = characterScanlines[value],
-                ForeColor = foreground,
+                FontBitmap = characterScanlines[scanline],
+                ForeColor = foreColor,
                 BackColor = _Mode7State.BackColor
             };
+
+            _Mode7State.ForeColor = _Mode7State.ForeColorPending;
         }
 
         private void WriteBitmapData_Mode7(byte value)
@@ -900,7 +881,7 @@ namespace BeebPerf
             }
         }
 
-        private bool InitialiseMode7Font(string fileName)
+        private bool CreateMode7Fonts(string fileName)
         {
             for (int ch = 0; ch <= 127 - 32; ch++)
             {
@@ -1011,8 +992,6 @@ namespace BeebPerf
 
         public List<FrameBitmap> FrameBitmaps = [];
 
-        private Instruction[] _Instructions = [];
-        private InstructionSet? _InstructionSet;
         private WriteBitmapData _WriteBitmapDataFunc;
         private ReadScreenData _ReadScreenDataFunc;
         private byte[] _Memory = [];
@@ -1024,7 +1003,7 @@ namespace BeebPerf
         private bool _RegisterModified;
 
         // 6845...
-        private bool _DisplayEnabled;
+        private bool _DisplayFrame;
         private byte _CtrlR0_HorizontalTotal;
         private byte _CtrlR1_HorizontalDisplayed;
         private byte _CtrlR4_VerticalTotal;
@@ -1049,9 +1028,9 @@ namespace BeebPerf
         private byte[] _ULAPalette = [];
         private int _BitsPerPixel;
         private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
+        private int _ScanlinesPerCharAdjust;
         private bool _TeletextMode;
         private bool _BlankSpace;
-        private int _ScanlinesPerCharAdjust;
         private static ColorPalette _ColorPalette;
 
         // CRT bitmap...
