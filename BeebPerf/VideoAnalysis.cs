@@ -261,6 +261,9 @@ namespace BeebPerf
             _RowCounter = 0;
             _ColumnCounter = 0;
 
+            _Mode7State.DoubleHeightRow = DoubleHeightRow.Top;
+            _Mode7State.LastRowCounter = -1;
+
             if (--_Mode7State.Mode7FlashTrigger < 0)
             {
                 _Mode7State.Mode7FlashTrigger = _Mode7State.Mode7FlashOn ? Mode7_FlashOffFrameCount : Mode7_FlashOnFrameCount;
@@ -507,15 +510,36 @@ namespace BeebPerf
             Buffer.BlockCopy(_CRTBitmapTbl[value], 0, _CRTBitmap, index, 8);
         }
 
-        private void UpdateMode7StateBegin(byte value)
+        private void WriteBitmapData_Mode7(byte value)
         {
-            if (_ColumnCounter == 0) // first char in row?
+            if (_ColumnCounter >= 40)
+                return;
+
+            // update double-height row state
+            if (_RowCounter != _Mode7State.LastRowCounter)
+            {
+                if (_RowCounter == 0)
+                {
+                    _Mode7State.DoubleHeightRow = DoubleHeightRow.Top;
+                }
+                else if (_Mode7State.DoubleHeight)
+                {
+                    _Mode7State.DoubleHeightRow =
+                        _Mode7State.DoubleHeightRow == DoubleHeightRow.Top
+                        ? DoubleHeightRow.Bottom
+                        : DoubleHeightRow.Top;
+                }
+
+                _Mode7State.LastRowCounter = _RowCounter;
+            }
+
+            // reset state at start of scanline
+            if (_ColumnCounter == 0)
             {
                 _Mode7State.ForeColor = 7;
                 _Mode7State.BackColor = 0;
                 _Mode7State.ForeColorPending = 7;
                 _Mode7State.DoubleHeight = false;
-
                 _Mode7State.NextHoldGraphics = false;
                 _Mode7State.NextHoldGraphicsChar = 32;
                 _Mode7State.NextHoldMosaic = false;
@@ -524,6 +548,7 @@ namespace BeebPerf
                 _Mode7State.Mosaic = false;
             }
 
+            // apply pending state changes
             _Mode7State.HoldGraphics = _Mode7State.NextHoldGraphics;
             _Mode7State.HoldGraphicsChar = _Mode7State.NextHoldGraphicsChar;
             _Mode7State.HoldMosaic = _Mode7State.NextHoldMosaic;
@@ -539,11 +564,12 @@ namespace BeebPerf
                 _Mode7State.NextHoldMosaic = _Mode7State.Mosaic;
             }
 
-            uint[][] characterScanlines;
+            uint[,] fontBitmap;
 
             if (value >= 128 && value <= 159)
             {
-                if (!_Mode7State.HoldGraphics && value != 158) 
+                // control codes...
+                if (!_Mode7State.HoldGraphics && value != 158)
                     _Mode7State.NextHoldGraphicsChar = 32; // SAA5050 teletext rendering bug
 
                 switch (value)
@@ -632,84 +658,61 @@ namespace BeebPerf
                 if (_Mode7State.HoldGraphics && _Mode7State.Graphics)
                 {
                     value = _Mode7State.HoldGraphicsChar;
-                    characterScanlines = _Mode7State.HoldMosaic ? _Mode7MosaicFont : _Mode7GraphicFont;
+                    fontBitmap = _Mode7State.HoldMosaic ? _Mode7MosaicFont : _Mode7GraphicFont;
                 }
                 else
                 {
                     value = 32; // space
-                    characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
+                    fontBitmap = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
                 }
             }
             else
             {
-                characterScanlines = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
+                fontBitmap = _Mode7State.Graphics ? (_Mode7State.Mosaic ? _Mode7MosaicFont : _Mode7GraphicFont) : _Mode7TextFont;
             }
 
             value &= 0x7F; // clear top bit
 
-            Mode7CharacterHeight height = _Mode7State.DoubleHeight ? Mode7CharacterHeight.Double_Upper : Mode7CharacterHeight.Normal;
-            if (_Mode7State.DoubleHeight && _RowCounter > 0)
-            {
-                height = _Mode7State.LineChars[_ColumnCounter].Height switch
-                {
-                    Mode7CharacterHeight.Normal => Mode7CharacterHeight.Double_Upper,
-                    Mode7CharacterHeight.Double_Upper => Mode7CharacterHeight.Double_Lower,
-                    Mode7CharacterHeight.Double_Lower => Mode7CharacterHeight.Double_Upper,
-                    _ => throw new ArgumentOutOfRangeException()
-                };
-            }
-
-            int scanline = Math.Max(value - 32, 0);
-
+            // determine foreground color (considering flash state)
             byte foreColor;
             if (_Mode7State.Flash && !_Mode7State.Mode7FlashOn)
                 foreColor = _Mode7State.BackColor;
             else
                 foreColor = _Mode7State.ForeColor;
 
-            _Mode7State.LineChars[_ColumnCounter] = new Mode7Character()
-            {
-                Height = height,
-                FontBitmap = characterScanlines[scanline],
-                ForeColor = foreColor,
-                BackColor = _Mode7State.BackColor
-            };
+            // determine scanline index
+            int scanlineIndex;
+            if (_Mode7State.DoubleHeight)
+                scanlineIndex = (_ScanlineCounter >> 1) + _Mode7State.DoubleHeightRow switch
+                {
+                    DoubleHeightRow.Top => 0,
+                    DoubleHeightRow.Bottom => 10,
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+            else
+                scanlineIndex = _ScanlineCounter;
 
-            _Mode7State.ForeColor = _Mode7State.ForeColorPending;
-        }
+            // fetch font scanline
+            int valueAsIndex = Math.Max(value - 32, 0);
+            uint fontScanline = fontBitmap[valueAsIndex, scanlineIndex];
 
-        private void WriteBitmapData_Mode7(byte value)
-        {
-            if (_ColumnCounter >= 40)
-                return;
-
-            if (_ScanlineCounter <= 1) // first scanline?
-                UpdateMode7StateBegin(value);
-
-            var character = _Mode7State.LineChars[_ColumnCounter];
-
-            int scanlineIndex = character.Height switch
-            {
-                Mode7CharacterHeight.Normal => _ScanlineCounter,
-                Mode7CharacterHeight.Double_Upper => _ScanlineCounter >> 1,
-                Mode7CharacterHeight.Double_Lower => 10 + (_ScanlineCounter >> 1),
-                _ => throw new ArgumentOutOfRangeException()
-            };
-            uint bitmap = character.FontBitmap[scanlineIndex];
-
+            // render 12 pixels (6 bytes)
             int index = _CRTBitmapScanlineOffset + (_ColumnCounter * 6);
-
             uint pixelMask = 0x800;
             while (pixelMask != 0)
             {
-                uint hiColor = ((bitmap & pixelMask) != 0) ? character.ForeColor : character.BackColor;
+                uint hiColor = ((fontScanline & pixelMask) != 0) ? foreColor : _Mode7State.BackColor;
                 pixelMask >>= 1;
 
-                uint loColor = ((bitmap & pixelMask) != 0) ? character.ForeColor : character.BackColor;
+                uint loColor = ((fontScanline & pixelMask) != 0) ? foreColor : _Mode7State.BackColor;
                 pixelMask >>= 1;
 
                 _CRTBitmap[index++] = (byte)((hiColor << 4) | loColor);
             }
+
+            // commit pending foreground color
+            _Mode7State.ForeColor = _Mode7State.ForeColorPending;
+
         }
 
         private void Build4bppLookupTbl()
@@ -883,13 +886,6 @@ namespace BeebPerf
 
         private bool CreateMode7Fonts(string fileName)
         {
-            for (int ch = 0; ch <= 127 - 32; ch++)
-            {
-                _Mode7TextFont[ch] = new uint[20];
-                _Mode7GraphicFont[ch] = new uint[20];
-                _Mode7MosaicFont[ch] = new uint[20];
-            }
-
             try
             {
                 using var fs = File.OpenRead(fileName);
@@ -897,7 +893,7 @@ namespace BeebPerf
                 for (int ch = 0; ch < 96; ch++)
                 {
                     for (int i = 0; i < 2; i++)
-                        _Mode7TextFont[ch][i] = 0;
+                        _Mode7TextFont[ch, i] = 0;
 
                     for (int i = 2; i < 20; i++)
                     {
@@ -909,7 +905,7 @@ namespace BeebPerf
                         if (hiByte == -1)
                             throw new EndOfStreamException();
 
-                        _Mode7TextFont[ch][i] = (uint)((hiByte << 8) | loByte);
+                        _Mode7TextFont[ch, i] = (uint)((hiByte << 8) | loByte);
                     }
                 }
             }
@@ -935,13 +931,13 @@ namespace BeebPerf
                     if ((ch & 0x40) != 0) bottom |= 0x003F;
 
                     for (int i = 0; i < 6; i++)
-                        _Mode7GraphicFont[ch][i] = top;
+                        _Mode7GraphicFont[ch, i] = top;
 
                     for (int i = 6; i < 14; i++)
-                        _Mode7GraphicFont[ch][i] = middle;
+                        _Mode7GraphicFont[ch, i] = middle;
 
                     for (int i = 14; i < 20; i++)
-                        _Mode7GraphicFont[ch][i] = bottom;
+                        _Mode7GraphicFont[ch, i] = bottom;
 
                     // mosaic fonts
                     top &= 0x03CF;
@@ -949,22 +945,22 @@ namespace BeebPerf
                     bottom &= 0x03CF;
 
                     for (int i = 0; i < 4; i++)
-                        _Mode7MosaicFont[ch][i] = top;
+                        _Mode7MosaicFont[ch, i] = top;
 
                     for (int i = 4; i < 6; i++)
-                        _Mode7MosaicFont[ch][i] = 0;
+                        _Mode7MosaicFont[ch, i] = 0;
 
                     for (int i = 6; i < 12; i++)
-                        _Mode7MosaicFont[ch][i] = middle;
+                        _Mode7MosaicFont[ch, i] = middle;
 
                     for (int i = 12; i < 14; i++)
-                        _Mode7MosaicFont[ch][i] = 0;
+                        _Mode7MosaicFont[ch, i] = 0;
 
                     for (int i = 14; i < 18; i++)
-                        _Mode7MosaicFont[ch][i] = bottom;
+                        _Mode7MosaicFont[ch, i] = bottom;
 
                     for (int i = 18; i < 20; i++)
-                        _Mode7MosaicFont[ch][i] = 0;
+                        _Mode7MosaicFont[ch, i] = 0;
                 }
             }
 
@@ -1033,7 +1029,7 @@ namespace BeebPerf
         private bool _BlankSpace;
         private static ColorPalette _ColorPalette;
 
-        // CRT bitmap...
+        // CRT fontScanline...
         private const int _CRTMaxBitmapWidth = 640;
         private const int _CRTMaxBitmapHeight = 512;
         private const int _CRTBitmapStride = 640 / 2;
@@ -1049,33 +1045,18 @@ namespace BeebPerf
         private byte[][] _CRTBitmapTbl = new byte[256][];
 
         // mode 7...
-        private uint[][] _Mode7TextFont = new uint[96][];
-        private uint[][] _Mode7GraphicFont = new uint[96][];
-        private uint[][] _Mode7MosaicFont = new uint[96][];
+        private uint[,] _Mode7TextFont = new uint[96, 20];
+        private uint[,] _Mode7GraphicFont = new uint[96, 20];
+        private uint[,] _Mode7MosaicFont = new uint[96, 20];
 
-        private enum Mode7CharacterHeight
+        private enum DoubleHeightRow
         {
-            Normal = 0,
-            Double_Upper = 1,
-            Double_Lower = 2
+            Top = 0,
+            Bottom = 1
         }
 
-        private struct Mode7Character
+        private class Mode7State
         {
-            public byte ForeColor;
-            public byte BackColor;
-            public uint[] FontBitmap;
-            public Mode7CharacterHeight Height;
-        }
-
-        private struct Mode7State
-        {
-            public Mode7State()
-            {
-                Mode7FlashOn = true;
-                LineChars = new Mode7Character[40];
-            }
-
             public byte ForeColor;
             public byte ForeColorPending;
             public byte BackColor;
@@ -1093,7 +1074,8 @@ namespace BeebPerf
             public bool NextHoldMosaic;
             public bool Mode7FlashOn;
             public int Mode7FlashTrigger;
-            public Mode7Character[] LineChars;
+            public int LastRowCounter;
+            public DoubleHeightRow DoubleHeightRow;
         }
 
         private Mode7State _Mode7State = new();
