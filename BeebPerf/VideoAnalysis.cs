@@ -240,7 +240,7 @@ namespace BeebPerf
             }
             else
             {
-                // teletext mode
+                // Mode 7 (teletext)
                 _WriteBitmapDataFunc = WriteBitmapData_Mode7;
                 
                 bitmapWidth = 480;
