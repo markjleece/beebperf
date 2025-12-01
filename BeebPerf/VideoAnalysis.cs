@@ -71,8 +71,7 @@ namespace BeebPerf
         {
             return await Task.Run(() =>
             {
-                Analysis(instructions, instructionSet, model);
-                return true;
+                return Analysis(instructions, instructionSet, model);
             });
         }
 
@@ -81,6 +80,7 @@ namespace BeebPerf
             InstructionSet instructionSet,
             Model model)
         {
+            // initialize from snapshot
             _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
             _ULARegister = model.Snapshot.VideoULARegister;
 
@@ -103,22 +103,15 @@ namespace BeebPerf
             _ScreenAddress = model.Snapshot.ScreenAddress;
             _ScreenSize = 0x8000 - _ScreenAddress;
 
+            // initialize video state
             _ScreenStartAddress = 0;
             _RegisterModified = true;
 
-            GenerateFrameBitmaps(instructions, instructionSet);
-
-            return true;
-        }
-
-        private void GenerateFrameBitmaps(
-            Instruction[] instructions,
-            InstructionSet instructionSet)
-        {
             _DisplayFrame = false;
             _FrameCount = 1;
             _CRTBitmap = new byte[_CRTMaxBitmapHeight * _CRTBitmapStride];
 
+            // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate frames
             int cycleCount = 0;
             foreach (var instruction in instructions)
             {
@@ -143,6 +136,8 @@ namespace BeebPerf
                 if (_DisplayFrame)
                     DisplayMemory(cycleCount);
             }
+
+            return true;
         }
 
         private void UpdateVideoState()
@@ -163,6 +158,12 @@ namespace BeebPerf
             _ScanlinesPerCharAdjust = (interlacedSync && interlacedVideo) ? 2 : 1;
 
             _TeletextMode = ((_ULARegister >> 1) & 0x01) != 0;
+
+            if ((_TeletextMode && (!interlacedSync || !interlacedVideo)) ||
+                (!_TeletextMode && interlacedVideo))
+            {
+                _DisplayFrame = false; // unsupported interlaced mode!
+            }
 
             if (_TeletextMode)
                 _ScreenStartAddress = (((_CtrlR12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CtrlR13_ScreenStartLow;
@@ -226,15 +227,26 @@ namespace BeebPerf
                 bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
                 bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust);
 
+                _CRTAspectRatio = _CRTAspectRatio_NonTeletext;
+
+                if (interlacedSync)
+                {
+                    bitmapHeight *= 2;
+                    _CRTAspectRatio *= 2.0f;
+                }
+
                 if (bitmapWidth > _CRTMaxBitmapWidth || bitmapHeight > _CRTMaxBitmapHeight)
-                    _DisplayFrame = false; // unsupported overscan
+                    _DisplayFrame = false; // unsupported over-scan!
             }
             else
             {
+                // teletext mode
                 _WriteBitmapDataFunc = WriteBitmapData_Mode7;
-
+                
                 bitmapWidth = 480;
                 bitmapHeight = 500;
+
+                _CRTAspectRatio = _CRTAspectRatio_Teletext;
             }
 
             if (_CRTBitmapWidth < bitmapWidth)
@@ -261,13 +273,13 @@ namespace BeebPerf
             _RowCounter = 0;
             _ColumnCounter = 0;
 
-            _Mode7State.DoubleHeightRow = DoubleHeightRow.Top;
+            _Mode7State.DoubleHeightRow = Mode7DoubleHeightRow.Top;
             _Mode7State.LastRowCounter = -1;
 
-            if (--_Mode7State.Mode7FlashTrigger < 0)
+            if (--_Mode7State.FlashTrigger < 0)
             {
-                _Mode7State.Mode7FlashTrigger = _Mode7State.Mode7FlashOn ? Mode7_FlashOffFrameCount : Mode7_FlashOnFrameCount;
-                _Mode7State.Mode7FlashOn = !_Mode7State.Mode7FlashOn; // toggle flash state
+                _Mode7State.FlashTrigger = _Mode7State.FlashOn ? _Mode7FlashOffFrameCount : _Mode7FlashOnFrameCount;
+                _Mode7State.FlashOn = !_Mode7State.FlashOn; // toggle flash state
             }
 
             UpdateVideoState();
@@ -315,7 +327,7 @@ namespace BeebPerf
 
             FrameBitmaps.Add(new()
             {
-                AspectRatio = _TeletextMode ? _CRTAspectRatio_Teletext : _CRTAspectRatio_NonTeletext,
+                AspectRatio = _CRTAspectRatio,
                 FrameNumber = _FrameCount++,
                 StartCycleCount = _StartCycleCount,
                 EndCycleCount = cycleCount,
@@ -520,14 +532,14 @@ namespace BeebPerf
             {
                 if (_RowCounter == 0)
                 {
-                    _Mode7State.DoubleHeightRow = DoubleHeightRow.Top;
+                    _Mode7State.DoubleHeightRow = Mode7DoubleHeightRow.Top;
                 }
                 else if (_Mode7State.DoubleHeight)
                 {
                     _Mode7State.DoubleHeightRow =
-                        _Mode7State.DoubleHeightRow == DoubleHeightRow.Top
-                        ? DoubleHeightRow.Bottom
-                        : DoubleHeightRow.Top;
+                        _Mode7State.DoubleHeightRow == Mode7DoubleHeightRow.Top
+                        ? Mode7DoubleHeightRow.Bottom
+                        : Mode7DoubleHeightRow.Top;
                 }
 
                 _Mode7State.LastRowCounter = _RowCounter;
@@ -675,7 +687,7 @@ namespace BeebPerf
 
             // determine foreground color (considering flash state)
             byte foreColor;
-            if (_Mode7State.Flash && !_Mode7State.Mode7FlashOn)
+            if (_Mode7State.Flash && !_Mode7State.FlashOn)
                 foreColor = _Mode7State.BackColor;
             else
                 foreColor = _Mode7State.ForeColor;
@@ -683,12 +695,7 @@ namespace BeebPerf
             // determine scanline index
             int scanlineIndex;
             if (_Mode7State.DoubleHeight)
-                scanlineIndex = (_ScanlineCounter >> 1) + _Mode7State.DoubleHeightRow switch
-                {
-                    DoubleHeightRow.Top => 0,
-                    DoubleHeightRow.Bottom => 10,
-                    _ => throw new ArgumentOutOfRangeException()
-                };
+                scanlineIndex = (_ScanlineCounter >> 1) + (_Mode7State.DoubleHeightRow == Mode7DoubleHeightRow.Top ? 0 : 10);
             else
                 scanlineIndex = _ScanlineCounter;
 
@@ -712,7 +719,6 @@ namespace BeebPerf
 
             // commit pending foreground color
             _Mode7State.ForeColor = _Mode7State.ForeColorPending;
-
         }
 
         private void Build4bppLookupTbl()
@@ -1029,10 +1035,10 @@ namespace BeebPerf
         private bool _BlankSpace;
         private static ColorPalette _ColorPalette;
 
-        // CRT fontScanline...
-        private const int _CRTMaxBitmapWidth = 640;
-        private const int _CRTMaxBitmapHeight = 512;
-        private const int _CRTBitmapStride = 640 / 2;
+        // CRT...
+        private const int _CRTMaxBitmapWidth = 1024;
+        private const int _CRTMaxBitmapHeight = 640;
+        private const int _CRTBitmapStride = _CRTMaxBitmapWidth / 2;
         private const float _CRTAspectRatio_Teletext = 0.813f;
         private const float _CRTAspectRatio_NonTeletext = 0.46f;
 
@@ -1043,13 +1049,14 @@ namespace BeebPerf
         private int _CRTBitmapScanlineOffsetReset;
         private byte[] _CRTBitmap = [];
         private byte[][] _CRTBitmapTbl = new byte[256][];
+        private float _CRTAspectRatio;
 
         // mode 7...
         private uint[,] _Mode7TextFont = new uint[96, 20];
         private uint[,] _Mode7GraphicFont = new uint[96, 20];
         private uint[,] _Mode7MosaicFont = new uint[96, 20];
 
-        private enum DoubleHeightRow
+        private enum Mode7DoubleHeightRow
         {
             Top = 0,
             Bottom = 1
@@ -1072,14 +1079,14 @@ namespace BeebPerf
             public byte NextHoldGraphicsChar;
             public bool HoldMosaic;
             public bool NextHoldMosaic;
-            public bool Mode7FlashOn;
-            public int Mode7FlashTrigger;
+            public bool FlashOn;
+            public int FlashTrigger;
             public int LastRowCounter;
-            public DoubleHeightRow DoubleHeightRow;
+            public Mode7DoubleHeightRow DoubleHeightRow;
         }
 
         private Mode7State _Mode7State = new();
-        private const int Mode7_FlashOffFrameCount = 13;
-        private const int Mode7_FlashOnFrameCount = 37;
+        private const int _Mode7FlashOffFrameCount = 13;
+        private const int _Mode7FlashOnFrameCount = 37;
     }
 }
