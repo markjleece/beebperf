@@ -73,7 +73,9 @@ namespace BeebPerf.ux
 
             foreach (var routineCell in _RoutineCells)
             {
-                if (!routineCell.Selectable || !routineCell.Rectangle.Contains(e.X, e.Y))
+                if ((routineCell.CellType != RoutineCellType.Caller &&
+                     routineCell.CellType != RoutineCellType.Callee) ||
+                    !routineCell.Rectangle.Contains(e.X, e.Y))
                     continue;
 
                 SelectRoutineInternal(routineCell.Routine);
@@ -100,7 +102,9 @@ namespace BeebPerf.ux
                     continue;
 
                 ShowToolTip(routineCell, e.Location);
-                if (routineCell.Selectable && routineCell != _FocusRoutineCell)
+                if ((routineCell.CellType == RoutineCellType.Caller ||
+                     routineCell.CellType == RoutineCellType.Callee) &&
+                    routineCell != _FocusRoutineCell)
                     SetFocus(routineCell);
                 return;
             }
@@ -226,7 +230,7 @@ namespace BeebPerf.ux
 
             // paint border
             Color borderColor = fillColor;
-            if (!routineCell.HideBorder)
+            if (routineCell.CellType != RoutineCellType.Self)
             {
                 borderColor = ForeColor;
                 if (routineCell.ShowHotness)
@@ -259,7 +263,7 @@ namespace BeebPerf.ux
                 using var brush = new SolidBrush(ForeColor);
                 e.Graphics.DrawString(metrics, Font, brush, textRect, textFormat);
 
-                // paint routine address/label (with ellipses)
+                // paint routine address/executionCountLabel (with ellipses)
                 textRect.Width -= metricsMeasure.Width;
 
                 textFormat = new StringFormat
@@ -270,7 +274,7 @@ namespace BeebPerf.ux
                     Trimming = StringTrimming.EllipsisCharacter
                 };
 
-                string label = routineCell.RoutineBody ? "Function Body" : FormatRoutine(routineCell);
+                string label = (routineCell.CellType == RoutineCellType.SelfBody) ? "Function Body" : FormatRoutine(routineCell);
                 e.Graphics.DrawString(label, Font, brush, textRect, textFormat);
             }
         }
@@ -315,10 +319,10 @@ namespace BeebPerf.ux
             LayoutSelf(selfBounds);
 
             var callersBounds = new Rectangle(2 * borderSize, panelTop, panelWidth, panelHeight);
-            LayoutCallerCallees(callersBounds, _Callers, showHotness: false, borderSize);
+            LayoutCallerCallees(callersBounds, _Callers, RoutineCellType.Caller, borderSize);
 
             var calleesBounds = new Rectangle(borderSize + 2 * panelWidth + 9 * borderSize, panelTop, panelWidth, panelHeight);
-            LayoutCallerCallees(calleesBounds, _Callees, showHotness: true, borderSize);
+            LayoutCallerCallees(calleesBounds, _Callees, RoutineCellType.Callee, borderSize);
         }
 
         private void LayoutSelf(Rectangle bounds)
@@ -337,7 +341,8 @@ namespace BeebPerf.ux
                     Rectangle = rect,
                     Routine = _Routine!,
                     CycleCount = _Routine!.AggregateMetrics.InclusiveCycleCount,
-                    HideBorder = true
+                    ExecutionCount = _Routine!.AggregateMetrics.ExecutionCount,
+                    CellType = RoutineCellType.Self
                 });
             }
 
@@ -350,13 +355,14 @@ namespace BeebPerf.ux
                     Rectangle = rect,
                     Routine = _Routine!,
                     CycleCount = _Routine!.AggregateMetrics.SelfCycleCount,
-                    RoutineBody = true,
+                    ExecutionCount = _Routine!.AggregateMetrics.ExecutionCount,
+                    CellType = RoutineCellType.SelfBody,
                     ShowHotness = true
                 });
             }
         }
 
-        private void LayoutCallerCallees(Rectangle bounds, List<RoutineMetrics> routineMetrics, bool showHotness, int borderSize)
+        private void LayoutCallerCallees(Rectangle bounds, List<RoutineMetrics> routineMetrics, RoutineCellType cellType, int borderSize)
         {
             if (routineMetrics.Count == 0)
                 return;
@@ -387,8 +393,9 @@ namespace BeebPerf.ux
                         Rectangle = rect,
                         Routine = routineMetric.Routine,
                         CycleCount = routineMetric.CPUMetrics.InclusiveCycleCount,
-                        ShowHotness = showHotness,
-                        Selectable = true
+                        ExecutionCount = routineMetric.CPUMetrics.ExecutionCount,
+                        ShowHotness = (cellType == RoutineCellType.Callee),
+                        CellType = cellType
                     });
                 }
             }
@@ -399,8 +406,22 @@ namespace BeebPerf.ux
             _ToolTipTimer.Stop();
             _ToolTipTimer.Start();
 
-            var label = routineCell.RoutineBody ? "Self CPU" : "Total CPU";
-            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\n{label}: {FormatMetrics(routineCell)}";
+            var cpuLabel = routineCell.CellType switch
+            {
+                RoutineCellType.SelfBody => "Self CPU",
+                RoutineCellType.Caller => "Total CPU (in callee)",
+                _ => "Total CPU"
+            };
+
+            var executionCountLabel = routineCell.CellType switch
+            {
+                RoutineCellType.Caller => "Execution count (in callee)",
+                _ => "Execution count"
+            };
+
+            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\n" +
+                           $"{cpuLabel}: {FormatMetrics(routineCell)}\n" +
+                           $"{executionCountLabel}: {routineCell.ExecutionCount:N0}";
             _ToolTipLocation = mousePosition;
             _ToolTipLocation.Offset(10, 10);
         }
@@ -453,14 +474,21 @@ namespace BeebPerf.ux
             return (Form)control;
         }
 
+        private enum RoutineCellType
+        {
+            Caller,
+            Self,
+            SelfBody,
+            Callee
+        }
+
         private class RoutineCell
         {
             public required Routine Routine;
             public required Rectangle Rectangle;
             public required int CycleCount;
-            public bool HideBorder;
-            public bool Selectable;
-            public bool RoutineBody;
+            public required int ExecutionCount;
+            public required RoutineCellType CellType;
             public bool ShowHotness;
         }
 

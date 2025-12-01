@@ -796,20 +796,12 @@ namespace BeebPerf
         {
             Dictionary<CallStack, CPUMetrics> callerMetrics = new();
 
-            foreach (var callStack in routine!.MetricsByStack.Keys)
+            foreach (var kvp in routine!.MetricsByStack)
             {
-                if (callStack.Parent == null)
+                if (kvp.Key.Parent == null)
                     continue;
 
-                var caller = callStack.Parent!;
-
-                if (caller.Routine.MetricsByStack.TryGetValue(caller, out var parentMetrics))
-                {
-                    var metrics = callerMetrics.TryGetValue(caller, out var existing)
-                        ? existing
-                        : callerMetrics[caller] = new CPUMetrics();
-                    metrics.Add(parentMetrics);
-                }
+                callerMetrics.Add(kvp.Key.Parent, kvp.Value.Clone());
             }
 
             return ToList(callerMetrics);
