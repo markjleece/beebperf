@@ -92,7 +92,8 @@ namespace BeebPerf
                         var memoryAddress = instruction.MemoryAddress;
                         var page = memoryAddress.Page;
                         if (!zeroPage || (page == MemoryPage.WholeRam && memoryAddress.Address < 0x100))
-                            memory[(int)page][memoryAddress.PageOffset] += increments[memoryAccess];
+                            if (memory[(int)page] != null)
+                                memory[(int)page][memoryAddress.PageOffset] += increments[memoryAccess];
                     }
                 }
 

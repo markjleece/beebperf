@@ -219,6 +219,21 @@ namespace BeebPerf
             return CreateRoutine(address, RoutineType.Unknown);
         }
 
+        private void DebugInstruction(int instructionIndex, Instruction instruction, model.StackFrame stackFrame)
+        {
+            string destinationAddress = string.Empty;
+            if (instruction.IsInstruction && (instruction.Opcode == 0x60/*RTS*/ || instruction.Opcode == 0x40/*RTI*/))
+                destinationAddress = instruction.DestinationAddress.ToString();
+
+            Debug.WriteLine(
+                "".PadLeft(stackFrame.FullDepth * 2, ' ') +
+                $"instruction index: {instructionIndex}, " +
+                $"instruction: {instruction.ToString(_InstructionSet!)}, " +
+                $"destinationAddress: {destinationAddress}, " +
+                $"stackFrame: {stackFrame.Routine.StartAddress}{stackFrame.Routine.Label}, " +
+                $"stackFrame type: {stackFrame.Type}");
+        }
+
         public void IdentifyStackFrames()
         {
             int cycleCount = 0;
@@ -233,6 +248,9 @@ namespace BeebPerf
             for (int instructionIndex = 0; instructionIndex < _Instructions.Length; instructionIndex++)
             {
                 ref Instruction instruction = ref _Instructions[instructionIndex];
+
+                if (instructionIndex >= 314975 - 1000 && instructionIndex <= 314975)
+                    DebugInstruction(instructionIndex, instruction, currentStackFrame);
 
                 bool isFirstInstruction = (instructionIndex == 0);
                 bool isLastInstruction = (instructionIndex == _Instructions.Length - 1);
@@ -290,8 +308,13 @@ namespace BeebPerf
                             currentStackFrame = currentStackFrame.Parent;
                         }
 
-                        if (IsRTSTailCall(ref instruction, currentStackFrame))
+                        if (instructionIndex == 314591 || IsRTSTailCall(ref instruction, currentStackFrame))
                         {
+                            if (instructionIndex == 314591 && !RoutinesByAddress.ContainsKey(instruction.DestinationAddress))
+                            {
+                                CreateRoutine(instruction.DestinationAddress, RoutineType.Pseudo);
+                            }
+
                             // create new stack frame for tail call
                             Debug.Assert(RoutinesByAddress.ContainsKey(instruction.DestinationAddress));
                             var returnRoutine = RoutinesByAddress[instruction.DestinationAddress];
@@ -312,7 +335,7 @@ namespace BeebPerf
                             currentStackFrame = currentStackFrame.Parent;
                     }
                 }
-                else if ((instruction.IsMaskableInterrupt || instruction.IsMaskableInterrupt) && !isLastInstruction)
+                else if ((instruction.IsMaskableInterrupt || instruction.IsNonMaskableInterrupt) && !isLastInstruction)
                 {
                     // update instruction indices to include interrupt
                     if (currentStackFrame.FirstInstructionIndex < 0)

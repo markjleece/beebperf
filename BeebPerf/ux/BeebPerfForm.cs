@@ -64,8 +64,10 @@ namespace BeebPerf.ux
 
         private void BeebPerfForm_Load(object sender, EventArgs e)
         {
+            SetState((AppStateFlags)0);
+
             if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
-                OpenPerfFile(_RecentFilePathName);
+                return; //OpenPerfFile(_RecentFilePathName);
         }
 
         private void openButton_Click(object sender, EventArgs e)
@@ -660,13 +662,13 @@ namespace BeebPerf.ux
                 codeView.Clear();
             }
 
-            if (state == AppStateFlags.Loading ||
+            spinner.Visible =
+               (state == AppStateFlags.Loading ||
                 state == AppStateFlags.StaticCPUAnalysis ||
                 state == AppStateFlags.DynamicCPUAnalysis ||
                 state == AppStateFlags.DynamicMemoryAnalysis ||
                 state == AppStateFlags.DynamicMemoryAddressAnalysis ||
-                state == AppStateFlags.VideoAnalysis)
-                spinner.Visible = true;
+                state == AppStateFlags.VideoAnalysis);
 
             AppState |= state;
             UpdateToolbarState();

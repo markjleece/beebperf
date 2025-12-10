@@ -19,8 +19,10 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.ux;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.model
 {
@@ -222,5 +224,49 @@ namespace BeebPerf.model
 
         [FieldOffset(1)] private byte _MemoryReadValue;
         [FieldOffset(5)] private byte _MemoryWriteValue;
+
+        public string ToString(InstructionSet instructionSet)
+        {
+            if (IsInstruction)
+            {
+                string mnemonic = instructionSet.Mnemonic(Opcode);
+                string operand = (instructionSet.Size(Opcode) == 3) ? $"&{Operand:X4}" : $"&{Operand:X2}";
+                string address = OpcodeAddress.ToString();
+                InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(Opcode);
+                return addressMode switch
+                {
+                    InstructionSet.AddressMode.Accumulator => $"{address} {mnemonic} A",
+                    InstructionSet.AddressMode.Implied => $"{address} {mnemonic}",
+                    InstructionSet.AddressMode.ZeroPage => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressMode.Absolute => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressMode.Immediate => $"{address} {mnemonic} #{operand}",
+                    InstructionSet.AddressMode.Relative => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressMode.ZeroPageX => $"{address} {mnemonic} {operand}, X",
+                    InstructionSet.AddressMode.AbsoluteX => $"{address} {mnemonic} {operand}, X",
+                    InstructionSet.AddressMode.ZeroPageY => $"{address} {mnemonic} {operand}, Y",
+                    InstructionSet.AddressMode.AbsoluteY => $"{address} {mnemonic} {operand}, Y",
+                    InstructionSet.AddressMode.Indirect => $"{address} {mnemonic} ({operand}), Y",
+                    InstructionSet.AddressMode.IndirectX => $"{address} {mnemonic} ({operand}, X)",
+                    InstructionSet.AddressMode.IndirectY => $"{address} {mnemonic} ({operand}), Y",
+                    _ => string.Empty
+                };
+            }
+            else if (IsMaskableInterrupt)
+            {
+                return $"MASKABLE INTERRUPT to {ISRAddress}";
+            }
+            else if (IsNonMaskableInterrupt)
+            {
+                return $"NON-MASKABLE INTERRUPT to {ISRAddress}";
+            }
+            else if (IsBeginDisplayEvent)
+            {
+                return $"BEGIN DISPLAY EVENT";
+            }
+            else
+            {
+                return $"UNKNOWN INSTRUCTION TYPE";
+            }
+        }
     }
 }

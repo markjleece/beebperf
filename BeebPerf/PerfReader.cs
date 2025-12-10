@@ -19,11 +19,10 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.model;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Diagnostics;
-using BeebPerf.model;
-using System.CodeDom;
 
 namespace BeebPerf
 {
@@ -350,7 +349,7 @@ namespace BeebPerf
                         else
                             memoryAddress = operand;
 
-                        instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress);
+                        instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress, opcodeAddress);
 
                         if ((memoryAccess & 0x1) != 0)
                         {
@@ -364,16 +363,10 @@ namespace BeebPerf
                             instruction.MemoryWriteValue = memoryWriteValue;
 
                             if (memoryAddress >= 0xFE30 && memoryAddress < 0xFE34)
-                            {
-                                if ((model.BBCModel != BBCModelType.IntegraB) ||
-                                    (model.BBCModel == BBCModelType.IntegraB && memoryAddress == 0xFE30))
-                                    RomPagingRegisterChange(model, memoryWriteValue);
-                            }
-
-                            if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38 && (model.BBCModel == BBCModelType.Master128 || model.BBCModel == BBCModelType.MasterET))
+                                RomPagingRegisterChange(model, memoryWriteValue);
+                            else if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38)
                                 AccessControlRegisterChange(model, memoryWriteValue);
-
-                            if (memoryAddress == 0xFE38 && model.BBCModel == BBCModelType.IntegraB)
+                            else if (memoryAddress == 0xFE38 && model.BBCModel == BBCModelType.IntegraB)
                                 _HiddenRamAddress = memoryWriteValue;
                         }
                     }
@@ -434,12 +427,14 @@ namespace BeebPerf
                 case BBCModelType.Master128:
                 case BBCModelType.MasterET:
                     _ShadowRamSelected = (value & 1) != 0;
+                    _ShadowRamXBit = (value & 4) != 0;
+                    _ShadowRamEBit = (value & 2) != 0;
                     _FilingSystemRamSelected = (value & 8) != 0;
                     break;
             }
         }
 
-        private CanonicalAddress ToCanonicalAddress(Model model, ushort address)
+        private CanonicalAddress ToCanonicalAddress(Model model, ushort address, ushort opcodeAddress = 0)
         {
             MemoryPage page;
 
@@ -453,19 +448,30 @@ namespace BeebPerf
                     break;
 
                 case BBCModelType.BPlus:
-                    if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
-                        page = MemoryPage.ShadowRam;
-                    else if (address >= 0x8000 && address < 0xB000 && _PrivateRamSelected)
+                    if (address < 0x3000)
+                        page = MemoryPage.WholeRam;
+                    else if (address < 0x8000)
+                    {
+                        if (_ShadowRamSelected && 
+                            ((opcodeAddress >= 0xC000 && opcodeAddress < 0xE000) || 
+                             (opcodeAddress >= 0xA000 && opcodeAddress < 0xB000 && _PrivateRamSelected)))
+                            page = MemoryPage.ShadowRam;
+                        else
+                            page = MemoryPage.WholeRam;
+                    }
+                    else if (address < 0xB000 && _PrivateRamSelected)
                         page = MemoryPage.PrivateRam;
-                    else if (address >= 0x8000 && address < 0xC000)
+                    else if (address < 0xC000)
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
                     else
                         page = MemoryPage.WholeRam;
                     break;
                     
                 case BBCModelType.IntegraB:
+                    if (address < 0x3000)
+                        page = MemoryPage.WholeRam;
                     if (address < 0x8000)
-                        if (address >= 0x3000 && _ShadowRamEnabled && !_ShadowRamSelected)
+                        if (_ShadowRamEnabled && !_ShadowRamSelected)
                             page = MemoryPage.ShadowRam;
                         else
                             page = MemoryPage.WholeRam;
@@ -482,13 +488,20 @@ namespace BeebPerf
 
                 case BBCModelType.Master128:
                 case BBCModelType.MasterET:
-                    if (address >= 0x3000 && address < 0x8000 && _ShadowRamSelected)
-                        page = MemoryPage.ShadowRam;
-                    else if (address >= 0x8000 && address < 0x9000 && _PrivateRamSelected)
+                    if (address < 0x3000)
+                        page = MemoryPage.WholeRam;
+                    if (address < 0x8000)
+                    {
+                        if (_ShadowRamXBit || (_ShadowRamEBit && opcodeAddress >= 0xC000 && opcodeAddress < 0xE000))
+                            page = MemoryPage.ShadowRam;
+                        else
+                            page = MemoryPage.WholeRam;
+                    }
+                    else if (address < 0x9000 && _PrivateRamSelected)
                         page = MemoryPage.PrivateRam;
-                    else if (address >= 0x8000 && address < 0xC000)
+                    else if (address < 0xC000)
                         page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    else if (address >= 0xC000 && address < 0xE000)
+                    else if (address < 0xE000)
                         page = MemoryPage.FilingSystemRam;
                     else
                         page = MemoryPage.WholeRam;
@@ -568,6 +581,8 @@ namespace BeebPerf
 
         private int _RomPageSelected;
         private bool _ShadowRamSelected;
+        private bool _ShadowRamXBit;
+        private bool _ShadowRamEBit;
         private bool _PrivateRamSelected;
         private bool _FilingSystemRamSelected;
 

@@ -19,7 +19,36 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+//
+// Code derived from the BeebEm project, specifically portions of
+// the Video class. Uses the same SAA5050 font loading and
+// font file, and SAA5050 state machine logic.
+//
+// The code emulates the 6845, ULA, and SAA5050 at a
+// character/address level.
+//
+// The code renders frame bitmaps in 4bpp indexed format, where
+// the palette is set to match the BBC Micro's 16-color palette.
+//
+// Supports:
+// - Standard modes 0-6, and teletext mode 7
+// - Non-standard video modes (e.g. Mode 8)
+// - Mixed non-teletext modes (mid-frame ULA changes)
+// - Interlaced support
+// - Over-scan resolutions up to 1024x640
+// - Hardware scrolling
+// 
+// Limitations:
+// - No support for shadow RAM reads
+// - No support for hardware cursor
+// - No support for non-interlaced teletext modes
+// - No support for mixed teletext and non-teletext modes
+// - No support for graphics tablets
+// - No support for custom ULA palettes
+//
+
 using BeebPerf.model;
+using System;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 
@@ -61,7 +90,7 @@ namespace BeebPerf
             for (int i = 0; i < 256; i++)
                 _CRTBitmapTbl[i] = new byte[8];
 
-            CreateMode7Fonts(GetSolutionFolder() + "\\teletext.fnt");
+            ConstructMode7Fonts(GetSolutionFolder() + "\\teletext.fnt");
         }
 
         public async Task<bool> AnalysisAsync(
@@ -81,6 +110,8 @@ namespace BeebPerf
             Model model)
         {
             // initialize from snapshot
+            _BBCModel = model.BBCModel;
+
             _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
             _ULARegister = model.Snapshot.VideoULARegister;
 
@@ -96,12 +127,18 @@ namespace BeebPerf
             _Memory = new byte[65536];
             Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 65536);
 
-            _ShadowRAM = new byte[20480];
+            _ShadowRam = new byte[20480];
             if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRAM, 0, 20480);
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
+
+            _FilingSystemRam = new byte[0x1000];
+            if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 1024);
 
             _ScreenAddress = model.Snapshot.ScreenAddress;
             _ScreenSize = 0x8000 - _ScreenAddress;
+
+            SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
 
             // initialize video state
             _ScreenStartAddress = 0;
@@ -109,7 +146,7 @@ namespace BeebPerf
 
             _DisplayFrame = false;
             _FrameCount = 1;
-            _CRTBitmap = new byte[_CRTMaxBitmapHeight * _CRTBitmapStride];
+            _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
 
             // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate frames
             FrameBitmaps = [];
@@ -237,7 +274,7 @@ namespace BeebPerf
                     _CRTAspectRatio *= 2.0f;
                 }
 
-                if (bitmapWidth > _CRTMaxBitmapWidth || bitmapHeight > _CRTMaxBitmapHeight)
+                if (bitmapWidth > _CRTMaxBitmapWidth || bitmapHeight > _CRTMaxBufferHeight)
                     _DisplayFrame = false; // unsupported over-scan!
             }
             else
@@ -343,15 +380,21 @@ namespace BeebPerf
         {
             ushort address = memoryAddress.Address;
 
-            // TODO shadow ram
-            if (memoryAddress.Page != MemoryPage.WholeRam || address < _ScreenAddress)
-                return;
-
             if (address < 0x8000)
             {
-                _Memory[address] = value;
+                if (memoryAddress.Page == MemoryPage.WholeRam)
+                    _Memory[address] = value;
+                else if (memoryAddress.Page == MemoryPage.ShadowRam)
+                    _ShadowRam[address - 0x3000] = value;
+                else if (memoryAddress.Page == MemoryPage.FilingSystemRam)
+                    _FilingSystemRam[address] = value;
+                return;
             }
-            else if (address == 0xFE00)
+
+            if (memoryAddress.Page != MemoryPage.WholeRam)
+                return;
+
+            if (address == 0xFE00)
             {
                 _CtrlWriteRegister = value;
             }
@@ -440,6 +483,30 @@ namespace BeebPerf
                     _ScreenSize = 0x8000 - _ScreenAddress;
                 }
             }
+            if (address >= 0xFE34 && address < 0xFE38)
+            {
+                SetDisplayShadowRam(value);
+            }
+        }
+
+        private void SetDisplayShadowRam(byte accessControlRegister)
+        {
+            switch (_BBCModel)
+            {
+                case BBCModelType.BPlus:
+                case BBCModelType.IntegraB:
+                    _DisplayShadowRam = (accessControlRegister & 0x80) != 0;
+                    break;
+
+                case BBCModelType.Master128:
+                case BBCModelType.MasterET:
+                    _DisplayShadowRam = (accessControlRegister & 0x01) != 0;
+                    break;
+
+                default:
+                    _DisplayShadowRam = false;
+                    break;
+            }
         }
 
         private void DisplayMemory(int cycleCount)
@@ -450,11 +517,9 @@ namespace BeebPerf
 
             for (int i = 0; i < characterCount; i++) // TODO: Need to deal with interlacing
             {
+                // read screen memory and rasterize it to CRT bitmap, if not in blanking period
                 if (!_BlankSpace)
-                {
-                    byte value = _ReadScreenDataFunc();
-                    _WriteBitmapDataFunc(value);
-                }
+                    _WriteBitmapDataFunc(_ReadScreenDataFunc());
 
                 // advance counters
                 _ColumnCounter++;
@@ -491,7 +556,7 @@ namespace BeebPerf
             if (characterAddress > 0x8000)
                 characterAddress -= _ScreenSize;
 
-            return _Memory[characterAddress];
+            return ReadDisplayMemory(characterAddress);
         }
 
         private byte ReadScreenData_NonTeletext()
@@ -505,7 +570,25 @@ namespace BeebPerf
             if (memoryAddress > 0x8000)
                 memoryAddress -= _ScreenSize;
 
-            return _Memory[memoryAddress];
+            return ReadDisplayMemory(memoryAddress);
+        }
+
+        private byte ReadDisplayMemory(int address)
+        {
+            if (_DisplayShadowRam)
+            {
+                if (address < 0x3000)
+                {
+                    if (_BBCModel == BBCModelType.Master128 || _BBCModel == BBCModelType.MasterET)
+                        return _FilingSystemRam[address & 0x0FFF]; // is this correct?
+                    else
+                        return _Memory[address];
+                }
+                else
+                    return _ShadowRam[address - 0x3000];
+            }
+            else
+                return _Memory[address];
         }
 
         private void WriteBitmapData_Void(byte value)
@@ -555,7 +638,7 @@ namespace BeebPerf
                 _Mode7State.ForeColorPending = 7;
                 _Mode7State.DoubleHeight = false;
                 _Mode7State.NextHoldGraphics = false;
-                _Mode7State.NextHoldGraphicsChar = 32;
+                _Mode7State.NextHoldGraphicsChar = 32; // space
                 _Mode7State.NextHoldMosaic = false;
                 _Mode7State.NextGraphics = false;
                 _Mode7State.NextFlash = false;
@@ -892,7 +975,7 @@ namespace BeebPerf
             }
         }
 
-        private bool CreateMode7Fonts(string fileName)
+        private bool ConstructMode7Fonts(string fileName)
         {
             try
             {
@@ -998,8 +1081,10 @@ namespace BeebPerf
 
         private WriteBitmapData _WriteBitmapDataFunc;
         private ReadScreenData _ReadScreenDataFunc;
+        private BBCModelType _BBCModel;
         private byte[] _Memory = [];
-        private byte[] _ShadowRAM = [];
+        private byte[] _ShadowRam = [];
+        private byte[] _FilingSystemRam = [];
         private byte _SystemVIA_DataDirection;
         private byte _ScreenAddressLatch;
         private int _StartCycleCount;
@@ -1035,11 +1120,12 @@ namespace BeebPerf
         private int _ScanlinesPerCharAdjust;
         private bool _TeletextMode;
         private bool _BlankSpace;
+        private bool _DisplayShadowRam;
         private static ColorPalette _ColorPalette;
 
         // CRT...
         private const int _CRTMaxBitmapWidth = 1024;
-        private const int _CRTMaxBitmapHeight = 640;
+        private const int _CRTMaxBufferHeight = 640;
         private const int _CRTBitmapStride = _CRTMaxBitmapWidth / 2;
         private const float _CRTAspectRatio_Teletext = 0.813f;
         private const float _CRTAspectRatio_NonTeletext = 0.46f;

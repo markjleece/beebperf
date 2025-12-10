@@ -94,6 +94,17 @@ namespace BeebPerf.model
             }
         }
 
+        public int FullDepth
+        {
+            get
+            {
+                int depth = 0;
+                for (var callStack = this; callStack != null; callStack = callStack.Parent)
+                    depth++;
+                return depth;
+            }
+        }
+
         public CallType Type;
         public Routine Routine;
         public CanonicalAddress CanonicalAddress;
