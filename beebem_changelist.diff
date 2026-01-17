@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..cead477 100644
+index 52f9049..68b33ff 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -793,7 +793,7 @@ index 52f9049..cead477 100644
  
 +		PerfWriter_WriteInstruction(
 +			PrePC, ProgramCounter, (byte)CurrentInstruction, Cycles, StackPointer,
-+			LastReadWriteAddress, LastReadValue, LastWriteValue);
++			PSR, LastReadWriteAddress, LastReadValue, LastWriteValue);
 +
  		PollVIAs(Cycles - ViaCycles);
  		PollHardware(Cycles);
@@ -802,7 +802,7 @@ index 52f9049..cead477 100644
  			// Int noticed 2 cycles before end of instruction - interrupt now
  			CyclesToInt = NO_TIMER_INT_DUE;
  			DoInterrupt();
-+			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, PrePC, ProgramCounter, IRQCycles, StackPointer);
++			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackPointer);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
@@ -810,7 +810,7 @@ index 52f9049..cead477 100644
  		{
  			NMIStatus &= ~(1<<nmi_econet);
  			DoNMI();
-+			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, PrePC, ProgramCounter, IRQCycles, StackPointer);
++			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackPointer);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
@@ -1529,7 +1529,7 @@ index b893fa5..d6d046d 100644
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index 3e84b2d..b5aba53 100644
+index 3e84b2d..318408e 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -1540,14 +1540,18 @@ index 3e84b2d..b5aba53 100644
  #include "Sound.h"
  #include "SysVia.h"
  #include "UefState.h"
-@@ -662,6 +663,7 @@ static void VideoStartOfFrame()
+@@ -662,10 +663,10 @@ static void VideoStartOfFrame()
      VideoState.IsNewTVFrame = false;
  
      FrameNum = mainWin->StartOfFrame();
-+    PerfWriter_WriteBeginDisplayEvent();
- 
+-
      CursorFieldCount--;
      Mode7FlashTrigger--;
+     VideoState.InterlaceFrame = !VideoState.InterlaceFrame;
++    PerfWriter_WriteBeginDisplayEvent((CRTC_InterlaceAndDelay & 1) ? (byte)VideoState.InterlaceFrame : 0);
+   }
+ 
+   // Cursor update for blink. I thought I'd put it here, as this is where the mode 7 flash field thingy is too
 diff --git a/Src/ZipFile/ZipFile.vcxproj b/Src/ZipFile/ZipFile.vcxproj
 index c035963..478e557 100644
 --- a/Src/ZipFile/ZipFile.vcxproj
