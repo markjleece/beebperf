@@ -150,7 +150,6 @@ namespace BeebPerf
 
             // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate frames
             FrameBitmaps = [];
-
             int cycleCount = 0;
             foreach (var instruction in instructions)
             {

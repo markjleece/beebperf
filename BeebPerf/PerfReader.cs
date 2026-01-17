@@ -254,25 +254,25 @@ namespace BeebPerf
                                 _ => throw new ArgumentOutOfRangeException()
                             };
 
-                            // interrupt service routine address
-                            ushort isrAddress = ReadShort(dataStream);
-                            instruction.ISRAddress = ToCanonicalAddress(model, isrAddress);
-
-                            // interrupted opcode address
-                            ushort interruptedAddress = ReadShort(dataStream);
-                            instruction.InterruptedAddress = ToCanonicalAddress(model, interruptedAddress);
-
                             // cycle count
                             int cycles = ReadByte(dataStream);
                             Debug.Assert(cycles == 7);
                             instruction.CycleCount = cycles;
+    
+                            // interrupt service routine address
+                            ushort destinationAddress = ReadShort(dataStream);
+                            instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
 
-                            // stack pointer
-                            instruction.StackPointer = ReadByte(dataStream);
+                            // return address
+                            ushort returnAddress = ReadShort(dataStream);
+                            instruction.ReturnAddress = ToCanonicalAddress(model, returnAddress);
                         }
                         else if (eventType == EventType.BeginDisplayEvent)
                         {
                             instruction.Type = InstructionType.BeginDisplayEvent;
+
+                            // display field
+                            instruction.DisplayField = ReadByte(dataStream);
                         }
 
                         model.Instructions[_InstructionCount++] = instruction;
@@ -312,63 +312,83 @@ namespace BeebPerf
                 Debug.Assert(cycleCount <= 7);
                 instruction.CycleCount = cycleCount;
 
-                // stack pointer
-                if (instructionSet.ModifiesStackPointer(opcode))
+                // stack
+                if (opcode == 0x9A/*TXS*/ || opcode == 0xBA/*TSX*/ ||
+                    (opcode == 0x9B/*TAS*/ && model.InstructionSet!.CPU == CPUType._6502))
+                {
                     instruction.StackPointer = ReadByte(dataStream);
+                }
+                else if (
+                    opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/ || 
+                    (model.InstructionSet!.CPU == CPUType._65C02 && (
+                        opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/ ||
+                        opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/)))
+                {
+                    instruction.StackValue = ReadByte(dataStream);
+                }
 
                 // destination address
-                if (opcode == 0x20/*JSR abs*/ || opcode == 0x4C/*JMP abs*/)
+                if (opcode == 0x00/*BRK*/ || opcode == 0x60/*RTS*/ || 
+                    opcode == 0x40/*RTI*/ || opcode == 0x6C/*JMP (abs)*/ ||
+                    (opcode == 0x7C/*JMP (abs,X)*/ && model.InstructionSet!.CPU == CPUType._65C02))
                 {
-                    // JSR/JMP return address
-                    instruction.DestinationAddress = ToCanonicalAddress(model, operand);
+                    instruction.DestinationAddress = ToCanonicalAddress(model, ReadShort(dataStream));
                 }
-                else if (opcode == 0x60/*RTS*/ || opcode == 0x40/*RTI*/ ||
-                         opcode == 0x6C/*JMP ind*/ || (opcode == 0x7C/*JMP (abs,X)*/ && model.InstructionSet!.CPU == CPUType._65C02))
+                else if (opcode == 0x20/*JSR abs*/ || opcode == 0x4C/*JMP abs*/)
                 {
-                    // RTS/RTI/JMP destination address
-                    ushort destinationAddress = ReadShort(dataStream);
-                    instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
+                    instruction.DestinationAddress = ToCanonicalAddress(model, operand);
                 }
                 else if (instructionSet.IsBranch(opcode))
                 {
-                    // branch destination
                     int destinationAddress = opcodeAddress + 2;
                     if (cycleCount > 2)
                         destinationAddress = unchecked(destinationAddress + (sbyte)instruction.Operand);
                     instruction.DestinationAddress = ToCanonicalAddress(model, (ushort)destinationAddress);
                 }
-                else
+
+                // return address
+                if (opcode == 0x00/*BRK*/)
                 {
-                    // memory access address
-                    byte memoryAccess = instructionSet.MemoryAccess(opcode);
-                    if (memoryAccess != 0x0)
+                    instruction.ReturnAddress = instruction.OpcodeAddress.Offset(2);
+                }
+                else if (opcode == 0x20/*JSR*/)
+                {
+                    instruction.ReturnAddress = instruction.OpcodeAddress.Offset(3);
+                }
+                else if (opcode == 0x60/*RTS*/ || opcode == 0x40/*RTI*/)
+                {
+                    instruction.ReturnAddress = instruction.DestinationAddress;
+                }
+
+                // memory access address and read/write values
+                byte memoryAccess = instructionSet.MemoryAccess(opcode);
+                if (memoryAccess != 0x0)
+                {
+                    ushort memoryAddress;
+                    if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressMode.Complex)
+                        memoryAddress = ReadShort(dataStream);
+                    else
+                        memoryAddress = operand;
+
+                    instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress, opcodeAddress);
+
+                    if ((memoryAccess & 0x1) != 0)
                     {
-                        ushort memoryAddress;
-                        if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressMode.Complex)
-                            memoryAddress = ReadShort(dataStream);
-                        else
-                            memoryAddress = operand;
+                        byte memoryReadValue = ReadByte(dataStream);
+                        instruction.MemoryReadValue = memoryReadValue;
+                    }
 
-                        instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress, opcodeAddress);
+                    if ((memoryAccess & 0x2) != 0)
+                    {
+                        byte memoryWriteValue = ReadByte(dataStream);
+                        instruction.MemoryWriteValue = memoryWriteValue;
 
-                        if ((memoryAccess & 0x1) != 0)
-                        {
-                            byte memoryReadValue = ReadByte(dataStream);
-                            instruction.MemoryReadValue = memoryReadValue;
-                        }
-
-                        if ((memoryAccess & 0x2) != 0)
-                        {
-                            byte memoryWriteValue = ReadByte(dataStream);
-                            instruction.MemoryWriteValue = memoryWriteValue;
-
-                            if (memoryAddress >= 0xFE30 && memoryAddress < 0xFE34)
-                                RomPagingRegisterChange(model, memoryWriteValue);
-                            else if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38)
-                                AccessControlRegisterChange(model, memoryWriteValue);
-                            else if (memoryAddress == 0xFE38 && model.BBCModel == BBCModelType.IntegraB)
-                                _HiddenRamAddress = memoryWriteValue;
-                        }
+                        if (memoryAddress >= 0xFE30 && memoryAddress < 0xFE34)
+                            RomPagingRegisterChange(model, memoryWriteValue);
+                        else if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38)
+                            AccessControlRegisterChange(model, memoryWriteValue);
+                        else if (memoryAddress == 0xFE38 && model.BBCModel == BBCModelType.IntegraB)
+                            _HiddenRamAddress = memoryWriteValue;
                     }
                 }
 

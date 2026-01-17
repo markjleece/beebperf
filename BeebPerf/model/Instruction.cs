@@ -19,10 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using BeebPerf.ux;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.model
 {
@@ -59,39 +57,96 @@ namespace BeebPerf.model
             set => _TypeAndCycleCount = (byte)((_TypeAndCycleCount & 0xF0) | (value & 0x0F));
         }
 
+        public CanonicalAddress DestinationAddress
+        {
+            get
+            {
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                     (Opcode == 0x00/*BRK*/ || Opcode == 0x60/*RTS*/ || 
+                      Opcode == 0x40/*RTI*/ || Opcode == 0x20/*JSR*/ || 
+                      Opcode == 0x4C/*JMP abs*/ ||
+                      Opcode == 0x6C/*JMP (abs)*/ || Opcode == 0x7C/*JMP (abs,X)*/ ||
+                      (Opcode & 0x1F) == 0x10)/*B??*/));
+                return new CanonicalAddress(_DestinationAddress, (MemoryPage)_DestinationAddressPage);
+            }
+            set
+            {
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                     (Opcode == 0x00/*BRK*/ || Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/ ||
+                      Opcode == 0x20/*JSR abs*/ || Opcode == 0x4C/*JMP abs*/ ||
+                      Opcode == 0x6C/*JMP (abs)*/ || Opcode == 0x7C/*JMP (abs,X)*/ ||
+                      (Opcode & 0x1F) == 0x10)/*B??*/));
+                _DestinationAddress = value.Address;
+                _DestinationAddressPage = (byte)value.Page;
+            }
+        }
+
+        public CanonicalAddress ReturnAddress
+        {
+            get
+            {
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction && 
+                    (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ || 
+                     Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/)));
+                return new CanonicalAddress(_ReturnAddress, (MemoryPage)_ReturnAddressPage);
+            }
+            set
+            {
+                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                    (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ || 
+                     Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/)));
+                _ReturnAddress = value.Address;
+                _ReturnAddressPage = (byte)value.Page;
+            }
+        }
+
+        public byte StackValue
+        {
+            get
+            {
+                Debug.Assert(IsInstruction &&
+                    (Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
+                     Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
+                     Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/));
+                return _StackValue;
+            }
+            set
+            {
+                Debug.Assert(IsInstruction &&
+                    (Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
+                     Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
+                     Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/));
+                _StackValue = value;
+            }
+        }
+
         public byte StackPointer
         {
-            get => _StackPointer;
-            set => _StackPointer = value;
-        }
-
-        public CanonicalAddress ISRAddress
-        {
             get
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
-                return new CanonicalAddress(_ISRAddress, (MemoryPage)_ISRAddressPage);
+                Debug.Assert(IsInstruction &&
+                    (Opcode == 0x9A/*TXS*/ || Opcode == 0xBA/*TSX*/ || Opcode == 0x9B/*TAS*/));
+                return _StackPointer;
             }
             set
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
-                _ISRAddress = value.Address;
-                _ISRAddressPage = (byte)value.Page;
+                Debug.Assert(IsInstruction &&
+                    (Opcode == 0x9A/*TXS*/ || Opcode == 0xBA/*TSX*/ || Opcode == 0x9B/*TAS*/));
+                _StackPointer = value;
             }
         }
 
-        public CanonicalAddress InterruptedAddress
+        public int DisplayField
         {
             get
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
-                return new CanonicalAddress(_InterruptedAddress, (MemoryPage)_InterruptedAddressPage);
+                Debug.Assert(IsBeginDisplayEvent);
+                return _DisplayField;
             }
             set
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt);
-                _InterruptedAddress = value.Address;
-                _InterruptedAddressPage = (byte)value.Page;
+                Debug.Assert(IsBeginDisplayEvent && (value == 0 || value == 1));
+                _DisplayField = (byte)value;
             }
         }
 
@@ -135,21 +190,6 @@ namespace BeebPerf.model
                 Debug.Assert(IsInstruction);
                 _OpcodeAddress = value.Address;
                 _OpcodeAddressPage = (byte)value.Page;
-            }
-        }
-
-        public CanonicalAddress DestinationAddress
-        {
-            get
-            {
-                Debug.Assert(IsInstruction);
-                return new CanonicalAddress(_DestinationAddress, (MemoryPage)_DestinationAddressPage);
-            }
-            set
-            {
-                Debug.Assert(IsInstruction);
-                _DestinationAddress = value.Address;
-                _DestinationAddressPage = (byte)value.Page;
             }
         }
 
@@ -198,32 +238,32 @@ namespace BeebPerf.model
 
         // common fields
         [FieldOffset(0)] private byte _TypeAndCycleCount;
-        [FieldOffset(1)] private byte _StackPointer;
 
-        // interrupt fields
-        [FieldOffset(2)] private byte _NonMaskableInterrupt;
-
-        [FieldOffset(8)] private ushort _ISRAddress;
-        [FieldOffset(3)] private byte _ISRAddressPage;
-
-        [FieldOffset(10)] private ushort _InterruptedAddress;
-        [FieldOffset(4)] private byte _InterruptedAddressPage;
+        // display event fields
+        [FieldOffset(1)] private byte _DisplayField;
 
         // instruction fields
-        [FieldOffset(2)] private byte _Opcode;
-        [FieldOffset(6)] private ushort _Operand;
+        [FieldOffset(1)] private byte _OpcodeAddressPage;
+        [FieldOffset(2)] private ushort _OpcodeAddress;
 
-        [FieldOffset(8)] private ushort _OpcodeAddress;
-        [FieldOffset(3)] private byte _OpcodeAddressPage;
+        [FieldOffset(6)] private byte _Opcode;
+        [FieldOffset(4)] private ushort _Operand;
 
-        [FieldOffset(10)] private ushort _DestinationAddress;
-        [FieldOffset(4)] private byte _DestinationAddressPage;
+        [FieldOffset(7)] private byte _MemoryAddressPage;
+        [FieldOffset(8)] private ushort _MemoryAddress;
 
-        [FieldOffset(10)] private ushort _MemoryAddress;
-        [FieldOffset(4)] private byte _MemoryAddressPage;
+        [FieldOffset(10)] private byte _MemoryReadValue;
+        [FieldOffset(11)] private byte _MemoryWriteValue;
 
-        [FieldOffset(1)] private byte _MemoryReadValue;
-        [FieldOffset(5)] private byte _MemoryWriteValue;
+        [FieldOffset(10)] private byte _StackValue;            // overrides _MemoryReadValue
+        [FieldOffset(11)] private byte _StackPointer;          // overrides _MemoryWriteValue
+
+        // interrupt and instruction fields
+        [FieldOffset(7)] private byte _DestinationAddressPage; // overrides _MemoryAddressPage
+        [FieldOffset(8)] private ushort _DestinationAddress;   // overrides _MemoryAddressPage
+
+        [FieldOffset(1)] private byte _ReturnAddressPage;      // overrides _OpcodeAddressPage
+        [FieldOffset(10)] private ushort _ReturnAddress;       // overrides _MemoryReadValue & _MemoryWriteValue
 
         public string ToString(InstructionSet instructionSet)
         {
@@ -253,11 +293,11 @@ namespace BeebPerf.model
             }
             else if (IsMaskableInterrupt)
             {
-                return $"MASKABLE INTERRUPT to {ISRAddress}";
+                return $"MASKABLE INTERRUPT to {DestinationAddress}";
             }
             else if (IsNonMaskableInterrupt)
             {
-                return $"NON-MASKABLE INTERRUPT to {ISRAddress}";
+                return $"NON-MASKABLE INTERRUPT to {DestinationAddress}";
             }
             else if (IsBeginDisplayEvent)
             {
