@@ -882,7 +882,7 @@ index 630c025..7512c41 100644
      "#define _AFX_NO_OLE_RESOURCES\r\n"
 diff --git a/Src/BeebEm.user.props b/Src/BeebEm.user.props
 new file mode 100644
-index 0000000..421d46d
+index 0000000..029cfd3
 --- /dev/null
 +++ b/Src/BeebEm.user.props
 @@ -0,0 +1,18 @@
@@ -1533,10 +1533,10 @@ index c087f1f..28bfdf4 100644
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..3a65091
+index 0000000..b7cf1e0
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,940 @@
+@@ -0,0 +1,943 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2005  Mike Wyatt
@@ -2004,7 +2004,10 @@ index 0000000..3a65091
 +
 +    // video ULA
 +    snapshotData.WriteByte(VideoULA_ControlReg);
-+    snapshotData.Write(VideoULA_Palette, sizeof(VideoULA_Palette));
++    for (int i = 0; i < 16; i++)
++    {
++        snapshotData.WriteByte(VideoULA_Palette[i] ^ 0x07); // save physical color bits 0..2 inverted
++    }
 +
 +    // video 6845 registers
 +    byte CRTCRegs[] = {

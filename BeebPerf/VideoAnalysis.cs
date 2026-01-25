@@ -48,7 +48,6 @@
 //
 
 using BeebPerf.model;
-using System;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 
