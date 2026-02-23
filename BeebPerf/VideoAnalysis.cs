@@ -155,8 +155,8 @@ namespace BeebPerf
                 if (instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
-                    byte memoryAccess = instructionSet.MemoryAccess(opcode);
-                    if ((memoryAccess & 0x2/*write*/) != 0)
+                    var memoryAccess = instructionSet.MemoryAccess(opcode);
+                    if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                     {
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
                         if (_RegisterModified)

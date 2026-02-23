@@ -20,6 +20,8 @@
 // --------------------------------------------------------------
 
 using System.Diagnostics;
+using System.Reflection.Emit;
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
 namespace BeebPerf.model
@@ -124,14 +126,22 @@ namespace BeebPerf.model
         {
             get
             {
-                Debug.Assert(IsInstruction &&
-                    (Opcode == 0x9A/*TXS*/ || Opcode == 0xBA/*TSX*/ || Opcode == 0x9B/*TAS*/));
-                return _StackPointer;
+                Debug.Assert(IsInstruction && (
+                        Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
+                        Opcode == 0x08/*PHP*/ || Opcode == 0x28/*PLP*/ ||
+                        Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
+                        Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/ ||
+                        Opcode == 0x9A/*TXS*/ || Opcode == 0x9B/*TAS*/));
+                 return _StackPointer;
             }
             set
             {
-                Debug.Assert(IsInstruction &&
-                    (Opcode == 0x9A/*TXS*/ || Opcode == 0xBA/*TSX*/ || Opcode == 0x9B/*TAS*/));
+                Debug.Assert(IsInstruction && (
+                        Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
+                        Opcode == 0x08/*PHP*/ || Opcode == 0x28/*PLP*/ ||
+                        Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
+                        Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/ ||
+                        Opcode == 0x9A/*TXS*/ || Opcode == 0x9B/*TAS*/));
                 _StackPointer = value;
             }
         }
@@ -260,7 +270,7 @@ namespace BeebPerf.model
 
         // interrupt and instruction fields
         [FieldOffset(7)] private byte _DestinationAddressPage; // overrides _MemoryAddressPage
-        [FieldOffset(8)] private ushort _DestinationAddress;   // overrides _MemoryAddressPage
+        [FieldOffset(8)] private ushort _DestinationAddress;   // overrides _MemoryAddress
 
         [FieldOffset(1)] private byte _ReturnAddressPage;      // overrides _OpcodeAddressPage
         [FieldOffset(10)] private ushort _ReturnAddress;       // overrides _MemoryReadValue & _MemoryWriteValue
@@ -272,22 +282,22 @@ namespace BeebPerf.model
                 string mnemonic = instructionSet.Mnemonic(Opcode);
                 string operand = (instructionSet.Size(Opcode) == 3) ? $"&{Operand:X4}" : $"&{Operand:X2}";
                 string address = OpcodeAddress.ToString();
-                InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(Opcode);
+                InstructionSet.AddressingModeType addressMode = instructionSet.AddressingMode(Opcode);
                 return addressMode switch
                 {
-                    InstructionSet.AddressMode.Accumulator => $"{address} {mnemonic} A",
-                    InstructionSet.AddressMode.Implied => $"{address} {mnemonic}",
-                    InstructionSet.AddressMode.ZeroPage => $"{address} {mnemonic} {operand}",
-                    InstructionSet.AddressMode.Absolute => $"{address} {mnemonic} {operand}",
-                    InstructionSet.AddressMode.Immediate => $"{address} {mnemonic} #{operand}",
-                    InstructionSet.AddressMode.Relative => $"{address} {mnemonic} {operand}",
-                    InstructionSet.AddressMode.ZeroPageX => $"{address} {mnemonic} {operand}, X",
-                    InstructionSet.AddressMode.AbsoluteX => $"{address} {mnemonic} {operand}, X",
-                    InstructionSet.AddressMode.ZeroPageY => $"{address} {mnemonic} {operand}, Y",
-                    InstructionSet.AddressMode.AbsoluteY => $"{address} {mnemonic} {operand}, Y",
-                    InstructionSet.AddressMode.Indirect => $"{address} {mnemonic} ({operand}), Y",
-                    InstructionSet.AddressMode.IndirectX => $"{address} {mnemonic} ({operand}, X)",
-                    InstructionSet.AddressMode.IndirectY => $"{address} {mnemonic} ({operand}), Y",
+                    InstructionSet.AddressingModeType.Accumulator => $"{address} {mnemonic} A",
+                    InstructionSet.AddressingModeType.Implied => $"{address} {mnemonic}",
+                    InstructionSet.AddressingModeType.ZeroPage => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressingModeType.Absolute => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressingModeType.Immediate => $"{address} {mnemonic} #{operand}",
+                    InstructionSet.AddressingModeType.Relative => $"{address} {mnemonic} {operand}",
+                    InstructionSet.AddressingModeType.ZeroPageX => $"{address} {mnemonic} {operand}, X",
+                    InstructionSet.AddressingModeType.AbsoluteX => $"{address} {mnemonic} {operand}, X",
+                    InstructionSet.AddressingModeType.ZeroPageY => $"{address} {mnemonic} {operand}, Y",
+                    InstructionSet.AddressingModeType.AbsoluteY => $"{address} {mnemonic} {operand}, Y",
+                    InstructionSet.AddressingModeType.Indirect => $"{address} {mnemonic} ({operand}), Y",
+                    InstructionSet.AddressingModeType.IndirectX => $"{address} {mnemonic} ({operand}, X)",
+                    InstructionSet.AddressingModeType.IndirectY => $"{address} {mnemonic} ({operand}), Y",
                     _ => string.Empty
                 };
             }

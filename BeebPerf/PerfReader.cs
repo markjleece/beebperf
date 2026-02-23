@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -37,37 +38,36 @@ namespace BeebPerf
 
             _LastOpcodeAddress = 0;
 
-            var fs = File.OpenRead(fileName);
-
+            using var fs = File.OpenRead(fileName);
             while (fs.Position < fs.Length)
             {
-                var dataStream = ReadChunk(fs, out string tag);
+                using var dataStream = ReadChunk(fs, out string tag);
                 switch (tag)
                 {
                     case "PFhd":
                         if (model is not null)
-                            throw new Exception("invalid .perf file format");
+                            throw new InvalidDataException("invalid .perf file format");
 
                         model = ReadHeaderData(dataStream);
                         break;
 
                     case "PFlb":
                         if (model is null)
-                            throw new Exception("invalid .perf file format");
+                            throw new InvalidDataException("invalid .perf file format");
 
                         ReadLabelData(dataStream, model);
                         break;
 
                     case "PFss":
                         if (model is null)
-                            throw new Exception("invalid .perf file format");
+                            throw new InvalidDataException("invalid .perf file format");
 
                         ReadSnapshotData(dataStream, model);
                         break;
 
                     case "PFex":
                         if (model is null)
-                            throw new Exception("invalid .perf file format");
+                            throw new InvalidDataException("invalid .perf file format");
 
                         ReadExecutionData(dataStream, model);
                         break;
@@ -85,12 +85,17 @@ namespace BeebPerf
         {
             byte majorVersion = ReadByte(dataStream);
             byte minorVersion = ReadByte(dataStream);
-
-            if (majorVersion != 1 && minorVersion != 0)
-                throw new Exception($"Unsupported .perf file version: {majorVersion}.{minorVersion}");
+            if (majorVersion != 1 || minorVersion != 0)
+                throw new InvalidDataException($"Unsupported .perf file version: {majorVersion}.{minorVersion}");
 
             BBCModelType bbcModel = (BBCModelType)ReadByte(dataStream);
+            if (bbcModel != BBCModelType.B && bbcModel != BBCModelType.IntegraB && bbcModel != BBCModelType.BPlus && bbcModel != BBCModelType.Master128 && bbcModel != BBCModelType.MasterET)
+                throw new InvalidDataException("invalid .perf file format: unknown BBC model");
+
             int totalExecutionCount = ReadInt(dataStream);
+            if (totalExecutionCount <= 0)
+                throw new InvalidDataException("invalid .perf file format");
+
             Model model = new Model(bbcModel, totalExecutionCount);
             _InstructionSet = model.InstructionSet;
             return model;
@@ -121,7 +126,12 @@ namespace BeebPerf
             bool hasFilingSystemRam = (model.BBCModel == BBCModelType.Master128 || model.BBCModel == BBCModelType.MasterET);
             bool hasHiddenRam = (model.BBCModel == BBCModelType.IntegraB);
 
-            model.Snapshot.StackPointer = ReadByte(dataStream);
+            model.Snapshot.ProgramCounter = ReadShort(dataStream);
+            model.Snapshot.Accumulator = _Accumulator = ReadByte(dataStream);
+            model.Snapshot.XRegister = _XRegister = ReadByte(dataStream);
+            model.Snapshot.YRegister = _YRegister = ReadByte(dataStream);
+            model.Snapshot.StatusRegister = _StatusRegister = ReadByte(dataStream);
+            model.Snapshot.StackPointer = _StackPointer = ReadByte(dataStream);
 
             byte romPagingRegister = ReadByte(dataStream);
             model.Snapshot.RomPagingRegister = romPagingRegister;
@@ -130,6 +140,24 @@ namespace BeebPerf
             byte accessControlRegister = ReadByte(dataStream);
             model.Snapshot.AccessControlRegister = accessControlRegister;
             AccessControlRegisterChange(model, accessControlRegister);
+
+            int stackFrameCount = ReadByte(dataStream);
+            model.Snapshot.StackFrames = new MiniStackFrame[stackFrameCount];
+            for (int i = 0; i < stackFrameCount; i++)
+            {
+                byte type = ReadByte(dataStream);
+                byte startAddressPage = ReadByte(dataStream);
+                ushort startAddress = ReadShort(dataStream);
+                byte returnAddressPage = ReadByte(dataStream);
+                ushort returnAddress = ReadShort(dataStream);
+                byte stackPointer = ReadByte(dataStream);
+
+                model.Snapshot.StackFrames[i] = new(
+                    (CallType)type,
+                    new CanonicalAddress(startAddress, (MemoryPage)startAddressPage),
+                    new CanonicalAddress(returnAddress, (MemoryPage)returnAddressPage),
+                    stackPointer);
+            }
 
             byte screenAddress = ReadByte(dataStream);
             model.Snapshot.ScreenAddress = screenAddress switch
@@ -258,7 +286,7 @@ namespace BeebPerf
                             int cycles = ReadByte(dataStream);
                             Debug.Assert(cycles == 7);
                             instruction.CycleCount = cycles;
-    
+
                             // interrupt service routine address
                             ushort destinationAddress = ReadShort(dataStream);
                             instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
@@ -307,24 +335,56 @@ namespace BeebPerf
 
                 instruction.Operand = operand;
 
-                // cycle count
-                int cycleCount = ReadByte(dataStream);
-                Debug.Assert(cycleCount <= 7);
+                // cycle count and register changes
+                byte bits = ReadByte(dataStream);
+                int cycleCount = (bits & 0x7);
+                Debug.Assert(cycleCount >= 2 && cycleCount <= 7);
                 instruction.CycleCount = cycleCount;
 
-                // stack
-                if (opcode == 0x9A/*TXS*/ || opcode == 0xBA/*TSX*/ ||
-                    (opcode == 0x9B/*TAS*/ && model.InstructionSet!.CPU == CPUType._6502))
+                if ((bits & (byte)ModifiedRegister.Accumulator) != 0) // new value of accumulator
+                    _Accumulator = ReadByte(dataStream);
+
+                if ((bits & (byte)ModifiedRegister.XRegister) != 0) // new value of X register
+                    _XRegister = ReadByte(dataStream);
+
+                if ((bits & (byte)ModifiedRegister.YRegister) != 0) // new value of Y register
+                    _YRegister = ReadByte(dataStream);
+
+                if ((bits & (byte)ModifiedRegister.StatusRegister) != 0) // new value of status register
+                    _StatusRegister = ReadByte(dataStream);
+
+                if ((bits & (byte)ModifiedRegister.StackPointer) != 0) // new value of stack pointer
+                    _StackPointer = ReadByte(dataStream);
+
+                // stack pointer
+                // TODO: replace with table lookup?
+                if (opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/ ||
+                    opcode == 0x08/*PHP*/ || opcode == 0x28/*PLP*/ ||
+                    opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/ ||
+                    opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/ ||
+                    opcode == 0x9A/*TXS*/ || opcode == 0x9B/*TAS*/)
                 {
-                    instruction.StackPointer = ReadByte(dataStream);
+                    instruction.StackPointer = _StackPointer;
                 }
-                else if (
-                    opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/ || 
-                    (model.InstructionSet!.CPU == CPUType._65C02 && (
-                        opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/ ||
-                        opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/)))
+
+                // stack value
+                if (opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/)
                 {
-                    instruction.StackValue = ReadByte(dataStream);
+                    instruction.StackValue = _Accumulator;
+                }
+                else if (opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/)
+                {
+                    if (model.InstructionSet!.CPU == CPUType._65C02)
+                        instruction.StackValue = _XRegister;
+                    else
+                        instruction.StackValue = _StackPointer;
+                }
+                else if (opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/)
+                {
+                    if (model.InstructionSet!.CPU == CPUType._65C02)
+                        instruction.StackValue = _YRegister;
+                    else
+                        instruction.StackValue = _StackPointer;
                 }
 
                 // destination address
@@ -361,26 +421,70 @@ namespace BeebPerf
                 }
 
                 // memory access address and read/write values
-                byte memoryAccess = instructionSet.MemoryAccess(opcode);
-                if (memoryAccess != 0x0)
+                var memoryAccess = instructionSet.MemoryAccess(opcode);
+                if (memoryAccess != InstructionSet.MemoryAccessType.None)
                 {
                     ushort memoryAddress;
-                    if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressMode.Complex)
+                    if (instructionSet.AddressingMode(opcode) >= InstructionSet.AddressingModeType.IndexedOrIndirect)
                         memoryAddress = ReadShort(dataStream);
                     else
                         memoryAddress = operand;
 
                     instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress, opcodeAddress);
 
-                    if ((memoryAccess & 0x1) != 0)
+                    if ((memoryAccess & InstructionSet.MemoryAccessType.Read) != 0)
                     {
-                        byte memoryReadValue = ReadByte(dataStream);
+                        byte memoryReadValue = 0;
+                        switch (instructionSet.LoadOrStore(opcode))
+                        {
+                            case InstructionSet.LoadOrStoreType.Neither:
+                                memoryReadValue = ReadByte(dataStream);
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.LDA:
+                                memoryReadValue = _Accumulator;
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.LDX:
+                                memoryReadValue = _XRegister;
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.LDY:
+                                memoryReadValue = _YRegister;
+                                break;
+
+                            default:
+                                Debug.Assert(false);
+                                break;
+                        }
                         instruction.MemoryReadValue = memoryReadValue;
                     }
 
-                    if ((memoryAccess & 0x2) != 0)
+                    if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                     {
-                        byte memoryWriteValue = ReadByte(dataStream);
+                        byte memoryWriteValue = 0;
+                        switch (instructionSet.LoadOrStore(opcode))
+                        {
+                            case InstructionSet.LoadOrStoreType.Neither:
+                                memoryWriteValue = ReadByte(dataStream);
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.STA:
+                                memoryWriteValue = _Accumulator;
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.STX:
+                                memoryWriteValue = _XRegister;
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.STY:
+                                memoryWriteValue = _YRegister;
+                                break;
+
+                            default:
+                                Debug.Assert(false);
+                                break;
+                        }
                         instruction.MemoryWriteValue = memoryWriteValue;
 
                         if (memoryAddress >= 0xFE30 && memoryAddress < 0xFE34)
@@ -490,7 +594,7 @@ namespace BeebPerf
                 case BBCModelType.IntegraB:
                     if (address < 0x3000)
                         page = MemoryPage.WholeRam;
-                    if (address < 0x8000)
+                    else if (address < 0x8000)
                         if (_ShadowRamEnabled && !_ShadowRamSelected)
                             page = MemoryPage.ShadowRam;
                         else
@@ -510,7 +614,7 @@ namespace BeebPerf
                 case BBCModelType.MasterET:
                     if (address < 0x3000)
                         page = MemoryPage.WholeRam;
-                    if (address < 0x8000)
+                    else if (address < 0x8000)
                     {
                         if (_ShadowRamXBit || (_ShadowRamEBit && opcodeAddress >= 0xC000 && opcodeAddress < 0xE000))
                             page = MemoryPage.ShadowRam;
@@ -536,15 +640,32 @@ namespace BeebPerf
             return new CanonicalAddress(address, page);
         }
 
+        private static bool IsLetter(byte b)
+        {
+            return (b >= (byte)'A' && b <= (byte)'Z') || (b >= (byte)'a' && b <= (byte)'z');
+        }
+
         private Stream ReadChunk(FileStream fs, out string tag)
         {
             // read header
             var buffer = new byte[13];
             fs.ReadExactly(buffer);
+
+            for (int i = 0; i < 4; i++)
+                if (!IsLetter(buffer[i]))
+                    throw new InvalidDataException("invalid .perf file format");
+
             tag = Encoding.ASCII.GetString(buffer, index:0, count:4);
-            int compressed = buffer[4];
-            int uncompressedSize = BitConverter.ToInt32(buffer, 5);
-            int compressedSize = BitConverter.ToInt32(buffer, 9);
+
+            byte compressed = buffer[4];
+            int uncompressedSize = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(5));
+            int compressedSize = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(9));
+
+            if (compressed != 0 && compressed != 1)
+                throw new InvalidDataException("invalid .perf file format");
+
+            if (compressedSize <= 0 || compressedSize > MaxChunkSize || uncompressedSize <= 0 || uncompressedSize > MaxChunkSize)
+                throw new InvalidDataException("invalid .perf file format");
 
             // read data
             byte[] uncompressedData;
@@ -565,26 +686,32 @@ namespace BeebPerf
 
                 uncompressedData = new byte[uncompressedSize];
                 if (!Inflate(compressedData, compressedSize, uncompressedData, uncompressedSize))
-                    throw new Exception("Inflate error");
+                    throw new InvalidDataException("Inflate error");
             }
 
             // wrap uncompressed data
             return new MemoryStream(uncompressedData);
         }
 
-        private static int ReadInt(Stream ms)
+        private static byte ReadByte(Stream ms)
         {
-            return ms.ReadByte() | (ms.ReadByte() << 8) | (ms.ReadByte() << 16) | (ms.ReadByte() << 24);
+            int v = ms.ReadByte();
+            if (v == -1) throw new EndOfStreamException();
+            return (byte)v;
         }
 
         private static ushort ReadShort(Stream ms)
         {
-            return (ushort)(ms.ReadByte() | (ms.ReadByte() << 8));
+            Span<byte> buf = stackalloc byte[2];
+            if (ms.Read(buf) != 2) throw new EndOfStreamException();
+            return (ushort)(buf[0] | (buf[1] << 8));
         }
 
-        private static byte ReadByte(Stream ms)
+        private static int ReadInt(Stream ms)
         {
-            return (byte)ms.ReadByte();
+            Span<byte> buf = stackalloc byte[4];
+            if (ms.Read(buf) != 4) throw new EndOfStreamException();
+            return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
         }
 
         private enum EventType
@@ -594,10 +721,26 @@ namespace BeebPerf
             BeginDisplayEvent = 2
         }
 
+        private enum ModifiedRegister : byte
+        {
+            // cycle count held in bits 0..3
+            Accumulator = 0x08,
+            XRegister = 0x10,
+            YRegister = 0x20,
+            StatusRegister = 0x40,
+            StackPointer = 0x80
+        };
+
         private InstructionSet? _InstructionSet;
 
         private ushort _LastOpcodeAddress = 0;
         private int _InstructionCount = 0;
+
+        private byte _Accumulator;
+        private byte _XRegister;
+        private byte _YRegister;
+        private byte _StatusRegister;
+        private byte _StackPointer;
 
         private int _RomPageSelected;
         private bool _ShadowRamSelected;
@@ -614,5 +757,7 @@ namespace BeebPerf
 
         private byte _RomPagingRegister;
         private byte _AccessControlRegister;
+
+        private static readonly int MaxChunkSize = 0x100000; // 1MB 
     }
 }

@@ -27,7 +27,8 @@ namespace BeebPerf.model
         {
         }
 
-        public StackFrame(Routine routine, CallType type, StackFrame? parent) : base(routine, type, parent) 
+        public StackFrame(Routine routine, CanonicalAddress returnAddress, byte stackPointer, CallType type, StackFrame? parent) : 
+            base(routine, returnAddress, stackPointer, type, parent) 
         {
             routine.StackFrames.Add(this);
         }
@@ -63,6 +64,11 @@ namespace BeebPerf.model
             CPUMetrics.Clear();
             foreach (var child in Children)
                 child.ClearMetrics();
+        }
+
+        public override string ToString()
+        {
+            return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, SP: {StackPointer}";
         }
 
         public int FirstInstructionIndex = -1;

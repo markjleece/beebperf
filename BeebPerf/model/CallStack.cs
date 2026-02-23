@@ -23,11 +23,13 @@ namespace BeebPerf.model
 {
     public enum CallType
     {
-        ISR,
-        JSR,
-        TailCall,
-        FallThrough,
-        Unknown
+        None = 0,
+        JSR = 1,
+        IRQ = 2,
+        NMI = 3,
+        BRK = 4,
+        TailCall = 5,
+        FallThrough = 6,
     }
 
     public class CallStack : IEquatable<CallStack>
@@ -37,12 +39,14 @@ namespace BeebPerf.model
             Routine = new Routine();
         }
 
-        public CallStack(Routine routine, CallType type, StackFrame? parent)
+        public CallStack(Routine routine, CanonicalAddress returnAddress, byte stackPointer, CallType type, StackFrame? parent)
         {
             Type = type;
             Parent = parent;
             Routine = routine;
-            CanonicalAddress = routine.StartAddress;
+            StartAddress = routine.StartAddress;
+            ReturnAddress = returnAddress;
+            StackPointer = stackPointer;
         }
 
         public bool Equals(CallStack? other)
@@ -54,10 +58,10 @@ namespace BeebPerf.model
 
             while (self is not null && peer is not null)
             {
-                if (!self.CanonicalAddress.Equals(peer.CanonicalAddress))
+                if (!self.StartAddress.Equals(peer.StartAddress))
                     return false;
 
-                if (self.Type == CallType.ISR)
+                if (self.Type == CallType.IRQ || self.Type == CallType.NMI || self.Type == CallType.BRK)
                     return true;
 
                 self = self.Parent;
@@ -72,8 +76,8 @@ namespace BeebPerf.model
             int hashCode = 0;
             for (var callStack = this; callStack != null; callStack = callStack.Parent)
             {
-                hashCode = unchecked(hashCode * 31 + callStack.CanonicalAddress.GetHashCode());
-                if (callStack.Type == CallType.ISR)
+                hashCode = unchecked(hashCode * 31 + callStack.StartAddress.GetHashCode());
+                if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
                     break;
             }
             return hashCode;
@@ -87,7 +91,7 @@ namespace BeebPerf.model
                 for (var callStack = this; callStack != null; callStack = callStack.Parent)
                 {
                     depth++;
-                    if (callStack.Type == CallType.ISR)
+                    if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
                         break;
                 }
                 return depth;
@@ -107,7 +111,9 @@ namespace BeebPerf.model
 
         public CallType Type;
         public Routine Routine;
-        public CanonicalAddress CanonicalAddress;
+        public CanonicalAddress StartAddress;
+        public CanonicalAddress ReturnAddress;
+        public byte StackPointer;
         public StackFrame? Parent;
     }
 }

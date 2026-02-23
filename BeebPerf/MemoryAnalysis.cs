@@ -85,15 +85,15 @@ namespace BeebPerf
                 if (cycleCount >= startCycleCount && postCycleCount < endCycleCount && instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
-                    byte memoryAccess = _InstructionSet!.MemoryAccess(opcode);
+                    var memoryAccess = _InstructionSet!.MemoryAccess(opcode);
 
-                    if (memoryAccess != 0) // memory access?
+                    if (memoryAccess != InstructionSet.MemoryAccessType.None) // memory access?
                     {
                         var memoryAddress = instruction.MemoryAddress;
                         var page = memoryAddress.Page;
                         if (!zeroPage || (page == MemoryPage.WholeRam && memoryAddress.Address < 0x100))
                             if (memory[(int)page] != null)
-                                memory[(int)page][memoryAddress.PageOffset] += increments[memoryAccess];
+                                memory[(int)page][memoryAddress.PageOffset] += increments[(int)memoryAccess];
                     }
                 }
 
@@ -180,7 +180,7 @@ namespace BeebPerf
                     cycleCount >= startCycleCount && cycleCount < endCycleCount)
                 {
                     byte opcode = instruction.Opcode;
-                    byte memoryAccess = _InstructionSet!.MemoryAccess(opcode);
+                    var memoryAccess = _InstructionSet!.MemoryAccess(opcode);
                     if (memoryAccess != 0 && instruction.MemoryAddress.Equals(address))
                     {
                         var routineAddress = stackFrame.Routine.StartAddress;
@@ -190,13 +190,13 @@ namespace BeebPerf
 
                         var coreInstruction = new CoreInstruction(ref instruction);
 
-                        if ((memoryAccess & 0x1) != 0)
+                        if ((memoryAccess & InstructionSet.MemoryAccessType.Read) != 0)
                         {
                             metrics.ReadCount++;
                             metrics.InstructionReadCounts[coreInstruction] = metrics.InstructionReadCounts.GetValueOrDefault(coreInstruction) + 1;
                         }
 
-                        if ((memoryAccess & 0x2) != 0)
+                        if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                         {
                             metrics.WriteCount++;
                             metrics.InstructionWriteCounts[coreInstruction] = metrics.InstructionWriteCounts.GetValueOrDefault(coreInstruction) + 1;

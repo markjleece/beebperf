@@ -736,7 +736,7 @@ namespace BeebPerf.ux
 
         private void UpdateCaptionText()
         {
-            string caption = "BeepPref";
+            string caption = "BeebPerf";
             if (_FilePathName != null && _FilePathName.Length > 0)
                 caption += $" - {_FilePathName}";
             if (_StatusText != null && _StatusText.Length > 0)

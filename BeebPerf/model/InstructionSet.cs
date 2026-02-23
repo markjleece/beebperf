@@ -1,18 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Numerics;
-using System.Runtime.Intrinsics.Arm;
-using System.Runtime.Intrinsics.X86;
-using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using static System.Net.WebRequestMethods;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
+﻿using System.Diagnostics;
 
 namespace BeebPerf.model
 {
@@ -154,8 +140,8 @@ namespace BeebPerf.model
                 3,12,13,12,6,6,6,6,0,9,0,9,8,8,8,8,  // 5 Absolute
                 0,11,13,11,4,4,4,4,0,2,1,2,10,5,5,5, // 6 ZeroPageX
                 3,12,13,12,6,6,6,6,0,9,0,9,8,8,8,8,  // 7 ZeroPageY
-                2,11,2,11,4,4,4,4,0,2,0,2,5,5,5,5,   // 8 AbsoluteX -
-                3,12,13,12,6,6,7,7,0,9,0,9,8,8,9,9,  // 9 AbsoluteY -
+                2,11,2,11,4,4,4,4,0,2,0,2,5,5,5,5,   // 8 AbsoluteX
+                3,12,13,12,6,6,7,7,0,9,0,9,8,8,9,9,  // 9 AbsoluteY
                 2,11,2,11,4,4,4,4,0,2,0,2,5,5,5,5,   // a Indirect 10
                 3,12,13,12,6,6,7,7,0,9,0,9,8,8,9,9,  // b IndirectX 11
                 2,11,2,11,4,4,4,4,0,2,0,2,5,5,5,5,   // c IndirectY 12
@@ -174,8 +160,8 @@ namespace BeebPerf.model
                 3,12,10,13,13,6,6,4,0,9,0,13,13,8,8,3, // 5 Absolute
                 0,11,13,13,4,4,4,4,0,2,1,13,10,5,5,3,  // 6 ZeroPageX
                 3,12,10,13,6,6,6,4,0,9,0,13,11,8,8,3,  // 7 ZeroPageY
-                3,11,13,13,4,4,4,4,0,2,0,13,5,5,5,3,   // 8 AbsoluteX -
-                3,12,10,13,6,6,7,4,0,9,0,13,5,8,8,3,   // 9 AbsoluteY -
+                3,11,13,13,4,4,4,4,0,2,0,13,5,5,5,3,   // 8 AbsoluteX
+                3,12,10,13,6,6,7,4,0,9,0,13,5,8,8,3,   // 9 AbsoluteY
                 2,11,2,13,4,4,4,4,0,2,0,13,5,5,5,3,    // a Indirect 10
                 3,12,10,13,6,6,7,4,0,9,0,13,8,8,9,3,   // b IndirectX 11
                 2,11,13,13,4,4,4,4,0,2,0,0,5,5,5,3,    // c IndirectY 12
@@ -184,44 +170,44 @@ namespace BeebPerf.model
                 3,12,10,13,13,6,6,4,0,9,0,13,13,8,8,3  // f
             ];
 
-            byte[] modifiesStackPointerTable6502 = [
+            byte[] loadOrStoreTable6502 = [
              // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 false
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 true
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0, // 9
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
+                0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
+                0,4,0,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
+                3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
+                0,1,0,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
-            ];
+           ];
 
-            byte[] modifiesStackPointerTable65C02 = [
+            byte[] loadOrStoreTable65C02 = [
              // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-                0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 false
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 true
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 5
-                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 7
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 9
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
-                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
+                0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
+                0,4,4,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
+                3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
+                0,1,1,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // d
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
-                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0  // f
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
             ];
 
             string[] mnemonicTable6502 = [
@@ -267,7 +253,7 @@ namespace BeebPerf.model
                 _SizeTable = sizeTable6502;
                 _MemoryAccessTable = memoryAccessTable6502;
                 _AddressModeTable = addressModeTable6502;
-                _ModifiedStackPointerTable = modifiesStackPointerTable6502;
+                _LoadOrStoreTable = loadOrStoreTable6502;
                 _MnemonicTable = mnemonicTable6502;
             }
             else
@@ -276,7 +262,7 @@ namespace BeebPerf.model
                 _SizeTable = sizeTable65C02;
                 _MemoryAccessTable = memoryAccessTable65C02;
                 _AddressModeTable = addressModeTable65C02;
-                _ModifiedStackPointerTable = modifiesStackPointerTable65C02;
+                _LoadOrStoreTable = loadOrStoreTable65C02;
                 _MnemonicTable = mnemonicTable65C02;
             }
 
@@ -285,13 +271,12 @@ namespace BeebPerf.model
             Debug.Assert(_SizeTable.Length == 256);
             Debug.Assert(_MemoryAccessTable.Length == 256);
             Debug.Assert(_AddressModeTable.Length == 256);
-            Debug.Assert(_ModifiedStackPointerTable.Length == 256);
+            Debug.Assert(_LoadOrStoreTable.Length == 256);
             Debug.Assert(_MnemonicTable.Length == 256);
         }
 
-        public enum AddressMode : byte
+        public enum AddressingModeType : byte
         {
-            Simple = 0,
             Implied = 0,
             Accumulator = 1,
             Immediate = 2,
@@ -299,7 +284,7 @@ namespace BeebPerf.model
             ZeroPage = 4,
             Absolute = 5,
 
-            Complex = 6,
+            IndexedOrIndirect = 6,
             ZeroPageX = 6,
             ZeroPageY = 7,
             AbsoluteX = 8,
@@ -308,6 +293,25 @@ namespace BeebPerf.model
             IndirectX = 11,
             IndirectY = 12,
             Invalid = 13
+        }
+
+        public enum MemoryAccessType : byte
+        {
+            None = 0,
+            Read = 0x1,
+            Write = 0x2,
+            ReadWrite = 0x3
+        }
+
+        public enum LoadOrStoreType : byte
+        {
+            Neither = 0,
+            LDA = 1,
+            LDX = 2,
+            LDY = 3,
+            STA = 4,
+            STX = 5,
+            STY = 6
         }
 
         public int Size(byte opcode)
@@ -325,19 +329,19 @@ namespace BeebPerf.model
             return _BranchOrJumpTable[opcode] != 0;
         }
 
-        public byte MemoryAccess(byte opcode)
+        public MemoryAccessType MemoryAccess(byte opcode)
         {
-            return _MemoryAccessTable[opcode];
+            return (MemoryAccessType)_MemoryAccessTable[opcode];
         }
 
-        public AddressMode AddressingMode(byte opcode)
+        public LoadOrStoreType LoadOrStore(byte opcode)
         {
-            return (AddressMode)_AddressModeTable[opcode];
+            return (LoadOrStoreType)_LoadOrStoreTable[opcode];
         }
 
-        public bool ModifiesStackPointer(byte opcode)
+        public AddressingModeType AddressingMode(byte opcode)
         {
-            return _ModifiedStackPointerTable[opcode] != 0;
+            return (AddressingModeType)_AddressModeTable[opcode];
         }
 
         public string Mnemonic(byte opcode)
@@ -352,7 +356,7 @@ namespace BeebPerf.model
         private readonly byte[] _SizeTable;
         private readonly byte[] _MemoryAccessTable;
         private readonly byte[] _AddressModeTable;
-        private readonly byte[] _ModifiedStackPointerTable;
+        private readonly byte[] _LoadOrStoreTable;
         private readonly string[] _MnemonicTable;
     }
 }

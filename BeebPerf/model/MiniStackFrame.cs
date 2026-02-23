@@ -21,45 +21,24 @@
 
 namespace BeebPerf.model
 {
-    public enum RoutineType
+    public class MiniStackFrame // Same as model.StackFrame but with only the information we need for routine identification
     {
-        JSR,
-        IRQ,
-        NMI,
-        BRK,
-        Pseudo
-    }
+        public CanonicalAddress StartAddress { get; }
+        public CanonicalAddress ReturnAddress { get; }
+        public byte StackPointer { get; }
+        CallType CallType { get; }
 
-    public class Routine
-    {
-        public Routine()
+        public MiniStackFrame(CallType callType, CanonicalAddress startAddress, CanonicalAddress returnAddress, byte stackPointer)
         {
-            StartAddress = new CanonicalAddress();
-            EndAddress = new CanonicalAddress();
-            Label = String.Empty;
+            CallType = callType;
+            StartAddress = startAddress;
+            ReturnAddress = returnAddress;
+            StackPointer = stackPointer;
         }
 
-        public Routine(CanonicalAddress address, RoutineType routineType, string label)
+        public override string ToString()
         {
-            Label = label;
-            RoutineType = routineType;
-            StartAddress = address;
-            EndAddress = address;
+            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, SP: {StackPointer}";
         }
-
-        public void ClearMetrics()
-        {
-            MetricsByStack.Clear();
-            AggregateMetrics.Clear();
-        }
-
-        public bool HotRoutine;
-        public string Label;
-        public RoutineType RoutineType;
-        public CanonicalAddress StartAddress;
-        public CanonicalAddress EndAddress;
-        public Dictionary<CallStack, CPUMetrics> MetricsByStack = new();
-        public CPUMetrics AggregateMetrics = new();
-        public List<StackFrame> StackFrames = new();
     }
 }

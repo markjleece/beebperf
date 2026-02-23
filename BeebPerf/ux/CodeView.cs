@@ -216,7 +216,7 @@ namespace BeebPerf.ux
         {
             byte opcode = instruction.Opcode;
 
-            if (_InstructionSet!.AddressingMode(opcode) != InstructionSet.AddressMode.Immediate)
+            if (_InstructionSet!.AddressingMode(opcode) != InstructionSet.AddressingModeType.Immediate)
                 return string.Empty;
 
             ushort operand = instruction.Operand;
@@ -373,9 +373,9 @@ namespace BeebPerf.ux
                 var instructionSet = codeView._InstructionSet!;
                 int opSize = instructionSet.Size(opcode);
                 string mnemonic = instructionSet.Mnemonic(opcode);
-                InstructionSet.AddressMode addressMode = instructionSet.AddressingMode(opcode);
+                InstructionSet.AddressingModeType addressMode = instructionSet.AddressingMode(opcode);
 
-                if (addressMode == InstructionSet.AddressMode.Relative)
+                if (addressMode == InstructionSet.AddressingModeType.Relative)
                 {
                     int branchAddress = instructionMetrics.Instruction.OpcodeAddress.Address;
                     operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
@@ -387,13 +387,13 @@ namespace BeebPerf.ux
                 if (opSize > 1)
                 {
                     Object address = operand;
-                    if (opSize == 2 && addressMode != InstructionSet.AddressMode.Relative)
+                    if (opSize == 2 && addressMode != InstructionSet.AddressingModeType.Relative)
                         address = (byte)operand;
 
-                    var type = (addressMode == InstructionSet.AddressMode.Immediate) ? Setting.Literal : Setting.Address;
+                    var type = (addressMode == InstructionSet.AddressingModeType.Immediate) ? Setting.Literal : Setting.Address;
                     segments.Add(new Segment { Type = type, Value = address });
 
-                    if (addressMode != InstructionSet.AddressMode.Immediate)
+                    if (addressMode != InstructionSet.AddressingModeType.Immediate)
                     {
                         string label = codeView.FormatLabel(operand, withOffset: true);
                         if (label.Length > 0)
@@ -407,35 +407,35 @@ namespace BeebPerf.ux
 
                 switch (addressMode)
                 {
-                    case InstructionSet.AddressMode.Accumulator:
+                    case InstructionSet.AddressingModeType.Accumulator:
                         segments.Add(new Segment { Type = Setting.Mnemonic, Value = "A" });
                         break;
 
-                    case InstructionSet.AddressMode.Immediate:
+                    case InstructionSet.AddressingModeType.Immediate:
                         segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "#" });
                         break;
 
-                    case InstructionSet.AddressMode.ZeroPageX:
-                    case InstructionSet.AddressMode.AbsoluteX:
+                    case InstructionSet.AddressingModeType.ZeroPageX:
+                    case InstructionSet.AddressingModeType.AbsoluteX:
                         segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X" });
                         break;
 
-                    case InstructionSet.AddressMode.ZeroPageY:
-                    case InstructionSet.AddressMode.AbsoluteY:
+                    case InstructionSet.AddressingModeType.ZeroPageY:
+                    case InstructionSet.AddressingModeType.AbsoluteY:
                         segments.Add(new Segment { Type = Setting.Punctuation, Value = ",Y",  });
                         break;
 
-                    case InstructionSet.AddressMode.Indirect:
+                    case InstructionSet.AddressingModeType.Indirect:
                         segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "("  });
                         segments.Add(new Segment { Type = Setting.Punctuation, Value = ")" });
                         break;
 
-                    case InstructionSet.AddressMode.IndirectX:
+                    case InstructionSet.AddressingModeType.IndirectX:
                         segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
                         segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X)" });
                         break;
 
-                    case InstructionSet.AddressMode.IndirectY:
+                    case InstructionSet.AddressingModeType.IndirectY:
                         segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
                         segments.Add(new Segment { Type = Setting.Punctuation, Value = "),Y" });
                         break;

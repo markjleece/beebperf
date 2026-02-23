@@ -71,7 +71,13 @@ namespace BeebPerf.model
                 {
                     Memory = (byte[][])Memory.Clone(),
                     MemoryReadOnly = (bool[])MemoryReadOnly.Clone(),
+                    ProgramCounter = ProgramCounter,
+                    Accumulator = Accumulator,
+                    XRegister = XRegister,
+                    YRegister = YRegister,
+                    StatusRegister = StatusRegister,
                     StackPointer = StackPointer,
+                    StackFrames = (MiniStackFrame[])StackFrames.Clone(),
                     RomPagingRegister = RomPagingRegister,
                     AccessControlRegister = AccessControlRegister,
                     ScreenAddress = ScreenAddress,
@@ -84,7 +90,13 @@ namespace BeebPerf.model
 
             public byte[][] Memory = [];
             public bool[] MemoryReadOnly = [];
+            public ushort ProgramCounter;
+            public byte Accumulator;
+            public byte XRegister;
+            public byte YRegister;
+            public byte StatusRegister;
             public byte StackPointer;
+            public MiniStackFrame[] StackFrames = [];
             public byte RomPagingRegister;
             public byte AccessControlRegister;
             public ushort ScreenAddress;

@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..68b33ff 100644
+index 52f9049..743e9c0 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -374,18 +374,7 @@ index 52f9049..68b33ff 100644
  #include "Sound.h"
  #include "Teletext.h"
  #include "Scsi.h"
-@@ -66,8 +67,9 @@ CycleCountT TotalCycles=0;
- 
- int ProgramCounter;
- int PrePC;
-+unsigned char StackPointer;
- static unsigned char Accumulator, XReg, YReg;
--static unsigned char StackReg, PSR;
-+static unsigned char PSR;
- static unsigned char IRQCycles;
- int DisplayCycles=0;
- 
-@@ -239,9 +241,6 @@ bool BasicHardwareOnly = false; // false = all hardware, true = basic hardware o
+@@ -239,9 +240,6 @@ bool BasicHardwareOnly = false; // false = all hardware, true = basic hardware o
  	var = ReadPaged(ProgramCounter++); \
  	var |= (ReadPaged(ProgramCounter++) << 8)
  
@@ -395,11 +384,11 @@ index 52f9049..68b33ff 100644
  static void PollVIAs(unsigned int nCycles);
  static void PollHardware(unsigned int nCycles);
  
-@@ -249,6 +248,42 @@ static unsigned int InstructionCount[256];
+@@ -249,6 +247,101 @@ static unsigned int InstructionCount[256];
  
  /*----------------------------------------------------------------------------*/
  
-+// Read and write helpers
++// Read and write memory helpers
 +
 +static int LastReadWriteAddress;
 +static unsigned char LastReadValue;
@@ -435,31 +424,101 @@ index 52f9049..68b33ff 100644
 +
 +/*----------------------------------------------------------------------------*/
 +
++// Call stack
++
++static StackFrame StackFrames[128];
++static int StackFrameCount = 1;
++static bool fSyncStackFrames = false;
++
++inline static void UpdateProgramStartAddress()
++{
++	if (PrePC > 0x8000 && ProgramCounter < 0x8000 && !StackFrames[0].StartAddress)
++	{
++		StackFrames[0].StartAddressPage = BeebMemPage(ProgramCounter);
++		StackFrames[0].StartAddress = ProgramCounter;
++	}
++}
++
++static void SyncStackFrames()
++{
++	if (!fSyncStackFrames) return;
++	fSyncStackFrames = false;
++	while (StackFrameCount > 1)
++	{
++		if (StackReg < StackFrames[StackFrameCount - 1].StackReg) break;
++		StackFrameCount--;
++	}
++}
++
++inline static void PushStackFrame(StackFrameType type, int startAddress, int returnAddress, byte stackReg)
++{
++	SyncStackFrames();
++    StackFrame* stackFrame = &StackFrames[StackFrameCount++];
++	stackFrame->Type = type;
++	stackFrame->StartAddressPage = BeebMemPage(startAddress);
++	stackFrame->StartAddress = startAddress;
++	stackFrame->ReturnAddressPage = BeebMemPage(returnAddress);
++	stackFrame->ReturnAddress = returnAddress;
++	stackFrame->StackReg = stackReg;
++}
++
++void GetStackFrames(const StackFrame** ppStackFrames, int* pStackFrameCount)
++{
++	SyncStackFrames();
++	*pStackFrameCount = StackFrameCount;
++	*ppStackFrames = StackFrames;
++}
++
++/*----------------------------------------------------------------------------*/
++
++void GetRegisters(int* pProgramCounter, unsigned char* pAccumulator, unsigned char* pXReg, unsigned char* pYReg, unsigned char* pPSR, unsigned char* pStackReg)
++{
++	*pProgramCounter = ProgramCounter;
++	*pAccumulator = Accumulator;
++	*pXReg = XReg;
++	*pYReg = YReg;
++	*pPSR = PSR;
++	*pStackReg = StackReg;
++}
++
++/*----------------------------------------------------------------------------*/
++
  // Correct cycle count for indirection across page boundary
  
  static INLINE void Carried()
-@@ -402,16 +437,16 @@ INLINE static void SetPSRCZN(int c, int z, int n)
+@@ -402,7 +495,7 @@ INLINE static void SetPSRCZN(int c, int z, int n)
  
  INLINE static void Push(unsigned char Value)
  {
 -	BEEBWRITEMEM_DIRECT(0x100 + StackReg, Value);
--	StackReg--;
-+	WholeRam[0x100 + StackPointer] = Value;
-+	StackPointer--;
++	WholeRam[0x100 + StackReg] = Value;
+ 	StackReg--;
  }
  
- /*----------------------------------------------------------------------------*/
+@@ -645,11 +738,14 @@ INLINE static void BPLInstrHandler()
  
- INLINE static unsigned char Pop()
+ INLINE static void BRKInstrHandler()
  {
--	StackReg++;
--	return WholeRam[0x100 + StackReg];
-+	StackPointer++;
-+	return WholeRam[0x100 + StackPointer];
++	byte preStackReg = StackReg;
++	int returnAddress = ProgramCounter + 1;
+ 	PushWord(ProgramCounter + 1);
+ 	PSR |= FlagB; // Set B before pushing
+ 	Push(PSR);
+ 	PSR |= FlagI; // Set I after pushing - see Birnbaum
+ 	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
++	PushStackFrame(StackFrameType_BRK, ProgramCounter, returnAddress, preStackReg);
  }
  
- /*----------------------------------------------------------------------------*/
-@@ -1119,7 +1154,7 @@ INLINE static int IndYAddrModeHandler_Address()
+ INLINE static void BVCInstrHandler()
+@@ -773,6 +869,7 @@ INLINE static void INYInstrHandler()
+ 
+ INLINE static void JSRInstrHandler(int Address)
+ {
++	PushStackFrame(StackFrameType_JSR, Address, ProgramCounter, StackReg);
+ 	PushWord(ProgramCounter - 1);
+ 	ProgramCounter = Address;
+ }
+@@ -1119,7 +1216,7 @@ INLINE static int IndYAddrModeHandler_Address()
  INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  {
  	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + XReg;
@@ -468,7 +527,7 @@ index 52f9049..68b33ff 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1287,7 +1322,7 @@ INLINE static int IndAddrXModeHandler_Address()
+@@ -1287,7 +1384,7 @@ INLINE static int IndAddrXModeHandler_Address()
  INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  {
  	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + YReg;
@@ -477,25 +536,17 @@ index 52f9049..68b33ff 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1337,7 +1372,7 @@ void Init6502Core()
- 	Accumulator = 0;
- 	XReg = 0;
- 	YReg = 0;
--	StackReg = 0xff; // Initial value?
-+	StackPointer = 0xff; // Initial value?
- 	PSR = FlagI; // Interrupts off for starters
- 
+@@ -1343,6 +1440,9 @@ void Init6502Core()
  	intStatus = 0;
-@@ -1499,7 +1534,7 @@ void Exec6502Instruction()
- 	for (int i = 0; i < Count; i++)
- 	{
- 		// Output debug info
--		if (DebugEnabled && !DebugDisassembler(ProgramCounter, PrePC, Accumulator, XReg, YReg, PSR, StackReg, true))
-+		if (DebugEnabled && !DebugDisassembler(ProgramCounter, PrePC, Accumulator, XReg, YReg, PSR, StackPointer, true))
- 		{
- 			Sleep(10);  // Ease up on CPU when halted
- 			continue;
-@@ -1590,7 +1625,7 @@ void Exec6502Instruction()
+ 	NMIStatus = 0;
+ 	NMILock = false;
++
++    memset(StackFrames, 0, sizeof(StackFrames));
++	StackFrames[0].StackReg = 0xFF;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1590,7 +1690,7 @@ void Exec6502Instruction()
  				break;
  			case 0x05:
  				// ORA zp
@@ -504,7 +555,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0x06:
  				// ASL zp
-@@ -1604,7 +1639,7 @@ void Exec6502Instruction()
+@@ -1604,7 +1704,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SLO zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					ASLInstrHandler(ZeroPageAddress);
@@ -513,7 +564,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x08:
-@@ -1715,7 +1750,7 @@ void Exec6502Instruction()
+@@ -1715,7 +1815,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SLO zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					ASLInstrHandler(ZeroPageAddress);
@@ -522,7 +573,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x18:
-@@ -1796,11 +1831,11 @@ void Exec6502Instruction()
+@@ -1796,11 +1896,11 @@ void Exec6502Instruction()
  				break;
  			case 0x24:
  				// BIT zp
@@ -536,7 +587,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0x26:
  				// ROL zp
-@@ -1814,7 +1849,7 @@ void Exec6502Instruction()
+@@ -1814,13 +1914,14 @@ void Exec6502Instruction()
  					// Undocumented instruction: RLA zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					ROLInstrHandler(ZeroPageAddress);
@@ -545,7 +596,14 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x28: {
-@@ -1918,7 +1953,7 @@ void Exec6502Instruction()
+ 					// PLP
+ 					unsigned char oldPSR = PSR;
+ 					PSR = Pop();
++					fSyncStackFrames = true;
+ 
+ 					if ((oldPSR ^ PSR) & FlagI) {
+ 						if (PSR & FlagI) {
+@@ -1918,7 +2019,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: RLA zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					ROLInstrHandler(ZeroPageAddress);
@@ -554,7 +612,15 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x38:
-@@ -2005,7 +2040,7 @@ void Exec6502Instruction()
+@@ -1983,6 +2084,7 @@ void Exec6502Instruction()
+ 				PSR = Pop();
+ 				ProgramCounter = PopWord();
+ 				NMILock = false;
++                fSyncStackFrames = true;
+ 				break;
+ 			case 0x41:
+ 				// EOR (zp,X)
+@@ -2005,7 +2107,7 @@ void Exec6502Instruction()
  				break;
  			case 0x45:
  				// EOR zp
@@ -563,7 +629,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0x46:
  				// LSR zp
-@@ -2019,7 +2054,7 @@ void Exec6502Instruction()
+@@ -2019,7 +2121,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SRE zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					LSRInstrHandler(ZeroPageAddress);
@@ -572,7 +638,15 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x48:
-@@ -2118,7 +2153,7 @@ void Exec6502Instruction()
+@@ -2047,6 +2149,7 @@ void Exec6502Instruction()
+ 			case 0x4c:
+ 				// JMP abs
+ 				ProgramCounter = AbsAddrModeHandler_Address();
++				UpdateProgramStartAddress();
+ 				break;
+ 			case 0x4d:
+ 				// EOR abs
+@@ -2118,7 +2221,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SRE zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					LSRInstrHandler(ZeroPageAddress);
@@ -581,7 +655,15 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x58:
-@@ -2203,7 +2238,7 @@ void Exec6502Instruction()
+@@ -2184,6 +2287,7 @@ void Exec6502Instruction()
+ 			case 0x60:
+ 				// RTS
+ 				ProgramCounter = PopWord() + 1;
++				fSyncStackFrames = true;
+ 				break;
+ 			case 0x61:
+ 				// ADC (zp,X)
+@@ -2203,7 +2307,7 @@ void Exec6502Instruction()
  			case 0x64:
  				if (CPUType == CPU::CPU65C12) {
  					// STZ zp
@@ -590,7 +672,7 @@ index 52f9049..68b33ff 100644
  				}
  				else {
  					// Undocumented instruction: NOP zp
-@@ -2212,7 +2247,7 @@ void Exec6502Instruction()
+@@ -2212,7 +2316,7 @@ void Exec6502Instruction()
  				break;
  			case 0x65:
  				// ADC zp
@@ -599,7 +681,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0x66:
  				// ROR zp
-@@ -2226,7 +2261,7 @@ void Exec6502Instruction()
+@@ -2226,13 +2330,14 @@ void Exec6502Instruction()
  					// Undocumented instruction: RRA zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					RORInstrHandler(ZeroPageAddress);
@@ -608,7 +690,22 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x68:
-@@ -2306,7 +2341,7 @@ void Exec6502Instruction()
+ 				// PLA
+ 				Accumulator = Pop();
+ 				SetPSRZN(Accumulator);
++				fSyncStackFrames = true;
+ 				break;
+ 			case 0x69:
+ 				// ADC imm
+@@ -2254,6 +2359,7 @@ void Exec6502Instruction()
+ 			case 0x6c:
+ 				// JMP (abs)
+ 				ProgramCounter = IndAddrModeHandler_Address();
++				UpdateProgramStartAddress();
+ 				break;
+ 			case 0x6d:
+ 				// ADC abs
+@@ -2306,7 +2412,7 @@ void Exec6502Instruction()
  			case 0x74:
  				if (CPUType == CPU::CPU65C12) {
  					// STZ zp,X
@@ -617,7 +714,7 @@ index 52f9049..68b33ff 100644
  				}
  				else {
  					// Undocumented instruction: NOP zp,x
-@@ -2329,7 +2364,7 @@ void Exec6502Instruction()
+@@ -2329,7 +2435,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: RRA zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					RORInstrHandler(ZeroPageAddress);
@@ -626,7 +723,15 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x78:
-@@ -2427,17 +2462,17 @@ void Exec6502Instruction()
+@@ -2348,6 +2454,7 @@ void Exec6502Instruction()
+ 					// PLY
+ 					YReg = Pop();
+ 					SetPSRZN(YReg);
++					fSyncStackFrames = true;
+ 				}
+ 				else {
+ 					// Undocumented instruction: NOP
+@@ -2427,17 +2534,17 @@ void Exec6502Instruction()
  			case 0x84:
  				// STY zp
  				AdvanceCyclesForMemWrite();
@@ -647,7 +752,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0x87:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2447,7 +2482,7 @@ void Exec6502Instruction()
+@@ -2447,7 +2554,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SAX zp
  					// This one does not seem to change the processor flags
  					AdvanceCyclesForMemWrite();
@@ -656,7 +761,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x88:
-@@ -2557,7 +2592,7 @@ void Exec6502Instruction()
+@@ -2557,7 +2664,7 @@ void Exec6502Instruction()
  				else {
  					// Undocumented instruction: SAX zp,Y
  					AdvanceCyclesForMemWrite();
@@ -665,16 +770,15 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0x98:
-@@ -2572,7 +2607,7 @@ void Exec6502Instruction()
- 				break;
+@@ -2573,6 +2680,7 @@ void Exec6502Instruction()
  			case 0x9a:
  				// TXS
--				StackReg = XReg;
-+				StackPointer = XReg;
+ 				StackReg = XReg;
++				fSyncStackFrames = true;
  				break;
  			case 0x9b:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2646,15 +2681,15 @@ void Exec6502Instruction()
+@@ -2646,15 +2754,15 @@ void Exec6502Instruction()
  				break;
  			case 0xa4:
  				// LDY zp
@@ -693,7 +797,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0xa7:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2663,7 +2698,7 @@ void Exec6502Instruction()
+@@ -2663,7 +2771,7 @@ void Exec6502Instruction()
  				else {
  					// Undocumented instruction: LAX zp
  					int ZeroPageAddress = ReadPaged(ProgramCounter++);
@@ -702,28 +806,7 @@ index 52f9049..68b33ff 100644
  					XReg = Accumulator;
  				}
  				break;
-@@ -2773,7 +2808,7 @@ void Exec6502Instruction()
- 				break;
- 			case 0xba:
- 				// TSX
--				XReg = StackReg;
-+				XReg = StackPointer;
- 				SetPSRZN(XReg);
- 				break;
- 			case 0xbb:
-@@ -2782,9 +2817,9 @@ void Exec6502Instruction()
- 				}
- 				else {
- 					// Undocumented instruction: LAS abs,Y
--					LDAInstrHandler(StackReg & AbsYAddrModeHandler_Data());
-+					LDAInstrHandler(StackPointer & AbsYAddrModeHandler_Data());
- 					XReg = Accumulator;
--					StackReg = Accumulator;
-+					StackPointer = Accumulator;
- 				}
- 				break;
- 			case 0xbc:
-@@ -2830,11 +2865,11 @@ void Exec6502Instruction()
+@@ -2830,11 +2938,11 @@ void Exec6502Instruction()
  				break;
  			case 0xc4:
  				// CPY zp
@@ -737,7 +820,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0xc6:
  				// DEC zp
-@@ -2848,7 +2883,7 @@ void Exec6502Instruction()
+@@ -2848,7 +2956,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: DCP zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					DECInstrHandler(ZeroPageAddress);
@@ -746,7 +829,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0xc8:
-@@ -2945,7 +2980,7 @@ void Exec6502Instruction()
+@@ -2945,7 +3053,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: DCP zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					DECInstrHandler(ZeroPageAddress);
@@ -755,7 +838,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0xd8:
-@@ -3027,11 +3062,11 @@ void Exec6502Instruction()
+@@ -3027,11 +3135,11 @@ void Exec6502Instruction()
  				break;
  			case 0xe4:
  				// CPX zp
@@ -769,7 +852,7 @@ index 52f9049..68b33ff 100644
  				break;
  			case 0xe6:
  				// INC zp
-@@ -3045,7 +3080,7 @@ void Exec6502Instruction()
+@@ -3045,7 +3153,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: ISC zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					INCInstrHandler(ZeroPageAddress);
@@ -778,7 +861,7 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0xe8:
-@@ -3136,7 +3171,7 @@ void Exec6502Instruction()
+@@ -3136,7 +3244,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: ISC zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					INCInstrHandler(ZeroPageAddress);
@@ -787,65 +870,118 @@ index 52f9049..68b33ff 100644
  				}
  				break;
  			case 0xf8:
-@@ -3213,6 +3248,10 @@ void Exec6502Instruction()
+@@ -3152,6 +3260,7 @@ void Exec6502Instruction()
+ 					// PLX
+ 					XReg = Pop();
+ 					SetPSRZN(XReg);
++					fSyncStackFrames = true;
+ 				}
+ 				else {
+ 					// Undocumented instruction: NOP
+@@ -3213,6 +3322,11 @@ void Exec6502Instruction()
  		Cycles += CyclesTable[CurrentInstruction] -
  		          CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
  
 +		PerfWriter_WriteInstruction(
-+			PrePC, ProgramCounter, (byte)CurrentInstruction, Cycles, StackPointer,
-+			PSR, LastReadWriteAddress, LastReadValue, LastWriteValue);
++			PrePC, ProgramCounter, (byte)CurrentInstruction, (byte)Cycles, 
++			Accumulator, XReg, YReg, PSR, StackReg,
++			LastReadWriteAddress, LastReadValue, LastWriteValue);
 +
  		PollVIAs(Cycles - ViaCycles);
  		PollHardware(Cycles);
  
-@@ -3224,6 +3263,7 @@ void Exec6502Instruction()
+@@ -3223,7 +3337,11 @@ void Exec6502Instruction()
+ 		{
  			// Int noticed 2 cycles before end of instruction - interrupt now
  			CyclesToInt = NO_TIMER_INT_DUE;
++			byte preStackReg = StackReg;
++			int returnAddress = ProgramCounter;
  			DoInterrupt();
-+			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackPointer);
++			//PushStackFrame(StackFrameType_IRQ, ProgramCounter, returnAddress, preStackReg);
++			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
-@@ -3234,6 +3274,7 @@ void Exec6502Instruction()
+@@ -3233,7 +3351,11 @@ void Exec6502Instruction()
+ 		if ((NMIStatus && !OldNMIStatus) || (NMIStatus & 1 << nmi_econet))
  		{
  			NMIStatus &= ~(1<<nmi_econet);
++			byte preStackReg = StackReg;
++			int returnAddress = ProgramCounter;
  			DoNMI();
-+			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackPointer);
++			//PushStackFrame(StackFrameType_NMI, ProgramCounter, returnAddress, preStackReg);
++			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
-@@ -3371,7 +3412,7 @@ void Save6502UEF(FILE *SUEF)
- 	UEFWrite8(Accumulator, SUEF);
- 	UEFWrite8(XReg, SUEF);
- 	UEFWrite8(YReg, SUEF);
--	UEFWrite8(StackReg, SUEF);
-+	UEFWrite8(StackPointer, SUEF);
- 	UEFWrite8(PSR, SUEF);
- 	UEFWrite32(TotalCycles, SUEF);
+@@ -3377,6 +3499,16 @@ void Save6502UEF(FILE *SUEF)
  	UEFWrite8(intStatus, SUEF);
-@@ -3386,7 +3427,7 @@ void Load6502UEF(FILE *SUEF)
- 	Accumulator = UEFRead8(SUEF);
- 	XReg = UEFRead8(SUEF);
- 	YReg = UEFRead8(SUEF);
--	StackReg = UEFRead8(SUEF);
-+	StackPointer = UEFRead8(SUEF);
- 	PSR = UEFRead8(SUEF);
- 	// TotalCycles = fget32(SUEF);
- 	UEFRead32(SUEF); // Unused, was: Dlong
+ 	UEFWrite8(NMIStatus, SUEF);
+ 	UEFWrite8(NMILock, SUEF);
++	SyncStackFrames();
++	UEFWrite8(StackFrameCount, SUEF);
++	for (int i = 0; i < StackFrameCount; i++) {
++		UEFWrite8(StackFrames[i].Type, SUEF);
++		UEFWrite8(StackFrames[i].StartAddressPage, SUEF);
++		UEFWrite16(StackFrames[i].StartAddress, SUEF);
++		UEFWrite8(StackFrames[i].ReturnAddressPage, SUEF);
++		UEFWrite16(StackFrames[i].ReturnAddress, SUEF);
++		UEFWrite8(StackFrames[i].StackReg, SUEF);
++	}
+ 	UEFWrite16(0, SUEF);
+ }
+ 
+@@ -3394,6 +3526,15 @@ void Load6502UEF(FILE *SUEF)
+ 	NMIStatus = UEFRead8(SUEF);
+ 	NMILock = UEFReadBool(SUEF);
+ 	// AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
++	StackFrameCount = UEFRead8(SUEF);
++    for (int i = 0; i < StackFrameCount; i++) {
++		StackFrames[i].Type = (StackFrameType)UEFRead8(SUEF);
++		StackFrames[i].StartAddressPage = (MemPageType)UEFRead8(SUEF);
++        StackFrames[i].StartAddress = UEFRead16(SUEF);
++		StackFrames[i].ReturnAddressPage = (MemPageType)UEFRead8(SUEF);
++        StackFrames[i].ReturnAddress = UEFRead16(SUEF);
++        StackFrames[i].StackReg = UEFRead8(SUEF);
++	}
+ }
+ 
+ void WriteInstructionCounts(const char *FileName)
 diff --git a/Src/6502core.h b/Src/6502core.h
-index 935ff6b..cff88bb 100644
+index 935ff6b..b097021 100644
 --- a/Src/6502core.h
 +++ b/Src/6502core.h
-@@ -61,6 +61,7 @@ constexpr int CPU_CYCLES_PER_SECOND = 2000000;
+@@ -99,4 +99,28 @@ void WriteInstructionCounts(const char *FileName);
+ int MillisecondsToCycles(int Time);
+ int MicrosecondsToCycles(int Time);
  
- extern int ProgramCounter;
- extern int PrePC;
-+extern unsigned char StackPointer;
- extern CycleCountT TotalCycles;
- extern bool NMILock;
- extern int DisplayCycles;
++enum StackFrameType
++{
++	StackFrameType_None = 0,
++	StackFrameType_JSR = 1,
++	StackFrameType_IRQ = 2,
++	StackFrameType_NMI = 3,
++	StackFrameType_BRK = 4
++};
++
++enum MemPageType;
++
++struct StackFrame
++{
++    StackFrameType Type;
++	int StartAddress;
++	int ReturnAddress;
++	unsigned char StackReg;
++	MemPageType StartAddressPage;
++	MemPageType ReturnAddressPage;
++};
++
++void GetStackFrames(const StackFrame** ppStackFrames, int* pStackFrameCount);
++void GetRegisters(int* pProgramCounter, unsigned char* pAccumulator, unsigned char* pXReg, unsigned char* pYReg, unsigned char* pPSR, unsigned char* pStackReg);
++
+ #endif
 diff --git a/Src/BeebEm.rc b/Src/BeebEm.rc
-index 630c025..7512c41 100644
+index 630c025..25af475 100644
 --- a/Src/BeebEm.rc
 +++ b/Src/BeebEm.rc
 @@ -111,6 +111,9 @@ BEGIN
@@ -858,31 +994,9 @@ index 630c025..7512c41 100644
          MENUITEM "E&xit",                       IDM_EXIT
      END
      POPUP "&Edit"
-@@ -904,18 +907,18 @@ END
- // TEXTINCLUDE
- //
- 
--1 TEXTINCLUDE
-+1 TEXTINCLUDE 
- BEGIN
-     "Resource.h\0"
- END
- 
--2 TEXTINCLUDE
-+2 TEXTINCLUDE 
- BEGIN
-     "#include ""afxres.h""\r\n"
-     "\0"
- END
- 
--3 TEXTINCLUDE
-+3 TEXTINCLUDE 
- BEGIN
-     "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
-     "#define _AFX_NO_OLE_RESOURCES\r\n"
 diff --git a/Src/BeebEm.user.props b/Src/BeebEm.user.props
 new file mode 100644
-index 0000000..029cfd3
+index 0000000..048ea52
 --- /dev/null
 +++ b/Src/BeebEm.user.props
 @@ -0,0 +1,18 @@
@@ -904,7 +1018,6 @@ index 0000000..029cfd3
 +    </BuildMacro>
 +  </ItemGroup>
 +</Project>
-\ No newline at end of file
 diff --git a/Src/BeebEm.vcxproj b/Src/BeebEm.vcxproj
 index f70cd26..4d5ac2b 100644
 --- a/Src/BeebEm.vcxproj
@@ -1059,7 +1172,7 @@ index 3598051..6dfee70 100644
    <ItemGroup>
      <Image Include="..\Help\bbcmicro.png">
 diff --git a/Src/BeebMem.cpp b/Src/BeebMem.cpp
-index a27e15f..61ca665 100644
+index a27e15f..279470f 100644
 --- a/Src/BeebMem.cpp
 +++ b/Src/BeebMem.cpp
 @@ -92,7 +92,7 @@ bool ShEn = false;   // Shadow RAM Enable
@@ -1071,8 +1184,168 @@ index a27e15f..61ca665 100644
  
  unsigned char Hidden[256];
  unsigned char Private[12288];
+@@ -290,6 +290,159 @@ const unsigned char *BeebMemPtrWithWrapMode7(int Address, int Length) {
+ 	return tmpBuf;
+ }
+ 
++/*----------------------------------------------------------------------------*/
++
++MemPageType BeebMemPage(int Address) {
++	if (MachineType == Model::B) {
++		if (Address >= 0x8000 && Address < 0xc000) {
++			if (PALRom[ROMSEL].Type == PALRomType::none) {
++				return (MemPageType)ROMSEL;
++			}
++			else {
++				return MemPage_Other;
++			}
++		}
++		else {
++			return MemPage_WholeRam;
++		}
++	}
++	else if (MachineType == Model::IntegraB) {
++		if (Address < 0x3000) return MemPage_WholeRam;
++		if (Address >= 0x8000 && Address < 0x8400 && Prvs8 && PrvEn) return MemPage_Private;
++		if (Address >= 0x8000 && Address < 0x9000 && Prvs4 && PrvEn) return MemPage_Private;
++		if (Address >= 0x9000 && Address < 0xb000 && Prvs1 && PrvEn) return MemPage_Private;
++		if (Address < 0x8000) {
++			if (ShEn) {
++				if (MemSel) {
++					return MemPage_WholeRam;
++				}
++				else {
++					return MemPage_ShadowRam;
++				}
++			}
++			else {
++				return MemPage_WholeRam;
++			}
++		}
++		if (Address >= 0x8000 && Address < 0xc000) {
++			if (PALRom[ROMSEL].Type == PALRomType::none) {
++				return (MemPageType)ROMSEL;
++			}
++			else {
++				return MemPage_Other;
++			}
++		}
++		if (Address < 0xfc00) return MemPage_WholeRam;
++		if (Address >= 0xff00) return MemPage_WholeRam;
++
++		if (Address == 0xfe3c)
++		{
++			switch (HidAdd)
++			{
++			case 0:
++			case 2:
++			case 4:
++			case 6:
++			case 7:
++			case 8:
++			case 9:
++			case 0xa:
++				return MemPage_Other; // CDP6818E clock
++			default:
++				return MemPage_Hidden;
++			}
++		}
++	}
++	else if (MachineType == Model::BPlus) {
++		if (Address < 0x3000) return MemPage_WholeRam;
++		if (Address < 0x8000 && Sh_Display && PrePC >= 0xc000 && PrePC < 0xe000) return MemPage_ShadowRam;
++		if (Address < 0x8000 && Sh_Display && MemSel && PrePC >= 0xa000 && PrePC < 0xb000) return MemPage_ShadowRam;
++		if (Address < 0x8000) return MemPage_WholeRam;
++		if (Address < 0xB000 && MemSel) return MemPage_Private;
++		if (Address >= 0x8000 && Address < 0xc000) {
++			if (PALRom[ROMSEL].Type == PALRomType::none) {
++				return (MemPageType)ROMSEL;
++			}
++			else {
++				return MemPage_Other;
++			}
++		}
++		if (Address < 0xfc00) return MemPage_WholeRam;
++		if (Address >= 0xff00) return MemPage_WholeRam;
++	}
++	else if (MachineType == Model::Master128 || MachineType == Model::MasterET) {
++		switch ((Address & 0xf000) >> 12) {
++		case 0:
++		case 1:
++		case 2:
++			return MemPage_WholeRam; // low memory - not paged.
++		case 3:
++		case 4:
++		case 5:
++		case 6:
++		case 7:
++			if (!Sh_CPUX && !Sh_CPUE) return MemPage_WholeRam;
++			if (Sh_CPUX) return MemPage_ShadowRam;
++			if (Sh_CPUE && !Sh_CPUX) {
++				if (PrePC >= 0xc000 && PrePC < 0xe000) {
++					return MemPage_ShadowRam;
++				}
++				else {
++					return MemPage_WholeRam;
++				}
++			}
++			break;
++		case 8:
++			if (PrivateRAMSelect) {
++				return MemPage_Private;
++			}
++			else {
++				if (PALRom[ROMSEL].Type == PALRomType::none) {
++					return (MemPageType)ROMSEL;
++				}
++				else {
++					return MemPage_Other;
++				}
++			}
++			break;
++		case 9:
++		case 0xa:
++		case 0xb:
++			if (PALRom[ROMSEL].Type == PALRomType::none) {
++				return (MemPageType)ROMSEL;
++			}
++			else {
++				return MemPage_Other;
++			}
++			break;
++		case 0xc:
++		case 0xd:
++			if (FSRAMSelect) {
++				return MemPage_FilingSystemRam;
++			}
++			else {
++				return MemPage_WholeRam;
++			}
++			break;
++		case 0xe:
++			return MemPage_WholeRam;
++		case 0xf:
++			if (Address < 0xfc00 || Address >= 0xff00) { 
++				return MemPage_WholeRam; 
++			}
++			if ((ACCCON & 0x40) && Address >= 0xfc00 && Address < 0xff00) {
++				return MemPage_WholeRam;
++			}
++			break;
++
++		default:
++			return MemPage_Other;
++		}
++	}
++
++	return MemPage_Other;
++} /* BeebMemPage */
++
+ /*----------------------------------------------------------------------------*/
+ unsigned char BeebReadMem(int Address) {
+ 	unsigned char Value = 0xff;
 diff --git a/Src/BeebMem.h b/Src/BeebMem.h
-index 6333326..0e9e2b6 100644
+index 6333326..43e2cba 100644
 --- a/Src/BeebMem.h
 +++ b/Src/BeebMem.h
 @@ -47,6 +47,8 @@ extern unsigned char WholeRam[65536];
@@ -1092,8 +1365,21 @@ index 6333326..0e9e2b6 100644
  
  enum RomFlags
  {
-@@ -94,7 +97,6 @@ extern char HardDrivePath[MAX_PATH]; // JGH
+@@ -92,9 +95,19 @@ extern char RomFile[MAX_PATH];
  
+ extern char HardDrivePath[MAX_PATH]; // JGH
+ 
++enum MemPageType {
++	MemPage_Rom = 0, // 0..15 depending on ROMSEL
++	MemPage_WholeRam = 16,
++	MemPage_ShadowRam = 17,
++	MemPage_Private = 18,
++	MemPage_FilingSystemRam = 19,
++	MemPage_Hidden = 20,
++	MemPage_Other = 21
++};
++
++MemPageType BeebMemPage(int Address);
  unsigned char BeebReadMem(int Address);
  void BeebWriteMem(int Address, unsigned char Value);
 -#define BEEBWRITEMEM_DIRECT(Address, Value) WholeRam[Address] = Value
@@ -1158,7 +1444,7 @@ index 7be5d1d..76405b2 100644
  	void CaptureBitmap(int SourceX,
  	                   int SourceY,
 diff --git a/Src/BeebWinIo.cpp b/Src/BeebWinIo.cpp
-index ee59192..68042c7 100644
+index ee59192..841f95f 100644
 --- a/Src/BeebWinIo.cpp
 +++ b/Src/BeebWinIo.cpp
 @@ -55,6 +55,7 @@ using std::max;
@@ -1213,7 +1499,7 @@ index ee59192..68042c7 100644
 +
 +	if (Dialog.Save())
 +	{
-+		// Add perf extension
++		// Add .perf extension
 +		if (!HasFileExt(FileName, ".perf"))
 +		{
 +			strcat(FileName, ".perf");
@@ -1294,7 +1580,7 @@ index 53fbd5e..283391c 100644
  const char* const CFG_HARD_DRIVE_PATH              = "HardDrivePath";
  const char* const CFG_EXPORT_PATH                  = "ExportPath";
 diff --git a/Src/Debug.cpp b/Src/Debug.cpp
-index 3ed3bad..d2c7780 100644
+index 3ed3bad..9575cd8 100644
 --- a/Src/Debug.cpp
 +++ b/Src/Debug.cpp
 @@ -108,7 +108,7 @@ static HWND hwndBP;
@@ -1306,42 +1592,6 @@ index 3ed3bad..d2c7780 100644
  static std::vector<Breakpoint> Breakpoints;
  static std::vector<Watch> Watches;
  
-@@ -1579,7 +1579,7 @@ bool DebugDisassembler(int addr,
-                        int XReg,
-                        int YReg,
-                        unsigned char PSR,
--                       unsigned char StackReg,
-+                       unsigned char stackReg,
-                        bool host)
- {
- 	// Update memory watches. Prevent emulator slowdown by limiting updates
-@@ -1750,7 +1750,7 @@ bool DebugDisassembler(int addr,
- 	else
- 	{
- 		int Length = DebugDisassembleInstructionWithCPUStatus(
--			addr, host, Accumulator, XReg, YReg, StackReg, PSR, str
-+			addr, host, Accumulator, XReg, YReg, stackReg, PSR, str
- 		);
- 
- 		if (!host)
-@@ -3390,7 +3390,7 @@ int DebugDisassembleInstructionWithCPUStatus(int addr,
-                                              int Accumulator,
-                                              int XReg,
-                                              int YReg,
--                                             unsigned char StackReg,
-+                                             unsigned char stackReg,
-                                              unsigned char PSR,
-                                              char *opstr)
- {
-@@ -3398,7 +3398,7 @@ int DebugDisassembleInstructionWithCPUStatus(int addr,
- 
- 	char* p = opstr + strlen(opstr);
- 
--	p += sprintf(p, "A=%02X X=%02X Y=%02X S=%02X ", Accumulator, XReg, YReg, StackReg);
-+	p += sprintf(p, "A=%02X X=%02X Y=%02X S=%02X ", Accumulator, XReg, YReg, stackReg);
- 
- 	*p++ = (PSR & FlagC) ? 'C' : '.';
- 	*p++ = (PSR & FlagZ) ? 'Z' : '.';
 diff --git a/Src/Debug.h b/Src/Debug.h
 index 9dae885..4d02094 100644
 --- a/Src/Debug.h
@@ -1364,7 +1614,7 @@ index 9dae885..4d02094 100644
  {
  	int start;
 diff --git a/Src/Hardware/Acorn1770/Acorn1770.vcxproj b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
-index 72c4469..922d5a0 100644
+index 72c4469..0eaf7a0 100644
 --- a/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 +++ b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 @@ -22,32 +22,32 @@
@@ -1379,14 +1629,14 @@ index 72c4469..922d5a0 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
@@ -1394,19 +1644,19 @@ index 72c4469..922d5a0 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
 diff --git a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
-index a880b0e..9b874cd 100644
+index a880b0e..2343504 100644
 --- a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 +++ b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 @@ -22,32 +22,32 @@
@@ -1421,14 +1671,14 @@ index a880b0e..9b874cd 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
@@ -1436,19 +1686,19 @@ index a880b0e..9b874cd 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
 diff --git a/Src/Hardware/Watford/Watford.vcxproj b/Src/Hardware/Watford/Watford.vcxproj
-index c0de679..2477913 100644
+index c0de679..1a19cf5 100644
 --- a/Src/Hardware/Watford/Watford.vcxproj
 +++ b/Src/Hardware/Watford/Watford.vcxproj
 @@ -22,32 +22,32 @@
@@ -1463,14 +1713,14 @@ index c0de679..2477913 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
@@ -1478,19 +1728,19 @@ index c0de679..2477913 100644
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
      <ConfigurationType>DynamicLibrary</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
 diff --git a/Src/InnoSetup/Installer.vcxproj b/Src/InnoSetup/Installer.vcxproj
-index c087f1f..28bfdf4 100644
+index c087f1f..def40d8 100644
 --- a/Src/InnoSetup/Installer.vcxproj
 +++ b/Src/InnoSetup/Installer.vcxproj
 @@ -21,32 +21,32 @@
@@ -1505,14 +1755,14 @@ index c087f1f..28bfdf4 100644
      <ConfigurationType>Application</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
      <ConfigurationType>Application</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140_xp</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
@@ -1520,23 +1770,23 @@ index c087f1f..28bfdf4 100644
      <ConfigurationType>Application</ConfigurationType>
      <UseDebugLibraries>true</UseDebugLibraries>
 -    <PlatformToolset>v140</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
      <ConfigurationType>Application</ConfigurationType>
      <UseDebugLibraries>false</UseDebugLibraries>
 -    <PlatformToolset>v140</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
++    <PlatformToolset>v142</PlatformToolset>
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..b7cf1e0
+index 0000000..64f4e4e
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,943 @@
+@@ -0,0 +1,1065 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2005  Mike Wyatt
@@ -1566,6 +1816,7 @@ index 0000000..b7cf1e0
 +#include <windows.h>
 +#include <process.h>
 +#include <assert.h>
++#include <algorithm>
 +
 +#include "6502core.h"
 +#include "BeebMem.h"
@@ -1616,7 +1867,7 @@ index 0000000..b7cf1e0
 +
 +inline static void FileWriteInt32(FILE* pFile, int32_t value)
 +{
-+    FileWrite(pFile, &value, sizeof(value));
++    FileWrite(pFile, &value, sizeof(value)); // assumes little endian host architecture
 +}
 +
 +//
@@ -1628,7 +1879,15 @@ index 0000000..b7cf1e0
 +    m_cpu(CPU::CPU6502),
 +    m_executionCount(0),
 +    m_lastOpcodeAddress(0),
-+    m_readWriteBuffers{ BufferSize, BufferSize },
++    m_programCounter(0),
++    m_accumulator(0),
++    m_XRegister(0),
++    m_YRegister(0),
++    m_statusRegister(0),
++    m_stackRegister(0),
++    m_stackFrames(nullptr),
++    m_stackFrameCount(0),
++    m_readWriteBuffers{BufferSize, BufferSize},
 +    m_readBuffer(&m_readWriteBuffers[0]),
 +    m_writeBuffer(&m_readWriteBuffers[1]),
 +    m_bReadBufferLocked(false),
@@ -1637,7 +1896,7 @@ index 0000000..b7cf1e0
 +    m_hShutdownEvent(NULL),
 +    m_hReadBufferReadyEvent(NULL),
 +    m_hReadBufferConsumedEvent(NULL),
-+    m_cs{ 0 }
++    m_cs{0}
 +{
 +}
 +
@@ -1664,7 +1923,7 @@ index 0000000..b7cf1e0
 +	}
 +}
 +
-+void PerfWriter::InitEncodingTable()
++void PerfWriter::InitOpcodeTraitsTable()
 +{
 +    static const byte sizeTable6502[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
@@ -1708,11 +1967,11 @@ index 0000000..b7cf1e0
 +
 +    static const byte memoryAccessTable6502[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-+        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 0 none
++        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 0 
 +        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 1 memory read
 +        0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // 2 memory write
-+        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 3 memory read & write
-+        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 4 
++        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 3 memory read and write
++        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 4
 +        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 5 
 +        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 6
 +        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 7
@@ -1728,11 +1987,11 @@ index 0000000..b7cf1e0
 +
 +    static const byte memoryAccessTable65C02[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-+        0,1,0,0,3,1,3,3,0,0,0,0,3,1,3,0, // 0 none
++        0,1,0,0,3,1,3,3,0,0,0,0,3,1,3,0, // 0 
 +        0,1,1,0,3,1,3,3,0,1,0,0,3,1,3,0, // 1 memory read
 +        0,1,0,0,1,1,3,3,0,0,0,0,1,1,3,0, // 2 memory write
-+        0,1,1,0,1,1,3,3,0,1,0,0,1,1,3,0, // 3 memory read & write
-+        0,1,0,0,0,1,3,3,0,0,0,0,0,1,3,0, // 4 
++        0,1,1,0,1,1,3,3,0,1,0,0,1,1,3,0, // 3 memory read and write
++        0,1,0,0,0,1,3,3,0,0,0,0,0,1,3,0, // 4
 +        0,1,1,0,0,1,3,3,0,1,0,0,0,1,3,0, // 5 
 +        0,1,0,0,2,1,3,3,0,0,0,0,0,1,3,0, // 6
 +        0,1,1,0,2,1,3,3,0,1,0,0,0,1,3,0, // 7
@@ -1786,15 +2045,57 @@ index 0000000..b7cf1e0
 +        0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0  // f
 +    };
 +
++    static const byte loadOrStoreTable6502[] = {
++     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
++        0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
++        0,4,0,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
++        3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
++        0,1,0,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
++    };
++
++    static const byte loadOrStoreTable65C02[] = {
++     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
++        0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
++        0,4,4,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
++        3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
++        0,1,1,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
++    };
++
 +    const byte* sizeTable;
 +    const byte* memoryAccessTable;
 +    const byte* addressModeTable;
++    const byte* loadOrStoreTable;
 +
 +    if (m_cpu == CPU::CPU6502)
 +    {
 +        sizeTable = sizeTable6502;
 +        memoryAccessTable = memoryAccessTable6502;
 +        addressModeTable = addressModeTable6502;
++        loadOrStoreTable = loadOrStoreTable6502;
 +    }
 +    else 
 +    {
@@ -1802,14 +2103,16 @@ index 0000000..b7cf1e0
 +        sizeTable = sizeTable65C02;
 +        memoryAccessTable = memoryAccessTable65C02;
 +        addressModeTable = addressModeTable65C02;
++        loadOrStoreTable = loadOrStoreTable65C02;
 +    }
 +
 +    for (int i = 0; i < 256; i++)
 +    {
 +        OpcodeTraits& opcodeTraits = m_opcodeTraitsTable[i];
-+        opcodeTraits.size = sizeTable[i];
-+        opcodeTraits.memoryAccess = memoryAccessTable[i];
-+        opcodeTraits.addressMode = addressModeTable[i];
++        opcodeTraits.Size = sizeTable[i];
++        opcodeTraits.MemoryAccess = memoryAccessTable[i];
++        opcodeTraits.LoadOrStore = loadOrStoreTable[i];
++        opcodeTraits.AddressingMode = addressModeTable[i];
 +    }
 +}
 +
@@ -1968,9 +2271,16 @@ index 0000000..b7cf1e0
 +    }
 +
 +    int snapshotSize =
-+        1 +                         // stack pointer
++        2 +                         // program counter
++        1 +                         // accumulator
++        1 +                         // X register
++        1 +                         // Y register
++        1 +                         // status register
++        1 +                         // stack register/pointer
 +        1 +                         // rom paging register
 +        1 +                         // access control register (ACCCON)
++        1 +                         // stack frame count
++        m_stackFrameCount * 8 +     // stack frames
 +        1 +                         // screen address
 +        (bHiddenRAM ? 1 : 0) +      // hidden ram address (IntegraB)
 +        1 +                         // video ULA control register
@@ -1987,12 +2297,30 @@ index 0000000..b7cf1e0
 +
 +    Buffer snapshotData(snapshotSize);
 +
-+    // stack pointer
-+    snapshotData.WriteByte(StackPointer);
++    // registers
++    snapshotData.WriteInt16((int16_t)m_programCounter);
++    snapshotData.WriteByte(m_accumulator);
++    snapshotData.WriteByte(m_XRegister);
++    snapshotData.WriteByte(m_YRegister);
++    snapshotData.WriteByte(m_statusRegister);
++    snapshotData.WriteByte(m_stackRegister);
 +
 +    // paging registers
 +    snapshotData.WriteByte(PagedRomReg);
 +    snapshotData.WriteByte(ACCCON);
++
++    // call stack
++    snapshotData.WriteByte((byte)m_stackFrameCount);
++    for (int i = 0; i < m_stackFrameCount; i++)
++    {
++        const StackFrame* stackFrame = &m_stackFrames[i];
++        snapshotData.WriteByte((byte)stackFrame->Type);
++        snapshotData.WriteByte((byte)stackFrame->StartAddressPage);
++        snapshotData.WriteInt16((int16_t)stackFrame->StartAddress);
++        snapshotData.WriteByte((byte)stackFrame->ReturnAddressPage);
++        snapshotData.WriteInt16((int16_t)stackFrame->ReturnAddress);
++        snapshotData.WriteByte(stackFrame->StackReg);
++    }
 +
 +    // screen address (B5 & B4 of System-VIA Port B addressable latch)
 +    snapshotData.WriteByte((IC32State & 0x30) >> 4);
@@ -2084,7 +2412,7 @@ index 0000000..b7cf1e0
 +    const byte* outputData = buffer.Data();
 +
 +    // compress buffer
-+    if (compressed)
++    if (compressed) 
 +    {
 +        static byte compressedData[BufferSize];
 +
@@ -2096,7 +2424,7 @@ index 0000000..b7cf1e0
 +        deflateStream.opaque = Z_NULL;
 +        deflateStream.avail_in = (uInt)buffer.Size();
 +        deflateStream.next_in = (byte*)buffer.Data();
-+        deflateStream.avail_out = (uInt)std::min(buffer.Size() - 1, BufferSize);
++        deflateStream.avail_out = (uInt)BufferSize;
 +        deflateStream.next_out = compressedData;
 +
 +        if (deflateInit(&deflateStream, Z_DEFAULT_COMPRESSION) != Z_OK)
@@ -2139,7 +2467,7 @@ index 0000000..b7cf1e0
 +}
 +
 +void PerfWriter::WriteInterruptEvent(
-+    bool bNonMaskable, int postPC, int cycleCount, byte stackPointer)
++    bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg)
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
@@ -2161,8 +2489,8 @@ index 0000000..b7cf1e0
 +    m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +
 +    // write pushed return address
-+    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + stackPointer + 2]);
-+    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + stackPointer + 3]);
++    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + postStackReg + 2]);
++    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + postStackReg + 3]);
 +
 +    m_executionCount++;
 +}
@@ -2188,8 +2516,9 @@ index 0000000..b7cf1e0
 +}
 +
 +void PerfWriter::WriteInstruction(
-+    int prePC, int postPC, byte opcode, int cycleCount, byte stackPointer,
-+    byte programStatusRegister, int memoryAddress, byte memoryReadValue, byte memoryWriteValue)
++    int prePC, int postPC, byte opcode, byte cycleCount, 
++    byte postAccumulator, byte postXReg, byte postYReg, byte postPSR, byte postStackReg,
++    int memoryAddress, byte memoryReadValue, byte memoryWriteValue)
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
@@ -2202,7 +2531,7 @@ index 0000000..b7cf1e0
 +    // get opcode's traits
 +    const OpcodeTraits opcodeTraits = m_opcodeTraitsTable[opcode];
 +
-+    // write opcode address (prePC)
++    // write opcode address (prePC) in compressed form if possible
 +    int diff = prePC - m_lastOpcodeAddress;
 +    m_lastOpcodeAddress = prePC;
 +    if (abs(diff) <= 63)
@@ -2217,6 +2546,7 @@ index 0000000..b7cf1e0
 +        {
 +            m_writeBuffer->WriteByteUnchecked(0x80);
 +        }
++
 +        // big-endian encoding
 +        m_writeBuffer->WriteByteUnchecked((byte)(prePC >> 8));
 +        m_writeBuffer->WriteByteUnchecked((byte)prePC);
@@ -2227,80 +2557,120 @@ index 0000000..b7cf1e0
 +
 +    // write operand
 +    byte operand1 = 0;
-+    if (opcodeTraits.size > 1)
++    if (opcodeTraits.Size > 1)
 +    {
 +        operand1 = BeebReadMem(prePC + 1);
 +        m_writeBuffer->WriteByteUnchecked(operand1);
 +    }
 +
 +    byte operand2 = 0;
-+    if (opcodeTraits.size > 2)
++    if (opcodeTraits.Size > 2)
 +    {
 +        operand2 = BeebReadMem(prePC + 2);
 +        m_writeBuffer->WriteByteUnchecked(operand2);
 +    }
 +
-+    // write cycle count
-+    assert(cycleCount <= 0xFF);
-+    m_writeBuffer->WriteByteUnchecked((byte)cycleCount);
-+
-+    // write stack pointer
-+    if (opcode == 0x9A/*TXS*/ ||
-+        opcode == 0xBA/*TSX*/ ||
-+        (opcode == 0x9B/*TAS*/ && m_cpu == CPU::CPU6502))
++    // calculate modified registers flags
++    byte modifiedRegisters = 0;
++    if (postAccumulator != m_accumulator)
 +    {
-+        m_writeBuffer->WriteByteUnchecked(stackPointer);
++        m_accumulator = postAccumulator;
++        modifiedRegisters |= ModifiedRegister::Accumulator;
 +    }
 +
-+    // write pushed/pulled stack value
-+    else if (
-+        opcode == 0x48/*PHA*/ ||
-+        (opcode == 0xDA/*PHX*/ && m_cpu == CPU::CPU65C12) ||
-+        (opcode == 0x5A/*PHY*/ && m_cpu == CPU::CPU65C12))
++    if (postXReg != m_XRegister)
 +    {
-+        m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + stackPointer + 1]);
++        m_XRegister = postXReg;
++        modifiedRegisters |= ModifiedRegister::XRegister;
 +    }
-+    else if (
-+        opcode == 0x68/*PLA*/ ||
-+        (opcode == 0xFA/*PLX*/ && m_cpu == CPU::CPU65C12) ||
-+        (opcode == 0x7A/*PLY*/ && m_cpu == CPU::CPU65C12))
++
++    if (postYReg != m_YRegister)
 +    {
-+        m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + stackPointer]);
++        m_YRegister = postYReg;
++        modifiedRegisters |= ModifiedRegister::YRegister;
++    }
++
++    if (postPSR != m_statusRegister)
++    {
++        m_statusRegister = postPSR;
++        modifiedRegisters |= ModifiedRegister::StatusRegister;
++    }
++
++    if (postStackReg != m_stackRegister)
++    {
++        m_stackRegister = postStackReg;
++        modifiedRegisters |= ModifiedRegister::StackPointer;
++    }
++
++    // write cycle count and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
++    assert(cycleCount <= 0x7);
++    m_writeBuffer->WriteByteUnchecked((byte)(cycleCount & 0x7) | modifiedRegisters);
++
++    // write modified registers values
++    if (modifiedRegisters & ModifiedRegister::Accumulator)
++    {
++        m_writeBuffer->WriteByteUnchecked(postAccumulator);
++    }
++
++    if (modifiedRegisters & ModifiedRegister::XRegister)
++    {
++        m_writeBuffer->WriteByteUnchecked(postXReg);
++    }
++
++    if (modifiedRegisters & ModifiedRegister::YRegister)
++    {
++        m_writeBuffer->WriteByteUnchecked(postYReg);
++    }
++
++    if (modifiedRegisters & ModifiedRegister::StatusRegister)
++    {
++        m_writeBuffer->WriteByteUnchecked(postPSR);
++    }
++
++    if (modifiedRegisters & ModifiedRegister::StackPointer)
++    {
++        m_writeBuffer->WriteByteUnchecked(postStackReg);
 +    }
 +
 +    // write destination address
-+    else if (
++    if (
 +        opcode == 0x60/*RTS*/ || 
 +        opcode == 0x40/*RTI*/ ||
 +        opcode == 0x00/*BRK*/ ||
 +        opcode == 0x6C/*JMP (abs)*/ || 
 +        (opcode == 0x7C/*JMP (abs,X)*/ && m_cpu == CPU::CPU65C12))
 +    {
++        // little endian encoding
 +        m_writeBuffer->WriteByteUnchecked((byte)postPC);
 +        m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +    }
 +    
 +    // write memory access address and read/write values
-+    else if (opcodeTraits.memoryAccess)
++    else if ((opcodeTraits.MemoryAccess & (MemoryAccess::Read | MemoryAccess::Write)) != 0)
 +    {
-+        if (opcodeTraits.addressMode == AddressMode::IndexedOrIndirect)
++        if (opcodeTraits.AddressingMode == AddressingMode::IndexedOrIndirect)  
 +        {
++            // little endian encoding
 +            m_writeBuffer->WriteByteUnchecked((byte)memoryAddress);
 +            m_writeBuffer->WriteByteUnchecked((byte)(memoryAddress >> 8));
 +        }
 +        else
 +        {
-+            assert(memoryAddress == (operand1 | (operand2 << 8)));
++            // for non-indexed/indirect addressing modes, the memory address can be obtained from the opcode
++            assert(memoryAddress == ((operand2 << 8) | operand1));
 +        }
 +
-+        if (opcodeTraits.memoryAccess & MemoryAccess::Read)
++        if (!opcodeTraits.LoadOrStore) // don't write memory values for load/store instructions, as these can be obtained from the registers
 +        {
-+            m_writeBuffer->WriteByteUnchecked(memoryReadValue);
-+        }
++            if ((opcodeTraits.MemoryAccess & MemoryAccess::Read) != 0)
++            {
++                m_writeBuffer->WriteByteUnchecked(memoryReadValue);
++            }
 +
-+        if (opcodeTraits.memoryAccess & MemoryAccess::Write)
-+        {
-+            m_writeBuffer->WriteByteUnchecked(memoryWriteValue);
++            if ((opcodeTraits.MemoryAccess & MemoryAccess::Write) != 0)
++            {
++                m_writeBuffer->WriteByteUnchecked(memoryWriteValue);
++            }
 +        }
 +    }
 +
@@ -2319,7 +2689,9 @@ index 0000000..b7cf1e0
 +    m_lastOpcodeAddress = 0;
 +
 +    SetCPU();
-+    InitEncodingTable();
++    InitOpcodeTraitsTable();
++    GetRegisters(&m_programCounter, &m_accumulator, &m_XRegister, &m_YRegister, &m_statusRegister, &m_stackRegister);
++    GetStackFrames(&m_stackFrames, &m_stackFrameCount);
 +
 +    try
 +    {
@@ -2482,10 +2854,10 @@ index 0000000..b7cf1e0
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..7cfc012
+index 0000000..4adc1ab
 --- /dev/null
 +++ b/Src/PerfWriter.h
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,358 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2005  Mike Wyatt
@@ -2529,10 +2901,11 @@ index 0000000..7cfc012
 +	bool Close();
 +	void WriteBeginDisplayEvent(byte displayField);
 +	void WriteInterruptEvent(
-+		bool bNonMaskable, int postPC, int cycleCount, byte stackPointer);
++		bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg);
 +	void WriteInstruction(
-+		int prePC, int postPC, byte opcode, int cycleCount, byte stackRegister, 
-+		byte programStatusRegister, int memoryAddress, byte memoryReadValue, byte memoryWriteValue);
++		int prePC, int postPC, byte opcode, byte cycleCount, 
++		byte postAccumulator, byte postXReg, byte postYReg, byte postPSR, byte postStackReg,
++		int memoryAddress, byte memoryReadValue, byte memoryWriteValue);
 +	const char* FileName() const;
 +	const char* ErrorString() const;
 +
@@ -2540,7 +2913,7 @@ index 0000000..7cfc012
 +	struct Buffer;
 +
 +	void SetCPU();
-+	void InitEncodingTable();
++	void InitOpcodeTraitsTable();
 +	void CreateResources();
 +	void DestroyResources();
 +	void WriteHeaderChunk();
@@ -2557,7 +2930,7 @@ index 0000000..7cfc012
 +		Error();
 +		Error(const Error&) = delete;
 +		Error& operator=(const Error&) = delete;
-+		void Set(Error& other);
++		void Set(const Error& other);
 +		void Set(const char* psError);
 +		void Clear();
 +		explicit operator bool() const;
@@ -2577,7 +2950,7 @@ index 0000000..7cfc012
 +		~Buffer();
 +		void Write(const void* data, int size);
 +		void WriteByte(byte value);
-+		void WriteInt16(int16_t value);
++        void WriteInt16(int16_t value);
 +		void WriteInt32(int32_t value);
 +		void WriteByteUnchecked(byte value);
 +		void Clear();
@@ -2595,6 +2968,14 @@ index 0000000..7cfc012
 +	std::string m_sFileName;
 +	int m_executionCount;
 +	int m_lastOpcodeAddress;
++    int m_programCounter;
++	byte m_accumulator;
++	byte m_XRegister;
++	byte m_YRegister;	
++	byte m_statusRegister;
++	byte m_stackRegister;
++	const StackFrame* m_stackFrames;
++	int m_stackFrameCount;
 +
 +	Error m_error;
 +	Error m_threadError;
@@ -2613,30 +2994,48 @@ index 0000000..7cfc012
 +
 +	bool m_bReadBufferLocked;
 +
-+	enum MemoryAccess
++	enum ModifiedRegister
 +	{
-+		None = 0x0,
-+		Read = 0x1,
-+		Write = 0x2,
-+		ReadWrite = 0x03
++		// cycle count held in bits 0..3
++		Accumulator = 0x08,
++		XRegister = 0x10,
++		YRegister = 0x20,
++		StatusRegister = 0x40,
++		StackPointer = 0x80
++    };
++
++	enum AddressingMode
++	{
++		IndexedOrIndirect = 1
 +	};
 +
-+	enum AddressMode
++	enum MemoryAccess
 +	{
-+		Simple = 0x0,
-+		IndexedOrIndirect = 0x1
++		Read = 1,
++		Write = 2,
++	};
++
++	enum LoadOrStore
++	{
++		LDA = 1,
++        LDX = 2,
++        LDY = 3,
++		STA	= 4,
++		STX = 5,
++        STY = 6
 +	};
 +
 +	struct OpcodeTraits
 +	{
-+		byte size : 2;
-+		byte memoryAccess : 2;
-+		byte addressMode : 1;
++        byte Size : 2; // 1, 2 or 3 bytes (including opcode)
++        byte AddressingMode : 1; // AddressingMode
++		byte MemoryAccess : 2; // MemoryAccess
++        byte LoadOrStore : 3; // LoadOrStore
 +	};
 +
 +	OpcodeTraits m_opcodeTraitsTable[256];
 +
-+	const static int MaxInstructionSize = 12;
++	const static int MaxInstructionSize = 16;
 +	const static int BufferSize = 0x80000; // 512K
 +
 +	static unsigned int __stdcall ThreadFunc(void* pParameter);
@@ -2666,29 +3065,31 @@ index 0000000..7cfc012
 +	}
 +}
 +
-+inline void PerfWriter_WriteInterruptEvent(bool bNonMaskable, int postPC, int cycleCount, byte stackPointer)
++inline void PerfWriter_WriteInterruptEvent(bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg)
 +{
 +	if (perfWriter != nullptr)
 +	{
-+		perfWriter->WriteInterruptEvent(bNonMaskable, postPC, cycleCount, stackPointer);
++		perfWriter->WriteInterruptEvent(bNonMaskable, postPC, cycleCount, postStackReg);
 +	}
 +}
 +
 +inline void PerfWriter_WriteInstruction(
-+	int prePC, int postPC, byte opcode, int cycleCount, byte stackRegister, 
-+	byte programStatusRegister,	int memoryAddress, byte memoryReadValue, byte memoryWriteValue)
++	int prePC, int postPC, byte opcode, byte cycleCount, 
++	byte postAccumulator, byte postXReg, byte postYReg, byte postPSR, byte postStackReg,
++	int memoryAddress, byte memoryReadValue, byte memoryWriteValue)
 +{
 +	if (perfWriter != nullptr)
 +	{
 +		perfWriter->WriteInstruction(
-+			prePC, postPC, opcode, cycleCount, stackRegister,
-+			programStatusRegister, memoryAddress, memoryReadValue, memoryWriteValue);
++			prePC, postPC, opcode, cycleCount,
++			postAccumulator, postXReg, postYReg, postPSR, postStackReg,
++			memoryAddress, memoryReadValue, memoryWriteValue);
 +	}
 +}
 +
 +inline PerfWriter::Buffer::Buffer(int capacity) :
-+	m_size(0),
-+	m_capacity(capacity)
++	m_capacity(capacity),
++	m_size(0)
 +{
 +	m_data = new byte[capacity];
 +}
@@ -2724,7 +3125,8 @@ index 0000000..7cfc012
 +
 +inline void PerfWriter::Buffer::WriteInt16(int16_t value)
 +{
-+	if (m_size + 2 > m_capacity)
++	// assumes little endian host architecture
++	if (m_size + 2 > m_capacity) 
 +	{
 +		throw std::exception("buffer full!");
 +	}
@@ -2734,6 +3136,7 @@ index 0000000..7cfc012
 +
 +inline void PerfWriter::Buffer::WriteInt32(int32_t value)
 +{
++	// assumes little endian host architecture
 +	if (m_size + 4 > m_capacity)
 +	{
 +		throw std::exception("buffer full!");
@@ -2762,7 +3165,7 @@ index 0000000..7cfc012
 +{
 +}
 +
-+inline void PerfWriter::Error::Set(Error& other)
++inline void PerfWriter::Error::Set(const Error& other)
 +{
 +	if (!m_bError)
 +	{
@@ -2773,6 +3176,11 @@ index 0000000..7cfc012
 +
 +inline void PerfWriter::Error::Set(const char* psError)
 +{
++	if (psError == nullptr)
++	{
++		throw std::exception("psError == nullptr");
++	}
++
 +	if (!m_bError)
 +	{
 +		m_bError = (psError[0] != '\0');
@@ -2959,8 +3367,21 @@ index b893fa5..d6d046d 100644
  #define _APS_NEXT_CONTROL_VALUE         1145
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
+diff --git a/Src/UefState.cpp b/Src/UefState.cpp
+index e271e44..4c3201b 100644
+--- a/Src/UefState.cpp
++++ b/Src/UefState.cpp
+@@ -47,7 +47,7 @@ Boston, MA  02110-1301, USA.
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-const unsigned char UEFSTATE_VERSION = 15;
++const unsigned char UEFSTATE_VERSION = 16;
+ 
+ /*-------------------------------------------------------------------------*/
+ 
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index 3e84b2d..318408e 100644
+index 3e84b2d..6e4eadd 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -2971,11 +3392,7 @@ index 3e84b2d..318408e 100644
  #include "Sound.h"
  #include "SysVia.h"
  #include "UefState.h"
-@@ -662,10 +663,10 @@ static void VideoStartOfFrame()
-     VideoState.IsNewTVFrame = false;
- 
-     FrameNum = mainWin->StartOfFrame();
--
+@@ -666,6 +667,7 @@ static void VideoStartOfFrame()
      CursorFieldCount--;
      Mode7FlashTrigger--;
      VideoState.InterlaceFrame = !VideoState.InterlaceFrame;
@@ -2983,38 +3400,3 @@ index 3e84b2d..318408e 100644
    }
  
    // Cursor update for blink. I thought I'd put it here, as this is where the mode 7 flash field thingy is too
-diff --git a/Src/ZipFile/ZipFile.vcxproj b/Src/ZipFile/ZipFile.vcxproj
-index c035963..478e557 100644
---- a/Src/ZipFile/ZipFile.vcxproj
-+++ b/Src/ZipFile/ZipFile.vcxproj
-@@ -29,26 +29,26 @@
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-     <ConfigurationType>Application</ConfigurationType>
-     <UseDebugLibraries>true</UseDebugLibraries>
--    <PlatformToolset>v142</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
-     <CharacterSet>Unicode</CharacterSet>
-   </PropertyGroup>
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-     <ConfigurationType>Application</ConfigurationType>
-     <UseDebugLibraries>false</UseDebugLibraries>
--    <PlatformToolset>v142</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
-     <WholeProgramOptimization>true</WholeProgramOptimization>
-     <CharacterSet>Unicode</CharacterSet>
-   </PropertyGroup>
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-     <ConfigurationType>Application</ConfigurationType>
-     <UseDebugLibraries>true</UseDebugLibraries>
--    <PlatformToolset>v142</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
-     <CharacterSet>Unicode</CharacterSet>
-   </PropertyGroup>
-   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-     <ConfigurationType>Application</ConfigurationType>
-     <UseDebugLibraries>false</UseDebugLibraries>
--    <PlatformToolset>v142</PlatformToolset>
-+    <PlatformToolset>v143</PlatformToolset>
-     <WholeProgramOptimization>true</WholeProgramOptimization>
-     <CharacterSet>Unicode</CharacterSet>
-   </PropertyGroup>
