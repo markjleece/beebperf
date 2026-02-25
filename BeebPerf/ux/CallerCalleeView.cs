@@ -296,7 +296,7 @@ namespace BeebPerf.ux
         {
             var routine = routineCell.Routine;
             if (routine.Label.Length > 0)
-                return $"{routine.Label} ({routine.StartAddress})";
+                return $"{routine.StartAddress} {routine.Label}";
             else
                 return routine.StartAddress.ToString();
         }

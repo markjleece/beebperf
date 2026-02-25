@@ -137,10 +137,8 @@ namespace BeebPerf.ux
                 LabelSegment = new() { Type = Setting.Label, Value = "loop" },
                 InstructionSegments = [
                     new() { Type = Setting.Mnemonic, Value = "LDA" },
-                    new() { Type = Setting.Label, Value = "gameObject" },
-                    new() { Type = Setting.Punctuation, Value = "(" },
                     new() { Type = Setting.Address, Value = 0x08A0 },
-                    new() { Type = Setting.Punctuation, Value = "),X" },
+                    new() { Type = Setting.Label, Value = " gameObject" }
                 ]
             },
             new()
@@ -157,10 +155,8 @@ namespace BeebPerf.ux
                 AddressSegment = new Segment { Type = Setting.Address, Value = 0x2A73 },
                 InstructionSegments = [
                     new() { Type = Setting.Mnemonic, Value = "BEQ" },
-                    new() { Type = Setting.Label, Value = "func" },
-                    new() { Type = Setting.Punctuation, Value = "(" },
                     new() { Type = Setting.Address, Value = 0x21B2 },
-                    new() { Type = Setting.Punctuation, Value = ")" },
+                    new() { Type = Setting.Label, Value = " func" },
                 ]
             }
         ];

@@ -397,11 +397,7 @@ namespace BeebPerf.ux
                     {
                         string label = codeView.FormatLabel(operand, withOffset: true);
                         if (label.Length > 0)
-                        {
-                            segments.Insert(1, new Segment { Type = Setting.Label, Value = label });
-                            segments.Insert(2, new Segment { Type = Setting.Punctuation, Value = " (" });
-                            segments.Add(new Segment { Type = Setting.Punctuation, Value = ")" });
-                        }
+                            segments.Add(new Segment { Type = Setting.Label, Value = label.PadLeft(label.Length + 1) });
                     }
                 }
 

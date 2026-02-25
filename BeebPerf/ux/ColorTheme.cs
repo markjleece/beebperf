@@ -19,9 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using BeebPerf.model;
 using Microsoft.Win32;
-using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 
 namespace BeebPerf

@@ -111,12 +111,18 @@ namespace BeebPerf
                 var routine = CreateRoutine(stackFrame.StartAddress);
                 switch (stackFrame.CallType)
                 {
-                    case CallType.IRQ:
                     case CallType.BRK:
+                        routine.Label = "BRK";
+                        _MaskableISR = routine;
+                        break;
+
+                    case CallType.IRQ:
+                        routine.Label = "IRQ";
                         _MaskableISR = routine;
                         break;
 
                     case CallType.NMI:
+                        routine.Label = "NMI";
                         _NonMaskableISR = routine;
                         break;
                 }
@@ -942,7 +948,7 @@ namespace BeebPerf
 
                 foreach (var child in stackFrame.Children)
                 {
-                    if (child.Type != CallType.IRQ && child.Type != CallType.NMI || child.Type != CallType.BRK)
+                    if (child.Type == CallType.IRQ || child.Type == CallType.NMI || child.Type == CallType.BRK)
                         continue;
 
                     if (!calleeMetrics.ContainsKey(child))

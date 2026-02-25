@@ -67,7 +67,7 @@ namespace BeebPerf.ux
             SetState((AppStateFlags)0);
 
             if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
-                return; //OpenPerfFile(_RecentFilePathName);
+                OpenPerfFile(_RecentFilePathName);
         }
 
         private void openButton_Click(object sender, EventArgs e)
