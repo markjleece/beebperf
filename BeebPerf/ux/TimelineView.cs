@@ -120,7 +120,7 @@ namespace BeebPerf.ux
         {
             base.OnMouseDown(e);
 
-            if (e.Button != MouseButtons.Left)
+            if (_RecordingDuration == 0 || e.Button != MouseButtons.Left)
                 return;
 
             var mousePos = new Point(e.X, e.Y);
@@ -154,6 +154,9 @@ namespace BeebPerf.ux
             base.OnMouseMove(e);
 
             SetCursor(new Point(e.X, e.Y));
+
+            if (_RecordingDuration == 0)
+                return;
 
             switch (_DragMode)
             {
@@ -409,6 +412,12 @@ namespace BeebPerf.ux
 
         private void SetCursor(Point mousePos)
         {
+            if (_RecordingDuration == 0)
+            {
+                Cursor = Cursors.Default;
+                return;
+            }
+
             if (_DragMode != DragMode.None)
             {
                 Cursor = Cursors.SizeWE;

@@ -271,14 +271,14 @@ namespace BeebPerf
                     {
                         // event:
                         var eventType = (EventType)marker;
-                        if (eventType == EventType.MaskableInterruptEvent ||
-                            eventType == EventType.NonMaskableInterruptEvent)
+                        if (eventType == EventType.IRQ ||
+                            eventType == EventType.NMI)
                         {
                             // mark as interrupt
                             instruction.Type = eventType switch
                             {
-                                EventType.MaskableInterruptEvent => InstructionType.MaskableInterrupt,
-                                EventType.NonMaskableInterruptEvent => InstructionType.NonMaskableInterrupt,
+                                EventType.IRQ => InstructionType.IRQ,
+                                EventType.NMI => InstructionType.NMI,
                                 _ => throw new ArgumentOutOfRangeException()
                             };
 
@@ -356,16 +356,9 @@ namespace BeebPerf
                 if ((bits & (byte)ModifiedRegister.StackPointer) != 0) // new value of stack pointer
                     _StackPointer = ReadByte(dataStream);
 
-                // stack pointer
-                // TODO: replace with table lookup?
-                if (opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/ ||
-                    opcode == 0x08/*PHP*/ || opcode == 0x28/*PLP*/ ||
-                    opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/ ||
-                    opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/ ||
-                    opcode == 0x9A/*TXS*/ || opcode == 0x9B/*TAS*/)
-                {
+                // stack pointer (excluding BRK, JMP, RTI, RTS)
+                if (model.InstructionSet!.ModifiesStackPointer(opcode) && (opcode & 0x0F) != 0)
                     instruction.StackPointer = _StackPointer;
-                }
 
                 // stack value
                 if (opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/)
@@ -716,8 +709,8 @@ namespace BeebPerf
 
         private enum EventType
         {
-            MaskableInterruptEvent = 0,
-            NonMaskableInterruptEvent = 1,
+            IRQ = 0,
+            NMI = 1,
             BeginDisplayEvent = 2
         }
 

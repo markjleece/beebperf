@@ -66,24 +66,28 @@ namespace BeebPerf
 
         private void IdentifyRoutines()
         {
-            // we do this in two phases
-            // 1) identify an initial set of routines based on JSR instructions, interrupt vectors etc.
-            // 2) identify any additional routines based on branches and jumps that land in the middle of existing routines, splitting those routines as necessary
-
             RoutinesByAddress = new();
             _SortedRoutineAddresses = new();
 
+            // identify routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI, whilst collecting branches and jumps
+            var branchesAndJumps = IdentifyPrimaryRoutines();
+
+            // group branches and jumps by routine
+            var branchesAndJumpByRoutine = GroupBranchesAndJumps(branchesAndJumps);
+
+            // identify additional routines invoked by cross routine jumps and branches
+            IdentifySecondaryRoutines(branchesAndJumpByRoutine);
+        }
+
+        private HashSet<CanonicalAddressPair> IdentifyPrimaryRoutines()
+        {
             HashSet<CanonicalAddressPair> branchesAndJumps = new(1024);
 
-            // first prime a call stack with the initial call stack
-            Stack<MiniStackFrame> stackFrames = new();
-            foreach (var stackFrame in _InitialCallStack)
-            {
-                pushStackFrame(stackFrame, RoutineType.JSR);
-                //Debug.WriteLine($"Initial stack frame: {stackFrame}");
-            }
+            // we identify all the routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI by simulating
+            // the call stack where we create routines for pushed stack frames. We also create routines
+            // for any RTI or RTS which doesn't return to the caller
 
-            // next, iterate through instructions, tracking the stack frames to identify routine entry points, whilst collecting branches and jumps for phase 2
+            Stack<MiniStackFrame> stackFrames = new();
             byte stackPointer = _InitialStackPointer;
             bool fSyncStack = false;
 
@@ -100,77 +104,95 @@ namespace BeebPerf
                 }
             }
 
-            void pushStackFrame(MiniStackFrame stackFrame, RoutineType routineType)
+            void pushStackFrame(MiniStackFrame stackFrame)
             {
+                syncStackFrames();
                 stackFrames.Push(stackFrame);
-                CreateRoutine(stackFrame.StartAddress, routineType);
+                var routine = CreateRoutine(stackFrame.StartAddress);
+                switch (stackFrame.CallType)
+                {
+                    case CallType.IRQ:
+                    case CallType.BRK:
+                        _MaskableISR = routine;
+                        break;
+
+                    case CallType.NMI:
+                        _NonMaskableISR = routine;
+                        break;
+                }
             }
 
+            // first populate the call stack with the initial call stack
+            foreach (var stackFrame in _InitialCallStack)
+                pushStackFrame(stackFrame);
+
+            // next iterate over instructions simulating the call stack, whilst collecting branches and jumps
             foreach (var instruction in _Instructions)
             {
                 if (instruction.IsInstruction)
                 {
-                    switch (instruction.Opcode)
+                    byte opcode = instruction.Opcode;
+                    if (opcode == 0x20/*JSR*/)
                     {
-                        case 0x00/*BRK*/:
-                        case 0x20/*JSR*/:
-                            syncStackFrames();
-                            var routineType = instruction.Opcode == 0x20 ? RoutineType.JSR : RoutineType.BRK;
-                            var callTyle = instruction.Opcode == 0x20 ? CallType.JSR : CallType.BRK;
-                            pushStackFrame(new MiniStackFrame(callTyle, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer), routineType);
-                            stackPointer -= (byte)(instruction.Opcode == 0x20 ? 2/*JSR*/ : 3/*BRK*/);
-                            break;
-
-                        case 0x40/*RTI*/:
-                        case 0x60/*RTS*/:
-                            syncStackFrames();
-                            stackPointer += (byte)(instruction.Opcode == 0x60 ? 2/*RTS*/ : 3/*RTI*/);
-                            if (stackPointer < stackFrames.Peek().StackPointer)
-                                CreateRoutine(instruction.DestinationAddress, RoutineType.Pseudo);
-                            else
-                                stackFrames.Pop();
-                            break;
-
-                        case 0x48/*PHA*/:
-                        case 0x68/*PLA*/:
-                        case 0x08/*PHP*/:
-                        case 0x28/*PLP*/:
-                        case 0xDA/*PHX*/:
-                        case 0xFA/*PLX*/:
-                        case 0x5A/*PHY*/:
-                        case 0x7A/*PLY*/:
-                        case 0x9A/*TXS*/:
-                        case 0x9B/*TAS*/:
-                            stackPointer = instruction.StackPointer;
-                            fSyncStack = true;
-                            break;
-
-                        default:
-                            // collect branches and jumps for phase 2
-                            if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
-                            {
-                                CanonicalAddress destination = instruction.DestinationAddress;
-                                if ((instruction.Opcode & 0x0F) == 0) // is branch?
-                                {
-                                    int branchedAddress = unchecked(instruction.OpcodeAddress.Address + 2 + (sbyte)instruction.Operand);
-                                    destination = new CanonicalAddress((ushort)branchedAddress, instruction.OpcodeAddress.Page);
-                                }
-                                branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
-                            }
-                            break;
+                        pushStackFrame(new MiniStackFrame(CallType.JSR, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
+                        stackPointer -= 2;
+                    }
+                    else if (opcode == 0x00/*BRK*/)
+                    {
+                        pushStackFrame(new MiniStackFrame(CallType.BRK, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
+                        stackPointer -= 3;
+                    }
+                    else if (opcode == 0x40/*RTI*/)
+                    {
+                        syncStackFrames();
+                        stackPointer += 3;
+                        if (stackPointer < stackFrames.Peek().StackPointer)
+                            CreateRoutine(instruction.DestinationAddress);
+                        else
+                            stackFrames.Pop();
+                    }
+                    else if (opcode == 0x60/*RTS*/)
+                    {
+                        syncStackFrames();
+                        stackPointer += 2;
+                        if (stackPointer < stackFrames.Peek().StackPointer)
+                            CreateRoutine(instruction.DestinationAddress);
+                        else
+                            stackFrames.Pop();
+                    }
+                    else if (_InstructionSet!.ModifiesStackPointer(opcode))
+                    {
+                        stackPointer = instruction.StackPointer;
+                        fSyncStack = true;
+                    }
+                    else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
+                    {
+                        CanonicalAddress destination = instruction.DestinationAddress;
+                        if ((instruction.Opcode & 0x0F) == 0) // is branch?
+                        {
+                            int branchedAddress = unchecked(instruction.OpcodeAddress.Address + 2 + (sbyte)instruction.Operand);
+                            destination = new CanonicalAddress((ushort)branchedAddress, instruction.OpcodeAddress.Page);
+                        }
+                        branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
                     }
                 }
-                else if (instruction.IsNonMaskableInterrupt || instruction.IsMaskableInterrupt)
+                else if (instruction.IsNMI)
                 {
-                    var routineType = instruction.IsMaskableInterrupt ? RoutineType.IRQ : RoutineType.NMI;
-                    var callTyle = instruction.IsMaskableInterrupt? CallType.IRQ : CallType.NMI;
-                    syncStackFrames();
-                    pushStackFrame(new MiniStackFrame(callTyle, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer), routineType);
+                    pushStackFrame(new MiniStackFrame(CallType.IRQ, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
+                    stackPointer -= 3;
+                }
+                else if (instruction.IsIRQ)
+                {
+                    pushStackFrame(new MiniStackFrame(CallType.NMI, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
                     stackPointer -= 3;
                 }
             }
 
-            // group branches and jumps by routine
+            return branchesAndJumps;
+        }
+
+        private Dictionary<CanonicalAddress/*routine*/, HashSet<CanonicalAddressPair>> GroupBranchesAndJumps(HashSet<CanonicalAddressPair> branchesAndJumps)
+        { 
             Dictionary<CanonicalAddress/*routine*/, HashSet<CanonicalAddressPair>> branchesAndJumpsByRoutine = new();
 
             foreach (CanonicalAddressPair branchOrJump in branchesAndJumps)
@@ -191,6 +213,11 @@ namespace BeebPerf
                 routineBranchesAndJumps.Add(branchOrJump);
             }
 
+            return branchesAndJumpsByRoutine;
+        }
+
+        private void IdentifySecondaryRoutines(Dictionary<CanonicalAddress/*routine*/, HashSet<CanonicalAddressPair>> branchesAndJumpsByRoutine)
+        {
             // now we have an initial set of routines and a set of branches and jumps, so we can identify any additional
             // routines that are required to ensure all branch and jump destinations are routine entry points
             var allRoutines = RoutinesByAddress.Keys.ToList<CanonicalAddress>();
@@ -219,7 +246,7 @@ namespace BeebPerf
                     CanonicalAddress newRoutine = destinationAddress;
                     CanonicalAddress existingRoutine = destinationRoutine;
 
-                    CreateRoutine(newRoutine, RoutineType.Pseudo);
+                    CreateRoutine(newRoutine);
 
                     if (!branchesAndJumpsByRoutine.ContainsKey(existingRoutine))
                         continue; // the routine we are splitting does not contain any branches or jumps, so nothing more to do
@@ -249,43 +276,18 @@ namespace BeebPerf
             }
         }
 
-        private Routine CreateRoutine(CanonicalAddress address, RoutineType routineType)
+        private Routine CreateRoutine(CanonicalAddress address)
         {
             if (RoutinesByAddress.TryGetValue(address, out Routine? routine))
                 return routine;
 
             string label = _Labels.TryGetValue(address.Address, out var lbl) ? lbl : string.Empty;
-            routine = new Routine(address, routineType, label);
-
-            if (routineType == RoutineType.NMI)
-                _NonMaskableISR = routine;
-            else if (routineType == RoutineType.IRQ || routineType == RoutineType.BRK)
-                _MaskableISR = routine;
+            routine = new Routine(address, label);
 
             RoutinesByAddress.Add(address, routine);
             _SortedRoutineAddresses.Add(address);
 
             return routine;
-        }
-
-        private void DebugInstruction(int instructionIndex, Instruction instruction, model.StackFrame stackFrame)
-        {
-            string destinationAddress = string.Empty;
-            if (instruction.IsInstruction && (instruction.Opcode == 0x60/*RTS*/ || instruction.Opcode == 0x40/*RTI*/))
-                destinationAddress = instruction.DestinationAddress.ToString();
-
-            string returnAddress = string.Empty;
-            if (instruction.IsNonMaskableInterrupt)
-                returnAddress = instruction.ReturnAddress.ToString();
-
-            Debug.WriteLine(
-                "".PadLeft(stackFrame.FullDepth * 2, ' ') +
-                $"instruction index: {instructionIndex}, " +
-                $"instruction: {instruction.ToString(_InstructionSet!)}, " +
-                $"destinationAddress: {destinationAddress}, " +
-                $"returnAddress: {returnAddress}, " +
-                $"stackFrame: {stackFrame.Routine.StartAddress}{stackFrame.Routine.Label}, " +
-                $"stackFrame type: {stackFrame.Type}");
         }
 
         public void IdentifyStackFrames()
@@ -295,7 +297,7 @@ namespace BeebPerf
             foreach (var stackFrame in _InitialCallStack)
             {
                 currentStackFrame = CreateStackFrame(
-                    CallType.JSR, // TODO: could be an ISR here (need to serialize this!)
+                    stackFrame.CallType,
                     RoutinesByAddress[stackFrame.StartAddress],
                     stackFrame.ReturnAddress,
                     stackFrame.StackPointer,
@@ -319,7 +321,6 @@ namespace BeebPerf
                     currentStackFrame.EndCycleCount = postCycleCount;
                     if (stackPointer < currentStackFrame.StackPointer)
                         break;
-                    //Debug.WriteLine($"SYNC:{currentStackFrame}");
                     currentStackFrame = currentStackFrame.Parent;
                 }
             }
@@ -376,16 +377,15 @@ namespace BeebPerf
                         syncStackFrames(postCycleCount);
                         currentStackFrame = CreateStackFrame(
                             CallType.TailCall,
-                            RoutinesByAddress[instruction.DestinationAddress], 
+                            RoutinesByAddress[instruction.DestinationAddress],
                             currentStackFrame.ReturnAddress,
-                            currentStackFrame.StackPointer, 
-                            postCycleCount, 
+                            currentStackFrame.StackPointer,
+                            postCycleCount,
                             parent: currentStackFrame);
                     }
                     else if (instruction.Opcode == 0x60/*RTS*/ || instruction.Opcode == 0x40/*RTI*/)
                     {
                         syncStackFrames(postCycleCount);
-
                         stackPointer += (byte)(instruction.Opcode == 0x60 ? 2/*RTS*/ : 3/*RTI*/);
 
                         // unwind any fall-through and tail calls
@@ -401,59 +401,33 @@ namespace BeebPerf
                         {
                             // create new stack frame for tail call
                             currentStackFrame = CreateStackFrame(
-                                CallType.TailCall, 
-                                RoutinesByAddress[instruction.DestinationAddress], 
+                                CallType.TailCall,
+                                RoutinesByAddress[instruction.DestinationAddress],
                                 currentStackFrame.ReturnAddress,
                                 currentStackFrame.StackPointer,
-                                postCycleCount, 
+                                postCycleCount,
                                 parent: currentStackFrame);
                         }
                         else
                         {
+                            // does RTS/RTI return to the caller? If not we need to insert a new parent stack frame
                             var destinationAddress = _SortedRoutineAddresses.Find(instruction.DestinationAddress);
                             if (!destinationAddress.Equals(currentStackFrame!.Parent!.Routine.StartAddress))
-                            {
-                                // not returning directly to caller, so create and insert new stack frame for landing tail call
-                                //Debug.WriteLine($"RTNI:{currentStackFrame}");
-                                var newParentStackFrame = CreateStackFrame(
+                                currentStackFrame = InsertParentStackFrame(
+                                    currentStackFrame,
                                     CallType.TailCall,
-                                    RoutinesByAddress[destinationAddress],
-                                    currentStackFrame.ReturnAddress,
-                                    currentStackFrame.StackPointer,
-                                    currentStackFrame.StartCycleCount,
-                                    parent: currentStackFrame!.Parent);
-                                currentStackFrame.Parent.Children.Remove(currentStackFrame);
-                                newParentStackFrame.Children.Add(currentStackFrame);
-                                currentStackFrame.Parent = newParentStackFrame;
-                                currentStackFrame = newParentStackFrame;
-                            }
+                                    RoutinesByAddress[destinationAddress]);
                             else
-                            {
-                                //Debug.WriteLine($"RTND:{currentStackFrame}");
-                                currentStackFrame = currentStackFrame.Parent;
-                            }
+                                currentStackFrame = currentStackFrame.Parent; // upwind
                         }
                     }
-                    else switch (instruction.Opcode)
+                    else if (_InstructionSet!.ModifiesStackPointer(instruction.Opcode) && !isLastInstruction)
                     {
-                        case 0x48/*PHA*/:
-                        case 0x68/*PLA*/:
-                        case 0x08/*PHP*/:
-                        case 0x28/*PLP*/:
-                        case 0xDA/*PHX*/:
-                        case 0xFA/*PLX*/:
-                        case 0x5A/*PHY*/:
-                        case 0x7A/*PLY*/:
-                        case 0x9A/*TXS*/:
-                        case 0x9B/*TAS*/:
-                            stackPointer = instruction.StackPointer;
-                            fSyncStack = true;
-                            break;
-                        default:
-                            break;
+                        stackPointer = instruction.StackPointer;
+                        fSyncStack = true;
                     }
                 }
-                else if ((instruction.IsMaskableInterrupt || instruction.IsNonMaskableInterrupt) && !isLastInstruction)
+                else if ((instruction.IsNMI || instruction.IsIRQ) && !isLastInstruction)
                 {
                     // update instruction indices to include interrupt
                     if (currentStackFrame!.FirstInstructionIndex < 0)
@@ -524,6 +498,23 @@ namespace BeebPerf
             };
             //Debug.WriteLine($"{prefix}:{stackFrame}");
             return stackFrame;
+        }
+
+        private model.StackFrame InsertParentStackFrame(model.StackFrame currentStackFrame, CallType callType, Routine routine)
+        {
+            var newParentStackFrame = CreateStackFrame(
+                callType,
+                routine,
+                currentStackFrame.ReturnAddress,
+                currentStackFrame.StackPointer,
+                currentStackFrame.StartCycleCount,
+                parent: currentStackFrame.Parent);
+
+            currentStackFrame.Parent!.Children.Remove(currentStackFrame);
+            newParentStackFrame.Children.Add(currentStackFrame);
+            currentStackFrame.Parent = newParentStackFrame;
+            
+            return newParentStackFrame;
         }
 
         //
@@ -682,7 +673,7 @@ namespace BeebPerf
             if (treeNodesByStack.TryGetValue(callStack, out CallTreeNode? treeNode))
                 return treeNode;
 
-            if (callStack.Routine.RoutineType is RoutineType.NMI or RoutineType.IRQ)
+            if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
                 return null;
 
             var newTreeNode = new CallTreeNode(callStack);
@@ -743,8 +734,7 @@ namespace BeebPerf
             if (treeNodesByStack.TryGetValue(callStack, out var treeNode))
                 return treeNode;
 
-            if (callStack.Parent is null ||
-                callStack.Routine.RoutineType is RoutineType.NMI or RoutineType.IRQ)
+            if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
                 return null;
 
             var newTreeNode = new CallTreeNode(callStack);
@@ -836,10 +826,10 @@ namespace BeebPerf
             {
                 if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
                 {
-                    if (childStackFrame.Type == CallType.JSR ||
-                        childStackFrame.Type == CallType.TailCall)
+                    if (previousInstructionIndex > -1 &&
+                        (childStackFrame.Type == CallType.JSR ||
+                         childStackFrame.Type == CallType.TailCall))
                     {
-                        // we need to get the cycle instructionCount
                         var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
                         if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
                         {

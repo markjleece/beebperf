@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..743e9c0 100644
+index 52f9049..b8d141f 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -384,7 +384,7 @@ index 52f9049..743e9c0 100644
  static void PollVIAs(unsigned int nCycles);
  static void PollHardware(unsigned int nCycles);
  
-@@ -249,6 +247,101 @@ static unsigned int InstructionCount[256];
+@@ -249,6 +247,105 @@ static unsigned int InstructionCount[256];
  
  /*----------------------------------------------------------------------------*/
  
@@ -427,44 +427,48 @@ index 52f9049..743e9c0 100644
 +// Call stack
 +
 +static StackFrame StackFrames[128];
-+static int StackFrameCount = 1;
-+static bool fSyncStackFrames = false;
++static int StackFrameCount;
++static bool fSyncStackFrames;
 +
-+inline static void UpdateProgramStartAddress()
++static void SetStackFrame(int index, StackFrameType type, int startAddress, int returnAddress, unsigned char returnStackReg)
 +{
-+	if (PrePC > 0x8000 && ProgramCounter < 0x8000 && !StackFrames[0].StartAddress)
-+	{
-+		StackFrames[0].StartAddressPage = BeebMemPage(ProgramCounter);
-+		StackFrames[0].StartAddress = ProgramCounter;
-+	}
-+}
-+
-+static void SyncStackFrames()
-+{
-+	if (!fSyncStackFrames) return;
-+	fSyncStackFrames = false;
-+	while (StackFrameCount > 1)
-+	{
-+		if (StackReg < StackFrames[StackFrameCount - 1].StackReg) break;
-+		StackFrameCount--;
-+	}
-+}
-+
-+inline static void PushStackFrame(StackFrameType type, int startAddress, int returnAddress, byte stackReg)
-+{
-+	SyncStackFrames();
-+    StackFrame* stackFrame = &StackFrames[StackFrameCount++];
++	StackFrame* stackFrame = &StackFrames[index];
 +	stackFrame->Type = type;
 +	stackFrame->StartAddressPage = BeebMemPage(startAddress);
 +	stackFrame->StartAddress = startAddress;
 +	stackFrame->ReturnAddressPage = BeebMemPage(returnAddress);
 +	stackFrame->ReturnAddress = returnAddress;
-+	stackFrame->StackReg = stackReg;
++	stackFrame->ReturnStackReg = returnStackReg;
++}
++
++static void SyncStackFrames(byte stackReg)
++{
++	if (!fSyncStackFrames) return;
++	fSyncStackFrames = false;
++	while (StackFrameCount > 1)
++	{
++		if (stackReg < StackFrames[StackFrameCount - 1].ReturnStackReg) break;
++		StackFrameCount--;
++	}
++}
++
++inline static void PushStackFrame(StackFrameType type, int startAddress, int returnAddress, byte returnStackReg)
++{
++	SyncStackFrames(returnStackReg);
++	SetStackFrame(StackFrameCount++, type, startAddress, returnAddress, returnStackReg);
++}
++
++inline static void UpdateRootStackFrame()
++{
++	if (PrePC > 0x8000 && ProgramCounter < 0x8000 && StackFrames[0].StartAddress >= 0x8000)
++	{
++		SetStackFrame(0, StackFrameType_None, ProgramCounter, PrePC, StackReg);
++	}
 +}
 +
 +void GetStackFrames(const StackFrame** ppStackFrames, int* pStackFrameCount)
 +{
-+	SyncStackFrames();
++	SyncStackFrames(StackReg);
 +	*pStackFrameCount = StackFrameCount;
 +	*ppStackFrames = StackFrames;
 +}
@@ -486,7 +490,7 @@ index 52f9049..743e9c0 100644
  // Correct cycle count for indirection across page boundary
  
  static INLINE void Carried()
-@@ -402,7 +495,7 @@ INLINE static void SetPSRCZN(int c, int z, int n)
+@@ -402,7 +499,7 @@ INLINE static void SetPSRCZN(int c, int z, int n)
  
  INLINE static void Push(unsigned char Value)
  {
@@ -495,22 +499,22 @@ index 52f9049..743e9c0 100644
  	StackReg--;
  }
  
-@@ -645,11 +738,14 @@ INLINE static void BPLInstrHandler()
+@@ -645,11 +742,14 @@ INLINE static void BPLInstrHandler()
  
  INLINE static void BRKInstrHandler()
  {
-+	byte preStackReg = StackReg;
++	byte returnStackReg = StackReg;
 +	int returnAddress = ProgramCounter + 1;
  	PushWord(ProgramCounter + 1);
  	PSR |= FlagB; // Set B before pushing
  	Push(PSR);
  	PSR |= FlagI; // Set I after pushing - see Birnbaum
  	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
-+	PushStackFrame(StackFrameType_BRK, ProgramCounter, returnAddress, preStackReg);
++	PushStackFrame(StackFrameType_BRK, ProgramCounter, returnAddress, returnStackReg);
  }
  
  INLINE static void BVCInstrHandler()
-@@ -773,6 +869,7 @@ INLINE static void INYInstrHandler()
+@@ -773,6 +873,7 @@ INLINE static void INYInstrHandler()
  
  INLINE static void JSRInstrHandler(int Address)
  {
@@ -518,7 +522,7 @@ index 52f9049..743e9c0 100644
  	PushWord(ProgramCounter - 1);
  	ProgramCounter = Address;
  }
-@@ -1119,7 +1216,7 @@ INLINE static int IndYAddrModeHandler_Address()
+@@ -1119,7 +1220,7 @@ INLINE static int IndYAddrModeHandler_Address()
  INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  {
  	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + XReg;
@@ -527,7 +531,7 @@ index 52f9049..743e9c0 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1287,7 +1384,7 @@ INLINE static int IndAddrXModeHandler_Address()
+@@ -1287,7 +1388,7 @@ INLINE static int IndAddrXModeHandler_Address()
  INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  {
  	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + YReg;
@@ -536,17 +540,18 @@ index 52f9049..743e9c0 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1343,6 +1440,9 @@ void Init6502Core()
+@@ -1343,6 +1444,10 @@ void Init6502Core()
  	intStatus = 0;
  	NMIStatus = 0;
  	NMILock = false;
 +
-+    memset(StackFrames, 0, sizeof(StackFrames));
-+	StackFrames[0].StackReg = 0xFF;
++	StackFrameCount = 1;
++	SetStackFrame(0, StackFrameType_None, ProgramCounter, 0, StackReg);
++	fSyncStackFrames = false;
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1590,7 +1690,7 @@ void Exec6502Instruction()
+@@ -1590,7 +1695,7 @@ void Exec6502Instruction()
  				break;
  			case 0x05:
  				// ORA zp
@@ -555,7 +560,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x06:
  				// ASL zp
-@@ -1604,7 +1704,7 @@ void Exec6502Instruction()
+@@ -1604,7 +1709,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SLO zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					ASLInstrHandler(ZeroPageAddress);
@@ -564,7 +569,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x08:
-@@ -1715,7 +1815,7 @@ void Exec6502Instruction()
+@@ -1715,7 +1820,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SLO zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					ASLInstrHandler(ZeroPageAddress);
@@ -573,7 +578,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x18:
-@@ -1796,11 +1896,11 @@ void Exec6502Instruction()
+@@ -1796,11 +1901,11 @@ void Exec6502Instruction()
  				break;
  			case 0x24:
  				// BIT zp
@@ -587,7 +592,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x26:
  				// ROL zp
-@@ -1814,13 +1914,14 @@ void Exec6502Instruction()
+@@ -1814,13 +1919,14 @@ void Exec6502Instruction()
  					// Undocumented instruction: RLA zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					ROLInstrHandler(ZeroPageAddress);
@@ -603,7 +608,7 @@ index 52f9049..743e9c0 100644
  
  					if ((oldPSR ^ PSR) & FlagI) {
  						if (PSR & FlagI) {
-@@ -1918,7 +2019,7 @@ void Exec6502Instruction()
+@@ -1918,7 +2024,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: RLA zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					ROLInstrHandler(ZeroPageAddress);
@@ -612,7 +617,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x38:
-@@ -1983,6 +2084,7 @@ void Exec6502Instruction()
+@@ -1983,6 +2089,7 @@ void Exec6502Instruction()
  				PSR = Pop();
  				ProgramCounter = PopWord();
  				NMILock = false;
@@ -620,7 +625,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x41:
  				// EOR (zp,X)
-@@ -2005,7 +2107,7 @@ void Exec6502Instruction()
+@@ -2005,7 +2112,7 @@ void Exec6502Instruction()
  				break;
  			case 0x45:
  				// EOR zp
@@ -629,7 +634,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x46:
  				// LSR zp
-@@ -2019,7 +2121,7 @@ void Exec6502Instruction()
+@@ -2019,7 +2126,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SRE zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					LSRInstrHandler(ZeroPageAddress);
@@ -638,15 +643,15 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x48:
-@@ -2047,6 +2149,7 @@ void Exec6502Instruction()
+@@ -2047,6 +2154,7 @@ void Exec6502Instruction()
  			case 0x4c:
  				// JMP abs
  				ProgramCounter = AbsAddrModeHandler_Address();
-+				UpdateProgramStartAddress();
++				UpdateRootStackFrame();
  				break;
  			case 0x4d:
  				// EOR abs
-@@ -2118,7 +2221,7 @@ void Exec6502Instruction()
+@@ -2118,7 +2226,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SRE zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					LSRInstrHandler(ZeroPageAddress);
@@ -655,7 +660,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x58:
-@@ -2184,6 +2287,7 @@ void Exec6502Instruction()
+@@ -2184,6 +2292,7 @@ void Exec6502Instruction()
  			case 0x60:
  				// RTS
  				ProgramCounter = PopWord() + 1;
@@ -663,7 +668,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x61:
  				// ADC (zp,X)
-@@ -2203,7 +2307,7 @@ void Exec6502Instruction()
+@@ -2203,7 +2312,7 @@ void Exec6502Instruction()
  			case 0x64:
  				if (CPUType == CPU::CPU65C12) {
  					// STZ zp
@@ -672,7 +677,7 @@ index 52f9049..743e9c0 100644
  				}
  				else {
  					// Undocumented instruction: NOP zp
-@@ -2212,7 +2316,7 @@ void Exec6502Instruction()
+@@ -2212,7 +2321,7 @@ void Exec6502Instruction()
  				break;
  			case 0x65:
  				// ADC zp
@@ -681,7 +686,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x66:
  				// ROR zp
-@@ -2226,13 +2330,14 @@ void Exec6502Instruction()
+@@ -2226,13 +2335,14 @@ void Exec6502Instruction()
  					// Undocumented instruction: RRA zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					RORInstrHandler(ZeroPageAddress);
@@ -697,15 +702,15 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x69:
  				// ADC imm
-@@ -2254,6 +2359,7 @@ void Exec6502Instruction()
+@@ -2254,6 +2364,7 @@ void Exec6502Instruction()
  			case 0x6c:
  				// JMP (abs)
  				ProgramCounter = IndAddrModeHandler_Address();
-+				UpdateProgramStartAddress();
++				UpdateRootStackFrame();
  				break;
  			case 0x6d:
  				// ADC abs
-@@ -2306,7 +2412,7 @@ void Exec6502Instruction()
+@@ -2306,7 +2417,7 @@ void Exec6502Instruction()
  			case 0x74:
  				if (CPUType == CPU::CPU65C12) {
  					// STZ zp,X
@@ -714,7 +719,7 @@ index 52f9049..743e9c0 100644
  				}
  				else {
  					// Undocumented instruction: NOP zp,x
-@@ -2329,7 +2435,7 @@ void Exec6502Instruction()
+@@ -2329,7 +2440,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: RRA zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					RORInstrHandler(ZeroPageAddress);
@@ -723,7 +728,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x78:
-@@ -2348,6 +2454,7 @@ void Exec6502Instruction()
+@@ -2348,6 +2459,7 @@ void Exec6502Instruction()
  					// PLY
  					YReg = Pop();
  					SetPSRZN(YReg);
@@ -731,7 +736,7 @@ index 52f9049..743e9c0 100644
  				}
  				else {
  					// Undocumented instruction: NOP
-@@ -2427,17 +2534,17 @@ void Exec6502Instruction()
+@@ -2427,17 +2539,17 @@ void Exec6502Instruction()
  			case 0x84:
  				// STY zp
  				AdvanceCyclesForMemWrite();
@@ -752,7 +757,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x87:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2447,7 +2554,7 @@ void Exec6502Instruction()
+@@ -2447,7 +2559,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: SAX zp
  					// This one does not seem to change the processor flags
  					AdvanceCyclesForMemWrite();
@@ -761,7 +766,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x88:
-@@ -2557,7 +2664,7 @@ void Exec6502Instruction()
+@@ -2557,7 +2669,7 @@ void Exec6502Instruction()
  				else {
  					// Undocumented instruction: SAX zp,Y
  					AdvanceCyclesForMemWrite();
@@ -770,7 +775,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0x98:
-@@ -2573,6 +2680,7 @@ void Exec6502Instruction()
+@@ -2573,6 +2685,7 @@ void Exec6502Instruction()
  			case 0x9a:
  				// TXS
  				StackReg = XReg;
@@ -778,7 +783,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0x9b:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2646,15 +2754,15 @@ void Exec6502Instruction()
+@@ -2646,15 +2759,15 @@ void Exec6502Instruction()
  				break;
  			case 0xa4:
  				// LDY zp
@@ -797,7 +802,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0xa7:
  				if (CPUType == CPU::CPU65C12) {
-@@ -2663,7 +2771,7 @@ void Exec6502Instruction()
+@@ -2663,7 +2776,7 @@ void Exec6502Instruction()
  				else {
  					// Undocumented instruction: LAX zp
  					int ZeroPageAddress = ReadPaged(ProgramCounter++);
@@ -806,7 +811,7 @@ index 52f9049..743e9c0 100644
  					XReg = Accumulator;
  				}
  				break;
-@@ -2830,11 +2938,11 @@ void Exec6502Instruction()
+@@ -2830,11 +2943,11 @@ void Exec6502Instruction()
  				break;
  			case 0xc4:
  				// CPY zp
@@ -820,7 +825,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0xc6:
  				// DEC zp
-@@ -2848,7 +2956,7 @@ void Exec6502Instruction()
+@@ -2848,7 +2961,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: DCP zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					DECInstrHandler(ZeroPageAddress);
@@ -829,7 +834,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0xc8:
-@@ -2945,7 +3053,7 @@ void Exec6502Instruction()
+@@ -2945,7 +3058,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: DCP zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					DECInstrHandler(ZeroPageAddress);
@@ -838,7 +843,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0xd8:
-@@ -3027,11 +3135,11 @@ void Exec6502Instruction()
+@@ -3027,11 +3140,11 @@ void Exec6502Instruction()
  				break;
  			case 0xe4:
  				// CPX zp
@@ -852,7 +857,7 @@ index 52f9049..743e9c0 100644
  				break;
  			case 0xe6:
  				// INC zp
-@@ -3045,7 +3153,7 @@ void Exec6502Instruction()
+@@ -3045,7 +3158,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: ISC zp
  					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
  					INCInstrHandler(ZeroPageAddress);
@@ -861,7 +866,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0xe8:
-@@ -3136,7 +3244,7 @@ void Exec6502Instruction()
+@@ -3136,7 +3249,7 @@ void Exec6502Instruction()
  					// Undocumented instruction: ISC zp,X
  					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
  					INCInstrHandler(ZeroPageAddress);
@@ -870,7 +875,7 @@ index 52f9049..743e9c0 100644
  				}
  				break;
  			case 0xf8:
-@@ -3152,6 +3260,7 @@ void Exec6502Instruction()
+@@ -3152,6 +3265,7 @@ void Exec6502Instruction()
  					// PLX
  					XReg = Pop();
  					SetPSRZN(XReg);
@@ -878,7 +883,7 @@ index 52f9049..743e9c0 100644
  				}
  				else {
  					// Undocumented instruction: NOP
-@@ -3213,6 +3322,11 @@ void Exec6502Instruction()
+@@ -3213,6 +3327,11 @@ void Exec6502Instruction()
  		Cycles += CyclesTable[CurrentInstruction] -
  		          CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
  
@@ -890,35 +895,35 @@ index 52f9049..743e9c0 100644
  		PollVIAs(Cycles - ViaCycles);
  		PollHardware(Cycles);
  
-@@ -3223,7 +3337,11 @@ void Exec6502Instruction()
+@@ -3223,7 +3342,11 @@ void Exec6502Instruction()
  		{
  			// Int noticed 2 cycles before end of instruction - interrupt now
  			CyclesToInt = NO_TIMER_INT_DUE;
-+			byte preStackReg = StackReg;
 +			int returnAddress = ProgramCounter;
++			byte returnStackReg = StackReg;
  			DoInterrupt();
-+			//PushStackFrame(StackFrameType_IRQ, ProgramCounter, returnAddress, preStackReg);
++			PushStackFrame(StackFrameType_IRQ, ProgramCounter, returnAddress, returnStackReg);
 +			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
-@@ -3233,7 +3351,11 @@ void Exec6502Instruction()
+@@ -3233,7 +3356,11 @@ void Exec6502Instruction()
  		if ((NMIStatus && !OldNMIStatus) || (NMIStatus & 1 << nmi_econet))
  		{
  			NMIStatus &= ~(1<<nmi_econet);
-+			byte preStackReg = StackReg;
 +			int returnAddress = ProgramCounter;
++			byte returnStackReg = StackReg;
  			DoNMI();
-+			//PushStackFrame(StackFrameType_NMI, ProgramCounter, returnAddress, preStackReg);
++			PushStackFrame(StackFrameType_NMI, ProgramCounter, returnAddress, returnStackReg);
 +			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
  			PollHardware(IRQCycles);
  			PollVIAs(IRQCycles);
  			IRQCycles = 0;
-@@ -3377,6 +3499,16 @@ void Save6502UEF(FILE *SUEF)
+@@ -3377,6 +3504,16 @@ void Save6502UEF(FILE *SUEF)
  	UEFWrite8(intStatus, SUEF);
  	UEFWrite8(NMIStatus, SUEF);
  	UEFWrite8(NMILock, SUEF);
-+	SyncStackFrames();
++	SyncStackFrames(StackReg);
 +	UEFWrite8(StackFrameCount, SUEF);
 +	for (int i = 0; i < StackFrameCount; i++) {
 +		UEFWrite8(StackFrames[i].Type, SUEF);
@@ -926,12 +931,12 @@ index 52f9049..743e9c0 100644
 +		UEFWrite16(StackFrames[i].StartAddress, SUEF);
 +		UEFWrite8(StackFrames[i].ReturnAddressPage, SUEF);
 +		UEFWrite16(StackFrames[i].ReturnAddress, SUEF);
-+		UEFWrite8(StackFrames[i].StackReg, SUEF);
++		UEFWrite8(StackFrames[i].ReturnStackReg, SUEF);
 +	}
  	UEFWrite16(0, SUEF);
  }
  
-@@ -3394,6 +3526,15 @@ void Load6502UEF(FILE *SUEF)
+@@ -3394,6 +3531,15 @@ void Load6502UEF(FILE *SUEF)
  	NMIStatus = UEFRead8(SUEF);
  	NMILock = UEFReadBool(SUEF);
  	// AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
@@ -942,13 +947,13 @@ index 52f9049..743e9c0 100644
 +        StackFrames[i].StartAddress = UEFRead16(SUEF);
 +		StackFrames[i].ReturnAddressPage = (MemPageType)UEFRead8(SUEF);
 +        StackFrames[i].ReturnAddress = UEFRead16(SUEF);
-+        StackFrames[i].StackReg = UEFRead8(SUEF);
++        StackFrames[i].ReturnStackReg = UEFRead8(SUEF);
 +	}
  }
  
  void WriteInstructionCounts(const char *FileName)
 diff --git a/Src/6502core.h b/Src/6502core.h
-index 935ff6b..b097021 100644
+index 935ff6b..3534998 100644
 --- a/Src/6502core.h
 +++ b/Src/6502core.h
 @@ -99,4 +99,28 @@ void WriteInstructionCounts(const char *FileName);
@@ -971,7 +976,7 @@ index 935ff6b..b097021 100644
 +    StackFrameType Type;
 +	int StartAddress;
 +	int ReturnAddress;
-+	unsigned char StackReg;
++	unsigned char ReturnStackReg;
 +	MemPageType StartAddressPage;
 +	MemPageType ReturnAddressPage;
 +};
@@ -1783,7 +1788,7 @@ index c087f1f..def40d8 100644
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..64f4e4e
+index 0000000..a7fb1f3
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
 @@ -0,0 +1,1065 @@
@@ -2319,7 +2324,7 @@ index 0000000..64f4e4e
 +        snapshotData.WriteInt16((int16_t)stackFrame->StartAddress);
 +        snapshotData.WriteByte((byte)stackFrame->ReturnAddressPage);
 +        snapshotData.WriteInt16((int16_t)stackFrame->ReturnAddress);
-+        snapshotData.WriteByte(stackFrame->StackReg);
++        snapshotData.WriteByte(stackFrame->ReturnStackReg);
 +    }
 +
 +    // screen address (B5 & B4 of System-VIA Port B addressable latch)

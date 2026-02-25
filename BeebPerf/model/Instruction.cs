@@ -20,8 +20,6 @@
 // --------------------------------------------------------------
 
 using System.Diagnostics;
-using System.Reflection.Emit;
-using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 
 namespace BeebPerf.model
@@ -29,8 +27,8 @@ namespace BeebPerf.model
     public enum InstructionType
     {
         Instruction = 0x00,
-        MaskableInterrupt = 0x10,
-        NonMaskableInterrupt = 0x20,
+        IRQ = 0x10,
+        NMI = 0x20,
         BeginDisplayEvent = 0x30
     }
 
@@ -43,8 +41,8 @@ namespace BeebPerf.model
         }
 
         public bool IsInstruction => (Type == InstructionType.Instruction);
-        public bool IsMaskableInterrupt => (Type == InstructionType.MaskableInterrupt);
-        public bool IsNonMaskableInterrupt => (Type == InstructionType.NonMaskableInterrupt);
+        public bool IsNMI => (Type == InstructionType.IRQ);
+        public bool IsIRQ => (Type == InstructionType.NMI);
         public bool IsBeginDisplayEvent => (Type == InstructionType.BeginDisplayEvent);
 
         public InstructionType Type
@@ -63,7 +61,7 @@ namespace BeebPerf.model
         {
             get
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction &&
                      (Opcode == 0x00/*BRK*/ || Opcode == 0x60/*RTS*/ || 
                       Opcode == 0x40/*RTI*/ || Opcode == 0x20/*JSR*/ || 
                       Opcode == 0x4C/*JMP abs*/ ||
@@ -73,7 +71,7 @@ namespace BeebPerf.model
             }
             set
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction &&
                      (Opcode == 0x00/*BRK*/ || Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/ ||
                       Opcode == 0x20/*JSR abs*/ || Opcode == 0x4C/*JMP abs*/ ||
                       Opcode == 0x6C/*JMP (abs)*/ || Opcode == 0x7C/*JMP (abs,X)*/ ||
@@ -87,14 +85,14 @@ namespace BeebPerf.model
         {
             get
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction && 
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction && 
                     (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ || 
                      Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/)));
                 return new CanonicalAddress(_ReturnAddress, (MemoryPage)_ReturnAddressPage);
             }
             set
             {
-                Debug.Assert(IsMaskableInterrupt || IsNonMaskableInterrupt || (IsInstruction &&
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction &&
                     (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ || 
                      Opcode == 0x60/*RTS*/ || Opcode == 0x40/*RTI*/)));
                 _ReturnAddress = value.Address;
@@ -301,11 +299,11 @@ namespace BeebPerf.model
                     _ => string.Empty
                 };
             }
-            else if (IsMaskableInterrupt)
+            else if (IsNMI)
             {
                 return $"MASKABLE INTERRUPT to {DestinationAddress}";
             }
-            else if (IsNonMaskableInterrupt)
+            else if (IsIRQ)
             {
                 return $"NON-MASKABLE INTERRUPT to {DestinationAddress}";
             }

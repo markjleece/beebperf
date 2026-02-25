@@ -26,7 +26,7 @@ namespace BeebPerf.model
         public CanonicalAddress StartAddress { get; }
         public CanonicalAddress ReturnAddress { get; }
         public byte StackPointer { get; }
-        CallType CallType { get; }
+        public CallType CallType { get; }
 
         public MiniStackFrame(CallType callType, CanonicalAddress startAddress, CanonicalAddress returnAddress, byte stackPointer)
         {

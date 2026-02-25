@@ -210,6 +210,46 @@ namespace BeebPerf.model
                 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
             ];
 
+            byte[] modifiesStackPointerTable6502 = [
+             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 No
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 Yes
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
+                0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0, // 9
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  // f
+            ];
+
+            byte[] modifiesStackPointerTable65C02 = [
+             // 0 1 2 3 4 5 6 7 8 9 a b c d e f
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 0 No
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 Yes
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 2
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 4
+                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 5
+                1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0, // 6
+                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 7
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8
+                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // 9
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // a
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // b
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
+                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0, // d
+                0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
+                0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0  // f
+            ];
+
             string[] mnemonicTable6502 = [
                 "BRK","ORA","JAM","SLO","NOP","ORA","ASL","SLO","PHP","ORA","ASL","ANC","NOP","ORA","ASL","SLO",
                 "BPL","ORA","JAM","SLO","NOP","ORA","ASL","SLO","CLC","ORA","NOP","SLO","NOP","ORA","ASL","SLO",
@@ -254,6 +294,7 @@ namespace BeebPerf.model
                 _MemoryAccessTable = memoryAccessTable6502;
                 _AddressModeTable = addressModeTable6502;
                 _LoadOrStoreTable = loadOrStoreTable6502;
+                _ModifiesStackPointerTable = modifiesStackPointerTable6502;
                 _MnemonicTable = mnemonicTable6502;
             }
             else
@@ -263,6 +304,7 @@ namespace BeebPerf.model
                 _MemoryAccessTable = memoryAccessTable65C02;
                 _AddressModeTable = addressModeTable65C02;
                 _LoadOrStoreTable = loadOrStoreTable65C02;
+                _ModifiesStackPointerTable = modifiesStackPointerTable65C02;
                 _MnemonicTable = mnemonicTable65C02;
             }
 
@@ -344,6 +386,11 @@ namespace BeebPerf.model
             return (AddressingModeType)_AddressModeTable[opcode];
         }
 
+        public bool ModifiesStackPointer(byte opcode)
+        {
+            return _ModifiesStackPointerTable[opcode] != 0;
+        }
+
         public string Mnemonic(byte opcode)
         {
             return _MnemonicTable[opcode];
@@ -357,6 +404,7 @@ namespace BeebPerf.model
         private readonly byte[] _MemoryAccessTable;
         private readonly byte[] _AddressModeTable;
         private readonly byte[] _LoadOrStoreTable;
+        private readonly byte[] _ModifiesStackPointerTable;
         private readonly string[] _MnemonicTable;
     }
 }

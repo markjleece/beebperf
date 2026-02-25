@@ -21,15 +21,6 @@
 
 namespace BeebPerf.model
 {
-    public enum RoutineType
-    {
-        JSR,
-        IRQ,
-        NMI,
-        BRK,
-        Pseudo
-    }
-
     public class Routine
     {
         public Routine()
@@ -39,10 +30,9 @@ namespace BeebPerf.model
             Label = String.Empty;
         }
 
-        public Routine(CanonicalAddress address, RoutineType routineType, string label)
+        public Routine(CanonicalAddress address, string label)
         {
             Label = label;
-            RoutineType = routineType;
             StartAddress = address;
             EndAddress = address;
         }
@@ -55,7 +45,6 @@ namespace BeebPerf.model
 
         public bool HotRoutine;
         public string Label;
-        public RoutineType RoutineType;
         public CanonicalAddress StartAddress;
         public CanonicalAddress EndAddress;
         public Dictionary<CallStack, CPUMetrics> MetricsByStack = new();
