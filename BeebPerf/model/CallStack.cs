@@ -41,7 +41,7 @@ namespace BeebPerf.model
 
         public CallStack(Routine routine, CanonicalAddress returnAddress, byte stackPointer, CallType type, StackFrame? parent)
         {
-            Type = type;
+            CallType = type;
             Parent = parent;
             Routine = routine;
             StartAddress = routine.StartAddress;
@@ -61,7 +61,7 @@ namespace BeebPerf.model
                 if (!self.StartAddress.Equals(peer.StartAddress))
                     return false;
 
-                if (self.Type == CallType.IRQ || self.Type == CallType.NMI || self.Type == CallType.BRK)
+                if (self.CallType == CallType.IRQ || self.CallType == CallType.NMI || self.CallType == CallType.BRK)
                     return true;
 
                 self = self.Parent;
@@ -77,7 +77,7 @@ namespace BeebPerf.model
             for (var callStack = this; callStack != null; callStack = callStack.Parent)
             {
                 hashCode = unchecked(hashCode * 31 + callStack.StartAddress.GetHashCode());
-                if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
+                if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
                     break;
             }
             return hashCode;
@@ -91,7 +91,7 @@ namespace BeebPerf.model
                 for (var callStack = this; callStack != null; callStack = callStack.Parent)
                 {
                     depth++;
-                    if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
+                    if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
                         break;
                 }
                 return depth;
@@ -109,7 +109,7 @@ namespace BeebPerf.model
             }
         }
 
-        public CallType Type;
+        public CallType CallType;
         public Routine Routine;
         public CanonicalAddress StartAddress;
         public CanonicalAddress ReturnAddress;

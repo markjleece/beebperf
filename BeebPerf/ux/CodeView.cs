@@ -63,8 +63,6 @@ namespace BeebPerf.ux
             SetColumnAlignment(BranchCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
-            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
-            SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
             SetColumnHeaderToolTip(AddressColumnIndex, "Address");
             SetColumnHeaderToolTip(LabelColumnIndex, "Label");
@@ -172,7 +170,10 @@ namespace BeebPerf.ux
             if (obj is not InstructionMetrics)
                 return string.Empty;
 
-            return FormatCountAndRange(obj, columnIndex);
+            if (columnIndex == TailCallColumnIndex)
+                return ((InstructionMetrics)obj).TailCall ? "Yes" : string.Empty;
+            else
+                return FormatCountAndRange(obj, columnIndex);
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)

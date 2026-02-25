@@ -342,8 +342,6 @@ namespace BeebPerf
 
                 if (instruction.IsInstruction)
                 {
-                    // TODO: Make sure BRKs are treated like ISRs
-
                     // is first instruction of a routine?
                     if (RoutinesByAddress.TryGetValue(instruction.OpcodeAddress, out Routine? routine) && !isFirstInstruction)
                         if (routine != currentStackFrame!.Routine) // fall through?
@@ -364,7 +362,7 @@ namespace BeebPerf
 
                     if ((instruction.Opcode == 0x00/*BRK*/ || instruction.Opcode == 0x20/*JSR*/) && !isLastInstruction)
                     {
-                        // create new stack frame for routine / break
+                        // create new stack frame for JSR/BRK
                         syncStackFrames(postCycleCount);
                         currentStackFrame = CreateStackFrame(
                             instruction.Opcode == 0x20 ? CallType.JSR : CallType.BRK,
@@ -394,18 +392,17 @@ namespace BeebPerf
                         syncStackFrames(postCycleCount);
                         stackPointer += (byte)(instruction.Opcode == 0x60 ? 2/*RTS*/ : 3/*RTI*/);
 
-                        // unwind any fall-through and tail calls
-                        while (currentStackFrame!.Type == CallType.TailCall || currentStackFrame!.Type == CallType.FallThrough)
+                        // unwind any fall-through and tail calls, updating end cycle count
+                        while (currentStackFrame!.CallType == CallType.TailCall || currentStackFrame!.CallType == CallType.FallThrough)
                         {
                             currentStackFrame.EndCycleCount = postCycleCount;
                             currentStackFrame = currentStackFrame.Parent;
                         }
-
                         currentStackFrame.EndCycleCount = postCycleCount;
 
                         if (stackPointer < currentStackFrame!.StackPointer)
                         {
-                            // create new stack frame for tail call
+                            // create stack frame for tail call
                             currentStackFrame = CreateStackFrame(
                                 CallType.TailCall,
                                 RoutinesByAddress[instruction.DestinationAddress],
@@ -416,15 +413,21 @@ namespace BeebPerf
                         }
                         else
                         {
-                            // does RTS/RTI return to the caller? If not we need to insert a new parent stack frame
-                            var destinationAddress = _SortedRoutineAddresses.Find(instruction.DestinationAddress);
-                            if (!destinationAddress.Equals(currentStackFrame!.Parent!.Routine.StartAddress))
+                            // does RTS/RTI return to the caller or caller's fallthrough? it not we need to insert a parent stack frame
+                            var parentRoutineStartAddress = currentStackFrame!.Parent!.Routine.StartAddress;
+                            var destinationRoutineAddress = _SortedRoutineAddresses.Find(instruction.DestinationAddress);
+                            if (parentRoutineStartAddress.Equals(destinationRoutineAddress) ||
+                                parentRoutineStartAddress.Equals(_SortedRoutineAddresses.Find(instruction.DestinationAddress.Offset(-1))))
+                            {
+                                currentStackFrame = currentStackFrame.Parent; // return to caller/caller's fallthrough
+                            }
+                            else
+                            {
                                 currentStackFrame = InsertParentStackFrame(
                                     currentStackFrame,
                                     CallType.TailCall,
-                                    RoutinesByAddress[destinationAddress]);
-                            else
-                                currentStackFrame = currentStackFrame.Parent; // upwind
+                                    RoutinesByAddress[destinationRoutineAddress]);
+                            }
                         }
                     }
                     else if (_InstructionSet!.ModifiesStackPointer(instruction.Opcode) && !isLastInstruction)
@@ -433,7 +436,7 @@ namespace BeebPerf
                         fSyncStack = true;
                     }
                 }
-                else if ((instruction.IsNMI || instruction.IsIRQ) && !isLastInstruction)
+                else if ((instruction.IsIRQ || instruction.IsNMI) && !isLastInstruction)
                 {
                     // update instruction indices to include interrupt
                     if (currentStackFrame!.FirstInstructionIndex < 0)
@@ -444,9 +447,9 @@ namespace BeebPerf
 
                     syncStackFrames(postCycleCount);
 
-                    // create new stack frame for interrupt service routine
+                    // create new stack frame for IRQ/NMI
                     currentStackFrame = CreateStackFrame(
-                        CallType.IRQ,
+                        instruction.IsIRQ ? CallType.IRQ : CallType.NMI,
                         RoutinesByAddress[instruction.DestinationAddress],
                         instruction.ReturnAddress,
                         stackPointer,
@@ -492,17 +495,6 @@ namespace BeebPerf
             stackFrame.StartCycleCount = startCycleCount;
             if (parent != null)
                 parent.Children.Add(stackFrame);
-            string prefix = type switch {
-                CallType.None => "NONE",
-                CallType.JSR => "JSR_",
-                CallType.IRQ => "IRQ_",
-                CallType.NMI => "NMI_",
-                CallType.BRK => "BRK_",
-                CallType.TailCall => "TAIL",
-                CallType.FallThrough => "FALL",
-                _ => "????"
-            };
-            //Debug.WriteLine($"{prefix}:{stackFrame}");
             return stackFrame;
         }
 
@@ -586,7 +578,7 @@ namespace BeebPerf
             {
                 excludedCycleCount += CalculateMetrics(childStackFrame);
                 childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
-                if (childStackFrame.Type != CallType.IRQ && childStackFrame.Type != CallType.NMI && childStackFrame.Type != CallType.BRK)
+                if (childStackFrame.CallType != CallType.IRQ && childStackFrame.CallType != CallType.NMI && childStackFrame.CallType != CallType.BRK)
                     childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
             }
 
@@ -679,7 +671,7 @@ namespace BeebPerf
             if (treeNodesByStack.TryGetValue(callStack, out CallTreeNode? treeNode))
                 return treeNode;
 
-            if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
+            if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
                 return null;
 
             var newTreeNode = new CallTreeNode(callStack);
@@ -740,7 +732,7 @@ namespace BeebPerf
             if (treeNodesByStack.TryGetValue(callStack, out var treeNode))
                 return treeNode;
 
-            if (callStack.Type == CallType.IRQ || callStack.Type == CallType.NMI || callStack.Type == CallType.BRK)
+            if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
                 return null;
 
             var newTreeNode = new CallTreeNode(callStack);
@@ -833,19 +825,18 @@ namespace BeebPerf
                 if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
                 {
                     if (previousInstructionIndex > -1 &&
-                        (childStackFrame.Type == CallType.JSR ||
-                         childStackFrame.Type == CallType.TailCall))
+                        (childStackFrame.CallType == CallType.JSR || childStackFrame.CallType == CallType.TailCall))
                     {
                         var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
                         if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
                         {
                             metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
-                            if (childStackFrame.Type == CallType.TailCall)
-                                metrics.TailCall |= true;
+                            if (childStackFrame.CallType == CallType.TailCall)
+                                metrics.TailCall = true;
                         }
                     }
 
-                    if (childStackFrame.Type == CallType.FallThrough)
+                    if (childStackFrame.CallType == CallType.FallThrough)
                         CalculateStackFrameMetrics(childStackFrame, ref instructionOrdinal, instructionMetrics);
 
                     // skip over child stack frames
@@ -948,7 +939,7 @@ namespace BeebPerf
 
                 foreach (var child in stackFrame.Children)
                 {
-                    if (child.Type == CallType.IRQ || child.Type == CallType.NMI || child.Type == CallType.BRK)
+                    if (child.CallType == CallType.IRQ || child.CallType == CallType.NMI || child.CallType == CallType.BRK)
                         continue;
 
                     if (!calleeMetrics.ContainsKey(child))
