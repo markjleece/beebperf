@@ -413,13 +413,14 @@ namespace BeebPerf
                         }
                         else
                         {
-                            // does RTS/RTI return to the caller or caller's fallthrough? it not we need to insert a parent stack frame
+                            // does RTS/RTI return to the caller, or caller's fall-through? it not we need to insert a parent stack frame
                             var parentRoutineStartAddress = currentStackFrame!.Parent!.Routine.StartAddress;
                             var destinationRoutineAddress = _SortedRoutineAddresses.Find(instruction.DestinationAddress);
                             if (parentRoutineStartAddress.Equals(destinationRoutineAddress) ||
                                 parentRoutineStartAddress.Equals(_SortedRoutineAddresses.Find(instruction.DestinationAddress.Offset(-1))))
                             {
-                                currentStackFrame = currentStackFrame.Parent; // return to caller/caller's fallthrough
+                                // return to caller, or caller's fall-through
+                                currentStackFrame = currentStackFrame.Parent;
                             }
                             else
                             {
