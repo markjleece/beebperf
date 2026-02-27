@@ -118,8 +118,8 @@ namespace BeebPerf.ux
                 if (!routineCell.Rectangle.Contains(PixelsToLayout(e.Location)))
                     continue;
 
-                if (_SelectedRoutine != routineCell.Routine ||
-                    _SelectedCallStack != routineCell.CallStack)
+                if (routineCell.Routine != _SelectedRoutine ||
+                   !routineCell.CallStack.Equals(_SelectedCallStack))
                 {
                     SelectRoutineInternal(routineCell.Routine, routineCell.CallStack);
                     form.SetSelectedRoutine(routineCell.Routine, routineCell.CallStack, memoryAccess: null);
@@ -161,6 +161,17 @@ namespace BeebPerf.ux
             RemoveFocus();
         }
 
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            if (_VScrollBar.Enabled)
+            {
+                int value = _VScrollBar.Value - (e.Delta * _VScrollBar.SmallChange / 120/*WHEEL_DELTA*/);
+                _VScrollBar.Value = Math.Clamp(value, 0, _VScrollBar.Maximum - _VScrollBar.LargeChange);
+                Invalidate();
+            }
+        }
+
         private void AddCallTreeInternal(CallTreeNode treeNode)
         {
             _CallTrees.Add(treeNode);
@@ -177,7 +188,7 @@ namespace BeebPerf.ux
 
         private void SelectRoutineInternal(Routine routine, CallStack callStack)
         {
-            if (_SelectedRoutine == routine && _SelectedCallStack == callStack)
+            if (routine == _SelectedRoutine && callStack.Equals(_SelectedCallStack))
                 return;
 
             _SelectedRoutine = routine;
@@ -262,7 +273,7 @@ namespace BeebPerf.ux
             if (borderRect.Width > 0)
             {
                 if (routineCell.Routine == _SelectedRoutine &&
-                    routineCell.CallStack == _SelectedCallStack)
+                    routineCell.CallStack.Equals(_SelectedCallStack))
                 {
                     // inset two-pixel border
                     borderPen = selectedLinePen;
@@ -468,7 +479,7 @@ namespace BeebPerf.ux
             foreach (var routineCell in _RoutineCells)
             {
                 if (routineCell.Routine != _SelectedRoutine ||
-                    routineCell.CallStack != _SelectedCallStack)
+                   !routineCell.CallStack.Equals(_SelectedCallStack))
                     continue;
 
                 int marginSize = Font.Height / 2;

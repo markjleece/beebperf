@@ -111,19 +111,15 @@ namespace BeebPerf
                 var routine = CreateRoutine(stackFrame.StartAddress);
                 switch (stackFrame.CallType)
                 {
-                    case CallType.BRK:
-                        routine.Label = "BRK";
-                        _MaskableISR = routine;
-                        break;
-
                     case CallType.IRQ:
-                        routine.Label = "IRQ";
-                        _MaskableISR = routine;
+                    case CallType.BRK:
+                        routine.Label = "IRQ/BRK";
+                        _IRQBRKRoutine = routine;
                         break;
 
                     case CallType.NMI:
                         routine.Label = "NMI";
-                        _NonMaskableISR = routine;
+                        _NMIRoutine = routine;
                         break;
                 }
             }
@@ -706,11 +702,11 @@ namespace BeebPerf
         private void PopulateNonMaskableInterruptCallTree()
         {
             NonMaskableInterruptCallTree = null;
-            if (_NonMaskableISR is null || _NonMaskableISR.MetricsByStack.Keys.Count == 0)
+            if (_NMIRoutine is null || _NMIRoutine.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
-            CallStack stack = _NonMaskableISR.MetricsByStack.Keys.First();
+            CallStack stack = _NMIRoutine.MetricsByStack.Keys.First();
             NonMaskableInterruptCallTree = new CallTreeNode(stack);
             interruptTreeNodesByStack.Add(stack, NonMaskableInterruptCallTree);
 
@@ -724,11 +720,11 @@ namespace BeebPerf
         private void PopulateMaskableInterruptCallTree()
         {
             MaskableInterruptCallTree = null;
-            if (_MaskableISR is null || _MaskableISR.MetricsByStack.Keys.Count == 0)
+            if (_IRQBRKRoutine is null || _IRQBRKRoutine.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
-            CallStack stack = _MaskableISR.MetricsByStack.Keys.First();
+            CallStack stack = _IRQBRKRoutine.MetricsByStack.Keys.First();
             MaskableInterruptCallTree = new CallTreeNode(stack);
             interruptTreeNodesByStack.Add(stack, MaskableInterruptCallTree);
 
@@ -1001,8 +997,8 @@ namespace BeebPerf
         public int EndCycleCount;
         public model.StackFrame RootStackFrame = new();
 
-        private Routine? _MaskableISR = null;
-        private Routine? _NonMaskableISR = null;
+        private Routine? _IRQBRKRoutine = null;
+        private Routine? _NMIRoutine = null;
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
         private Instruction[] _Instructions = [];
         private Dictionary<ushort, string> _Labels = [];

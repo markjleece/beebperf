@@ -986,7 +986,7 @@ index 935ff6b..3534998 100644
 +
  #endif
 diff --git a/Src/BeebEm.rc b/Src/BeebEm.rc
-index 630c025..25af475 100644
+index e921f98..df7d840 100644
 --- a/Src/BeebEm.rc
 +++ b/Src/BeebEm.rc
 @@ -111,6 +111,9 @@ BEGIN
@@ -999,32 +999,8 @@ index 630c025..25af475 100644
          MENUITEM "E&xit",                       IDM_EXIT
      END
      POPUP "&Edit"
-diff --git a/Src/BeebEm.user.props b/Src/BeebEm.user.props
-new file mode 100644
-index 0000000..048ea52
---- /dev/null
-+++ b/Src/BeebEm.user.props
-@@ -0,0 +1,18 @@
-+<?xml version="1.0" encoding="utf-8"?>
-+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-+  <ImportGroup Label="PropertySheets" />
-+  <PropertyGroup Label="UserMacros">
-+    <DXSDK_Dir></DXSDK_Dir>
-+    <ISCC_Dir></ISCC_Dir>
-+  </PropertyGroup>
-+  <PropertyGroup />
-+  <ItemDefinitionGroup />
-+  <ItemGroup>
-+    <BuildMacro Include="DXSDK_Dir">
-+      <Value>$(DXSDK_Dir)</Value>
-+    </BuildMacro>
-+    <BuildMacro Include="ISCC_Dir">
-+      <Value>$(ISCC_Dir)</Value>
-+    </BuildMacro>
-+  </ItemGroup>
-+</Project>
 diff --git a/Src/BeebEm.vcxproj b/Src/BeebEm.vcxproj
-index f70cd26..4d5ac2b 100644
+index 81b032a..c2e1b43 100644
 --- a/Src/BeebEm.vcxproj
 +++ b/Src/BeebEm.vcxproj
 @@ -22,32 +22,32 @@
@@ -1153,7 +1129,7 @@ index f70cd26..4d5ac2b 100644
      <ClInclude Include="Preferences.h" />
      <ClInclude Include="RenameFileDialog.h" />
 diff --git a/Src/BeebEm.vcxproj.filters b/Src/BeebEm.vcxproj.filters
-index 3598051..6dfee70 100644
+index 49a1c2e..bf7a73a 100644
 --- a/Src/BeebEm.vcxproj.filters
 +++ b/Src/BeebEm.vcxproj.filters
 @@ -336,6 +336,9 @@
@@ -1392,10 +1368,10 @@ index 6333326..43e2cba 100644
  const unsigned char *BeebMemPtrWithWrapMode7(int Address, int Length);
  void BeebReadRoms(void);
 diff --git a/Src/BeebWin.cpp b/Src/BeebWin.cpp
-index 89fea70..601e6ac 100644
+index df545ce..ab2ed0f 100644
 --- a/Src/BeebWin.cpp
 +++ b/Src/BeebWin.cpp
-@@ -665,6 +665,7 @@ void BeebWin::Shutdown()
+@@ -667,6 +667,7 @@ void BeebWin::Shutdown()
  	m_Frozen = true;
  
  	EndVideo();
@@ -1403,7 +1379,7 @@ index 89fea70..601e6ac 100644
  
  	if (m_AutoSavePrefsCMOS || m_AutoSavePrefsFolders ||
  	    m_AutoSavePrefsAll || m_AutoSavePrefsChanged)
-@@ -1361,6 +1362,9 @@ void BeebWin::InitMenu(void)
+@@ -1379,6 +1380,9 @@ void BeebWin::InitMenu(void)
  	// File -> Video Options
  	UpdateVideoCaptureMenu();
  
@@ -1413,7 +1389,7 @@ index 89fea70..601e6ac 100644
  	// File -> Disc Options
  	CheckMenuItem(IDM_WRITE_PROTECT_DISC0, m_WriteProtectDisc[0]);
  	CheckMenuItem(IDM_WRITE_PROTECT_DISC1, m_WriteProtectDisc[1]);
-@@ -4705,7 +4709,16 @@ void BeebWin::HandleCommand(UINT MenuID)
+@@ -4813,7 +4817,16 @@ void BeebWin::HandleCommand(UINT MenuID)
  		UpdateVideoCaptureMenu();
  		break;
  
@@ -1432,10 +1408,10 @@ index 89fea70..601e6ac 100644
  	case IDM_SPEECH:
  		EnableSpeech(!SpeechEnabled);
 diff --git a/Src/BeebWin.h b/Src/BeebWin.h
-index 7be5d1d..76405b2 100644
+index 9bd9764..f7a6f29 100644
 --- a/Src/BeebWin.h
 +++ b/Src/BeebWin.h
-@@ -526,6 +526,12 @@ public:
+@@ -527,6 +527,12 @@ public:
  	void EndVideo();
  	bool IsCapturing() const;
  
@@ -1788,10 +1764,10 @@ index c087f1f..def40d8 100644
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..a7fb1f3
+index 0000000..fd29b47
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1065 @@
+@@ -0,0 +1,1061 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2005  Mike Wyatt
@@ -2053,17 +2029,17 @@ index 0000000..a7fb1f3
 +    static const byte loadOrStoreTable6502[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA, LDX, LDY, STA, STX, STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
-+        0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
-+        0,4,0,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
-+        3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
-+        0,1,0,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
++        0,1,0,0,1,1,1,0,0,0,0,0,1,1,1,0, // 8
++        0,1,0,0,1,1,1,0,0,1,0,0,0,1,0,0, // 9
++        1,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // a
++        0,1,0,0,1,1,1,0,0,1,0,0,1,1,1,0, // b
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
@@ -2073,17 +2049,17 @@ index 0000000..a7fb1f3
 +    static const byte loadOrStoreTable65C02[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 LDX
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3 LDY
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 STA
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5 STX
-+        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6 STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA, LDX, LDY, STA, STX, STY
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
++        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
-+        0,4,0,0,6,4,5,0,0,0,0,0,6,4,5,0, // 8
-+        0,4,4,0,6,4,5,0,0,4,0,0,0,4,0,0, // 9
-+        3,1,2,0,3,1,2,0,0,1,0,0,3,1,2,0, // a
-+        0,1,1,0,3,1,2,0,0,1,0,0,3,1,2,0, // b
++        0,1,0,0,1,1,1,0,0,0,0,0,1,1,1,0, // 8
++        0,1,1,0,1,1,1,0,0,1,0,0,0,1,0,0, // 9
++        1,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // a
++        0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // b
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // d
 +        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // e
@@ -2579,31 +2555,26 @@ index 0000000..a7fb1f3
 +    byte modifiedRegisters = 0;
 +    if (postAccumulator != m_accumulator)
 +    {
-+        m_accumulator = postAccumulator;
 +        modifiedRegisters |= ModifiedRegister::Accumulator;
 +    }
 +
 +    if (postXReg != m_XRegister)
 +    {
-+        m_XRegister = postXReg;
 +        modifiedRegisters |= ModifiedRegister::XRegister;
 +    }
 +
 +    if (postYReg != m_YRegister)
 +    {
-+        m_YRegister = postYReg;
 +        modifiedRegisters |= ModifiedRegister::YRegister;
 +    }
 +
 +    if (postPSR != m_statusRegister)
 +    {
-+        m_statusRegister = postPSR;
 +        modifiedRegisters |= ModifiedRegister::StatusRegister;
 +    }
 +
 +    if (postStackReg != m_stackRegister)
 +    {
-+        m_stackRegister = postStackReg;
 +        modifiedRegisters |= ModifiedRegister::StackPointer;
 +    }
 +
@@ -2611,61 +2582,62 @@ index 0000000..a7fb1f3
 +    assert(cycleCount <= 0x7);
 +    m_writeBuffer->WriteByteUnchecked((byte)(cycleCount & 0x7) | modifiedRegisters);
 +
-+    // write modified registers values
++    // update / write modified registers
 +    if (modifiedRegisters & ModifiedRegister::Accumulator)
 +    {
++        m_accumulator = postAccumulator;
 +        m_writeBuffer->WriteByteUnchecked(postAccumulator);
 +    }
 +
 +    if (modifiedRegisters & ModifiedRegister::XRegister)
 +    {
++        m_XRegister = postXReg;
 +        m_writeBuffer->WriteByteUnchecked(postXReg);
 +    }
 +
 +    if (modifiedRegisters & ModifiedRegister::YRegister)
 +    {
++        m_YRegister = postYReg;
 +        m_writeBuffer->WriteByteUnchecked(postYReg);
 +    }
 +
 +    if (modifiedRegisters & ModifiedRegister::StatusRegister)
 +    {
++        m_statusRegister = postPSR;
 +        m_writeBuffer->WriteByteUnchecked(postPSR);
 +    }
 +
 +    if (modifiedRegisters & ModifiedRegister::StackPointer)
 +    {
++        m_stackRegister = postStackReg;
 +        m_writeBuffer->WriteByteUnchecked(postStackReg);
 +    }
 +
-+    // write destination address
-+    if (
-+        opcode == 0x60/*RTS*/ || 
++    if (opcode == 0x60/*RTS*/ || 
 +        opcode == 0x40/*RTI*/ ||
 +        opcode == 0x00/*BRK*/ ||
 +        opcode == 0x6C/*JMP (abs)*/ || 
 +        (opcode == 0x7C/*JMP (abs,X)*/ && m_cpu == CPU::CPU65C12))
 +    {
-+        // little endian encoding
++        // write destination address
 +        m_writeBuffer->WriteByteUnchecked((byte)postPC);
 +        m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +    }
-+    
-+    // write memory access address and read/write values
 +    else if ((opcodeTraits.MemoryAccess & (MemoryAccess::Read | MemoryAccess::Write)) != 0)
 +    {
-+        if (opcodeTraits.AddressingMode == AddressingMode::IndexedOrIndirect)  
++        // write memory access address
++        if (opcodeTraits.AddressingMode == AddressingMode::IndexedOrIndirect)
 +        {
-+            // little endian encoding
 +            m_writeBuffer->WriteByteUnchecked((byte)memoryAddress);
 +            m_writeBuffer->WriteByteUnchecked((byte)(memoryAddress >> 8));
 +        }
 +        else
 +        {
-+            // for non-indexed/indirect addressing modes, the memory address can be obtained from the opcode
 +            assert(memoryAddress == ((operand2 << 8) | operand1));
 +        }
 +
-+        if (!opcodeTraits.LoadOrStore) // don't write memory values for load/store instructions, as these can be obtained from the registers
++        // write read / write values
++        if (!opcodeTraits.LoadOrStore) 
 +        {
 +            if ((opcodeTraits.MemoryAccess & MemoryAccess::Read) != 0)
 +            {
@@ -2859,7 +2831,7 @@ index 0000000..a7fb1f3
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..4adc1ab
+index 0000000..8796028
 --- /dev/null
 +++ b/Src/PerfWriter.h
 @@ -0,0 +1,358 @@
@@ -3035,7 +3007,7 @@ index 0000000..4adc1ab
 +        byte Size : 2; // 1, 2 or 3 bytes (including opcode)
 +        byte AddressingMode : 1; // AddressingMode
 +		byte MemoryAccess : 2; // MemoryAccess
-+        byte LoadOrStore : 3; // LoadOrStore
++        byte LoadOrStore : 1; // LoadOrStore
 +	};
 +
 +	OpcodeTraits m_opcodeTraitsTable[256];
@@ -3221,135 +3193,6 @@ index 0000000..4adc1ab
 +
 +#endif
 +
-diff --git a/Src/Preferences.cfg b/Src/Preferences.cfg
-new file mode 100644
-index 0000000..04d6efd
---- /dev/null
-+++ b/Src/Preferences.cfg
-@@ -0,0 +1,123 @@
-+*** BeebEm Preferences ***
-+
-+AMXMouseAdjust=30
-+AMXMouseEnabled=0
-+AMXMouseLRForMiddle=1
-+AMXMouseSize=320x256
-+AVIPath=
-+AutoSavePrefsAll=0
-+AutoSavePrefsCMOS=0
-+AutoSavePrefsFolders=0
-+BasicHardware=0
-+BasicHardwareOnly=0
-+BitKeys=3031323334353637
-+BitmapCaptureFormat=BMP
-+BitmapCaptureResolution=640x512
-+CMOSRam=01fe00ea00c9fffe320007c11e050039a2000000000000000000000000000000000000000000000000000000000000000000
-+CMOSRamMasterET=01fe00ea00deffff320007c11e050059a2000000000000000000000000000000000000000000000000000000000000000000
-+CaptureFrameSkip=1
-+CaptureMouse=0
-+CaptureResolution=640x512
-+DXSmoothMode7Only=0
-+DXSmoothing=1
-+DirectXFullScreenMode=ScreenResolution
-+DisableKeysBreak=0
-+DisableKeysEscape=0
-+DisableKeysShortcut=0
-+DiscDriveSoundEnabled=1
-+DiscLEDColour=0
-+DiscsFilter=0
-+DiscsPath=DiscIms
-+DisplayRenderer=DirectX9
-+EconetEnabled=0
-+ExponentialVolume=1
-+FDCDLL0=None
-+FDCDLL1=None
-+FDCDLL2=Hardware\Acorn1770.dll
-+FDCDLL3=None
-+FDCDLL4=None
-+FloppyDriveEnabled=1
-+FreezeWhenInactive=1
-+FullScreen=0
-+HardDrivePath=DiscIms
-+HideCursor=0
-+HideMenuEnabled=0
-+IDEDriveEnabled=0
-+IP232Address=127.0.0.1
-+IP232Enabled=0
-+IP232Handshake=0
-+IP232Mode=0
-+IP232Port=25232
-+IP232Raw=0
-+ImagePath=
-+KeyMapAS=0
-+KeyMapFunc=0
-+KeyMapping=Logical
-+KeyboardLinks=00
-+MachineType=ModelB
-+MaintainAspectRatio=1
-+Monitor=RGB
-+MotionBlur=0
-+MotionBlurIntensities=64584b3e3226190c
-+Music5000Enabled=0
-+PartSamples=1
-+PrefsVersion=3
-+PrinterEnabled=0
-+PrinterFile=
-+PrinterPort=Clipboard
-+RelaySoundEnabled=0
-+SCSIDriveEnabled=0
-+SWRAMBoard=0
-+SWRAMWritable=00000000010101010000000000000000
-+SampleRate=44100
-+SerialPort=COM2
-+SerialPortEnabled=0
-+ShowDiscLEDs=0
-+ShowFPS=1
-+ShowKeyboardLEDs=0
-+SoundChipEnabled=1
-+SoundEnabled=1
-+SoundStreamer=XAudio2
-+SoundVolume=100
-+SpeechEnabled=0
-+Speed=100
-+StatesPath=BeebState
-+Sticks=Disabled
-+TapeClockSpeed=5600
-+TapeSoundEnabled=0
-+TapesPath=Tapes
-+TeleTextAdapterEnabled=0
-+TeleTextAdapterSource=IP
-+TeletextAdapterEnabled=0
-+TeletextAdapterSource=File
-+TeletextFile0=C:\Users\markl\OneDrive\Documents\BeebEm\DiscIms\txt0.dat
-+TeletextFile1=C:\Users\markl\OneDrive\Documents\BeebEm\DiscIms\txt1.dat
-+TeletextFile2=C:\Users\markl\OneDrive\Documents\BeebEm\DiscIms\txt2.dat
-+TeletextFile3=C:\Users\markl\OneDrive\Documents\BeebEm\DiscIms\txt3.dat
-+TeletextHalfMode=0
-+TeletextIP0=127.0.0.1
-+TeletextIP1=127.0.0.1
-+TeletextIP2=127.0.0.1
-+TeletextIP3=127.0.0.1
-+TeletextPort0=19761
-+TeletextPort1=19762
-+TeletextPort2=19763
-+TeletextPort3=19764
-+TextToSpeechAutoSpeak=1
-+TextToSpeechEnabled=0
-+TextToSpeechRate=0
-+TextToSpeechSpeakPunctuation=0
-+TextViewEnabled=0
-+Timing=FixedSpeed
-+TouchScreenEnabled=0
-+TubeType=None
-+UnlockTape=0
-+UserKeyMapFile=DefaultUser.kmap
-+UserPortRTCEnabled=0
-+UserPortRTCRegisters=0000000000000000
-+WinPosX=34
-+WinPosY=65
-+WinSizeX=1024
-+WinSizeY=768
-+WriteInstructionCounts=0
-+WriteProtectOnLoad=1
 diff --git a/Src/Resource.h b/Src/Resource.h
 index b893fa5..d6d046d 100644
 --- a/Src/Resource.h
@@ -3386,7 +3229,7 @@ index e271e44..4c3201b 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index 3e84b2d..6e4eadd 100644
+index c17d038..8bf7b2b 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -3397,7 +3240,7 @@ index 3e84b2d..6e4eadd 100644
  #include "Sound.h"
  #include "SysVia.h"
  #include "UefState.h"
-@@ -666,6 +667,7 @@ static void VideoStartOfFrame()
+@@ -656,6 +657,7 @@ static void VideoStartOfFrame()
      CursorFieldCount--;
      Mode7FlashTrigger--;
      VideoState.InterlaceFrame = !VideoState.InterlaceFrame;

@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using static BeebPerf.VideoAnalysis;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace BeebPerf.ux
 {
@@ -566,9 +567,26 @@ namespace BeebPerf.ux
             ZoomOutInternal();
         }
 
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            base.OnMouseWheel(e);
+            if (_ScrollBar.Enabled)
+            {
+                int oldValue = _ScrollBar.Value;
+                int newValue = _ScrollBar.Value - (e.Delta * _ScrollBar.SmallChange / 120/*WHEEL_DELTA*/);
+                _ScrollBar.Value = Math.Clamp(newValue, _ScrollBar.Minimum, _ScrollBar.Maximum - _ScrollBar.LargeChange);
+                ScrollTimelime(_ScrollBar.Value, oldValue);
+            }
+        }
+
         private void ScrollBar_Scroll(object? sender, ScrollEventArgs e)
         {
-            int deltaCycles = PixelsToCycles(e.NewValue) - PixelsToCycles(e.OldValue);
+            ScrollTimelime(e.NewValue, e.OldValue);
+        }
+
+        private void ScrollTimelime(int newValue, int oldValue)
+        {
+            int deltaCycles = PixelsToCycles(newValue) - PixelsToCycles(oldValue);
             _DisplayFrom += deltaCycles;
             _DisplayTo += deltaCycles;
 
@@ -603,7 +621,7 @@ namespace BeebPerf.ux
             _ScrollBar.Minimum = CyclesToPixels(-extends);
             _ScrollBar.Maximum = CyclesToPixels(_RecordingDuration + extends);
             _ScrollBar.LargeChange = CyclesToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
-            _ScrollBar.SmallChange = Width / DeviceDpi;
+            _ScrollBar.SmallChange = DeviceDpi;
             _ScrollBar.Value = 0;
             _ScrollBar.Enabled = true;
         }
