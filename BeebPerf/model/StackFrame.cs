@@ -68,7 +68,7 @@ namespace BeebPerf.model
 
         public override string ToString()
         {
-            return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, SP: {StackPointer}";
+            return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
         }
 
         public int FirstInstructionIndex = -1;

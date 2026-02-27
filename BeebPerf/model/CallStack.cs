@@ -39,14 +39,14 @@ namespace BeebPerf.model
             Routine = new Routine();
         }
 
-        public CallStack(Routine routine, CanonicalAddress returnAddress, byte stackPointer, CallType type, StackFrame? parent)
+        public CallStack(Routine routine, CanonicalAddress returnAddress, byte returnStackPointer, CallType type, StackFrame? parent)
         {
             CallType = type;
             Parent = parent;
             Routine = routine;
             StartAddress = routine.StartAddress;
             ReturnAddress = returnAddress;
-            StackPointer = stackPointer;
+            ReturnStackPointer = returnStackPointer;
         }
 
         public bool Equals(CallStack? other)
@@ -113,7 +113,7 @@ namespace BeebPerf.model
         public Routine Routine;
         public CanonicalAddress StartAddress;
         public CanonicalAddress ReturnAddress;
-        public byte StackPointer;
+        public byte ReturnStackPointer;
         public StackFrame? Parent;
     }
 }

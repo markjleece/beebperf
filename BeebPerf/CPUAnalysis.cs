@@ -98,7 +98,7 @@ namespace BeebPerf
                 fSyncStack = false;
                 while (stackFrames.Count > 1)
                 {
-                    if (stackPointer < stackFrames.Peek().StackPointer)
+                    if (stackPointer < stackFrames.Peek().ReturnStackPointer)
                         break;
                     stackFrames.Pop();
                 }
@@ -152,7 +152,7 @@ namespace BeebPerf
                     {
                         syncStackFrames();
                         stackPointer += 3;
-                        if (stackPointer < stackFrames.Peek().StackPointer)
+                        if (stackPointer < stackFrames.Peek().ReturnStackPointer)
                             CreateRoutine(instruction.DestinationAddress);
                         else
                             stackFrames.Pop();
@@ -161,7 +161,7 @@ namespace BeebPerf
                     {
                         syncStackFrames();
                         stackPointer += 2;
-                        if (stackPointer < stackFrames.Peek().StackPointer)
+                        if (stackPointer < stackFrames.Peek().ReturnStackPointer)
                             CreateRoutine(instruction.DestinationAddress);
                         else
                             stackFrames.Pop();
@@ -306,7 +306,7 @@ namespace BeebPerf
                     stackFrame.CallType,
                     RoutinesByAddress[stackFrame.StartAddress],
                     stackFrame.ReturnAddress,
-                    stackFrame.StackPointer,
+                    stackFrame.ReturnStackPointer,
                     startCycleCount: 0,
                     parent: currentStackFrame);
             }
@@ -325,7 +325,7 @@ namespace BeebPerf
                 while (currentStackFrame?.Parent != null)
                 {
                     currentStackFrame.EndCycleCount = postCycleCount;
-                    if (stackPointer < currentStackFrame.StackPointer)
+                    if (stackPointer < currentStackFrame.ReturnStackPointer)
                         break;
                     currentStackFrame = currentStackFrame.Parent;
                 }
@@ -349,7 +349,7 @@ namespace BeebPerf
                                 CallType.FallThrough,
                                 routine,
                                 currentStackFrame.ReturnAddress,
-                                currentStackFrame.StackPointer,
+                                currentStackFrame.ReturnStackPointer,
                                 cycleCount, 
                                 parent: currentStackFrame);
 
@@ -368,7 +368,7 @@ namespace BeebPerf
                             CallType.BRK,
                             RoutinesByAddress[instruction.DestinationAddress],
                             returnAddress: instruction.OpcodeAddress.Offset(2),
-                            stackPointer,
+                            returnStackPointer: stackPointer,
                             postCycleCount,
                             parent: currentStackFrame);
                         stackPointer -= 3;
@@ -381,7 +381,7 @@ namespace BeebPerf
                             CallType.JSR,
                             RoutinesByAddress[instruction.DestinationAddress],
                             returnAddress: instruction.OpcodeAddress.Offset(3),
-                            stackPointer,
+                            returnStackPointer: stackPointer,
                             postCycleCount,
                             parent: currentStackFrame);
                         stackPointer -= 2;
@@ -396,7 +396,7 @@ namespace BeebPerf
                             CallType.TailCall,
                             RoutinesByAddress[instruction.DestinationAddress],
                             currentStackFrame.ReturnAddress,
-                            currentStackFrame.StackPointer,
+                            currentStackFrame.ReturnStackPointer,
                             postCycleCount,
                             parent: currentStackFrame);
                     }
@@ -413,14 +413,14 @@ namespace BeebPerf
                         }
                         currentStackFrame.EndCycleCount = postCycleCount;
 
-                        if (stackPointer < currentStackFrame!.StackPointer)
+                        if (stackPointer < currentStackFrame!.ReturnStackPointer)
                         {
                             // create stack frame for tail call
                             currentStackFrame = CreateStackFrame(
                                 CallType.TailCall,
                                 RoutinesByAddress[instruction.DestinationAddress],
                                 currentStackFrame.ReturnAddress,
-                                currentStackFrame.StackPointer,
+                                currentStackFrame.ReturnStackPointer,
                                 postCycleCount,
                                 parent: currentStackFrame);
                         }
@@ -499,11 +499,11 @@ namespace BeebPerf
             CallType type,
             Routine routine,
             CanonicalAddress returnAddress,
-            byte stackPointer,
+            byte returnStackPointer,
             int startCycleCount,
             model.StackFrame? parent)
         {
-            model.StackFrame stackFrame = new(routine, returnAddress, stackPointer, type, parent);
+            model.StackFrame stackFrame = new(routine, returnAddress, returnStackPointer, type, parent);
             stackFrame.StartCycleCount = startCycleCount;
             if (parent != null)
                 parent.Children.Add(stackFrame);
@@ -516,7 +516,7 @@ namespace BeebPerf
                 callType,
                 routine,
                 currentStackFrame.ReturnAddress,
-                currentStackFrame.StackPointer,
+                currentStackFrame.ReturnStackPointer,
                 currentStackFrame.StartCycleCount,
                 parent: currentStackFrame.Parent);
 

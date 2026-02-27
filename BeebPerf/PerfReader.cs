@@ -150,13 +150,13 @@ namespace BeebPerf
                 ushort startAddress = ReadShort(dataStream);
                 byte returnAddressPage = ReadByte(dataStream);
                 ushort returnAddress = ReadShort(dataStream);
-                byte stackPointer = ReadByte(dataStream);
+                byte returnStackPointer = ReadByte(dataStream);
 
                 model.Snapshot.StackFrames[i] = new(
                     (CallType)type,
                     new CanonicalAddress(startAddress, (MemoryPage)startAddressPage),
                     new CanonicalAddress(returnAddress, (MemoryPage)returnAddressPage),
-                    stackPointer);
+                    returnStackPointer);
             }
 
             byte screenAddress = ReadByte(dataStream);

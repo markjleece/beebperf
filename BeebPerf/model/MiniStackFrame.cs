@@ -25,20 +25,20 @@ namespace BeebPerf.model
     {
         public CanonicalAddress StartAddress { get; }
         public CanonicalAddress ReturnAddress { get; }
-        public byte StackPointer { get; }
+        public byte ReturnStackPointer { get; }
         public CallType CallType { get; }
 
-        public MiniStackFrame(CallType callType, CanonicalAddress startAddress, CanonicalAddress returnAddress, byte stackPointer)
+        public MiniStackFrame(CallType callType, CanonicalAddress startAddress, CanonicalAddress returnAddress, byte returnStackPointer)
         {
             CallType = callType;
             StartAddress = startAddress;
             ReturnAddress = returnAddress;
-            StackPointer = stackPointer;
+            ReturnStackPointer = returnStackPointer;
         }
 
         public override string ToString()
         {
-            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, SP: {StackPointer}";
+            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, SP: {ReturnStackPointer}";
         }
     }
 }
