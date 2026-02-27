@@ -41,14 +41,14 @@ namespace BeebPerf.model
         }
 
         public bool IsInstruction => (Type == InstructionType.Instruction);
-        public bool IsNMI => (Type == InstructionType.IRQ);
-        public bool IsIRQ => (Type == InstructionType.NMI);
+        public bool IsIRQ => (Type == InstructionType.IRQ);
+        public bool IsNMI => (Type == InstructionType.NMI);
         public bool IsBeginDisplayEvent => (Type == InstructionType.BeginDisplayEvent);
 
         public InstructionType Type
         {
             get => (InstructionType)(_TypeAndCycleCount & 0xF0);
-            set => _TypeAndCycleCount = (byte)(((byte)value & 0xF0)| (_TypeAndCycleCount & 0x0F));
+            set => _TypeAndCycleCount = (byte)(((byte)value & 0xF0) | (_TypeAndCycleCount & 0x0F));
         }
 
         public int CycleCount

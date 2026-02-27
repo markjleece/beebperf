@@ -182,12 +182,12 @@ namespace BeebPerf
                         branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
                     }
                 }
-                else if (instruction.IsNMI)
+                else if (instruction.IsIRQ)
                 {
                     pushStackFrame(new MiniStackFrame(CallType.IRQ, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
                     stackPointer -= 3;
                 }
-                else if (instruction.IsIRQ)
+                else if (instruction.IsNMI)
                 {
                     pushStackFrame(new MiniStackFrame(CallType.NMI, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
                     stackPointer -= 3;
@@ -360,18 +360,31 @@ namespace BeebPerf
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)
                         currentStackFrame.LastInstructionIndex = instructionIndex;
 
-                    if ((instruction.Opcode == 0x00/*BRK*/ || instruction.Opcode == 0x20/*JSR*/) && !isLastInstruction)
+                    if (instruction.Opcode == 0x00/*BRK*/ && !isLastInstruction)
                     {
-                        // create new stack frame for JSR/BRK
+                        // create new stack frame for BRK
                         syncStackFrames(postCycleCount);
                         currentStackFrame = CreateStackFrame(
-                            instruction.Opcode == 0x20 ? CallType.JSR : CallType.BRK,
+                            CallType.BRK,
+                            RoutinesByAddress[instruction.DestinationAddress],
+                            returnAddress: instruction.OpcodeAddress.Offset(2),
+                            stackPointer,
+                            postCycleCount,
+                            parent: currentStackFrame);
+                        stackPointer -= 3;
+                    }
+                    else if (instruction.Opcode == 0x20/*JSR*/ && !isLastInstruction)
+                    {
+                        // create new stack frame for JSR
+                        syncStackFrames(postCycleCount);
+                        currentStackFrame = CreateStackFrame(
+                            CallType.JSR,
                             RoutinesByAddress[instruction.DestinationAddress],
                             returnAddress: instruction.OpcodeAddress.Offset(3),
                             stackPointer,
                             postCycleCount,
                             parent: currentStackFrame);
-                        stackPointer -= (byte)(instruction.Opcode == 0x20 ? 2/*JSR*/ : 3/*BRK*/);
+                        stackPointer -= 2;
                     }
                     else if (instructionSet.IsBranchOrJump(instruction.Opcode) && instruction.CycleCount > 2 &&
                              RoutinesByAddress.TryGetValue(instruction.DestinationAddress, out Routine? destinationRoutine) &&
@@ -446,9 +459,8 @@ namespace BeebPerf
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)
                         currentStackFrame.LastInstructionIndex = instructionIndex;
 
-                    syncStackFrames(postCycleCount);
-
                     // create new stack frame for IRQ/NMI
+                    syncStackFrames(postCycleCount);
                     currentStackFrame = CreateStackFrame(
                         instruction.IsIRQ ? CallType.IRQ : CallType.NMI,
                         RoutinesByAddress[instruction.DestinationAddress],
@@ -463,25 +475,24 @@ namespace BeebPerf
                 cycleCount = postCycleCount;
             }
 
+            // unwind residual stack, setting end cycle counts
             syncStackFrames(cycleCount);
-
-            // set initial cycle counts
-            StartCycleCount = 0;
-            EndCycleCount = cycleCount;
-
-            // unwind residual stack
-            int depth = 0;
+            int residualDepth = 0;
             while (true)
             {
                 currentStackFrame!.EndCycleCount = cycleCount;
                 if (currentStackFrame.Parent is null) 
                     break;
                 currentStackFrame = currentStackFrame.Parent;
-                depth++;
+                residualDepth++;
             }
-            Debug.Assert(depth < 10);
+            Debug.Assert(residualDepth < 10);
+
+            currentStackFrame!.EndCycleCount = cycleCount;
 
             RootStackFrame = currentStackFrame;
+            StartCycleCount = 0;
+            EndCycleCount = cycleCount;
         }
 
         private model.StackFrame CreateStackFrame(
