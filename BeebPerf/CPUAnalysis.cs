@@ -346,7 +346,7 @@ namespace BeebPerf
                                 routine,
                                 currentStackFrame.ReturnAddress,
                                 currentStackFrame.ReturnStackPointer,
-                                cycleCount, 
+                                cycleCount,
                                 parent: currentStackFrame);
 
                     // update instruction indices to include instruction
@@ -355,6 +355,10 @@ namespace BeebPerf
 
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)
                         currentStackFrame.LastInstructionIndex = instructionIndex;
+
+                    // update routine end address
+                    if (currentStackFrame.Routine.EndAddress.CompareTo(instruction.OpcodeAddress) < 0)
+                        currentStackFrame.Routine.EndAddress = instruction.OpcodeAddress;
 
                     if (instruction.Opcode == 0x00/*BRK*/ && !isLastInstruction)
                     {
@@ -436,7 +440,8 @@ namespace BeebPerf
                                 currentStackFrame = InsertParentStackFrame(
                                     currentStackFrame,
                                     CallType.TailCall,
-                                    RoutinesByAddress[destinationRoutineAddress]);
+                                    RoutinesByAddress[destinationRoutineAddress],
+                                    stackPointer);
                             }
                         }
                     }
@@ -473,17 +478,11 @@ namespace BeebPerf
 
             // unwind residual stack, setting end cycle counts
             syncStackFrames(cycleCount);
-            int residualDepth = 0;
-            while (true)
+            while (currentStackFrame!.Parent != null)
             {
-                currentStackFrame!.EndCycleCount = cycleCount;
-                if (currentStackFrame.Parent is null) 
-                    break;
+                currentStackFrame.EndCycleCount = cycleCount;
                 currentStackFrame = currentStackFrame.Parent;
-                residualDepth++;
             }
-            Debug.Assert(residualDepth < 10);
-
             currentStackFrame!.EndCycleCount = cycleCount;
 
             RootStackFrame = currentStackFrame;
@@ -506,13 +505,13 @@ namespace BeebPerf
             return stackFrame;
         }
 
-        private model.StackFrame InsertParentStackFrame(model.StackFrame currentStackFrame, CallType callType, Routine routine)
+        private model.StackFrame InsertParentStackFrame(model.StackFrame currentStackFrame, CallType callType, Routine routine, byte returnStackPointer)
         {
             var newParentStackFrame = CreateStackFrame(
                 callType,
                 routine,
-                currentStackFrame.ReturnAddress,
-                currentStackFrame.ReturnStackPointer,
+                new CanonicalAddress(), // we don't know
+                returnStackPointer,
                 currentStackFrame.StartCycleCount,
                 parent: currentStackFrame.Parent);
 

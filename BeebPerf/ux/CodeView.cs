@@ -113,7 +113,7 @@ namespace BeebPerf.ux
                 var ellipses = new Ellipses();
                 var fallThrough = new FallThrough();
 
-                CanonicalAddress nextAddress = instructionMetrics[0].Instruction.OpcodeAddress;
+                CanonicalAddress nextAddress = routine.StartAddress;
                 foreach (var obj in instructionMetrics)
                 {
                     // add ellipses
