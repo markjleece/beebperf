@@ -29,7 +29,7 @@ namespace BeebPerf.model
         NMI = 3,
         BRK = 4,
         TailCall = 5,
-        FallThrough = 6,
+        FallThrough = 6
     }
 
     public class CallStack : IEquatable<CallStack>

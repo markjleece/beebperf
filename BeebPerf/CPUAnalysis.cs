@@ -26,14 +26,14 @@ namespace BeebPerf
 {
     public class CPUAnalysis
     {
-        public async Task<bool> StaticAnalysis(Model model)
+        public async Task<bool> StaticAnalysisAsync(Model model)
         {
             return await Task.Run(() => 
             {
                 Initialize(model);
-                IdentifyRoutines();
-                IdentifyStackFrames();
-                return true; 
+                CreateRoutines();
+                CreateStackFrames();
+                return true;
             });
         }
 
@@ -64,49 +64,40 @@ namespace BeebPerf
             _InitialStackPointer = model.Snapshot.StackPointer;
         }
 
-        private void IdentifyRoutines()
+        private void CreateRoutines()
         {
             RoutinesByAddress = new();
             _SortedRoutineAddresses = new();
 
-            // identify routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI, whilst collecting branches and jumps
-            var branchesAndJumps = IdentifyPrimaryRoutines();
+            // create routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI, whilst collecting branches and jumps
+            var branchesAndJumps = CreatePrimaryRoutines();
 
             // group branches and jumps by routine
             var branchesAndJumpByRoutine = GroupBranchesAndJumps(branchesAndJumps);
 
-            // identify additional routines invoked by cross routine jumps and branches
-            IdentifySecondaryRoutines(branchesAndJumpByRoutine);
+            // create additional routines invoked by cross routine jumps and branches
+            CreateSecondaryRoutines(branchesAndJumpByRoutine);
         }
 
-        private HashSet<CanonicalAddressPair> IdentifyPrimaryRoutines()
+        private HashSet<CanonicalAddressPair> CreatePrimaryRoutines()
         {
-            HashSet<CanonicalAddressPair> branchesAndJumps = new(1024);
-
-            // we identify all the routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI by simulating
+            // we create all the routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI by simulating
             // the call stack where we create routines for pushed stack frames. We also create routines
             // for any RTI or RTS which doesn't return to the caller
 
+            HashSet<CanonicalAddressPair> branchesAndJumps = new(1024);
             Stack<MiniStackFrame> stackFrames = new();
             byte stackPointer = _InitialStackPointer;
-            bool fSyncStack = false;
 
-            void syncStackFrames()
+            void syncStackFrames(byte returnStackPointer)
             {
-                if (!fSyncStack)
-                    return;
-                fSyncStack = false;
-                while (stackFrames.Count > 1)
-                {
-                    if (stackPointer < stackFrames.Peek().ReturnStackPointer)
-                        break;
+                while (stackFrames.Count > 1 && returnStackPointer >= stackFrames.Peek().ReturnStackPointer)
                     stackFrames.Pop();
-                }
             }
 
             void pushStackFrame(MiniStackFrame stackFrame)
             {
-                syncStackFrames();
+                syncStackFrames(stackFrame.ReturnStackPointer);
                 stackFrames.Push(stackFrame);
                 var routine = CreateRoutine(stackFrame.StartAddress);
                 switch (stackFrame.CallType)
@@ -139,6 +130,15 @@ namespace BeebPerf
                         pushStackFrame(new MiniStackFrame(CallType.JSR, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
                         stackPointer -= 2;
                     }
+                    else if (opcode == 0x60/*RTS*/)
+                    {
+                        syncStackFrames(stackPointer);
+                        stackPointer += 2;
+                        if (stackPointer >= stackFrames.Peek().ReturnStackPointer && stackFrames.Count > 1)
+                            stackFrames.Pop();
+                        else
+                            CreateRoutine(instruction.DestinationAddress);
+                    }
                     else if (opcode == 0x00/*BRK*/)
                     {
                         pushStackFrame(new MiniStackFrame(CallType.BRK, instruction.DestinationAddress, instruction.ReturnAddress, stackPointer));
@@ -146,26 +146,16 @@ namespace BeebPerf
                     }
                     else if (opcode == 0x40/*RTI*/)
                     {
-                        syncStackFrames();
+                        syncStackFrames(stackPointer);
                         stackPointer += 3;
-                        if (stackPointer < stackFrames.Peek().ReturnStackPointer)
-                            CreateRoutine(instruction.DestinationAddress);
-                        else
+                        if (stackPointer >= stackFrames.Peek().ReturnStackPointer && stackFrames.Count > 1)
                             stackFrames.Pop();
-                    }
-                    else if (opcode == 0x60/*RTS*/)
-                    {
-                        syncStackFrames();
-                        stackPointer += 2;
-                        if (stackPointer < stackFrames.Peek().ReturnStackPointer)
-                            CreateRoutine(instruction.DestinationAddress);
                         else
-                            stackFrames.Pop();
+                            CreateRoutine(instruction.DestinationAddress);
                     }
                     else if (_InstructionSet!.ModifiesStackPointer(opcode))
                     {
                         stackPointer = instruction.StackPointer;
-                        fSyncStack = true;
                     }
                     else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
                     {
@@ -218,9 +208,9 @@ namespace BeebPerf
             return branchesAndJumpsByRoutine;
         }
 
-        private void IdentifySecondaryRoutines(Dictionary<CanonicalAddress/*routine*/, HashSet<CanonicalAddressPair>> branchesAndJumpsByRoutine)
+        private void CreateSecondaryRoutines(Dictionary<CanonicalAddress/*routine*/, HashSet<CanonicalAddressPair>> branchesAndJumpsByRoutine)
         {
-            // now we have an initial set of routines and a set of branches and jumps, so we can identify any additional
+            // now we have an initial set of routines and a set of branches and jumps, so we create additional
             // routines that are required to ensure all branch and jump destinations are routine entry points
             var allRoutines = RoutinesByAddress.Keys.ToList<CanonicalAddress>();
             Stack<CanonicalAddress> pendingRoutines = new(allRoutines);
@@ -292,12 +282,73 @@ namespace BeebPerf
             return routine;
         }
 
-        public void IdentifyStackFrames()
+        private Routine CreatePageBaseRoutine(MemoryPage page)
         {
-            // prime call stack with initial stack frames
+            ushort baseAddress = page switch
+            {
+                MemoryPage.WholeRam => 0x0000,
+                MemoryPage.ShadowRam => 0x3000,
+                MemoryPage.PrivateRam => 0x8000,
+                MemoryPage.FilingSystemRam => 0xC000,
+                MemoryPage.HiddenRam => 0x0000,
+                _ => 0x8000
+            };
+
+            return CreateRoutine(new CanonicalAddress(baseAddress, page));
+        }
+
+        public void CreateStackFrames()
+        {
+            // create initial call stack
+            var currentStackFrame = CreateInitialStackFrames();
+
+            // iterate over instructions, creating remaining stack frames
+            CreateRemainingStackFrames(currentStackFrame);
+
+            // review inserted stack-frames, as their associated routine may be incorrect
+            ReviewInsertedStackFrames(currentStackFrame);
+        }
+
+        private model.StackFrame? CreateInitialStackFrames()
+        {
+            // reconstruct the initial call stack inserting tail calls when
+            // the return address is not within the parent
+
             model.StackFrame? currentStackFrame = null;
+
             foreach (var stackFrame in _InitialCallStack)
             {
+                if (currentStackFrame != null)
+                {
+                    // is the return address within the parent routine?
+                    var returnRoutineAddress = _SortedRoutineAddresses.Find(stackFrame.ReturnAddress);
+                    if (!returnRoutineAddress.Equals(currentStackFrame!.StartAddress))
+                    {
+                        // create stack frame for tail call, creating a base routine if needed
+                        Routine returnRoutine;
+                        if (returnRoutineAddress.Address != 0)
+                            returnRoutine = RoutinesByAddress[returnRoutineAddress];
+                        else
+                            returnRoutine = CreatePageBaseRoutine(returnRoutineAddress.Page);
+
+                        currentStackFrame = CreateStackFrame(
+                            CallType.TailCall,
+                            returnRoutine,
+                            currentStackFrame.ReturnAddress,
+                            currentStackFrame.ReturnStackPointer,
+                            startCycleCount: 0,
+                            parent: currentStackFrame);
+
+                        // mark as inserted
+                        currentStackFrame.InsertedTailCall = true;
+
+                        // ensure the stack frame's routine is updated if no instructions
+                        // fall within the stack frame
+                        currentStackFrame.LowestAddress = stackFrame.ReturnAddress.Address;
+                        currentStackFrame.HighestAddress = stackFrame.ReturnAddress.Address;
+                    }
+                }
+
                 currentStackFrame = CreateStackFrame(
                     stackFrame.CallType,
                     RoutinesByAddress[stackFrame.StartAddress],
@@ -307,24 +358,47 @@ namespace BeebPerf
                     parent: currentStackFrame);
             }
 
-            // iterate over all the instructions...
+            // if first instruction within in a tail-call?
+            var firstRoutineAddress = _SortedRoutineAddresses.Find(_Instructions[0].OpcodeAddress);
+            if (!currentStackFrame!.StartAddress.Equals(firstRoutineAddress))
+            {
+                // create stack frame for tail call, creating a base routine if needed
+                Routine firstRoutine;
+                if (firstRoutineAddress.Address != 0)
+                    firstRoutine = RoutinesByAddress[firstRoutineAddress];
+                else
+                    firstRoutine = CreatePageBaseRoutine(firstRoutineAddress.Page);
+
+                currentStackFrame = CreateStackFrame(
+                    CallType.TailCall,
+                    firstRoutine,
+                    currentStackFrame.ReturnAddress,
+                    currentStackFrame.ReturnStackPointer,
+                    startCycleCount: 0,
+                    parent: currentStackFrame);
+
+                // mark as inserted
+                currentStackFrame.InsertedTailCall = true;
+            }
+
+            return currentStackFrame;
+        }
+
+        private void CreateRemainingStackFrames(model.StackFrame? currentStackFrame)
+        {
             byte stackPointer = _InitialStackPointer;
-            var instructionSet = _InstructionSet!;
-            bool fSyncStack = false;
             int cycleCount = 0;
 
-            void syncStackFrames(int postCycleCount)
+            bool syncStackFrames(int postCycleCount)
             {
-                if (!fSyncStack)
-                    return;
-                fSyncStack = false;
-                while (currentStackFrame?.Parent != null)
+                bool stackModified = false;
+                while (stackPointer >= currentStackFrame!.ReturnStackPointer && currentStackFrame!.Parent != null)
                 {
                     currentStackFrame.EndCycleCount = postCycleCount;
-                    if (stackPointer < currentStackFrame.ReturnStackPointer)
-                        break;
                     currentStackFrame = currentStackFrame.Parent;
+                    stackModified = true;
                 }
+                return stackModified;
             }
 
             for (int instructionIndex = 0; instructionIndex < _Instructions.Length; instructionIndex++)
@@ -356,9 +430,18 @@ namespace BeebPerf
                     if (currentStackFrame.LastInstructionIndex < instructionIndex)
                         currentStackFrame.LastInstructionIndex = instructionIndex;
 
-                    // update routine end address
-                    if (currentStackFrame.Routine.EndAddress.CompareTo(instruction.OpcodeAddress) < 0)
-                        currentStackFrame.Routine.EndAddress = instruction.OpcodeAddress;
+                    // update start and end addresses
+                    ushort instructionAddress = instruction.OpcodeAddress.Address;
+                    if (currentStackFrame.LowestAddress < instructionAddress)
+                        currentStackFrame.LowestAddress = instructionAddress;
+
+                    if (currentStackFrame.HighestAddress > instructionAddress)
+                        currentStackFrame.HighestAddress = instructionAddress;
+
+                    // update routine's end address, but not if the stack frame was inserted
+                    if (!currentStackFrame.InsertedTailCall &&
+                        currentStackFrame.Routine.EndAddress < instructionAddress)
+                        currentStackFrame.Routine.EndAddress = instructionAddress;
 
                     if (instruction.Opcode == 0x00/*BRK*/ && !isLastInstruction)
                     {
@@ -386,7 +469,7 @@ namespace BeebPerf
                             parent: currentStackFrame);
                         stackPointer -= 2;
                     }
-                    else if (instructionSet.IsBranchOrJump(instruction.Opcode) && instruction.CycleCount > 2 &&
+                    else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode) && instruction.CycleCount > 2 &&
                              RoutinesByAddress.TryGetValue(instruction.DestinationAddress, out Routine? destinationRoutine) &&
                              destinationRoutine != currentStackFrame.Routine)
                     {
@@ -404,18 +487,9 @@ namespace BeebPerf
                     {
                         syncStackFrames(postCycleCount);
                         stackPointer += (byte)(instruction.Opcode == 0x60 ? 2/*RTS*/ : 3/*RTI*/);
-
-                        // unwind any fall-through and tail calls, updating end cycle count
-                        while (currentStackFrame!.CallType == CallType.TailCall || currentStackFrame!.CallType == CallType.FallThrough)
+                        if (!syncStackFrames(postCycleCount))
                         {
-                            currentStackFrame.EndCycleCount = postCycleCount;
-                            currentStackFrame = currentStackFrame.Parent;
-                        }
-                        currentStackFrame.EndCycleCount = postCycleCount;
-
-                        if (stackPointer < currentStackFrame!.ReturnStackPointer)
-                        {
-                            // create stack frame for tail call
+                            // create tail call as RTS/RTI didn't return to caller
                             currentStackFrame = CreateStackFrame(
                                 CallType.TailCall,
                                 RoutinesByAddress[instruction.DestinationAddress],
@@ -424,31 +498,10 @@ namespace BeebPerf
                                 postCycleCount,
                                 parent: currentStackFrame);
                         }
-                        else
-                        {
-                            // does RTS/RTI return to the caller, or caller's fall-through? it not we need to insert a parent stack frame
-                            var parentRoutineStartAddress = currentStackFrame!.Parent!.Routine.StartAddress;
-                            var destinationRoutineAddress = _SortedRoutineAddresses.Find(instruction.DestinationAddress);
-                            if (parentRoutineStartAddress.Equals(destinationRoutineAddress) ||
-                                parentRoutineStartAddress.Equals(_SortedRoutineAddresses.Find(instruction.DestinationAddress.Offset(-1))))
-                            {
-                                // return to caller, or caller's fall-through
-                                currentStackFrame = currentStackFrame.Parent;
-                            }
-                            else
-                            {
-                                currentStackFrame = InsertParentStackFrame(
-                                    currentStackFrame,
-                                    CallType.TailCall,
-                                    RoutinesByAddress[destinationRoutineAddress],
-                                    stackPointer);
-                            }
-                        }
                     }
                     else if (_InstructionSet!.ModifiesStackPointer(instruction.Opcode) && !isLastInstruction)
                     {
                         stackPointer = instruction.StackPointer;
-                        fSyncStack = true;
                     }
                 }
                 else if ((instruction.IsIRQ || instruction.IsNMI) && !isLastInstruction)
@@ -469,7 +522,6 @@ namespace BeebPerf
                         stackPointer,
                         postCycleCount, 
                         parent: currentStackFrame);
-
                     stackPointer -= 3;
                 }
 
@@ -478,16 +530,46 @@ namespace BeebPerf
 
             // unwind residual stack, setting end cycle counts
             syncStackFrames(cycleCount);
+            int count = 0;
             while (currentStackFrame!.Parent != null)
             {
                 currentStackFrame.EndCycleCount = cycleCount;
                 currentStackFrame = currentStackFrame.Parent;
+                count++;
             }
             currentStackFrame!.EndCycleCount = cycleCount;
+            Debug.Assert(count < 50);
 
+            // set members
             RootStackFrame = currentStackFrame;
             StartCycleCount = 0;
             EndCycleCount = cycleCount;
+        }
+
+        private void ReviewInsertedStackFrames(model.StackFrame? stackFrame)
+        {
+            while (stackFrame != null)
+            {
+                if (stackFrame.InsertedTailCall)
+                {
+                    // do the stack frames instructions span a different address
+                    // range than its current routine?
+                    if (stackFrame.Routine.EndAddress < stackFrame.LowestAddress)
+                    {
+                        // create a new routine, updating the stack frame to reference it
+                        var routineAddress = new CanonicalAddress(stackFrame.LowestAddress, stackFrame.Routine.StartAddress.Page);
+                        stackFrame.Routine.StackFrames.Remove(stackFrame);
+                        stackFrame.StartAddress = routineAddress;
+                        stackFrame.Routine = CreateRoutine(routineAddress);
+                        stackFrame.Routine.StackFrames.Add(stackFrame);
+                        stackFrame.Routine.EndAddress = stackFrame.HighestAddress;
+                    }
+                    else if (stackFrame.Routine.EndAddress < stackFrame.HighestAddress)
+                        stackFrame.Routine.EndAddress = stackFrame.HighestAddress;
+                }
+
+                stackFrame = stackFrame.Parent;
+            }
         }
 
         private model.StackFrame CreateStackFrame(
@@ -503,23 +585,6 @@ namespace BeebPerf
             if (parent != null)
                 parent.Children.Add(stackFrame);
             return stackFrame;
-        }
-
-        private model.StackFrame InsertParentStackFrame(model.StackFrame currentStackFrame, CallType callType, Routine routine, byte returnStackPointer)
-        {
-            var newParentStackFrame = CreateStackFrame(
-                callType,
-                routine,
-                new CanonicalAddress(), // we don't know
-                returnStackPointer,
-                currentStackFrame.StartCycleCount,
-                parent: currentStackFrame.Parent);
-
-            currentStackFrame.Parent!.Children.Remove(currentStackFrame);
-            newParentStackFrame.Children.Add(currentStackFrame);
-            currentStackFrame.Parent = newParentStackFrame;
-            
-            return newParentStackFrame;
         }
 
         //

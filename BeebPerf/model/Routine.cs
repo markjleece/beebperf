@@ -26,7 +26,7 @@ namespace BeebPerf.model
         public Routine()
         {
             StartAddress = new CanonicalAddress();
-            EndAddress = new CanonicalAddress();
+            EndAddress = StartAddress.Address;
             Label = String.Empty;
         }
 
@@ -34,7 +34,7 @@ namespace BeebPerf.model
         {
             Label = label;
             StartAddress = address;
-            EndAddress = address;
+            EndAddress = address.Address;
         }
 
         public void ClearMetrics()
@@ -46,7 +46,7 @@ namespace BeebPerf.model
         public bool HotRoutine;
         public string Label;
         public CanonicalAddress StartAddress;
-        public CanonicalAddress EndAddress;
+        public int EndAddress;
         public Dictionary<CallStack, CPUMetrics> MetricsByStack = new();
         public CPUMetrics AggregateMetrics = new();
         public List<StackFrame> StackFrames = new();

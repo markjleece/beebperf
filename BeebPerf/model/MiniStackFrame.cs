@@ -38,7 +38,7 @@ namespace BeebPerf.model
 
         public override string ToString()
         {
-            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, SP: {ReturnStackPointer}";
+            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, Return SP: {ReturnStackPointer}";
         }
     }
 }

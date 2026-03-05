@@ -127,7 +127,7 @@ namespace BeebPerf.ux
         {
             SetState(AppStateFlags.StaticCPUAnalysis);
 
-            var staticAnalysisTask = _CPUAnalysis.StaticAnalysis(_Model).ContinueWith((success) =>
+            var staticAnalysisTask = _CPUAnalysis.StaticAnalysisAsync(_Model).ContinueWith((success) =>
             {
                 this.Invoke((Action)(() =>
                 {

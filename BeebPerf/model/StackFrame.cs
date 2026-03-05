@@ -27,8 +27,8 @@ namespace BeebPerf.model
         {
         }
 
-        public StackFrame(Routine routine, CanonicalAddress returnAddress, byte stackPointer, CallType type, StackFrame? parent) : 
-            base(routine, returnAddress, stackPointer, type, parent) 
+        public StackFrame(Routine routine, CanonicalAddress returnAddress, byte returnStackPointer, CallType type, StackFrame? parent) : 
+            base(routine, returnAddress, returnStackPointer, type, parent) 
         {
             routine.StackFrames.Add(this);
         }
@@ -68,14 +68,17 @@ namespace BeebPerf.model
 
         public override string ToString()
         {
-            return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
+            return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Type: {CallType}, Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
         }
 
         public int FirstInstructionIndex = -1;
         public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
+        public ushort LowestAddress = ushort.MinValue;
+        public ushort HighestAddress = ushort.MaxValue;
         public CPUMetrics CPUMetrics = new();
         public List<StackFrame> Children = new();
+        public bool InsertedTailCall = false;
     }
 }

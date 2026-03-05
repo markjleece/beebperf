@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..b8d141f 100644
+index 52f9049..d424aee 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -374,17 +374,21 @@ index 52f9049..b8d141f 100644
  #include "Sound.h"
  #include "Teletext.h"
  #include "Scsi.h"
-@@ -239,9 +240,6 @@ bool BasicHardwareOnly = false; // false = all hardware, true = basic hardware o
- 	var = ReadPaged(ProgramCounter++); \
- 	var |= (ReadPaged(ProgramCounter++) << 8)
- 
+@@ -236,11 +237,8 @@ bool BasicHardwareOnly = false; // false = all hardware, true = basic hardware o
+ // Get a two byte address from the program counter, and then post inc
+ // the program counter
+ #define GETTWOBYTEFROMPC(var) \
+-	var = ReadPaged(ProgramCounter++); \
+-	var |= (ReadPaged(ProgramCounter++) << 8)
+-
 -#define WritePaged(addr,val) BeebWriteMem(addr,val)
 -#define ReadPaged(Address) BeebReadMem(Address)
--
++    var = ReadPaged(ProgramCounter++); \
++    var |= (ReadPaged(ProgramCounter++) << 8)
+ 
  static void PollVIAs(unsigned int nCycles);
  static void PollHardware(unsigned int nCycles);
- 
-@@ -249,6 +247,105 @@ static unsigned int InstructionCount[256];
+@@ -249,62 +247,157 @@ static unsigned int InstructionCount[256];
  
  /*----------------------------------------------------------------------------*/
  
@@ -396,30 +400,30 @@ index 52f9049..b8d141f 100644
 +
 +inline static unsigned char ReadZeroPage(int address)
 +{
-+	LastReadWriteAddress = address;
-+	LastReadValue = WholeRam[address];
-+	return LastReadValue;
++    LastReadWriteAddress = address;
++    LastReadValue = WholeRam[address];
++    return LastReadValue;
 +}
 +
 +inline static void WriteZeroPage(int address, unsigned char value)
 +{
-+	LastReadWriteAddress = address;
-+	LastWriteValue = value;
-+	WholeRam[address] = value;
++    LastReadWriteAddress = address;
++    LastWriteValue = value;
++    WholeRam[address] = value;
 +}
 +
 +inline static unsigned char ReadPaged(int address)
 +{
-+	LastReadWriteAddress = address;
-+	LastReadValue = BeebReadMem(address);
-+	return LastReadValue;
++    LastReadWriteAddress = address;
++    LastReadValue = BeebReadMem(address);
++    return LastReadValue;
 +}
 +
 +inline static void WritePaged(int address, unsigned char value)
 +{
-+	LastReadWriteAddress = address;
-+	LastWriteValue = value;
-+	BeebWriteMem(address, value);
++    LastReadWriteAddress = address;
++    LastWriteValue = value;
++    BeebWriteMem(address, value);
 +}
 +
 +/*----------------------------------------------------------------------------*/
@@ -428,61 +432,57 @@ index 52f9049..b8d141f 100644
 +
 +static StackFrame StackFrames[128];
 +static int StackFrameCount;
-+static bool fSyncStackFrames;
 +
 +static void SetStackFrame(int index, StackFrameType type, int startAddress, int returnAddress, unsigned char returnStackReg)
 +{
-+	StackFrame* stackFrame = &StackFrames[index];
-+	stackFrame->Type = type;
-+	stackFrame->StartAddressPage = BeebMemPage(startAddress);
-+	stackFrame->StartAddress = startAddress;
-+	stackFrame->ReturnAddressPage = BeebMemPage(returnAddress);
-+	stackFrame->ReturnAddress = returnAddress;
-+	stackFrame->ReturnStackReg = returnStackReg;
++    StackFrame* stackFrame = &StackFrames[index];
++    stackFrame->Type = type;
++    stackFrame->StartAddressPage = BeebMemPage(startAddress);
++    stackFrame->StartAddress = startAddress;
++    stackFrame->ReturnAddressPage = BeebMemPage(returnAddress);
++    stackFrame->ReturnAddress = returnAddress;
++    stackFrame->ReturnStackReg = returnStackReg;
 +}
 +
-+static void SyncStackFrames(byte stackReg)
++static void SyncStackFrames(unsigned char stackReg)
 +{
-+	if (!fSyncStackFrames) return;
-+	fSyncStackFrames = false;
-+	while (StackFrameCount > 1)
-+	{
-+		if (stackReg < StackFrames[StackFrameCount - 1].ReturnStackReg) break;
-+		StackFrameCount--;
-+	}
++    while (stackReg >= StackFrames[StackFrameCount - 1].ReturnStackReg && StackFrameCount > 1)
++    {
++        StackFrameCount--;
++    }
 +}
 +
-+inline static void PushStackFrame(StackFrameType type, int startAddress, int returnAddress, byte returnStackReg)
++inline static void PushStackFrame(StackFrameType type, int returnAddress, unsigned char returnStackReg)
 +{
-+	SyncStackFrames(returnStackReg);
-+	SetStackFrame(StackFrameCount++, type, startAddress, returnAddress, returnStackReg);
++    SyncStackFrames(returnStackReg);
++    SetStackFrame(StackFrameCount++, type, ProgramCounter, returnAddress, returnStackReg);
 +}
 +
 +inline static void UpdateRootStackFrame()
 +{
-+	if (PrePC > 0x8000 && ProgramCounter < 0x8000 && StackFrames[0].StartAddress >= 0x8000)
-+	{
-+		SetStackFrame(0, StackFrameType_None, ProgramCounter, PrePC, StackReg);
-+	}
++    if (PrePC > 0x8000 && ProgramCounter < 0x8000 && StackFrames[0].StartAddress >= 0x8000)
++    {
++        SetStackFrame(0/*index*/, StackFrameType_Root, ProgramCounter, 0/*returnAddress*/, 0xff/*returnStackReg*/);
++    }
 +}
 +
 +void GetStackFrames(const StackFrame** ppStackFrames, int* pStackFrameCount)
 +{
-+	SyncStackFrames(StackReg);
-+	*pStackFrameCount = StackFrameCount;
-+	*ppStackFrames = StackFrames;
++    SyncStackFrames(StackReg);
++    *pStackFrameCount = StackFrameCount;
++    *ppStackFrames = StackFrames;
 +}
 +
 +/*----------------------------------------------------------------------------*/
 +
 +void GetRegisters(int* pProgramCounter, unsigned char* pAccumulator, unsigned char* pXReg, unsigned char* pYReg, unsigned char* pPSR, unsigned char* pStackReg)
 +{
-+	*pProgramCounter = ProgramCounter;
-+	*pAccumulator = Accumulator;
-+	*pXReg = XReg;
-+	*pYReg = YReg;
-+	*pPSR = PSR;
-+	*pStackReg = StackReg;
++    *pProgramCounter = ProgramCounter;
++    *pAccumulator = Accumulator;
++    *pXReg = XReg;
++    *pYReg = YReg;
++    *pPSR = PSR;
++    *pStackReg = StackReg;
 +}
 +
 +/*----------------------------------------------------------------------------*/
@@ -490,470 +490,5713 @@ index 52f9049..b8d141f 100644
  // Correct cycle count for indirection across page boundary
  
  static INLINE void Carried()
-@@ -402,7 +499,7 @@ INLINE static void SetPSRCZN(int c, int z, int n)
+ {
+-	if (CPUType == CPU::CPU65C12)
+-	{
+-		if (CurrentInstruction == 0x1e ||
+-		    CurrentInstruction == 0x3e ||
+-		    CurrentInstruction == 0x5e ||
+-		    CurrentInstruction == 0x7e)
+-		{
+-			Cycles++;
+-		}
+-	}
+-
+-	if (((CurrentInstruction & 0xf) == 0x1 ||
+-	     (CurrentInstruction & 0xf) == 0x9 ||
+-	     (CurrentInstruction & 0xf) == 0xd) &&
+-	    (CurrentInstruction & 0xf0) != 0x90)
+-	{
+-		Cycles++;
+-	}
+-	else if (CurrentInstruction == 0x1c ||
+-	         CurrentInstruction == 0x3c ||
+-	         CurrentInstruction == 0x5c ||
+-	         CurrentInstruction == 0x7c ||
+-	         CurrentInstruction == 0xb3 ||
+-	         CurrentInstruction == 0xbb ||
+-	         CurrentInstruction == 0xbc ||
+-	         CurrentInstruction == 0xbe ||
+-	         CurrentInstruction == 0xbf ||
+-	         CurrentInstruction == 0xdc ||
+-	         CurrentInstruction == 0xfc)
+-	{
+-		Cycles++;
+-	}
++    if (CPUType == CPU::CPU65C12)
++    {
++        if (CurrentInstruction == 0x1e ||
++            CurrentInstruction == 0x3e ||
++            CurrentInstruction == 0x5e ||
++            CurrentInstruction == 0x7e)
++        {
++            Cycles++;
++        }
++    }
++
++    if (((CurrentInstruction & 0xf) == 0x1 ||
++         (CurrentInstruction & 0xf) == 0x9 ||
++         (CurrentInstruction & 0xf) == 0xd) &&
++        (CurrentInstruction & 0xf0) != 0x90)
++    {
++        Cycles++;
++    }
++    else if (CurrentInstruction == 0x1c ||
++             CurrentInstruction == 0x3c ||
++             CurrentInstruction == 0x5c ||
++             CurrentInstruction == 0x7c ||
++             CurrentInstruction == 0xb3 ||
++             CurrentInstruction == 0xbb ||
++             CurrentInstruction == 0xbc ||
++             CurrentInstruction == 0xbe ||
++             CurrentInstruction == 0xbf ||
++             CurrentInstruction == 0xdc ||
++             CurrentInstruction == 0xfc)
++    {
++        Cycles++;
++    }
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ void DoIntCheck()
+ {
+-	if (!IntDue)
+-	{
+-		IntDue = intStatus != 0;
++    if (!IntDue)
++    {
++        IntDue = intStatus != 0;
+ 
+-		if (!IntDue)
+-		{
+-			CyclesToInt = NO_TIMER_INT_DUE;
+-		}
+-		else if (CyclesToInt == NO_TIMER_INT_DUE)
+-		{
+-			// Non-timer interrupt has occurred
+-			CyclesToInt = 0;
+-		}
+-	}
++        if (!IntDue)
++        {
++            CyclesToInt = NO_TIMER_INT_DUE;
++        }
++        else if (CyclesToInt == NO_TIMER_INT_DUE)
++        {
++            // Non-timer interrupt has occurred
++            CyclesToInt = 0;
++        }
++    }
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+@@ -314,57 +407,57 @@ void DoIntCheck()
+ 
+ void SyncIO(void)
+ {
+-	if ((TotalCycles+Cycles) & 1)
+-	{
+-		Cycles++;
+-		IOCycles = 1;
+-		PollVIAs(1);
+-	}
+-	else
+-	{
+-		IOCycles = 0;
+-	}
++    if ((TotalCycles+Cycles) & 1)
++    {
++        Cycles++;
++        IOCycles = 1;
++        PollVIAs(1);
++    }
++    else
++    {
++        IOCycles = 0;
++    }
+ }
+ 
+ void AdjustForIORead(void)
+ {
+-	Cycles++;
+-	IOCycles += 1;
+-	PollVIAs(1);
++    Cycles++;
++    IOCycles += 1;
++    PollVIAs(1);
+ }
+ 
+ void AdjustForIOWrite(void)
+ {
+-	Cycles++;
+-	IOCycles += 1;
+-	PollVIAs(1);
+-	DoIntCheck();
++    Cycles++;
++    IOCycles += 1;
++    PollVIAs(1);
++    DoIntCheck();
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ static void AdvanceCyclesForMemRead()
+ {
+-	// Advance VIAs to point where mem read happens
+-	Cycles += CyclesToMemRead[CurrentInstruction];
+-	PollVIAs(CyclesToMemRead[CurrentInstruction]);
++    // Advance VIAs to point where mem read happens
++    Cycles += CyclesToMemRead[CurrentInstruction];
++    PollVIAs(CyclesToMemRead[CurrentInstruction]);
+ 
+-	// Check if interrupt should be taken if instruction does
+-	// a read but not a write (write instructions checked below).
+-	if (CyclesToMemRead[CurrentInstruction] != 0 &&
+-		CyclesToMemWrite[CurrentInstruction] == 0)
+-	{
+-		DoIntCheck();
+-	}
++    // Check if interrupt should be taken if instruction does
++    // a read but not a write (write instructions checked below).
++    if (CyclesToMemRead[CurrentInstruction] != 0 &&
++        CyclesToMemWrite[CurrentInstruction] == 0)
++    {
++        DoIntCheck();
++    }
+ }
+ 
+ static void AdvanceCyclesForMemWrite()
+ {
+-	// Advance VIAs to point where mem write happens
+-	Cycles += CyclesToMemWrite[CurrentInstruction];
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction]);
++    // Advance VIAs to point where mem write happens
++    Cycles += CyclesToMemWrite[CurrentInstruction];
++    PollVIAs(CyclesToMemWrite[CurrentInstruction]);
+ 
+-	DoIntCheck();
++    DoIntCheck();
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+@@ -374,8 +467,8 @@ static void AdvanceCyclesForMemWrite()
+ 
+ INLINE static void SetPSRZN(const unsigned char Value)
+ {
+-	PSR &= ~(FlagZ | FlagN);
+-	PSR |= ((Value == 0) << 1) | (Value & 0x80);
++    PSR &= ~(FlagZ | FlagN);
++    PSR |= ((Value == 0) << 1) | (Value & 0x80);
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+@@ -384,8 +477,8 @@ INLINE static void SetPSRZN(const unsigned char Value)
+ 
+ INLINE static void SetPSR(int Mask, int c, int z, int i, int d, int b, int v, int n)
+ {
+-	PSR &= ~Mask;
+-	PSR |= c | (z << 1) | (i << 2) | (d << 3) | (b << 4) | (v << 6) | n;
++    PSR &= ~Mask;
++    PSR |= c | (z << 1) | (i << 2) | (d << 3) | (b << 4) | (v << 6) | n;
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+@@ -394,41 +487,41 @@ INLINE static void SetPSR(int Mask, int c, int z, int i, int d, int b, int v, in
+ 
+ INLINE static void SetPSRCZN(int c, int z, int n)
+ {
+-	PSR &= ~(FlagC | FlagZ | FlagN);
+-	PSR |= c | (z << 1) | n;
++    PSR &= ~(FlagC | FlagZ | FlagN);
++    PSR |= c | (z << 1) | n;
+ }
+ 
+ /*----------------------------------------------------------------------------*/
  
  INLINE static void Push(unsigned char Value)
  {
 -	BEEBWRITEMEM_DIRECT(0x100 + StackReg, Value);
-+	WholeRam[0x100 + StackReg] = Value;
- 	StackReg--;
+-	StackReg--;
++    WholeRam[0x100 + StackReg] = Value;
++    StackReg--;
  }
  
-@@ -645,11 +742,14 @@ INLINE static void BPLInstrHandler()
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static unsigned char Pop()
+ {
+-	StackReg++;
+-	return WholeRam[0x100 + StackReg];
++    StackReg++;
++    return WholeRam[0x100 + StackReg];
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static void PushWord(int Value)
+ {
+-	Push((Value >> 8) & 0xff);
+-	Push(Value & 0xff);
++    Push((Value >> 8) & 0xff);
++    Push(Value & 0xff);
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static int PopWord()
+ {
+-	int Value = Pop();
+-	Value |= Pop() << 8;
+-	return Value;
++    int Value = Pop();
++    Value |= Pop() << 8;
++    return Value;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -437,528 +530,538 @@ INLINE static int PopWord()
+ 
+ INLINE static int RelAddrModeHandler_Data()
+ {
+-	// For branches - is this correct - i.e. is the program counter incremented
+-	// at the correct time?
+-	int EffectiveAddress = (signed char)ReadPaged(ProgramCounter++);
+-	EffectiveAddress += ProgramCounter;
++    // For branches - is this correct - i.e. is the program counter incremented
++    // at the correct time?
++    int EffectiveAddress = (signed char)ReadPaged(ProgramCounter++);
++    EffectiveAddress += ProgramCounter;
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static void ADCInstrHandler(unsigned char Operand)
+ {
+-	// NOTE! Not sure about C and V flags
+-	if (!GETDFLAG)
+-	{
+-		int TmpResultC = Accumulator + Operand + GETCFLAG;
+-		int TmpResultV = (signed char)Accumulator + (signed char)Operand + GETCFLAG;
+-		Accumulator = TmpResultC & 255;
+-		SetPSR(FlagC | FlagZ | FlagV | FlagN, (TmpResultC & 256) != 0,
+-			Accumulator == 0, 0, 0, 0, ((Accumulator & 128) != 0) ^ (TmpResultV < 0),
+-			Accumulator & 128);
+-	}
+-	else
+-	{
+-		// Z flag determined from 2's compl result, not BCD result!
+-		int TmpResult = Accumulator + Operand + GETCFLAG;
+-		int ZFlag = (TmpResult & 0xff) == 0;
+-
+-		int ln = (Accumulator & 0xf) + (Operand & 0xf) + GETCFLAG;
+-
+-		int TmpCarry = 0;
+-
+-		if (ln > 9)
+-		{
+-			ln += 6;
+-			ln &= 0xf;
+-			TmpCarry = 0x10;
+-		}
+-
+-		int hn = (Accumulator & 0xf0) + (Operand & 0xf0) + TmpCarry;
+-		// N and V flags are determined before high nibble is adjusted.
+-		// NOTE: V is not always correct
+-		int NFlag = hn & 128;
+-		int VFlag = (hn ^ Accumulator) & 128 && !((Accumulator ^ Operand) & 128);
+-
+-		int CFlag = 0;
+-
+-		if (hn > 0x90) {
+-			hn += 0x60;
+-			hn &= 0xf0;
+-			CFlag = 1;
+-		}
+-
+-		Accumulator = (unsigned char)(hn | ln);
+-
+-		if (CPUType == CPU::CPU65C12) {
+-			ZFlag = Accumulator == 0;
+-			NFlag = Accumulator & 128;
+-			Cycles++;
+-		}
+-
+-		SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
+-	}
++    // NOTE! Not sure about C and V flags
++    if (!GETDFLAG)
++    {
++        int TmpResultC = Accumulator + Operand + GETCFLAG;
++        int TmpResultV = (signed char)Accumulator + (signed char)Operand + GETCFLAG;
++        Accumulator = TmpResultC & 255;
++        SetPSR(FlagC | FlagZ | FlagV | FlagN, (TmpResultC & 256) != 0,
++            Accumulator == 0, 0, 0, 0, ((Accumulator & 128) != 0) ^ (TmpResultV < 0),
++            Accumulator & 128);
++    }
++    else
++    {
++        // Z flag determined from 2's compl result, not BCD result!
++        int TmpResult = Accumulator + Operand + GETCFLAG;
++        int ZFlag = (TmpResult & 0xff) == 0;
++
++        int ln = (Accumulator & 0xf) + (Operand & 0xf) + GETCFLAG;
++
++        int TmpCarry = 0;
++
++        if (ln > 9)
++        {
++            ln += 6;
++            ln &= 0xf;
++            TmpCarry = 0x10;
++        }
++
++        int hn = (Accumulator & 0xf0) + (Operand & 0xf0) + TmpCarry;
++        // N and V flags are determined before high nibble is adjusted.
++        // NOTE: V is not always correct
++        int NFlag = hn & 128;
++        int VFlag = (hn ^ Accumulator) & 128 && !((Accumulator ^ Operand) & 128);
++
++        int CFlag = 0;
++
++        if (hn > 0x90) {
++            hn += 0x60;
++            hn &= 0xf0;
++            CFlag = 1;
++        }
++
++        Accumulator = (unsigned char)(hn | ln);
++
++        if (CPUType == CPU::CPU65C12) {
++            ZFlag = Accumulator == 0;
++            NFlag = Accumulator & 128;
++            Cycles++;
++        }
++
++        SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
++    }
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static void ANDInstrHandler(unsigned char Operand)
+ {
+-	Accumulator &= Operand;
+-	PSR &= ~(FlagZ | FlagN);
+-	PSR |= ((Accumulator == 0) << 1) | (Accumulator & 128);
++    Accumulator &= Operand;
++    PSR &= ~(FlagZ | FlagN);
++    PSR |= ((Accumulator == 0) << 1) | (Accumulator & 128);
+ }
+ 
+ INLINE static void ASLInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, OldValue);
+-	unsigned char NewValue = OldValue << 1;
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, NewValue);
+-	SetPSRCZN((OldValue & 128) != 0, NewValue == 0, NewValue & 128);
++    unsigned char OldValue = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, OldValue);
++    unsigned char NewValue = OldValue << 1;
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, NewValue);
++    SetPSRCZN((OldValue & 128) != 0, NewValue == 0, NewValue & 128);
+ }
+ 
+ INLINE static void TRBInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	unsigned char NewValue = (Accumulator ^ 0xff) & OldValue;
+-	WritePaged(Address, NewValue);
+-	PSR &= ~FlagZ;
+-	PSR |= ((Accumulator & OldValue) == 0) ? FlagZ : 0;
++    unsigned char OldValue = ReadPaged(Address);
++    unsigned char NewValue = (Accumulator ^ 0xff) & OldValue;
++    WritePaged(Address, NewValue);
++    PSR &= ~FlagZ;
++    PSR |= ((Accumulator & OldValue) == 0) ? FlagZ : 0;
+ }
+ 
+ INLINE static void TSBInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	unsigned char NewValue = Accumulator | OldValue;
+-	WritePaged(Address, NewValue);
+-	PSR &= ~FlagZ;
+-	PSR |= ((Accumulator & OldValue) == 0) ? FlagZ : 0;
++    unsigned char OldValue = ReadPaged(Address);
++    unsigned char NewValue = Accumulator | OldValue;
++    WritePaged(Address, NewValue);
++    PSR &= ~FlagZ;
++    PSR |= ((Accumulator & OldValue) == 0) ? FlagZ : 0;
+ }
+ 
+ INLINE static void ASLInstrHandler_Acc()
+ {
+-	unsigned char OldValue = Accumulator;
+-	Accumulator <<= 1;
+-	SetPSRCZN((OldValue & 128) != 0, Accumulator == 0, Accumulator & 128);
++    unsigned char OldValue = Accumulator;
++    Accumulator <<= 1;
++    SetPSRCZN((OldValue & 128) != 0, Accumulator == 0, Accumulator & 128);
+ }
+ 
+ /*----------------------------------------------------------------------------*/
+ 
+ INLINE static void BCCInstrHandler()
+ {
+-	if (!GETCFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (!GETCFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BCSInstrHandler()
+ {
+-	if (GETCFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (GETCFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BEQInstrHandler()
+ {
+-	if (GETZFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (GETZFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BITInstrHandler(unsigned char Operand)
+ {
+-	PSR &= ~(FlagZ | FlagN | FlagV);
+-	// z if result 0, and NV to top bits of operand
+-	PSR |= (((Accumulator & Operand) == 0) << 1) | (Operand & 0xc0);
++    PSR &= ~(FlagZ | FlagN | FlagV);
++    // z if result 0, and NV to top bits of operand
++    PSR |= (((Accumulator & Operand) == 0) << 1) | (Operand & 0xc0);
+ }
+ 
+ INLINE static void BITImmedInstrHandler(unsigned char Operand)
+ {
+-	PSR &= ~FlagZ;
+-	// z if result 0, and NV to top bits of operand
+-	PSR |= ((Accumulator & Operand) == 0) << 1;
++    PSR &= ~FlagZ;
++    // z if result 0, and NV to top bits of operand
++    PSR |= ((Accumulator & Operand) == 0) << 1;
+ }
+ 
+ INLINE static void BMIInstrHandler()
+ {
+-	if (GETNFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (GETNFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BNEInstrHandler()
+ {
+-	if (!GETZFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (!GETZFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BPLInstrHandler()
+ {
+-	if (!GETNFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (!GETNFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
  
  INLINE static void BRKInstrHandler()
  {
-+	byte returnStackReg = StackReg;
-+	int returnAddress = ProgramCounter + 1;
- 	PushWord(ProgramCounter + 1);
- 	PSR |= FlagB; // Set B before pushing
- 	Push(PSR);
- 	PSR |= FlagI; // Set I after pushing - see Birnbaum
- 	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
-+	PushStackFrame(StackFrameType_BRK, ProgramCounter, returnAddress, returnStackReg);
+-	PushWord(ProgramCounter + 1);
+-	PSR |= FlagB; // Set B before pushing
+-	Push(PSR);
+-	PSR |= FlagI; // Set I after pushing - see Birnbaum
+-	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
++    int returnAddress = ProgramCounter + 1;
++    unsigned char returnStackReg = StackReg;
++
++    PushWord(ProgramCounter + 1);
++    PSR |= FlagB; // Set B before pushing
++    Push(PSR);
++    PSR |= FlagI; // Set I after pushing - see Birnbaum
++    ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
++
++    PushStackFrame(StackFrameType_BRK, returnAddress, returnStackReg);
  }
  
  INLINE static void BVCInstrHandler()
-@@ -773,6 +873,7 @@ INLINE static void INYInstrHandler()
+ {
+-	if (!GETVFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (!GETVFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BVSInstrHandler()
+ {
+-	if (GETVFLAG)
+-	{
+-		ProgramCounter = RelAddrModeHandler_Data();
+-		Branched = true;
+-	}
+-	else
+-	{
+-		ProgramCounter++;
+-	}
++    if (GETVFLAG)
++    {
++        ProgramCounter = RelAddrModeHandler_Data();
++        Branched = true;
++    }
++    else
++    {
++        ProgramCounter++;
++    }
+ }
+ 
+ INLINE static void BRAInstrHandler()
+ {
+-	ProgramCounter = RelAddrModeHandler_Data();
+-	Branched = true;
++    ProgramCounter = RelAddrModeHandler_Data();
++    Branched = true;
+ }
+ 
+ INLINE static void CMPInstrHandler(unsigned char Operand)
+ {
+-	unsigned char Result = Accumulator - Operand;
+-	unsigned char CFlag = (Accumulator >= Operand) ? FlagC : 0;
+-	SetPSRCZN(CFlag, Accumulator == Operand, Result & 0x80);
++    unsigned char Result = Accumulator - Operand;
++    unsigned char CFlag = (Accumulator >= Operand) ? FlagC : 0;
++    SetPSRCZN(CFlag, Accumulator == Operand, Result & 0x80);
+ }
+ 
+ INLINE static void CPXInstrHandler(unsigned char Operand)
+ {
+-	unsigned char Result = XReg - Operand;
+-	SetPSRCZN(XReg >= Operand, XReg == Operand, Result & 0x80);
++    unsigned char Result = XReg - Operand;
++    SetPSRCZN(XReg >= Operand, XReg == Operand, Result & 0x80);
+ }
+ 
+ INLINE static void CPYInstrHandler(unsigned char Operand)
+ {
+-	unsigned char Result = YReg - Operand;
+-	SetPSRCZN(YReg >= Operand, YReg == Operand, Result & 0x80);
++    unsigned char Result = YReg - Operand;
++    SetPSRCZN(YReg >= Operand, YReg == Operand, Result & 0x80);
+ }
+ 
+ INLINE static void DECInstrHandler(int Address)
+ {
+-	unsigned char Value = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, Value);
+-	Value--;
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, Value);
+-	SetPSRZN(Value);
++    unsigned char Value = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, Value);
++    Value--;
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, Value);
++    SetPSRZN(Value);
+ }
+ 
+ INLINE static void DEAInstrHandler()
+ {
+-	Accumulator--;
+-	SetPSRZN(Accumulator);
++    Accumulator--;
++    SetPSRZN(Accumulator);
+ }
+ 
+ INLINE static void DEXInstrHandler()
+ {
+-	XReg--;
+-	SetPSRZN(XReg);
++    XReg--;
++    SetPSRZN(XReg);
+ }
+ 
+ INLINE static void DEYInstrHandler()
+ {
+-	YReg--;
+-	SetPSRZN(YReg);
++    YReg--;
++    SetPSRZN(YReg);
+ }
+ 
+ INLINE static void EORInstrHandler(unsigned char Operand)
+ {
+-	Accumulator ^= Operand;
+-	SetPSRZN(Accumulator);
++    Accumulator ^= Operand;
++    SetPSRZN(Accumulator);
+ }
+ 
+ INLINE static void INCInstrHandler(int Address)
+ {
+-	unsigned char Value = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, Value);
+-	Value++;
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, Value);
+-	SetPSRZN(Value);
++    unsigned char Value = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, Value);
++    Value++;
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, Value);
++    SetPSRZN(Value);
+ }
+ 
+ INLINE static void INAInstrHandler()
+ {
+-	Accumulator++;
+-	SetPSRZN(Accumulator);
++    Accumulator++;
++    SetPSRZN(Accumulator);
+ }
+ 
+ INLINE static void INXInstrHandler()
+ {
+-	XReg++;
+-	SetPSRZN(XReg);
++    XReg++;
++    SetPSRZN(XReg);
+ }
+ 
+ INLINE static void INYInstrHandler()
+ {
+-	YReg++;
+-	SetPSRZN(YReg);
++    YReg++;
++    SetPSRZN(YReg);
+ }
  
  INLINE static void JSRInstrHandler(int Address)
  {
-+	PushStackFrame(StackFrameType_JSR, Address, ProgramCounter, StackReg);
- 	PushWord(ProgramCounter - 1);
- 	ProgramCounter = Address;
+-	PushWord(ProgramCounter - 1);
+-	ProgramCounter = Address;
++    int returnAddress = ProgramCounter;
++    unsigned char returnStackReg = StackReg;
++    
++    PushWord(ProgramCounter - 1);
++    ProgramCounter = Address;
++
++    PushStackFrame(StackFrameType_JSR, returnAddress, returnStackReg);
  }
-@@ -1119,7 +1220,7 @@ INLINE static int IndYAddrModeHandler_Address()
+ 
+ INLINE static void LDAInstrHandler(unsigned char Operand)
+ {
+-	Accumulator = Operand;
+-	SetPSRZN(Accumulator);
++    Accumulator = Operand;
++    SetPSRZN(Accumulator);
+ }
+ 
+ INLINE static void LDXInstrHandler(unsigned char Operand)
+ {
+-	XReg = Operand;
+-	SetPSRZN(XReg);
++    XReg = Operand;
++    SetPSRZN(XReg);
+ }
+ 
+ INLINE static void LDYInstrHandler(unsigned char Operand)
+ {
+-	YReg = Operand;
+-	SetPSRZN(YReg);
++    YReg = Operand;
++    SetPSRZN(YReg);
+ }
+ 
+ INLINE static void LSRInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, OldValue);
+-	unsigned char NewValue = OldValue >> 1;
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, NewValue);
+-	SetPSRCZN((OldValue & 1) != 0, NewValue == 0, 0);
++    unsigned char OldValue = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, OldValue);
++    unsigned char NewValue = OldValue >> 1;
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, NewValue);
++    SetPSRCZN((OldValue & 1) != 0, NewValue == 0, 0);
+ }
+ 
+ INLINE static void LSRInstrHandler_Acc()
+ {
+-	unsigned char OldValue = Accumulator;
+-	Accumulator >>= 1;
+-	SetPSRCZN((OldValue & 1) != 0, Accumulator == 0, 0);
++    unsigned char OldValue = Accumulator;
++    Accumulator >>= 1;
++    SetPSRCZN((OldValue & 1) != 0, Accumulator == 0, 0);
+ }
+ 
+ INLINE static void ORAInstrHandler(unsigned char Operand)
+ {
+-	Accumulator |= Operand;
+-	SetPSRZN(Accumulator);
++    Accumulator |= Operand;
++    SetPSRZN(Accumulator);
+ }
+ 
+ INLINE static void ROLInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, OldValue);
+-	unsigned char NewValue = (OldValue << 1) + GETCFLAG;
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, NewValue);
+-	SetPSRCZN((OldValue & 0x80) != 0, NewValue == 0, NewValue & 0x80);
++    unsigned char OldValue = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, OldValue);
++    unsigned char NewValue = (OldValue << 1) + GETCFLAG;
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, NewValue);
++    SetPSRCZN((OldValue & 0x80) != 0, NewValue == 0, NewValue & 0x80);
+ }
+ 
+ INLINE static void ROLInstrHandler_Acc()
+ {
+-	unsigned char OldValue = Accumulator;
+-	Accumulator = (OldValue << 1) + GETCFLAG;
+-	SetPSRCZN((OldValue & 0x80) != 0, Accumulator == 0, Accumulator & 0x80);
++    unsigned char OldValue = Accumulator;
++    Accumulator = (OldValue << 1) + GETCFLAG;
++    SetPSRCZN((OldValue & 0x80) != 0, Accumulator == 0, Accumulator & 0x80);
+ }
+ 
+ INLINE static void RORInstrHandler(int Address)
+ {
+-	unsigned char OldValue = ReadPaged(Address);
+-	Cycles++;
+-	PollVIAs(1);
+-	WritePaged(Address, OldValue);
+-	unsigned char NewValue = (OldValue >> 1) + (GETCFLAG << 7);
+-	Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
+-	PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
+-	WritePaged(Address, NewValue);
+-	SetPSRCZN(OldValue & 1, NewValue == 0, NewValue & 0x80);
++    unsigned char OldValue = ReadPaged(Address);
++    Cycles++;
++    PollVIAs(1);
++    WritePaged(Address, OldValue);
++    unsigned char NewValue = (OldValue >> 1) + (GETCFLAG << 7);
++    Cycles += CyclesToMemWrite[CurrentInstruction] - 1;
++    PollVIAs(CyclesToMemWrite[CurrentInstruction] - 1);
++    WritePaged(Address, NewValue);
++    SetPSRCZN(OldValue & 1, NewValue == 0, NewValue & 0x80);
+ }
+ 
+ INLINE static void RORInstrHandler_Acc()
+ {
+-	unsigned char OldValue = Accumulator;
+-	Accumulator = (OldValue >> 1) + (GETCFLAG << 7);
+-	SetPSRCZN(OldValue & 1, Accumulator == 0, Accumulator & 0x80);
++    unsigned char OldValue = Accumulator;
++    Accumulator = (OldValue >> 1) + (GETCFLAG << 7);
++    SetPSRCZN(OldValue & 1, Accumulator == 0, Accumulator & 0x80);
+ }
+ 
+ INLINE static void SBCInstrHandler(unsigned char Operand)
+ {
+-	// NOTE! Not sure about C and V flags
+-	if (!GETDFLAG)
+-	{
+-		int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
+-		int TmpResultC = Accumulator - Operand - (1 - GETCFLAG);
+-		Accumulator = TmpResultC & 255;
+-		SetPSR(FlagC | FlagZ | FlagV | FlagN, TmpResultC >= 0,
+-			Accumulator == 0, 0, 0, 0,
+-			((Accumulator & 128) != 0) ^ ((TmpResultV & 256) != 0),
+-			Accumulator & 128);
+-	}
+-	else
+-	{
+-		if (CPUType == CPU::CPU65C12)
+-		{
+-			// int ohn = Operand & 0xf0;
+-			int oln = Operand & 0x0f;
+-
+-			int ln = (Accumulator & 0xf) - oln - (1 - GETCFLAG);
+-			int TmpResult = Accumulator - Operand - (1 - GETCFLAG);
+-
+-			int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
+-			int VFlag = ((TmpResultV < -128) || (TmpResultV > 127));
+-
+-			int CFlag = (TmpResult & 256) == 0;
+-
+-			if (TmpResult < 0)
+-			{
+-				TmpResult -= 0x60;
+-			}
+-
+-			if (ln < 0)
+-			{
+-				TmpResult -= 0x06;
+-			}
+-
+-			int NFlag = TmpResult & 128;
+-			Accumulator = TmpResult & 0xFF;
+-			int ZFlag = (Accumulator == 0);
+-
+-			SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
+-
+-			Cycles++;
+-		}
+-		else
+-		{
+-			// Z flag determined from 2's compl result, not BCD result!
+-			int TmpResult = Accumulator - Operand - (1 - GETCFLAG);
+-			int ZFlag = ((TmpResult & 0xff) == 0);
+-
+-			int ohn = Operand & 0xf0;
+-			int oln = Operand & 0xf;
+-
+-			int ln = (Accumulator & 0xf) - oln - (1 - GETCFLAG);
+-			if (ln & 0x10) {
+-				ln -= 6;
+-			}
+-
+-			int TmpCarry = 0;
+-
+-			if (ln & 0x20) {
+-				TmpCarry = 0x10;
+-			}
+-
+-			ln &= 0xf;
+-			int hn = (Accumulator & 0xf0) - ohn - TmpCarry;
+-			/* N and V flags are determined before high nibble is adjusted.
+-			NOTE: V is not always correct */
+-			int NFlag = hn & 128;
+-
+-			int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
+-			int VFlag = ((TmpResultV < -128) || (TmpResultV > 127));
+-
+-			int CFlag = 1;
+-
+-			if (hn & 0x100) {
+-				hn -= 0x60;
+-				hn &= 0xf0;
+-				CFlag = 0;
+-			}
+-
+-			Accumulator = (unsigned char)(hn | ln);
+-
+-			SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
+-		}
+-	}
++    // NOTE! Not sure about C and V flags
++    if (!GETDFLAG)
++    {
++        int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
++        int TmpResultC = Accumulator - Operand - (1 - GETCFLAG);
++        Accumulator = TmpResultC & 255;
++        SetPSR(FlagC | FlagZ | FlagV | FlagN, TmpResultC >= 0,
++            Accumulator == 0, 0, 0, 0,
++            ((Accumulator & 128) != 0) ^ ((TmpResultV & 256) != 0),
++            Accumulator & 128);
++    }
++    else
++    {
++        if (CPUType == CPU::CPU65C12)
++        {
++            // int ohn = Operand & 0xf0;
++            int oln = Operand & 0x0f;
++
++            int ln = (Accumulator & 0xf) - oln - (1 - GETCFLAG);
++            int TmpResult = Accumulator - Operand - (1 - GETCFLAG);
++
++            int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
++            int VFlag = ((TmpResultV < -128) || (TmpResultV > 127));
++
++            int CFlag = (TmpResult & 256) == 0;
++
++            if (TmpResult < 0)
++            {
++                TmpResult -= 0x60;
++            }
++
++            if (ln < 0)
++            {
++                TmpResult -= 0x06;
++            }
++
++            int NFlag = TmpResult & 128;
++            Accumulator = TmpResult & 0xFF;
++            int ZFlag = (Accumulator == 0);
++
++            SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
++
++            Cycles++;
++        }
++        else
++        {
++            // Z flag determined from 2's compl result, not BCD result!
++            int TmpResult = Accumulator - Operand - (1 - GETCFLAG);
++            int ZFlag = ((TmpResult & 0xff) == 0);
++
++            int ohn = Operand & 0xf0;
++            int oln = Operand & 0xf;
++
++            int ln = (Accumulator & 0xf) - oln - (1 - GETCFLAG);
++            if (ln & 0x10) {
++                ln -= 6;
++            }
++
++            int TmpCarry = 0;
++
++            if (ln & 0x20) {
++                TmpCarry = 0x10;
++            }
++
++            ln &= 0xf;
++            int hn = (Accumulator & 0xf0) - ohn - TmpCarry;
++            /* N and V flags are determined before high nibble is adjusted.
++            NOTE: V is not always correct */
++            int NFlag = hn & 128;
++
++            int TmpResultV = (signed char)Accumulator - (signed char)Operand - (1 - GETCFLAG);
++            int VFlag = ((TmpResultV < -128) || (TmpResultV > 127));
++
++            int CFlag = 1;
++
++            if (hn & 0x100) {
++                hn -= 0x60;
++                hn &= 0xf0;
++                CFlag = 0;
++            }
++
++            Accumulator = (unsigned char)(hn | ln);
++
++            SetPSR(FlagC | FlagZ | FlagV | FlagN, CFlag, ZFlag, 0, 0, 0, VFlag, NFlag);
++        }
++    }
+ }
+ 
+ INLINE static void STXInstrHandler(int Address)
+ {
+-	WritePaged(Address, XReg);
++    WritePaged(Address, XReg);
+ }
+ 
+ INLINE static void STYInstrHandler(int Address)
+ {
+-	WritePaged(Address, YReg);
++    WritePaged(Address, YReg);
+ }
+ 
+ // ARR instruction hander.
+@@ -966,52 +1069,52 @@ INLINE static void STYInstrHandler(int Address)
+ 
+ INLINE static void ARRInstrHandler(unsigned char Operand)
+ {
+-	if (GETDFLAG)
+-	{
+-		const unsigned char Temp = Accumulator & Operand;
+-		const unsigned char HighBits = Temp >> 4;
+-		const unsigned char LowBits  = Temp & 0x0f;
++    if (GETDFLAG)
++    {
++        const unsigned char Temp = Accumulator & Operand;
++        const unsigned char HighBits = Temp >> 4;
++        const unsigned char LowBits  = Temp & 0x0f;
+ 
+-		Accumulator = (Temp >> 1) | (GETCFLAG << 7); // ROR
+-		SetPSRZN(Accumulator);
++        Accumulator = (Temp >> 1) | (GETCFLAG << 7); // ROR
++        SetPSRZN(Accumulator);
+ 
+-		PSR &= ~(FlagC | FlagV);
++        PSR &= ~(FlagC | FlagV);
+ 
+-		PSR |= (((Accumulator ^ Temp) & 0x40) != 0) << 6; // VFlag
++        PSR |= (((Accumulator ^ Temp) & 0x40) != 0) << 6; // VFlag
+ 
+-		if (LowBits + (LowBits & 1) > 5)
+-		{
+-			Accumulator = (Accumulator & 0xf0) | ((Accumulator + 6) & 0x0f);
+-		}
++        if (LowBits + (LowBits & 1) > 5)
++        {
++            Accumulator = (Accumulator & 0xf0) | ((Accumulator + 6) & 0x0f);
++        }
+ 
+-		// Update carry flag
+-		PSR |= (HighBits + (HighBits & 1)) > 5;
++        // Update carry flag
++        PSR |= (HighBits + (HighBits & 1)) > 5;
+ 
+-		if (GETCFLAG)
+-		{
+-			Accumulator = (Accumulator + 0x60) & 0xff;
+-		}
+-	}
+-	else
+-	{
+-		Accumulator &= Operand;
+-		RORInstrHandler_Acc();
++        if (GETCFLAG)
++        {
++            Accumulator = (Accumulator + 0x60) & 0xff;
++        }
++    }
++    else
++    {
++        Accumulator &= Operand;
++        RORInstrHandler_Acc();
+ 
+-		const int Bit6 = (Accumulator & 0x40) != 0;
+-		const int Bit5 = (Accumulator & 0x20) != 0;
++        const int Bit6 = (Accumulator & 0x40) != 0;
++        const int Bit5 = (Accumulator & 0x20) != 0;
+ 
+-		PSR &= ~(FlagC | FlagV);
+-		PSR |= Bit6; // FlagC
+-		PSR |= (Bit6 ^ Bit5) << 6; // FlagV
+-	}
++        PSR &= ~(FlagC | FlagV);
++        PSR |= Bit6; // FlagC
++        PSR |= (Bit6 ^ Bit5) << 6; // FlagV
++    }
+ }
+ 
+ // KIL (Halt) instruction handler.
+ 
+ INLINE static void KILInstrHandler()
+ {
+-	// Just repeat the instruction indefinitely.
+-	ProgramCounter--;
++    // Just repeat the instruction indefinitely.
++    ProgramCounter--;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1020,12 +1123,12 @@ INLINE static void KILInstrHandler()
+ 
+ INLINE static unsigned char AbsAddrModeHandler_Data()
+ {
+-	// Get the address from after the instruction.
+-	int FullAddress;
+-	GETTWOBYTEFROMPC(FullAddress);
++    // Get the address from after the instruction.
++    int FullAddress;
++    GETTWOBYTEFROMPC(FullAddress);
+ 
+-	// And then read it.
+-	return ReadPaged(FullAddress);
++    // And then read it.
++    return ReadPaged(FullAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1034,12 +1137,12 @@ INLINE static unsigned char AbsAddrModeHandler_Data()
+ 
+ INLINE static int AbsAddrModeHandler_Address()
+ {
+-	// Get the address from after the instruction.
+-	int FullAddress;
+-	GETTWOBYTEFROMPC(FullAddress);
++    // Get the address from after the instruction.
++    int FullAddress;
++    GETTWOBYTEFROMPC(FullAddress);
+ 
+-	// And then read it.
+-	return FullAddress;
++    // And then read it.
++    return FullAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1048,7 +1151,7 @@ INLINE static int AbsAddrModeHandler_Address()
+ 
+ INLINE static int ZeroPgAddrModeHandler_Address()
+ {
+-	return ReadPaged(ProgramCounter++);
++    return ReadPaged(ProgramCounter++);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1057,9 +1160,9 @@ INLINE static int ZeroPgAddrModeHandler_Address()
+ 
+ INLINE static unsigned char IndXAddrModeHandler_Data()
+ {
+-	unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++) + XReg;
+-	int EffectiveAddress = WholeRam[ZeroPageAddress] | (WholeRam[ZeroPageAddress + 1] << 8);
+-	return ReadPaged(EffectiveAddress);
++    unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++) + XReg;
++    int EffectiveAddress = WholeRam[ZeroPageAddress] | (WholeRam[ZeroPageAddress + 1] << 8);
++    return ReadPaged(EffectiveAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1068,9 +1171,9 @@ INLINE static unsigned char IndXAddrModeHandler_Data()
+ 
+ INLINE static int IndXAddrModeHandler_Address()
+ {
+-	unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++) + XReg;
+-	int EffectiveAddress = WholeRam[ZeroPageAddress] | (WholeRam[ZeroPageAddress + 1] << 8);
+-	return EffectiveAddress;
++    unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++) + XReg;
++    int EffectiveAddress = WholeRam[ZeroPageAddress] | (WholeRam[ZeroPageAddress + 1] << 8);
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1079,18 +1182,18 @@ INLINE static int IndXAddrModeHandler_Address()
+ 
+ INLINE static unsigned char IndYAddrModeHandler_Data()
+ {
+-	unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++);
+-	int EffectiveAddress = WholeRam[ZeroPageAddress] + YReg;
++    unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++);
++    int EffectiveAddress = WholeRam[ZeroPageAddress] + YReg;
+ 
+-	if (EffectiveAddress > 0xff)
+-	{
+-		Carried();
+-	}
++    if (EffectiveAddress > 0xff)
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += WholeRam[(unsigned char)(ZeroPageAddress + 1)] << 8;
+-	EffectiveAddress &= 0xffff;
++    EffectiveAddress += WholeRam[(unsigned char)(ZeroPageAddress + 1)] << 8;
++    EffectiveAddress &= 0xffff;
+ 
+-	return ReadPaged(EffectiveAddress);
++    return ReadPaged(EffectiveAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1099,17 +1202,17 @@ INLINE static unsigned char IndYAddrModeHandler_Data()
+ 
+ INLINE static int IndYAddrModeHandler_Address()
+ {
+-	unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++);
+-	uint16_t EffectiveAddress = WholeRam[ZeroPageAddress] + YReg;
++    unsigned char ZeroPageAddress = ReadPaged(ProgramCounter++);
++    uint16_t EffectiveAddress = WholeRam[ZeroPageAddress] + YReg;
+ 
+-	if (EffectiveAddress > 0xff)
+-	{
+-		Carried();
+-	}
++    if (EffectiveAddress > 0xff)
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += WholeRam[(unsigned char)(ZeroPageAddress + 1)] << 8;
++    EffectiveAddress += WholeRam[(unsigned char)(ZeroPageAddress + 1)] << 8;
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1118,8 +1221,8 @@ INLINE static int IndYAddrModeHandler_Address()
+ 
  INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  {
- 	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + XReg;
+-	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + XReg;
 -	return WholeRam[EffectiveAddress];
-+	return ReadZeroPage(EffectiveAddress);
++    unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + XReg;
++    return ReadZeroPage(EffectiveAddress);
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1287,7 +1388,7 @@ INLINE static int IndAddrXModeHandler_Address()
+@@ -1128,7 +1231,7 @@ INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
+ 
+ INLINE static int ZeroPgXAddrModeHandler_Address()
+ {
+-	return (ReadPaged(ProgramCounter++) + XReg) & 0xff;
++    return (ReadPaged(ProgramCounter++) + XReg) & 0xff;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1137,18 +1240,18 @@ INLINE static int ZeroPgXAddrModeHandler_Address()
+ 
+ INLINE static unsigned char AbsXAddrModeHandler_Data()
+ {
+-	int EffectiveAddress;
+-	GETTWOBYTEFROMPC(EffectiveAddress);
++    int EffectiveAddress;
++    GETTWOBYTEFROMPC(EffectiveAddress);
+ 
+-	if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + XReg) & 0xff00))
+-	{
+-		Carried();
+-	}
++    if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + XReg) & 0xff00))
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += XReg;
+-	EffectiveAddress &= 0xffff;
++    EffectiveAddress += XReg;
++    EffectiveAddress &= 0xffff;
+ 
+-	return ReadPaged(EffectiveAddress);
++    return ReadPaged(EffectiveAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1157,18 +1260,18 @@ INLINE static unsigned char AbsXAddrModeHandler_Data()
+ 
+ INLINE static int AbsXAddrModeHandler_Address()
+ {
+-	int EffectiveAddress;
+-	GETTWOBYTEFROMPC(EffectiveAddress);
++    int EffectiveAddress;
++    GETTWOBYTEFROMPC(EffectiveAddress);
+ 
+-	if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + XReg) & 0xff00))
+-	{
+-		Carried();
+-	}
++    if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + XReg) & 0xff00))
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += XReg;
+-	EffectiveAddress &= 0xffff;
++    EffectiveAddress += XReg;
++    EffectiveAddress &= 0xffff;
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1177,18 +1280,18 @@ INLINE static int AbsXAddrModeHandler_Address()
+ 
+ INLINE static unsigned char AbsYAddrModeHandler_Data()
+ {
+-	int EffectiveAddress;
+-	GETTWOBYTEFROMPC(EffectiveAddress);
++    int EffectiveAddress;
++    GETTWOBYTEFROMPC(EffectiveAddress);
+ 
+-	if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + YReg) & 0xff00))
+-	{
+-		Carried();
+-	}
++    if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + YReg) & 0xff00))
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += YReg;
+-	EffectiveAddress &= 0xffff;
++    EffectiveAddress += YReg;
++    EffectiveAddress &= 0xffff;
+ 
+-	return ReadPaged(EffectiveAddress);
++    return ReadPaged(EffectiveAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1197,18 +1300,18 @@ INLINE static unsigned char AbsYAddrModeHandler_Data()
+ 
+ INLINE static int AbsYAddrModeHandler_Address()
+ {
+-	int EffectiveAddress;
+-	GETTWOBYTEFROMPC(EffectiveAddress);
++    int EffectiveAddress;
++    GETTWOBYTEFROMPC(EffectiveAddress);
+ 
+-	if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + YReg) & 0xff00))
+-	{
+-		Carried();
+-	}
++    if ((EffectiveAddress & 0xff00) != ((EffectiveAddress + YReg) & 0xff00))
++    {
++        Carried();
++    }
+ 
+-	EffectiveAddress += YReg;
+-	EffectiveAddress &= 0xffff;
++    EffectiveAddress += YReg;
++    EffectiveAddress &= 0xffff;
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1217,27 +1320,27 @@ INLINE static int AbsYAddrModeHandler_Address()
+ 
+ INLINE static int IndAddrModeHandler_Address()
+ {
+-	int VectorLocation;
+-	GETTWOBYTEFROMPC(VectorLocation);
++    int VectorLocation;
++    GETTWOBYTEFROMPC(VectorLocation);
+ 
+-	int EffectiveAddress;
++    int EffectiveAddress;
+ 
+-	// Ok kiddies, deliberate bug time.
+-	// According to my BBC Master Reference Manual Part 2
+-	// the 6502 has a bug concerning this addressing mode and VectorLocation == xxFF
+-	// so, we're going to emulate that bug -- Richard Gellman
+-	if ((VectorLocation & 0xff) != 0xff || CPUType == CPU::CPU65C12)
+-	{
+-		EffectiveAddress = ReadPaged(VectorLocation);
+-		EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
+-	}
+-	else
+-	{
+-		EffectiveAddress = ReadPaged(VectorLocation);
+-		EffectiveAddress |= ReadPaged(VectorLocation - 0xff) << 8;
+-	}
++    // Ok kiddies, deliberate bug time.
++    // According to my BBC Master Reference Manual Part 2
++    // the 6502 has a bug concerning this addressing mode and VectorLocation == xxFF
++    // so, we're going to emulate that bug -- Richard Gellman
++    if ((VectorLocation & 0xff) != 0xff || CPUType == CPU::CPU65C12)
++    {
++        EffectiveAddress = ReadPaged(VectorLocation);
++        EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
++    }
++    else
++    {
++        EffectiveAddress = ReadPaged(VectorLocation);
++        EffectiveAddress |= ReadPaged(VectorLocation - 0xff) << 8;
++    }
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1246,10 +1349,10 @@ INLINE static int IndAddrModeHandler_Address()
+ 
+ INLINE static int ZPIndAddrModeHandler_Address()
+ {
+-	int VectorLocation = ReadPaged(ProgramCounter++);
+-	int EffectiveAddress = ReadPaged(VectorLocation);
+-	EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
+-	return EffectiveAddress;
++    int VectorLocation = ReadPaged(ProgramCounter++);
++    int EffectiveAddress = ReadPaged(VectorLocation);
++    EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1258,10 +1361,10 @@ INLINE static int ZPIndAddrModeHandler_Address()
+ 
+ INLINE static unsigned char ZPIndAddrModeHandler_Data()
+ {
+-	unsigned char VectorLocation = ReadPaged(ProgramCounter++);
+-	int EffectiveAddress = ReadPaged(VectorLocation);
+-	EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
+-	return ReadPaged(EffectiveAddress);
++    unsigned char VectorLocation = ReadPaged(ProgramCounter++);
++    int EffectiveAddress = ReadPaged(VectorLocation);
++    EffectiveAddress |= ReadPaged(VectorLocation + 1) << 8;
++    return ReadPaged(EffectiveAddress);
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1271,13 +1374,13 @@ INLINE static unsigned char ZPIndAddrModeHandler_Data()
+ 
+ INLINE static int IndAddrXModeHandler_Address()
+ {
+-	int VectorLocation;
+-	GETTWOBYTEFROMPC(VectorLocation);
++    int VectorLocation;
++    GETTWOBYTEFROMPC(VectorLocation);
+ 
+-	int EffectiveAddress = ReadPaged(VectorLocation + XReg);
+-	EffectiveAddress |= ReadPaged(VectorLocation + 1 + XReg) << 8;
++    int EffectiveAddress = ReadPaged(VectorLocation + XReg);
++    EffectiveAddress |= ReadPaged(VectorLocation + 1 + XReg) << 8;
+ 
+-	return EffectiveAddress;
++    return EffectiveAddress;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1286,8 +1389,8 @@ INLINE static int IndAddrXModeHandler_Address()
+ 
  INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  {
- 	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + YReg;
+-	unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + YReg;
 -	return WholeRam[EffectiveAddress];
-+	return ReadZeroPage(EffectiveAddress);
++    unsigned char EffectiveAddress = ReadPaged(ProgramCounter++) + YReg;
++    return ReadZeroPage(EffectiveAddress);
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1343,6 +1444,10 @@ void Init6502Core()
- 	intStatus = 0;
- 	NMIStatus = 0;
- 	NMILock = false;
+@@ -1296,7 +1399,7 @@ INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
+ 
+ INLINE static int ZeroPgYAddrModeHandler_Address()
+ {
+-	return (ReadPaged(ProgramCounter++) + YReg) & 0xff;
++    return (ReadPaged(ProgramCounter++) + YReg) & 0xff;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1305,63 +1408,80 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
+ 
+ void Init6502Core()
+ {
+-	switch (MachineType)
+-	{
+-		case Model::Master128:
+-		case Model::MasterET:
+-			CPUType = CPU::CPU65C12;
+-			break;
+-
+-		case Model::B:
+-		case Model::IntegraB:
+-		case Model::BPlus:
+-		default:
+-			CPUType = CPU::CPU6502;
+-			break;
+-	}
+-
+-	if (CPUType == CPU::CPU65C12) {
+-		CyclesTable = CyclesTable65C02;
+-		CyclesToMemRead = CyclesToMemRead65C02;
+-		CyclesToMemWrite = CyclesToMemWrite65C02;
+-	}
+-	else {
+-		CyclesTable = CyclesTable6502;
+-		CyclesToMemRead = CyclesToMemRead6502;
+-		CyclesToMemWrite = CyclesToMemWrite6502;
+-	}
+-
+-	ProgramCounter = BeebReadMem(0xfffc) | (BeebReadMem(0xfffd) << 8);
+-
+-	// For consistancy of execution
+-	Accumulator = 0;
+-	XReg = 0;
+-	YReg = 0;
+-	StackReg = 0xff; // Initial value?
+-	PSR = FlagI; // Interrupts off for starters
+-
+-	intStatus = 0;
+-	NMIStatus = 0;
+-	NMILock = false;
++    switch (MachineType)
++    {
++        case Model::Master128:
++        case Model::MasterET:
++            CPUType = CPU::CPU65C12;
++            break;
 +
-+	StackFrameCount = 1;
-+	SetStackFrame(0, StackFrameType_None, ProgramCounter, 0, StackReg);
-+	fSyncStackFrames = false;
++        case Model::B:
++        case Model::IntegraB:
++        case Model::BPlus:
++        default:
++            CPUType = CPU::CPU6502;
++            break;
++    }
++
++    if (CPUType == CPU::CPU65C12) {
++        CyclesTable = CyclesTable65C02;
++        CyclesToMemRead = CyclesToMemRead65C02;
++        CyclesToMemWrite = CyclesToMemWrite65C02;
++    }
++    else {
++        CyclesTable = CyclesTable6502;
++        CyclesToMemRead = CyclesToMemRead6502;
++        CyclesToMemWrite = CyclesToMemWrite6502;
++    }
++
++    ProgramCounter = BeebReadMem(0xfffc) | (BeebReadMem(0xfffd) << 8);
++
++    // For consistancy of execution
++    Accumulator = 0;
++    XReg = 0;
++    YReg = 0;
++    StackReg = 0xff; // Initial value?
++    PSR = FlagI; // Interrupts off for starters
++
++    intStatus = 0;
++    NMIStatus = 0;
++    NMILock = false;
++
++    StackFrameCount = 1;
++    SetStackFrame(0/*index*/, StackFrameType_Root, ProgramCounter, 0/*returnAddress*/, 0xff/*returnStackReg*/);
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1590,7 +1695,7 @@ void Exec6502Instruction()
- 				break;
- 			case 0x05:
- 				// ORA zp
+-void DoInterrupt(void) {
+-  PushWord(ProgramCounter);
+-  Push(PSR & ~FlagB);
+-  ProgramCounter=BeebReadMem(0xfffe) | (BeebReadMem(0xffff)<<8);
+-  SetPSR(FlagI,0,0,1,0,0,0,0);
+-  IRQCycles=7;
++void DoInterrupt(void)
++{
++    int returnAddress = ProgramCounter;
++    unsigned char returnStackReg = StackReg;
++
++    PushWord(ProgramCounter);
++    Push(PSR & ~FlagB);
++    ProgramCounter=BeebReadMem(0xfffe) | (BeebReadMem(0xffff)<<8);
++    SetPSR(FlagI,0,0,1,0,0,0,0);
++    IRQCycles=7;
++
++    PushStackFrame(StackFrameType_IRQ, returnAddress, returnStackReg);
++    PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
+ } /* DoInterrupt */
+ 
+ /*-------------------------------------------------------------------------*/
+-void DoNMI(void) {
+-  NMILock = true;
+-  PushWord(ProgramCounter);
+-  Push(PSR);
+-  ProgramCounter=BeebReadMem(0xfffa) | (BeebReadMem(0xfffb)<<8);
+-  SetPSR(FlagI,0,0,1,0,0,0,0); /* Normal interrupts should be disabled during NMI ? */
+-  IRQCycles=7;
++void DoNMI(void)
++{
++    int returnAddress = ProgramCounter;
++    unsigned char returnStackReg = StackReg;
++
++    NMILock = true;
++    PushWord(ProgramCounter);
++    Push(PSR);
++    ProgramCounter=BeebReadMem(0xfffa) | (BeebReadMem(0xfffb)<<8);
++    SetPSR(FlagI,0,0,1,0,0,0,0); /* Normal interrupts should be disabled during NMI ? */
++    IRQCycles=7;
++
++    PushStackFrame(StackFrameType_NMI, returnAddress, returnStackReg);
++    PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
+ } /* DoNMI */
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1388,58 +1508,58 @@ void DoNMI(void) {
+ 
+ static void ClipboardREMVHandler()
+ {
+-	if (GETVFLAG)
+-	{
+-		// Examine buffer state
+-
+-		if (mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength)
+-		{
+-			Accumulator = mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex];
+-			PSR &= ~FlagC;
+-		}
+-		else
+-		{
+-			PSR |= FlagC;
+-		}
+-	}
+-	else {
+-		// Remove character from buffer
+-		if (mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength)
+-		{
+-			unsigned char c = mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex++];
+-
+-			if (c == 0xa3) {
+-				// Convert pound sign
+-				c = 0x60;
+-			}
+-			else if (mainWin->m_TranslateCRLF)
+-			{
+-				if (c == 0x0a)
+-				{
+-					// Convert LF to CR
+-					c = 0x0d;
+-				}
+-				else if (c == 0x0d && mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex] == 0x0a)
+-				{
+-					// Drop LF after CR
+-					mainWin->m_ClipboardIndex++;
+-				}
+-			}
+-
+-			Accumulator = c;
+-			YReg = c;
+-			PSR &= ~FlagC;
+-		}
+-		else
+-		{
+-			// We've reached the end of the clipboard contents
+-			mainWin->ClearClipboardBuffer();
+-
+-			PSR |= FlagC;
+-		}
+-	}
+-
+-	CurrentInstruction = 0x60; // RTS
++    if (GETVFLAG)
++    {
++        // Examine buffer state
++
++        if (mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength)
++        {
++            Accumulator = mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex];
++            PSR &= ~FlagC;
++        }
++        else
++        {
++            PSR |= FlagC;
++        }
++    }
++    else {
++        // Remove character from buffer
++        if (mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength)
++        {
++            unsigned char c = mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex++];
++
++            if (c == 0xa3) {
++                // Convert pound sign
++                c = 0x60;
++            }
++            else if (mainWin->m_TranslateCRLF)
++            {
++                if (c == 0x0a)
++                {
++                    // Convert LF to CR
++                    c = 0x0d;
++                }
++                else if (c == 0x0d && mainWin->m_ClipboardBuffer[mainWin->m_ClipboardIndex] == 0x0a)
++                {
++                    // Drop LF after CR
++                    mainWin->m_ClipboardIndex++;
++                }
++            }
++
++            Accumulator = c;
++            YReg = c;
++            PSR &= ~FlagC;
++        }
++        else
++        {
++            // We've reached the end of the clipboard contents
++            mainWin->ClearClipboardBuffer();
++
++            PSR |= FlagC;
++        }
++    }
++
++    CurrentInstruction = 0x60; // RTS
+ }
+ 
+ // The routine indirected through the CNPV vector is used by the operating
+@@ -1464,25 +1584,25 @@ static void ClipboardREMVHandler()
+ 
+ static void ClipboardCNPVHandler()
+ {
+-	if (GETVFLAG)
+-	{
+-		mainWin->ClearClipboardBuffer();
+-	}
+-	else
+-	{
+-		if (GETCFLAG)
+-		{
+-			XReg = 0;
+-			YReg = 0;
+-		}
+-		else
+-		{
+-			XReg = mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength;
+-			YReg = 0;
+-		}
+-	}
+-
+-	CurrentInstruction = 0x60; // RTS
++    if (GETVFLAG)
++    {
++        mainWin->ClearClipboardBuffer();
++    }
++    else
++    {
++        if (GETCFLAG)
++        {
++            XReg = 0;
++            YReg = 0;
++        }
++        else
++        {
++            XReg = mainWin->m_ClipboardIndex < mainWin->m_ClipboardLength;
++            YReg = 0;
++        }
++    }
++
++    CurrentInstruction = 0x60; // RTS
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1491,1858 +1611,1865 @@ static void ClipboardCNPVHandler()
+ 
+ void Exec6502Instruction()
+ {
+-	bool iFlagJustCleared;
+-	bool iFlagJustSet;
+-
+-	const int Count = DebugEnabled ? 1 : 1024; // Makes debug window more responsive
+-
+-	for (int i = 0; i < Count; i++)
+-	{
+-		// Output debug info
+-		if (DebugEnabled && !DebugDisassembler(ProgramCounter, PrePC, Accumulator, XReg, YReg, PSR, StackReg, true))
+-		{
+-			Sleep(10);  // Ease up on CPU when halted
+-			continue;
+-		}
+-
+-		Branched = false;
+-		iFlagJustCleared = false;
+-		iFlagJustSet = false;
+-		Cycles = 0;
+-		IOCycles = 0;
+-		IntDue = false;
+-		CurrentInstruction = -1;
+-
+-		PrePC = ProgramCounter;
+-
+-		// Check for WRCHV, send char to speech output
+-		if (mainWin->m_TextToSpeechEnabled &&
+-			ProgramCounter == (WholeRam[0x20e] | (WholeRam[0x20f] << 8))) {
+-			mainWin->SpeakChar(Accumulator);
+-		}
+-		else if (mainWin->m_ClipboardLength > 0) {
+-			// Check for REMV (Remove from buffer vector) and CNPV (Count/purge buffer
+-			// vector). X register contains the buffer number (0 indicates the keyboard
+-			// buffer). See AUG p.263/264 and p.138
+-
+-			if (ProgramCounter == (WholeRam[0x22c] | (WholeRam[0x22d] << 8)) && XReg == 0) {
+-				ClipboardREMVHandler();
+-			}
+-			else if (ProgramCounter == (WholeRam[0x22e] | (WholeRam[0x22f] << 8)) && XReg == 0) {
+-				ClipboardCNPVHandler();
+-			}
+-		}
+-
+-		if (CurrentInstruction == -1) {
+-			// Read an instruction and post inc program counter
+-			CurrentInstruction = ReadPaged(ProgramCounter++);
+-		}
+-
+-		InstructionCount[CurrentInstruction]++;
+-
+-		// Advance VIAs to point where mem read happens
+-		ViaCycles = 0;
+-		AdvanceCyclesForMemRead();
+-
+-		switch (CurrentInstruction)
+-		{
+-			case 0x00:
+-				// BRK
+-				BRKInstrHandler();
+-				break;
+-			case 0x01:
+-				// ORA (zp,X)
+-				ORAInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0x02:
+-			case 0x22:
+-			case 0x42:
+-			case 0x62:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP imm
+-					ReadPaged(ProgramCounter++);
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x03:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					ASLInstrHandler(Address);
+-					ORAInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x04:
+-				if (CPUType == CPU::CPU65C12) {
+-					// TSB zp
+-					TSBInstrHandler(ZeroPgAddrModeHandler_Address());
+-				}
+-				else {
+-					// Undocumented instruction: NOP zp
+-					ZeroPgAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x05:
+-				// ORA zp
 -				ORAInstrHandler(WholeRam[ZeroPgAddrModeHandler_Address()]);
-+				ORAInstrHandler(ReadZeroPage(ZeroPgAddrModeHandler_Address()));
- 				break;
- 			case 0x06:
- 				// ASL zp
-@@ -1604,7 +1709,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: SLO zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					ASLInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0x06:
+-				// ASL zp
+-				ASLInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0x07:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					ASLInstrHandler(ZeroPageAddress);
 -					ORAInstrHandler(WholeRam[ZeroPageAddress]);
-+					ORAInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x08:
-@@ -1715,7 +1820,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: SLO zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					ASLInstrHandler(ZeroPageAddress);
+-				}
+-				break;
+-			case 0x08:
+-				// PHP
+-				Push(PSR | 48);
+-				break;
+-			case 0x09:
+-				// ORA imm
+-				ORAInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0x0a:
+-				// ASL A
+-				ASLInstrHandler_Acc();
+-				break;
+-			case 0x0b:
+-			case 0x2b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ANC imm
+-					ANDInstrHandler(ReadPaged(ProgramCounter++));
+-					PSR &= ~FlagC;
+-					PSR |= ((Accumulator & 128) >> 7);
+-				}
+-				break;
+-			case 0x0c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// TSB abs
+-					TSBInstrHandler(AbsAddrModeHandler_Address());
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs
+-					AbsAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x0d:
+-				// ORA abs
+-				ORAInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0x0e:
+-				// ASL abs
+-				ASLInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x0f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO abs
+-					int Address = AbsAddrModeHandler_Address();
+-					ASLInstrHandler(Address);
+-					ORAInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x10:
+-				// BPL rel
+-				BPLInstrHandler();
+-				break;
+-			case 0x11:
+-				// ORA (zp),Y
+-				ORAInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0x12:
+-				if (CPUType == CPU::CPU65C12) {
+-					// ORA (zp)
+-					ORAInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x13:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					ASLInstrHandler(Address);
+-					ORAInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x14:
+-				if (CPUType == CPU::CPU65C12) {
+-					// TRB zp
+-					TRBInstrHandler(ZeroPgAddrModeHandler_Address());
+-				}
+-				else {
+-					// Undocumented instruction: NOP zp,X
+-					ZeroPgXAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x15:
+-				// ORA zp,X
+-				ORAInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0x16:
+-				// ASL zp,X
+-				ASLInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0x17:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					ASLInstrHandler(ZeroPageAddress);
 -					ORAInstrHandler(WholeRam[ZeroPageAddress]);
-+					ORAInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x18:
-@@ -1796,11 +1901,11 @@ void Exec6502Instruction()
- 				break;
- 			case 0x24:
- 				// BIT zp
+-				}
+-				break;
+-			case 0x18:
+-				// CLC
+-				PSR &= ~FlagC;
+-				break;
+-			case 0x19:
+-				// ORA abs,Y
+-				ORAInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0x1a:
+-				if (CPUType == CPU::CPU65C12) {
+-					// INC A
+-					INAInstrHandler();
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0x1b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO abs,Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					ASLInstrHandler(Address);
+-					ORAInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x1c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// TRB abs
+-					TRBInstrHandler(AbsAddrModeHandler_Address());
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs,X
+-					AbsXAddrModeHandler_Data();
+-				}
+-				break;
+-			case 0x1d:
+-				// ORA abs,X
+-				ORAInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0x1e:
+-				// ASL abs,X
+-				ASLInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0x1f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SLO abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					ASLInstrHandler(Address);
+-					ORAInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x20:
+-				// JSR abs
+-				JSRInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x21:
+-				// AND (zp,X)
+-				ANDInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0x23:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					ROLInstrHandler(Address);
+-					ANDInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x24:
+-				// BIT zp
 -				BITInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				BITInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0x25:
- 				// AND zp
+-				break;
+-			case 0x25:
+-				// AND zp
 -				ANDInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				ANDInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0x26:
- 				// ROL zp
-@@ -1814,13 +1919,14 @@ void Exec6502Instruction()
- 					// Undocumented instruction: RLA zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					ROLInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0x26:
+-				// ROL zp
+-				ROLInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0x27:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					ROLInstrHandler(ZeroPageAddress);
 -					ANDInstrHandler(WholeRam[ZeroPageAddress]);
-+					ANDInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x28: {
- 					// PLP
- 					unsigned char oldPSR = PSR;
- 					PSR = Pop();
-+					fSyncStackFrames = true;
- 
- 					if ((oldPSR ^ PSR) & FlagI) {
- 						if (PSR & FlagI) {
-@@ -1918,7 +2024,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: RLA zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					ROLInstrHandler(ZeroPageAddress);
+-				}
+-				break;
+-			case 0x28: {
+-					// PLP
+-					unsigned char oldPSR = PSR;
+-					PSR = Pop();
+-
+-					if ((oldPSR ^ PSR) & FlagI) {
+-						if (PSR & FlagI) {
+-							iFlagJustSet = true;
+-						}
+-						else {
+-							iFlagJustCleared = true;
+-						}
+-					}
+-				}
+-				break;
+-			case 0x29:
+-				// AND imm
+-				ANDInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0x2a:
+-				// ROL A
+-				ROLInstrHandler_Acc();
+-				break;
+-			case 0x2c:
+-				// BIT abs
+-				BITInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0x2d:
+-				// AND abs
+-				ANDInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0x2e:
+-				// ROL abs
+-				ROLInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x2f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA abs
+-					int Address = AbsAddrModeHandler_Address();
+-					ROLInstrHandler(Address);
+-					ANDInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x30:
+-				// BMI rel
+-				BMIInstrHandler();
+-				break;
+-			case 0x31:
+-				// AND (zp),Y
+-				ANDInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0x32:
+-				if (CPUType == CPU::CPU65C12) {
+-					// AND (zp)
+-					ANDInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x33:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					ROLInstrHandler(Address);
+-					ANDInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x34:
+-				if (CPUType == CPU::CPU65C12) {
+-					// BIT abs,X
+-					BITInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: NOP zp,X
+-					ZeroPgXAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x35:
+-				// AND zp,X
+-				ANDInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0x36:
+-				// ROL zp,X
+-				ROLInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0x37:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					ROLInstrHandler(ZeroPageAddress);
 -					ANDInstrHandler(WholeRam[ZeroPageAddress]);
-+					ANDInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x38:
-@@ -1983,6 +2089,7 @@ void Exec6502Instruction()
- 				PSR = Pop();
- 				ProgramCounter = PopWord();
- 				NMILock = false;
-+                fSyncStackFrames = true;
- 				break;
- 			case 0x41:
- 				// EOR (zp,X)
-@@ -2005,7 +2112,7 @@ void Exec6502Instruction()
- 				break;
- 			case 0x45:
- 				// EOR zp
+-				}
+-				break;
+-			case 0x38:
+-				// SEC
+-				PSR |= FlagC;
+-				break;
+-			case 0x39:
+-				// AND abs,Y
+-				ANDInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0x3a:
+-				if (CPUType == CPU::CPU65C12) {
+-					// DEC A
+-					DEAInstrHandler();
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0x3b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA abs.Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					ROLInstrHandler(Address);
+-					ANDInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x3c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// BIT abs,X
+-					BITInstrHandler(AbsXAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs,x
+-					AbsXAddrModeHandler_Data();
+-				}
+-				break;
+-			case 0x3d:
+-				// AND abs,X
+-				ANDInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0x3e:
+-				// ROL abs,X
+-				ROLInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0x3f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RLA abs.X
+-					int Address = AbsXAddrModeHandler_Address();
+-					ROLInstrHandler(Address);
+-					ANDInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x40:
+-				// RTI
+-				PSR = Pop();
+-				ProgramCounter = PopWord();
+-				NMILock = false;
+-				break;
+-			case 0x41:
+-				// EOR (zp,X)
+-				EORInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0x43:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					LSRInstrHandler(Address);
+-					EORInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x44:
+-				// NOP zp
+-				ReadPaged(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0x45:
+-				// EOR zp
 -				EORInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				EORInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0x46:
- 				// LSR zp
-@@ -2019,7 +2126,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: SRE zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					LSRInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0x46:
+-				// LSR zp
+-				LSRInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0x47:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					LSRInstrHandler(ZeroPageAddress);
 -					EORInstrHandler(WholeRam[ZeroPageAddress]);
-+					EORInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x48:
-@@ -2047,6 +2154,7 @@ void Exec6502Instruction()
- 			case 0x4c:
- 				// JMP abs
- 				ProgramCounter = AbsAddrModeHandler_Address();
-+				UpdateRootStackFrame();
- 				break;
- 			case 0x4d:
- 				// EOR abs
-@@ -2118,7 +2226,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: SRE zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					LSRInstrHandler(ZeroPageAddress);
+-				}
+-				break;
+-			case 0x48:
+-				// PHA
+-				Push(Accumulator);
+-				break;
+-			case 0x49:
+-				// EOR imm
+-				EORInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0x4a:
+-				// LSR A
+-				LSRInstrHandler_Acc();
+-				break;
+-			case 0x4b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ALR imm
+-					ANDInstrHandler(ReadPaged(ProgramCounter++));
+-					LSRInstrHandler_Acc();
+-				}
+-				break;
+-			case 0x4c:
+-				// JMP abs
+-				ProgramCounter = AbsAddrModeHandler_Address();
+-				break;
+-			case 0x4d:
+-				// EOR abs
+-				EORInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0x4e:
+-				// LSR abs
+-				LSRInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x4f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE abs
+-					int Address = AbsAddrModeHandler_Address();
+-					LSRInstrHandler(Address);
+-					EORInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x50:
+-				// BVC rel
+-				BVCInstrHandler();
+-				break;
+-			case 0x51:
+-				// EOR (zp),Y
+-				EORInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0x52:
+-				if (CPUType == CPU::CPU65C12) {
+-					// EOR (zp)
+-					EORInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x53:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					LSRInstrHandler(Address);
+-					EORInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x54:
+-			case 0xd4:
+-			case 0xf4:
+-				// Undocumented instruction: NOP zp,X
+-				ZeroPgXAddrModeHandler_Address();
+-				break;
+-			case 0x55:
+-				// EOR zp,X
+-				EORInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0x56:
+-				// LSR zp,X
+-				LSRInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0x57:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					LSRInstrHandler(ZeroPageAddress);
 -					EORInstrHandler(WholeRam[ZeroPageAddress]);
-+					EORInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x58:
-@@ -2184,6 +2292,7 @@ void Exec6502Instruction()
- 			case 0x60:
- 				// RTS
- 				ProgramCounter = PopWord() + 1;
-+				fSyncStackFrames = true;
- 				break;
- 			case 0x61:
- 				// ADC (zp,X)
-@@ -2203,7 +2312,7 @@ void Exec6502Instruction()
- 			case 0x64:
- 				if (CPUType == CPU::CPU65C12) {
- 					// STZ zp
+-				}
+-				break;
+-			case 0x58:
+-				// CLI
+-				if (PSR & FlagI) {
+-					iFlagJustCleared = true;
+-				}
+-				PSR &= ~FlagI;
+-				break;
+-			case 0x59:
+-				// EOR abs,Y
+-				EORInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0x5a:
+-				if (CPUType == CPU::CPU65C12) {
+-					// PHY
+-					Push(YReg);
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0x5b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE abs,Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					LSRInstrHandler(Address);
+-					EORInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x5c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP abs
+-					AbsAddrModeHandler_Address();
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs,x
+-					AbsXAddrModeHandler_Data();
+-				}
+-				break;
+-			case 0x5d:
+-				// EOR abs,X
+-				EORInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0x5e:
+-				// LSR abs,X
+-				LSRInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0x5f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SRE abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					LSRInstrHandler(Address);
+-					EORInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x60:
+-				// RTS
+-				ProgramCounter = PopWord() + 1;
+-				break;
+-			case 0x61:
+-				// ADC (zp,X)
+-				ADCInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0x63:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					RORInstrHandler(Address);
+-					ADCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x64:
+-				if (CPUType == CPU::CPU65C12) {
+-					// STZ zp
 -					BEEBWRITEMEM_DIRECT(ZeroPgAddrModeHandler_Address(), 0);
-+					WriteZeroPage(ZeroPgAddrModeHandler_Address(), 0);
- 				}
- 				else {
- 					// Undocumented instruction: NOP zp
-@@ -2212,7 +2321,7 @@ void Exec6502Instruction()
- 				break;
- 			case 0x65:
- 				// ADC zp
+-				}
+-				else {
+-					// Undocumented instruction: NOP zp
+-					ZeroPgAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x65:
+-				// ADC zp
 -				ADCInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				ADCInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0x66:
- 				// ROR zp
-@@ -2226,13 +2335,14 @@ void Exec6502Instruction()
- 					// Undocumented instruction: RRA zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					RORInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0x66:
+-				// ROR zp
+-				RORInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0x67:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					RORInstrHandler(ZeroPageAddress);
 -					ADCInstrHandler(WholeRam[ZeroPageAddress]);
-+					ADCInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x68:
- 				// PLA
- 				Accumulator = Pop();
- 				SetPSRZN(Accumulator);
-+				fSyncStackFrames = true;
- 				break;
- 			case 0x69:
- 				// ADC imm
-@@ -2254,6 +2364,7 @@ void Exec6502Instruction()
- 			case 0x6c:
- 				// JMP (abs)
- 				ProgramCounter = IndAddrModeHandler_Address();
-+				UpdateRootStackFrame();
- 				break;
- 			case 0x6d:
- 				// ADC abs
-@@ -2306,7 +2417,7 @@ void Exec6502Instruction()
- 			case 0x74:
- 				if (CPUType == CPU::CPU65C12) {
- 					// STZ zp,X
+-				}
+-				break;
+-			case 0x68:
+-				// PLA
+-				Accumulator = Pop();
+-				SetPSRZN(Accumulator);
+-				break;
+-			case 0x69:
+-				// ADC imm
+-				ADCInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0x6a:
+-				// ROR A
+-				RORInstrHandler_Acc();
+-				break;
+-			case 0x6b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ARR imm
+-					ARRInstrHandler(ReadPaged(ProgramCounter++));
+-				}
+-				break;
+-			case 0x6c:
+-				// JMP (abs)
+-				ProgramCounter = IndAddrModeHandler_Address();
+-				break;
+-			case 0x6d:
+-				// ADC abs
+-				ADCInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0x6e:
+-				// ROR abs
+-				RORInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x6f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA abs
+-					int Address = AbsAddrModeHandler_Address();
+-					RORInstrHandler(Address);
+-					ADCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x70:
+-				// BVS rel
+-				BVSInstrHandler();
+-				break;
+-			case 0x71:
+-				// ADC (zp),Y
+-				ADCInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0x72:
+-				if (CPUType == CPU::CPU65C12) {
+-					// ADC (zp)
+-					ADCInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x73:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					RORInstrHandler(Address);
+-					ADCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x74:
+-				if (CPUType == CPU::CPU65C12) {
+-					// STZ zp,X
 -					BEEBWRITEMEM_DIRECT(ZeroPgXAddrModeHandler_Address(), 0);
-+					WriteZeroPage(ZeroPgXAddrModeHandler_Address(), 0);
- 				}
- 				else {
- 					// Undocumented instruction: NOP zp,x
-@@ -2329,7 +2440,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: RRA zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					RORInstrHandler(ZeroPageAddress);
+-				}
+-				else {
+-					// Undocumented instruction: NOP zp,x
+-					ZeroPgXAddrModeHandler_Address();
+-				}
+-				break;
+-			case 0x75:
+-				// ADC zp,X
+-				ADCInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0x76:
+-				// ROR zp,X
+-				RORInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0x77:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					RORInstrHandler(ZeroPageAddress);
 -					ADCInstrHandler(WholeRam[ZeroPageAddress]);
-+					ADCInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0x78:
-@@ -2348,6 +2459,7 @@ void Exec6502Instruction()
- 					// PLY
- 					YReg = Pop();
- 					SetPSRZN(YReg);
-+					fSyncStackFrames = true;
- 				}
- 				else {
- 					// Undocumented instruction: NOP
-@@ -2427,17 +2539,17 @@ void Exec6502Instruction()
- 			case 0x84:
- 				// STY zp
- 				AdvanceCyclesForMemWrite();
+-				}
+-				break;
+-			case 0x78:
+-				// SEI
+-				if (!(PSR & FlagI)) {
+-					iFlagJustSet = true;
+-				}
+-				PSR |= FlagI;
+-				break;
+-			case 0x79:
+-				// ADC abs,Y
+-				ADCInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0x7a:
+-				if (CPUType == CPU::CPU65C12) {
+-					// PLY
+-					YReg = Pop();
+-					SetPSRZN(YReg);
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0x7b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA abs,Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					RORInstrHandler(Address);
+-					ADCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x7c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// JMP abs,X
+-					ProgramCounter = IndAddrXModeHandler_Address();
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs,X
+-					AbsXAddrModeHandler_Data();
+-				}
+-				break;
+-			case 0x7d:
+-				// ADC abs,X
+-				ADCInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0x7e:
+-				// ROR abs,X
+-				RORInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0x7f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: RRA abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					RORInstrHandler(Address);
+-					ADCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0x80:
+-				if (CPUType == CPU::CPU65C12) {
+-					// BRA rel
+-					BRAInstrHandler();
+-				}
+-				else {
+-					// Undocumented instruction: NOP imm
+-					ReadPaged(ProgramCounter++);
+-				}
+-				break;
+-			case 0x81:
+-				// STA (zp,X)
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(IndXAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x82:
+-			case 0xc2:
+-			case 0xe2:
+-				// Undocumented instruction: NOP imm
+-				ReadPaged(ProgramCounter++);
+-				break;
+-			case 0x83:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SAX (zp,X)
+-					AdvanceCyclesForMemWrite();
+-					WritePaged(IndXAddrModeHandler_Address(), Accumulator & XReg);
+-				}
+-				break;
+-			case 0x84:
+-				// STY zp
+-				AdvanceCyclesForMemWrite();
 -				BEEBWRITEMEM_DIRECT(ZeroPgAddrModeHandler_Address(), YReg);
-+				WriteZeroPage(ZeroPgAddrModeHandler_Address(), YReg);
- 				break;
- 			case 0x85:
- 				// STA zp
- 				AdvanceCyclesForMemWrite();
+-				break;
+-			case 0x85:
+-				// STA zp
+-				AdvanceCyclesForMemWrite();
 -				BEEBWRITEMEM_DIRECT(ZeroPgAddrModeHandler_Address(), Accumulator);
-+				WriteZeroPage(ZeroPgAddrModeHandler_Address(), Accumulator);
- 				break;
- 			case 0x86:
- 				// STX zp
- 				AdvanceCyclesForMemWrite();
+-				break;
+-			case 0x86:
+-				// STX zp
+-				AdvanceCyclesForMemWrite();
 -				BEEBWRITEMEM_DIRECT(ZeroPgAddrModeHandler_Address(), XReg);
-+				WriteZeroPage(ZeroPgAddrModeHandler_Address(), XReg);
- 				break;
- 			case 0x87:
- 				if (CPUType == CPU::CPU65C12) {
-@@ -2447,7 +2559,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: SAX zp
- 					// This one does not seem to change the processor flags
- 					AdvanceCyclesForMemWrite();
+-				break;
+-			case 0x87:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SAX zp
+-					// This one does not seem to change the processor flags
+-					AdvanceCyclesForMemWrite();
 -					WholeRam[ZeroPgAddrModeHandler_Address()] = Accumulator & XReg;
-+					WriteZeroPage(ZeroPgAddrModeHandler_Address(), Accumulator & XReg);
- 				}
- 				break;
- 			case 0x88:
-@@ -2557,7 +2669,7 @@ void Exec6502Instruction()
- 				else {
- 					// Undocumented instruction: SAX zp,Y
- 					AdvanceCyclesForMemWrite();
+-				}
+-				break;
+-			case 0x88:
+-				// DEY
+-				DEYInstrHandler();
+-				break;
+-			case 0x89:
+-				if (CPUType == CPU::CPU65C12) {
+-					// BIT imm
+-					BITImmedInstrHandler(ReadPaged(ProgramCounter++));
+-				}
+-				else {
+-					// Undocumented instruction: NOP imm
+-					ReadPaged(ProgramCounter++);
+-				}
+-				break;
+-			case 0x8a:
+-				// TXA
+-				Accumulator = XReg;
+-				SetPSRZN(Accumulator);
+-				break;
+-			case 0x8b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: XAA imm
+-					// See http://visual6502.org/wiki/index.php?title=6502_Opcode_8B_(XAA,_ANE)_explained
+-					Accumulator &= XReg & ReadPaged(ProgramCounter++);
+-					SetPSRZN(Accumulator);
+-				}
+-				break;
+-			case 0x8c:
+-				// STY abs
+-				AdvanceCyclesForMemWrite();
+-				STYInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x8d:
+-				// STA abs
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(AbsAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x8e:
+-				// STX abs
+-				AdvanceCyclesForMemWrite();
+-				STXInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0x8f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SAX abs
+-					WritePaged(AbsAddrModeHandler_Address(), Accumulator & XReg);
+-				}
+-				break;
+-			case 0x90:
+-				// BCC rel
+-				BCCInstrHandler();
+-				break;
+-			case 0x91:
+-				// STA (zp),Y
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(IndYAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x92:
+-				if (CPUType == CPU::CPU65C12) {
+-					// STA (zp)
+-					AdvanceCyclesForMemWrite();
+-					WritePaged(ZPIndAddrModeHandler_Address(), Accumulator);
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0x93:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: AHX (zp),Y
+-					AdvanceCyclesForMemWrite();
+-					int Address = IndYAddrModeHandler_Address();
+-					WritePaged(Address, Accumulator & XReg & ((Address >> 8) + 1));
+-				}
+-				break;
+-			case 0x94:
+-				// STY zp,X
+-				AdvanceCyclesForMemWrite();
+-				STYInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0x95:
+-				// STA zp,X
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(ZeroPgXAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x96:
+-				// STX zp,X
+-				AdvanceCyclesForMemWrite();
+-				STXInstrHandler(ZeroPgYAddrModeHandler_Address());
+-				break;
+-			case 0x97:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: SAX zp,Y
+-					AdvanceCyclesForMemWrite();
 -					WholeRam[ZeroPgYAddrModeHandler_Address()] = Accumulator & XReg;
-+					WriteZeroPage(ZeroPgYAddrModeHandler_Address(), Accumulator & XReg);
- 				}
- 				break;
- 			case 0x98:
-@@ -2573,6 +2685,7 @@ void Exec6502Instruction()
- 			case 0x9a:
- 				// TXS
- 				StackReg = XReg;
-+				fSyncStackFrames = true;
- 				break;
- 			case 0x9b:
- 				if (CPUType == CPU::CPU65C12) {
-@@ -2646,15 +2759,15 @@ void Exec6502Instruction()
- 				break;
- 			case 0xa4:
- 				// LDY zp
+-				}
+-				break;
+-			case 0x98:
+-				// TYA
+-				Accumulator = YReg;
+-				SetPSRZN(Accumulator);
+-				break;
+-			case 0x99:
+-				// STA abs,Y
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(AbsYAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x9a:
+-				// TXS
+-				StackReg = XReg;
+-				break;
+-			case 0x9b:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: TAS abs,Y
+-					WritePaged(AbsYAddrModeHandler_Address(), Accumulator & XReg);
+-				}
+-				break;
+-			case 0x9c:
+-				if (CPUType == CPU::CPU65C12) {
+-					// STZ abs
+-					WritePaged(AbsAddrModeHandler_Address(), 0);
+-				}
+-				else {
+-					// Undocumented instruction: SHY abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					WritePaged(Address, YReg & (unsigned char)((Address >> 8) + 1));
+-				}
+-				break;
+-			case 0x9d:
+-				// STA abs,X
+-				AdvanceCyclesForMemWrite();
+-				WritePaged(AbsXAddrModeHandler_Address(), Accumulator);
+-				break;
+-			case 0x9e:
+-				if (CPUType == CPU::CPU65C12) {
+-					// STZ abs,x
+-					AdvanceCyclesForMemWrite();
+-					WritePaged(AbsXAddrModeHandler_Address(), 0);
+-				}
+-				else {
+-					// Undocumented instruction: SHX abs,Y
+-					AdvanceCyclesForMemWrite();
+-					WritePaged(AbsXAddrModeHandler_Address(), Accumulator & XReg);
+-				}
+-				break;
+-			case 0x9f:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: AHX abs,Y
+-					AdvanceCyclesForMemWrite();
+-					int Address = AbsYAddrModeHandler_Address();
+-					WritePaged(Address, Accumulator & XReg & ((Address >> 8) + 1));
+-				}
+-				break;
+-			case 0xa0:
+-				// LDY imm
+-				LDYInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xa1:
+-				// LDA (zp,X)
+-				LDAInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0xa2:
+-				// LDX imm
+-				LDXInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xa3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX (zp,X)
+-					LDAInstrHandler(IndXAddrModeHandler_Data());
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xa4:
+-				// LDY zp
 -				LDYInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				LDYInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xa5:
- 				// LDA zp
+-				break;
+-			case 0xa5:
+-				// LDA zp
 -				LDAInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				LDAInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xa6:
- 				// LDX zp
+-				break;
+-			case 0xa6:
+-				// LDX zp
 -				LDXInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				LDXInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xa7:
- 				if (CPUType == CPU::CPU65C12) {
-@@ -2663,7 +2776,7 @@ void Exec6502Instruction()
- 				else {
- 					// Undocumented instruction: LAX zp
- 					int ZeroPageAddress = ReadPaged(ProgramCounter++);
+-				break;
+-			case 0xa7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX zp
+-					int ZeroPageAddress = ReadPaged(ProgramCounter++);
 -					LDAInstrHandler(WholeRam[ZeroPageAddress]);
-+					LDAInstrHandler(ReadPaged(ZeroPageAddress));
- 					XReg = Accumulator;
- 				}
- 				break;
-@@ -2830,11 +2943,11 @@ void Exec6502Instruction()
- 				break;
- 			case 0xc4:
- 				// CPY zp
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xa8:
+-				// TAY
+-				YReg = Accumulator;
+-				SetPSRZN(Accumulator);
+-				break;
+-			case 0xa9:
+-				// LDA imm
+-				LDAInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xaa:
+-				// TXA
+-				XReg = Accumulator;
+-				SetPSRZN(Accumulator);
+-				break;
+-			case 0xab:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX imm
+-					LDAInstrHandler(Accumulator & ReadPaged(ProgramCounter++));
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xac:
+-				// LDY abs
+-				LDYInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xad:
+-				// LDA abs
+-				LDAInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xae:
+-				// LDX abs
+-				LDXInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xaf:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX abs
+-					LDAInstrHandler(AbsAddrModeHandler_Data());
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xb0:
+-				// BCS rel
+-				BCSInstrHandler();
+-				break;
+-			case 0xb1:
+-				// LDA (zp),Y
+-				LDAInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0xb2:
+-				if (CPUType == CPU::CPU65C12) {
+-					// LDA (zp)
+-					LDAInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0xb3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX (zp),Y
+-					LDAInstrHandler(IndYAddrModeHandler_Data());
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xb4:
+-				// LDY zp,X
+-				LDYInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0xb5:
+-				// LDA zp,X
+-				LDAInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0xb6:
+-				// LDX zp,Y
+-				LDXInstrHandler(ZeroPgYAddrModeHandler_Data());
+-				break;
+-			case 0xb7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX zp,Y
+-					LDXInstrHandler(ZeroPgYAddrModeHandler_Data());
+-					Accumulator = XReg;
+-				}
+-				break;
+-			case 0xb8:
+-				// CLV
+-				PSR &= ~FlagV;
+-				break;
+-			case 0xb9:
+-				// LDA abs,Y
+-				LDAInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0xba:
+-				// TSX
+-				XReg = StackReg;
+-				SetPSRZN(XReg);
+-				break;
+-			case 0xbb:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAS abs,Y
+-					LDAInstrHandler(StackReg & AbsYAddrModeHandler_Data());
+-					XReg = Accumulator;
+-					StackReg = Accumulator;
+-				}
+-				break;
+-			case 0xbc:
+-				// LDY abs,X
+-				LDYInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0xbd:
+-				// LDA abs,X
+-				LDAInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0xbe:
+-				// LDX abs,Y
+-				LDXInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0xbf:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: LAX abs,Y
+-					LDAInstrHandler(AbsYAddrModeHandler_Data());
+-					XReg = Accumulator;
+-				}
+-				break;
+-			case 0xc0:
+-				// CPY imm
+-				CPYInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xc1:
+-				// CMP (zp,X)
+-				CMPInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0xc3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocument instruction: DCP (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					DECInstrHandler(Address);
+-					CMPInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xc4:
+-				// CPY zp
 -				CPYInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				CPYInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xc5:
- 				// CMP zp
+-				break;
+-			case 0xc5:
+-				// CMP zp
 -				CMPInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				CMPInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xc6:
- 				// DEC zp
-@@ -2848,7 +2961,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: DCP zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					DECInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0xc6:
+-				// DEC zp
+-				DECInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0xc7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					DECInstrHandler(ZeroPageAddress);
 -					CMPInstrHandler(WholeRam[ZeroPageAddress]);
-+					CMPInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0xc8:
-@@ -2945,7 +3058,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: DCP zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					DECInstrHandler(ZeroPageAddress);
+-				}
+-				break;
+-			case 0xc8:
+-				// INY
+-				INYInstrHandler();
+-				break;
+-			case 0xc9:
+-				// CMP imm
+-				CMPInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xca:
+-				// DEX
+-				DEXInstrHandler();
+-				break;
+-			case 0xcb:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ASX imm
+-					//
+-					// Subtract #n from (A & X) and store result in X
+-					unsigned char Operand = ReadPaged(ProgramCounter++);
+-					unsigned char Result = (unsigned char)((Accumulator & XReg) - Operand);
+-					SetPSRCZN((Accumulator & XReg) >= Operand, Result == 0, Result & 128);
+-					XReg = Result;
+-				}
+-				break;
+-			case 0xcc:
+-				// CPY abs
+-				CPYInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xcd:
+-				// CMP abs
+-				CMPInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xce:
+-				// DEC abs
+-				DECInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0xcf:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP abs
+-					int Address = AbsAddrModeHandler_Address();
+-					DECInstrHandler(Address);
+-					CMPInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xd0:
+-				// BNE rel
+-				BNEInstrHandler();
+-				break;
+-			case 0xd1:
+-				// CMP (zp),Y
+-				CMPInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0xd2:
+-				if (CPUType == CPU::CPU65C12) {
+-					// CMP (zp)
+-					CMPInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0xd3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					DECInstrHandler(Address);
+-					CMPInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xd5:
+-				// CMP zp,X
+-				CMPInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0xd6:
+-				// DEC zp,X
+-				DECInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0xd7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					DECInstrHandler(ZeroPageAddress);
 -					CMPInstrHandler(WholeRam[ZeroPageAddress]);
-+					CMPInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0xd8:
-@@ -3027,11 +3140,11 @@ void Exec6502Instruction()
- 				break;
- 			case 0xe4:
- 				// CPX zp
+-				}
+-				break;
+-			case 0xd8:
+-				// CLD
+-				PSR &= ~FlagD;
+-				break;
+-			case 0xd9:
+-				// CMP abs,Y
+-				CMPInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0xda:
+-				if (CPUType == CPU::CPU65C12) {
+-					// PHX
+-					Push(XReg);
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0xdb:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP abs,Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					DECInstrHandler(Address);
+-					CMPInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xdc:
+-			case 0xfc:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP abs
+-					AbsAddrModeHandler_Address();
+-				}
+-				else {
+-					// Undocumented instruction: NOP abs,X
+-					AbsXAddrModeHandler_Data();
+-				}
+-				break;
+-			case 0xdd:
+-				// CMP abs,X
+-				CMPInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0xde:
+-				// DEC abs,X
+-				DECInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0xdf:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: DCP abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					DECInstrHandler(Address);
+-					CMPInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xe0:
+-				// CPX imm
+-				CPXInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xe1:
+-				// SBC (zp,X)
+-				SBCInstrHandler(IndXAddrModeHandler_Data());
+-				break;
+-			case 0xe3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC (zp,X)
+-					int Address = IndXAddrModeHandler_Address();
+-					INCInstrHandler(Address);
+-					SBCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xe4:
+-				// CPX zp
 -				CPXInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				CPXInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xe5:
- 				// SBC zp
+-				break;
+-			case 0xe5:
+-				// SBC zp
 -				SBCInstrHandler(WholeRam[ReadPaged(ProgramCounter++)]);
-+				SBCInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
- 				break;
- 			case 0xe6:
- 				// INC zp
-@@ -3045,7 +3158,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: ISC zp
- 					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
- 					INCInstrHandler(ZeroPageAddress);
+-				break;
+-			case 0xe6:
+-				// INC zp
+-				INCInstrHandler(ZeroPgAddrModeHandler_Address());
+-				break;
+-			case 0xe7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC zp
+-					int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
+-					INCInstrHandler(ZeroPageAddress);
 -					SBCInstrHandler(WholeRam[ZeroPageAddress]);
-+					SBCInstrHandler(ReadPaged(ZeroPageAddress));
- 				}
- 				break;
- 			case 0xe8:
-@@ -3136,7 +3249,7 @@ void Exec6502Instruction()
- 					// Undocumented instruction: ISC zp,X
- 					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
- 					INCInstrHandler(ZeroPageAddress);
+-				}
+-				break;
+-			case 0xe8:
+-				// INX
+-				INXInstrHandler();
+-				break;
+-			case 0xe9:
+-				// SBC imm
+-				SBCInstrHandler(ReadPaged(ProgramCounter++));
+-				break;
+-			case 0xea:
+-				// NOP
+-				break;
+-			case 0xeb:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// SBC imm
+-					SBCInstrHandler(ReadPaged(ProgramCounter++));
+-				}
+-				break;
+-			case 0xec:
+-				// CPX abs
+-				CPXInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xed:
+-				// SBC abs
+-				SBCInstrHandler(AbsAddrModeHandler_Data());
+-				break;
+-			case 0xee:
+-				// INC abs
+-				INCInstrHandler(AbsAddrModeHandler_Address());
+-				break;
+-			case 0xef:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC abs
+-					int Address = AbsAddrModeHandler_Address();
+-					INCInstrHandler(Address);
+-					SBCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xf0:
+-				// BEQ rel
+-				BEQInstrHandler();
+-				break;
+-			case 0xf1:
+-				// SBC (zp),Y
+-				SBCInstrHandler(IndYAddrModeHandler_Data());
+-				break;
+-			case 0xf2:
+-				if (CPUType == CPU::CPU65C12) {
+-					// SBC (zp)
+-					SBCInstrHandler(ZPIndAddrModeHandler_Data());
+-				}
+-				else {
+-					// Undocumented instruction: KIL
+-					KILInstrHandler();
+-				}
+-				break;
+-			case 0xf3:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC (zp),Y
+-					int Address = IndYAddrModeHandler_Address();
+-					INCInstrHandler(Address);
+-					SBCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xf5:
+-				// SBC zp,X
+-				SBCInstrHandler(ZeroPgXAddrModeHandler_Data());
+-				break;
+-			case 0xf6:
+-				// INC zp,X
+-				INCInstrHandler(ZeroPgXAddrModeHandler_Address());
+-				break;
+-			case 0xf7:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC zp,X
+-					int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
+-					INCInstrHandler(ZeroPageAddress);
 -					SBCInstrHandler(WholeRam[ZeroPageAddress]);
-+					SBCInstrHandler(ReadZeroPage(ZeroPageAddress));
- 				}
- 				break;
- 			case 0xf8:
-@@ -3152,6 +3265,7 @@ void Exec6502Instruction()
- 					// PLX
- 					XReg = Pop();
- 					SetPSRZN(XReg);
-+					fSyncStackFrames = true;
- 				}
- 				else {
- 					// Undocumented instruction: NOP
-@@ -3213,6 +3327,11 @@ void Exec6502Instruction()
- 		Cycles += CyclesTable[CurrentInstruction] -
- 		          CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
- 
-+		PerfWriter_WriteInstruction(
-+			PrePC, ProgramCounter, (byte)CurrentInstruction, (byte)Cycles, 
-+			Accumulator, XReg, YReg, PSR, StackReg,
-+			LastReadWriteAddress, LastReadValue, LastWriteValue);
+-				}
+-				break;
+-			case 0xf8:
+-				// SED
+-				PSR |= FlagD;
+-				break;
+-			case 0xf9:
+-				// SBC abs,Y
+-				SBCInstrHandler(AbsYAddrModeHandler_Data());
+-				break;
+-			case 0xfa:
+-				if (CPUType == CPU::CPU65C12) {
+-					// PLX
+-					XReg = Pop();
+-					SetPSRZN(XReg);
+-				}
+-				else {
+-					// Undocumented instruction: NOP
+-				}
+-				break;
+-			case 0xfb:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC abs,Y
+-					int Address = AbsYAddrModeHandler_Address();
+-					INCInstrHandler(Address);
+-					SBCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-			case 0xfd:
+-				// SBC abs,X
+-				SBCInstrHandler(AbsXAddrModeHandler_Data());
+-				break;
+-			case 0xfe:
+-				// INC abs,X
+-				INCInstrHandler(AbsXAddrModeHandler_Address());
+-				break;
+-			case 0xff:
+-				if (CPUType == CPU::CPU65C12) {
+-					// NOP
+-				}
+-				else {
+-					// Undocumented instruction: ISC abs,X
+-					int Address = AbsXAddrModeHandler_Address();
+-					INCInstrHandler(Address);
+-					SBCInstrHandler(ReadPaged(Address));
+-				}
+-				break;
+-		}
+-
+-		// This block corrects the cycle count for the branch instructions
+-		if ((CurrentInstruction == 0x10) ||
+-		    (CurrentInstruction == 0x30) ||
+-		    (CurrentInstruction == 0x50) ||
+-		    (CurrentInstruction == 0x70) ||
+-		    (CurrentInstruction == 0x80 && CPUType == CPU::CPU65C12) ||
+-		    (CurrentInstruction == 0x90) ||
+-		    (CurrentInstruction == 0xb0) ||
+-		    (CurrentInstruction == 0xd0) ||
+-		    (CurrentInstruction == 0xf0))
+-		{
+-			if (Branched)
+-			{
+-				Cycles++;
+-
+-				if ((ProgramCounter & 0xff00) != ((PrePC + 2) & 0xff00)) {
+-					Cycles++;
+-				}
+-			}
+-		}
+-
+-		Cycles += CyclesTable[CurrentInstruction] -
+-		          CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
+-
+-		PollVIAs(Cycles - ViaCycles);
+-		PollHardware(Cycles);
+-
+-		// Check for IRQ
+-		DoIntCheck();
+-		if (IntDue && (!GETIFLAG || iFlagJustSet) &&
+-		    (CyclesToInt <= (-2 - IOCycles) && !iFlagJustCleared))
+-		{
+-			// Int noticed 2 cycles before end of instruction - interrupt now
+-			CyclesToInt = NO_TIMER_INT_DUE;
+-			DoInterrupt();
+-			PollHardware(IRQCycles);
+-			PollVIAs(IRQCycles);
+-			IRQCycles = 0;
+-		}
+-
+-		// Check for NMI
+-		if ((NMIStatus && !OldNMIStatus) || (NMIStatus & 1 << nmi_econet))
+-		{
+-			NMIStatus &= ~(1<<nmi_econet);
+-			DoNMI();
+-			PollHardware(IRQCycles);
+-			PollVIAs(IRQCycles);
+-			IRQCycles = 0;
+-		}
+-
+-		OldNMIStatus = NMIStatus;
+-
+-		switch (TubeType)
+-		{
+-			case TubeDevice::Acorn65C02: // 3MHz
+-				SyncTubeProcessor();
+-				break;
+-
+-			case TubeDevice::AcornZ80: // TODO: 6MHz
+-			case TubeDevice::TorchZ80: // TODO: 4MHz
+-				Z80Execute();
+-				break;
+-
+-			case TubeDevice::AcornArm: // TODO: 8MHz
+-				arm->exec(4);
+-				break;
+-
+-			case TubeDevice::SprowArm: // 64MHz
+-				#if _DEBUG
+-				sprow->Execute(2);
+-				#else
+-				sprow->Execute(32 * Cycles);
+-				#endif
+-				break;
+-
+-			case TubeDevice::Master512CoPro: // 8MHz
+-				master512CoPro.Execute(4 * Cycles);
+-				break;
+-
+-			default:
+-				break;
+-		}
+-	}
++    bool iFlagJustCleared;
++    bool iFlagJustSet;
 +
- 		PollVIAs(Cycles - ViaCycles);
- 		PollHardware(Cycles);
- 
-@@ -3223,7 +3342,11 @@ void Exec6502Instruction()
- 		{
- 			// Int noticed 2 cycles before end of instruction - interrupt now
- 			CyclesToInt = NO_TIMER_INT_DUE;
-+			int returnAddress = ProgramCounter;
-+			byte returnStackReg = StackReg;
- 			DoInterrupt();
-+			PushStackFrame(StackFrameType_IRQ, ProgramCounter, returnAddress, returnStackReg);
-+			PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
- 			PollHardware(IRQCycles);
- 			PollVIAs(IRQCycles);
- 			IRQCycles = 0;
-@@ -3233,7 +3356,11 @@ void Exec6502Instruction()
- 		if ((NMIStatus && !OldNMIStatus) || (NMIStatus & 1 << nmi_econet))
- 		{
- 			NMIStatus &= ~(1<<nmi_econet);
-+			int returnAddress = ProgramCounter;
-+			byte returnStackReg = StackReg;
- 			DoNMI();
-+			PushStackFrame(StackFrameType_NMI, ProgramCounter, returnAddress, returnStackReg);
-+			PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
- 			PollHardware(IRQCycles);
- 			PollVIAs(IRQCycles);
- 			IRQCycles = 0;
-@@ -3377,6 +3504,16 @@ void Save6502UEF(FILE *SUEF)
- 	UEFWrite8(intStatus, SUEF);
- 	UEFWrite8(NMIStatus, SUEF);
- 	UEFWrite8(NMILock, SUEF);
-+	SyncStackFrames(StackReg);
-+	UEFWrite8(StackFrameCount, SUEF);
-+	for (int i = 0; i < StackFrameCount; i++) {
-+		UEFWrite8(StackFrames[i].Type, SUEF);
-+		UEFWrite8(StackFrames[i].StartAddressPage, SUEF);
-+		UEFWrite16(StackFrames[i].StartAddress, SUEF);
-+		UEFWrite8(StackFrames[i].ReturnAddressPage, SUEF);
-+		UEFWrite16(StackFrames[i].ReturnAddress, SUEF);
-+		UEFWrite8(StackFrames[i].ReturnStackReg, SUEF);
-+	}
- 	UEFWrite16(0, SUEF);
++    const int Count = DebugEnabled ? 1 : 1024; // Makes debug window more responsive
++
++    for (int i = 0; i < Count; i++)
++    {
++        // Output debug info
++        if (DebugEnabled && !DebugDisassembler(ProgramCounter, PrePC, Accumulator, XReg, YReg, PSR, StackReg, true))
++        {
++            Sleep(10);  // Ease up on CPU when halted
++            continue;
++        }
++
++        Branched = false;
++        iFlagJustCleared = false;
++        iFlagJustSet = false;
++        Cycles = 0;
++        IOCycles = 0;
++        IntDue = false;
++        CurrentInstruction = -1;
++
++        PrePC = ProgramCounter;
++
++        // Check for WRCHV, send char to speech output
++        if (mainWin->m_TextToSpeechEnabled &&
++            ProgramCounter == (WholeRam[0x20e] | (WholeRam[0x20f] << 8))) {
++            mainWin->SpeakChar(Accumulator);
++        }
++        else if (mainWin->m_ClipboardLength > 0) {
++            // Check for REMV (Remove from buffer vector) and CNPV (Count/purge buffer
++            // vector). X register contains the buffer number (0 indicates the keyboard
++            // buffer). See AUG p.263/264 and p.138
++
++            if (ProgramCounter == (WholeRam[0x22c] | (WholeRam[0x22d] << 8)) && XReg == 0) {
++                ClipboardREMVHandler();
++            }
++            else if (ProgramCounter == (WholeRam[0x22e] | (WholeRam[0x22f] << 8)) && XReg == 0) {
++                ClipboardCNPVHandler();
++            }
++        }
++
++        if (CurrentInstruction == -1) {
++            // Read an instruction and post inc program counter
++            CurrentInstruction = ReadPaged(ProgramCounter++);
++        }
++
++        InstructionCount[CurrentInstruction]++;
++
++        // Advance VIAs to point where mem read happens
++        ViaCycles = 0;
++        AdvanceCyclesForMemRead();
++
++        switch (CurrentInstruction)
++        {
++            case 0x00:
++                // BRK
++                BRKInstrHandler();
++                break;
++            case 0x01:
++                // ORA (zp,X)
++                ORAInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0x02:
++            case 0x22:
++            case 0x42:
++            case 0x62:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP imm
++                    ReadPaged(ProgramCounter++);
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x03:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    ASLInstrHandler(Address);
++                    ORAInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x04:
++                if (CPUType == CPU::CPU65C12) {
++                    // TSB zp
++                    TSBInstrHandler(ZeroPgAddrModeHandler_Address());
++                }
++                else {
++                    // Undocumented instruction: NOP zp
++                    ZeroPgAddrModeHandler_Address();
++                }
++                break;
++            case 0x05:
++                // ORA zp
++                ORAInstrHandler(ReadZeroPage(ZeroPgAddrModeHandler_Address()));
++                break;
++            case 0x06:
++                // ASL zp
++                ASLInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0x07:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    ASLInstrHandler(ZeroPageAddress);
++                    ORAInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x08:
++                // PHP
++                Push(PSR | 48);
++                break;
++            case 0x09:
++                // ORA imm
++                ORAInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0x0a:
++                // ASL A
++                ASLInstrHandler_Acc();
++                break;
++            case 0x0b:
++            case 0x2b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ANC imm
++                    ANDInstrHandler(ReadPaged(ProgramCounter++));
++                    PSR &= ~FlagC;
++                    PSR |= ((Accumulator & 128) >> 7);
++                }
++                break;
++            case 0x0c:
++                if (CPUType == CPU::CPU65C12) {
++                    // TSB abs
++                    TSBInstrHandler(AbsAddrModeHandler_Address());
++                }
++                else {
++                    // Undocumented instruction: NOP abs
++                    AbsAddrModeHandler_Address();
++                }
++                break;
++            case 0x0d:
++                // ORA abs
++                ORAInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0x0e:
++                // ASL abs
++                ASLInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x0f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO abs
++                    int Address = AbsAddrModeHandler_Address();
++                    ASLInstrHandler(Address);
++                    ORAInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x10:
++                // BPL rel
++                BPLInstrHandler();
++                break;
++            case 0x11:
++                // ORA (zp),Y
++                ORAInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0x12:
++                if (CPUType == CPU::CPU65C12) {
++                    // ORA (zp)
++                    ORAInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x13:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    ASLInstrHandler(Address);
++                    ORAInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x14:
++                if (CPUType == CPU::CPU65C12) {
++                    // TRB zp
++                    TRBInstrHandler(ZeroPgAddrModeHandler_Address());
++                }
++                else {
++                    // Undocumented instruction: NOP zp,X
++                    ZeroPgXAddrModeHandler_Address();
++                }
++                break;
++            case 0x15:
++                // ORA zp,X
++                ORAInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0x16:
++                // ASL zp,X
++                ASLInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0x17:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    ASLInstrHandler(ZeroPageAddress);
++                    ORAInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x18:
++                // CLC
++                PSR &= ~FlagC;
++                break;
++            case 0x19:
++                // ORA abs,Y
++                ORAInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0x1a:
++                if (CPUType == CPU::CPU65C12) {
++                    // INC A
++                    INAInstrHandler();
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0x1b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO abs,Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    ASLInstrHandler(Address);
++                    ORAInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x1c:
++                if (CPUType == CPU::CPU65C12) {
++                    // TRB abs
++                    TRBInstrHandler(AbsAddrModeHandler_Address());
++                }
++                else {
++                    // Undocumented instruction: NOP abs,X
++                    AbsXAddrModeHandler_Data();
++                }
++                break;
++            case 0x1d:
++                // ORA abs,X
++                ORAInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0x1e:
++                // ASL abs,X
++                ASLInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0x1f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SLO abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    ASLInstrHandler(Address);
++                    ORAInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x20:
++                // JSR abs
++                JSRInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x21:
++                // AND (zp,X)
++                ANDInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0x23:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    ROLInstrHandler(Address);
++                    ANDInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x24:
++                // BIT zp
++                BITInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0x25:
++                // AND zp
++                ANDInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0x26:
++                // ROL zp
++                ROLInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0x27:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    ROLInstrHandler(ZeroPageAddress);
++                    ANDInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x28: {
++                    // PLP
++                    unsigned char oldPSR = PSR;
++                    PSR = Pop();
++
++                    if ((oldPSR ^ PSR) & FlagI) {
++                        if (PSR & FlagI) {
++                            iFlagJustSet = true;
++                        }
++                        else {
++                            iFlagJustCleared = true;
++                        }
++                    }
++                }
++                break;
++            case 0x29:
++                // AND imm
++                ANDInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0x2a:
++                // ROL A
++                ROLInstrHandler_Acc();
++                break;
++            case 0x2c:
++                // BIT abs
++                BITInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0x2d:
++                // AND abs
++                ANDInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0x2e:
++                // ROL abs
++                ROLInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x2f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA abs
++                    int Address = AbsAddrModeHandler_Address();
++                    ROLInstrHandler(Address);
++                    ANDInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x30:
++                // BMI rel
++                BMIInstrHandler();
++                break;
++            case 0x31:
++                // AND (zp),Y
++                ANDInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0x32:
++                if (CPUType == CPU::CPU65C12) {
++                    // AND (zp)
++                    ANDInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x33:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    ROLInstrHandler(Address);
++                    ANDInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x34:
++                if (CPUType == CPU::CPU65C12) {
++                    // BIT abs,X
++                    BITInstrHandler(ZeroPgXAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: NOP zp,X
++                    ZeroPgXAddrModeHandler_Address();
++                }
++                break;
++            case 0x35:
++                // AND zp,X
++                ANDInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0x36:
++                // ROL zp,X
++                ROLInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0x37:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    ROLInstrHandler(ZeroPageAddress);
++                    ANDInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x38:
++                // SEC
++                PSR |= FlagC;
++                break;
++            case 0x39:
++                // AND abs,Y
++                ANDInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0x3a:
++                if (CPUType == CPU::CPU65C12) {
++                    // DEC A
++                    DEAInstrHandler();
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0x3b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA abs.Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    ROLInstrHandler(Address);
++                    ANDInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x3c:
++                if (CPUType == CPU::CPU65C12) {
++                    // BIT abs,X
++                    BITInstrHandler(AbsXAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: NOP abs,x
++                    AbsXAddrModeHandler_Data();
++                }
++                break;
++            case 0x3d:
++                // AND abs,X
++                ANDInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0x3e:
++                // ROL abs,X
++                ROLInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0x3f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RLA abs.X
++                    int Address = AbsXAddrModeHandler_Address();
++                    ROLInstrHandler(Address);
++                    ANDInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x40:
++                // RTI
++                PSR = Pop();
++                ProgramCounter = PopWord();
++                NMILock = false;
++                break;
++            case 0x41:
++                // EOR (zp,X)
++                EORInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0x43:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    LSRInstrHandler(Address);
++                    EORInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x44:
++                // NOP zp
++                ReadPaged(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0x45:
++                // EOR zp
++                EORInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0x46:
++                // LSR zp
++                LSRInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0x47:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    LSRInstrHandler(ZeroPageAddress);
++                    EORInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x48:
++                // PHA
++                Push(Accumulator);
++                break;
++            case 0x49:
++                // EOR imm
++                EORInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0x4a:
++                // LSR A
++                LSRInstrHandler_Acc();
++                break;
++            case 0x4b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ALR imm
++                    ANDInstrHandler(ReadPaged(ProgramCounter++));
++                    LSRInstrHandler_Acc();
++                }
++                break;
++            case 0x4c:
++                // JMP abs
++                ProgramCounter = AbsAddrModeHandler_Address();
++                UpdateRootStackFrame();
++                break;
++            case 0x4d:
++                // EOR abs
++                EORInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0x4e:
++                // LSR abs
++                LSRInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x4f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE abs
++                    int Address = AbsAddrModeHandler_Address();
++                    LSRInstrHandler(Address);
++                    EORInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x50:
++                // BVC rel
++                BVCInstrHandler();
++                break;
++            case 0x51:
++                // EOR (zp),Y
++                EORInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0x52:
++                if (CPUType == CPU::CPU65C12) {
++                    // EOR (zp)
++                    EORInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x53:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    LSRInstrHandler(Address);
++                    EORInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x54:
++            case 0xd4:
++            case 0xf4:
++                // Undocumented instruction: NOP zp,X
++                ZeroPgXAddrModeHandler_Address();
++                break;
++            case 0x55:
++                // EOR zp,X
++                EORInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0x56:
++                // LSR zp,X
++                LSRInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0x57:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    LSRInstrHandler(ZeroPageAddress);
++                    EORInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x58:
++                // CLI
++                if (PSR & FlagI) {
++                    iFlagJustCleared = true;
++                }
++                PSR &= ~FlagI;
++                break;
++            case 0x59:
++                // EOR abs,Y
++                EORInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0x5a:
++                if (CPUType == CPU::CPU65C12) {
++                    // PHY
++                    Push(YReg);
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0x5b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE abs,Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    LSRInstrHandler(Address);
++                    EORInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x5c:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP abs
++                    AbsAddrModeHandler_Address();
++                }
++                else {
++                    // Undocumented instruction: NOP abs,x
++                    AbsXAddrModeHandler_Data();
++                }
++                break;
++            case 0x5d:
++                // EOR abs,X
++                EORInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0x5e:
++                // LSR abs,X
++                LSRInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0x5f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SRE abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    LSRInstrHandler(Address);
++                    EORInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x60:
++                // RTS
++                ProgramCounter = PopWord() + 1;
++                break;
++            case 0x61:
++                // ADC (zp,X)
++                ADCInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0x63:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    RORInstrHandler(Address);
++                    ADCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x64:
++                if (CPUType == CPU::CPU65C12) {
++                    // STZ zp
++                    WriteZeroPage(ZeroPgAddrModeHandler_Address(), 0);
++                }
++                else {
++                    // Undocumented instruction: NOP zp
++                    ZeroPgAddrModeHandler_Address();
++                }
++                break;
++            case 0x65:
++                // ADC zp
++                ADCInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0x66:
++                // ROR zp
++                RORInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0x67:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    RORInstrHandler(ZeroPageAddress);
++                    ADCInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x68:
++                // PLA
++                Accumulator = Pop();
++                SetPSRZN(Accumulator);
++                break;
++            case 0x69:
++                // ADC imm
++                ADCInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0x6a:
++                // ROR A
++                RORInstrHandler_Acc();
++                break;
++            case 0x6b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ARR imm
++                    ARRInstrHandler(ReadPaged(ProgramCounter++));
++                }
++                break;
++            case 0x6c:
++                // JMP (abs)
++                ProgramCounter = IndAddrModeHandler_Address();
++                UpdateRootStackFrame();
++                break;
++            case 0x6d:
++                // ADC abs
++                ADCInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0x6e:
++                // ROR abs
++                RORInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x6f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA abs
++                    int Address = AbsAddrModeHandler_Address();
++                    RORInstrHandler(Address);
++                    ADCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x70:
++                // BVS rel
++                BVSInstrHandler();
++                break;
++            case 0x71:
++                // ADC (zp),Y
++                ADCInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0x72:
++                if (CPUType == CPU::CPU65C12) {
++                    // ADC (zp)
++                    ADCInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x73:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    RORInstrHandler(Address);
++                    ADCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x74:
++                if (CPUType == CPU::CPU65C12) {
++                    // STZ zp,X
++                    WriteZeroPage(ZeroPgXAddrModeHandler_Address(), 0);
++                }
++                else {
++                    // Undocumented instruction: NOP zp,x
++                    ZeroPgXAddrModeHandler_Address();
++                }
++                break;
++            case 0x75:
++                // ADC zp,X
++                ADCInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0x76:
++                // ROR zp,X
++                RORInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0x77:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    RORInstrHandler(ZeroPageAddress);
++                    ADCInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0x78:
++                // SEI
++                if (!(PSR & FlagI)) {
++                    iFlagJustSet = true;
++                }
++                PSR |= FlagI;
++                break;
++            case 0x79:
++                // ADC abs,Y
++                ADCInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0x7a:
++                if (CPUType == CPU::CPU65C12) {
++                    // PLY
++                    YReg = Pop();
++                    SetPSRZN(YReg);
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0x7b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA abs,Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    RORInstrHandler(Address);
++                    ADCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x7c:
++                if (CPUType == CPU::CPU65C12) {
++                    // JMP abs,X
++                    ProgramCounter = IndAddrXModeHandler_Address();
++                }
++                else {
++                    // Undocumented instruction: NOP abs,X
++                    AbsXAddrModeHandler_Data();
++                }
++                break;
++            case 0x7d:
++                // ADC abs,X
++                ADCInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0x7e:
++                // ROR abs,X
++                RORInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0x7f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: RRA abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    RORInstrHandler(Address);
++                    ADCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0x80:
++                if (CPUType == CPU::CPU65C12) {
++                    // BRA rel
++                    BRAInstrHandler();
++                }
++                else {
++                    // Undocumented instruction: NOP imm
++                    ReadPaged(ProgramCounter++);
++                }
++                break;
++            case 0x81:
++                // STA (zp,X)
++                AdvanceCyclesForMemWrite();
++                WritePaged(IndXAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x82:
++            case 0xc2:
++            case 0xe2:
++                // Undocumented instruction: NOP imm
++                ReadPaged(ProgramCounter++);
++                break;
++            case 0x83:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SAX (zp,X)
++                    AdvanceCyclesForMemWrite();
++                    WritePaged(IndXAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x84:
++                // STY zp
++                AdvanceCyclesForMemWrite();
++                WriteZeroPage(ZeroPgAddrModeHandler_Address(), YReg);
++                break;
++            case 0x85:
++                // STA zp
++                AdvanceCyclesForMemWrite();
++                WriteZeroPage(ZeroPgAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x86:
++                // STX zp
++                AdvanceCyclesForMemWrite();
++                WriteZeroPage(ZeroPgAddrModeHandler_Address(), XReg);
++                break;
++            case 0x87:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SAX zp
++                    // This one does not seem to change the processor flags
++                    AdvanceCyclesForMemWrite();
++                    WriteZeroPage(ZeroPgAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x88:
++                // DEY
++                DEYInstrHandler();
++                break;
++            case 0x89:
++                if (CPUType == CPU::CPU65C12) {
++                    // BIT imm
++                    BITImmedInstrHandler(ReadPaged(ProgramCounter++));
++                }
++                else {
++                    // Undocumented instruction: NOP imm
++                    ReadPaged(ProgramCounter++);
++                }
++                break;
++            case 0x8a:
++                // TXA
++                Accumulator = XReg;
++                SetPSRZN(Accumulator);
++                break;
++            case 0x8b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: XAA imm
++                    // See http://visual6502.org/wiki/index.php?title=6502_Opcode_8B_(XAA,_ANE)_explained
++                    Accumulator &= XReg & ReadPaged(ProgramCounter++);
++                    SetPSRZN(Accumulator);
++                }
++                break;
++            case 0x8c:
++                // STY abs
++                AdvanceCyclesForMemWrite();
++                STYInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x8d:
++                // STA abs
++                AdvanceCyclesForMemWrite();
++                WritePaged(AbsAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x8e:
++                // STX abs
++                AdvanceCyclesForMemWrite();
++                STXInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0x8f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SAX abs
++                    WritePaged(AbsAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x90:
++                // BCC rel
++                BCCInstrHandler();
++                break;
++            case 0x91:
++                // STA (zp),Y
++                AdvanceCyclesForMemWrite();
++                WritePaged(IndYAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x92:
++                if (CPUType == CPU::CPU65C12) {
++                    // STA (zp)
++                    AdvanceCyclesForMemWrite();
++                    WritePaged(ZPIndAddrModeHandler_Address(), Accumulator);
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0x93:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: AHX (zp),Y
++                    AdvanceCyclesForMemWrite();
++                    int Address = IndYAddrModeHandler_Address();
++                    WritePaged(Address, Accumulator & XReg & ((Address >> 8) + 1));
++                }
++                break;
++            case 0x94:
++                // STY zp,X
++                AdvanceCyclesForMemWrite();
++                STYInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0x95:
++                // STA zp,X
++                AdvanceCyclesForMemWrite();
++                WritePaged(ZeroPgXAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x96:
++                // STX zp,X
++                AdvanceCyclesForMemWrite();
++                STXInstrHandler(ZeroPgYAddrModeHandler_Address());
++                break;
++            case 0x97:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: SAX zp,Y
++                    AdvanceCyclesForMemWrite();
++                    WriteZeroPage(ZeroPgYAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x98:
++                // TYA
++                Accumulator = YReg;
++                SetPSRZN(Accumulator);
++                break;
++            case 0x99:
++                // STA abs,Y
++                AdvanceCyclesForMemWrite();
++                WritePaged(AbsYAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x9a:
++                // TXS
++                StackReg = XReg;
++                break;
++            case 0x9b:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: TAS abs,Y
++                    WritePaged(AbsYAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x9c:
++                if (CPUType == CPU::CPU65C12) {
++                    // STZ abs
++                    WritePaged(AbsAddrModeHandler_Address(), 0);
++                }
++                else {
++                    // Undocumented instruction: SHY abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    WritePaged(Address, YReg & (unsigned char)((Address >> 8) + 1));
++                }
++                break;
++            case 0x9d:
++                // STA abs,X
++                AdvanceCyclesForMemWrite();
++                WritePaged(AbsXAddrModeHandler_Address(), Accumulator);
++                break;
++            case 0x9e:
++                if (CPUType == CPU::CPU65C12) {
++                    // STZ abs,x
++                    AdvanceCyclesForMemWrite();
++                    WritePaged(AbsXAddrModeHandler_Address(), 0);
++                }
++                else {
++                    // Undocumented instruction: SHX abs,Y
++                    AdvanceCyclesForMemWrite();
++                    WritePaged(AbsXAddrModeHandler_Address(), Accumulator & XReg);
++                }
++                break;
++            case 0x9f:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: AHX abs,Y
++                    AdvanceCyclesForMemWrite();
++                    int Address = AbsYAddrModeHandler_Address();
++                    WritePaged(Address, Accumulator & XReg & ((Address >> 8) + 1));
++                }
++                break;
++            case 0xa0:
++                // LDY imm
++                LDYInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xa1:
++                // LDA (zp,X)
++                LDAInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0xa2:
++                // LDX imm
++                LDXInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xa3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX (zp,X)
++                    LDAInstrHandler(IndXAddrModeHandler_Data());
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xa4:
++                // LDY zp
++                LDYInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xa5:
++                // LDA zp
++                LDAInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xa6:
++                // LDX zp
++                LDXInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xa7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX zp
++                    int ZeroPageAddress = ReadPaged(ProgramCounter++);
++                    LDAInstrHandler(ReadPaged(ZeroPageAddress));
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xa8:
++                // TAY
++                YReg = Accumulator;
++                SetPSRZN(Accumulator);
++                break;
++            case 0xa9:
++                // LDA imm
++                LDAInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xaa:
++                // TXA
++                XReg = Accumulator;
++                SetPSRZN(Accumulator);
++                break;
++            case 0xab:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX imm
++                    LDAInstrHandler(Accumulator & ReadPaged(ProgramCounter++));
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xac:
++                // LDY abs
++                LDYInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xad:
++                // LDA abs
++                LDAInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xae:
++                // LDX abs
++                LDXInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xaf:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX abs
++                    LDAInstrHandler(AbsAddrModeHandler_Data());
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xb0:
++                // BCS rel
++                BCSInstrHandler();
++                break;
++            case 0xb1:
++                // LDA (zp),Y
++                LDAInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0xb2:
++                if (CPUType == CPU::CPU65C12) {
++                    // LDA (zp)
++                    LDAInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0xb3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX (zp),Y
++                    LDAInstrHandler(IndYAddrModeHandler_Data());
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xb4:
++                // LDY zp,X
++                LDYInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0xb5:
++                // LDA zp,X
++                LDAInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0xb6:
++                // LDX zp,Y
++                LDXInstrHandler(ZeroPgYAddrModeHandler_Data());
++                break;
++            case 0xb7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX zp,Y
++                    LDXInstrHandler(ZeroPgYAddrModeHandler_Data());
++                    Accumulator = XReg;
++                }
++                break;
++            case 0xb8:
++                // CLV
++                PSR &= ~FlagV;
++                break;
++            case 0xb9:
++                // LDA abs,Y
++                LDAInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0xba:
++                // TSX
++                XReg = StackReg;
++                SetPSRZN(XReg);
++                break;
++            case 0xbb:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAS abs,Y
++                    LDAInstrHandler(StackReg & AbsYAddrModeHandler_Data());
++                    XReg = Accumulator;
++                    StackReg = Accumulator;
++                }
++                break;
++            case 0xbc:
++                // LDY abs,X
++                LDYInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0xbd:
++                // LDA abs,X
++                LDAInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0xbe:
++                // LDX abs,Y
++                LDXInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0xbf:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: LAX abs,Y
++                    LDAInstrHandler(AbsYAddrModeHandler_Data());
++                    XReg = Accumulator;
++                }
++                break;
++            case 0xc0:
++                // CPY imm
++                CPYInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xc1:
++                // CMP (zp,X)
++                CMPInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0xc3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocument instruction: DCP (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    DECInstrHandler(Address);
++                    CMPInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xc4:
++                // CPY zp
++                CPYInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xc5:
++                // CMP zp
++                CMPInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xc6:
++                // DEC zp
++                DECInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0xc7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    DECInstrHandler(ZeroPageAddress);
++                    CMPInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0xc8:
++                // INY
++                INYInstrHandler();
++                break;
++            case 0xc9:
++                // CMP imm
++                CMPInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xca:
++                // DEX
++                DEXInstrHandler();
++                break;
++            case 0xcb:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ASX imm
++                    //
++                    // Subtract #n from (A & X) and store result in X
++                    unsigned char Operand = ReadPaged(ProgramCounter++);
++                    unsigned char Result = (unsigned char)((Accumulator & XReg) - Operand);
++                    SetPSRCZN((Accumulator & XReg) >= Operand, Result == 0, Result & 128);
++                    XReg = Result;
++                }
++                break;
++            case 0xcc:
++                // CPY abs
++                CPYInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xcd:
++                // CMP abs
++                CMPInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xce:
++                // DEC abs
++                DECInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0xcf:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP abs
++                    int Address = AbsAddrModeHandler_Address();
++                    DECInstrHandler(Address);
++                    CMPInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xd0:
++                // BNE rel
++                BNEInstrHandler();
++                break;
++            case 0xd1:
++                // CMP (zp),Y
++                CMPInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0xd2:
++                if (CPUType == CPU::CPU65C12) {
++                    // CMP (zp)
++                    CMPInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0xd3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    DECInstrHandler(Address);
++                    CMPInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xd5:
++                // CMP zp,X
++                CMPInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0xd6:
++                // DEC zp,X
++                DECInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0xd7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    DECInstrHandler(ZeroPageAddress);
++                    CMPInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0xd8:
++                // CLD
++                PSR &= ~FlagD;
++                break;
++            case 0xd9:
++                // CMP abs,Y
++                CMPInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0xda:
++                if (CPUType == CPU::CPU65C12) {
++                    // PHX
++                    Push(XReg);
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0xdb:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP abs,Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    DECInstrHandler(Address);
++                    CMPInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xdc:
++            case 0xfc:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP abs
++                    AbsAddrModeHandler_Address();
++                }
++                else {
++                    // Undocumented instruction: NOP abs,X
++                    AbsXAddrModeHandler_Data();
++                }
++                break;
++            case 0xdd:
++                // CMP abs,X
++                CMPInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0xde:
++                // DEC abs,X
++                DECInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0xdf:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: DCP abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    DECInstrHandler(Address);
++                    CMPInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xe0:
++                // CPX imm
++                CPXInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xe1:
++                // SBC (zp,X)
++                SBCInstrHandler(IndXAddrModeHandler_Data());
++                break;
++            case 0xe3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC (zp,X)
++                    int Address = IndXAddrModeHandler_Address();
++                    INCInstrHandler(Address);
++                    SBCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xe4:
++                // CPX zp
++                CPXInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xe5:
++                // SBC zp
++                SBCInstrHandler(ReadZeroPage(ReadPaged(ProgramCounter++)));
++                break;
++            case 0xe6:
++                // INC zp
++                INCInstrHandler(ZeroPgAddrModeHandler_Address());
++                break;
++            case 0xe7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC zp
++                    int ZeroPageAddress = ZeroPgAddrModeHandler_Address();
++                    INCInstrHandler(ZeroPageAddress);
++                    SBCInstrHandler(ReadPaged(ZeroPageAddress));
++                }
++                break;
++            case 0xe8:
++                // INX
++                INXInstrHandler();
++                break;
++            case 0xe9:
++                // SBC imm
++                SBCInstrHandler(ReadPaged(ProgramCounter++));
++                break;
++            case 0xea:
++                // NOP
++                break;
++            case 0xeb:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // SBC imm
++                    SBCInstrHandler(ReadPaged(ProgramCounter++));
++                }
++                break;
++            case 0xec:
++                // CPX abs
++                CPXInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xed:
++                // SBC abs
++                SBCInstrHandler(AbsAddrModeHandler_Data());
++                break;
++            case 0xee:
++                // INC abs
++                INCInstrHandler(AbsAddrModeHandler_Address());
++                break;
++            case 0xef:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC abs
++                    int Address = AbsAddrModeHandler_Address();
++                    INCInstrHandler(Address);
++                    SBCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xf0:
++                // BEQ rel
++                BEQInstrHandler();
++                break;
++            case 0xf1:
++                // SBC (zp),Y
++                SBCInstrHandler(IndYAddrModeHandler_Data());
++                break;
++            case 0xf2:
++                if (CPUType == CPU::CPU65C12) {
++                    // SBC (zp)
++                    SBCInstrHandler(ZPIndAddrModeHandler_Data());
++                }
++                else {
++                    // Undocumented instruction: KIL
++                    KILInstrHandler();
++                }
++                break;
++            case 0xf3:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC (zp),Y
++                    int Address = IndYAddrModeHandler_Address();
++                    INCInstrHandler(Address);
++                    SBCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xf5:
++                // SBC zp,X
++                SBCInstrHandler(ZeroPgXAddrModeHandler_Data());
++                break;
++            case 0xf6:
++                // INC zp,X
++                INCInstrHandler(ZeroPgXAddrModeHandler_Address());
++                break;
++            case 0xf7:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC zp,X
++                    int ZeroPageAddress = ZeroPgXAddrModeHandler_Address();
++                    INCInstrHandler(ZeroPageAddress);
++                    SBCInstrHandler(ReadZeroPage(ZeroPageAddress));
++                }
++                break;
++            case 0xf8:
++                // SED
++                PSR |= FlagD;
++                break;
++            case 0xf9:
++                // SBC abs,Y
++                SBCInstrHandler(AbsYAddrModeHandler_Data());
++                break;
++            case 0xfa:
++                if (CPUType == CPU::CPU65C12) {
++                    // PLX
++                    XReg = Pop();
++                    SetPSRZN(XReg);
++                }
++                else {
++                    // Undocumented instruction: NOP
++                }
++                break;
++            case 0xfb:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC abs,Y
++                    int Address = AbsYAddrModeHandler_Address();
++                    INCInstrHandler(Address);
++                    SBCInstrHandler(ReadPaged(Address));
++                }
++                break;
++            case 0xfd:
++                // SBC abs,X
++                SBCInstrHandler(AbsXAddrModeHandler_Data());
++                break;
++            case 0xfe:
++                // INC abs,X
++                INCInstrHandler(AbsXAddrModeHandler_Address());
++                break;
++            case 0xff:
++                if (CPUType == CPU::CPU65C12) {
++                    // NOP
++                }
++                else {
++                    // Undocumented instruction: ISC abs,X
++                    int Address = AbsXAddrModeHandler_Address();
++                    INCInstrHandler(Address);
++                    SBCInstrHandler(ReadPaged(Address));
++                }
++                break;
++        }
++
++        // This block corrects the cycle count for the branch instructions
++        if ((CurrentInstruction == 0x10) ||
++            (CurrentInstruction == 0x30) ||
++            (CurrentInstruction == 0x50) ||
++            (CurrentInstruction == 0x70) ||
++            (CurrentInstruction == 0x80 && CPUType == CPU::CPU65C12) ||
++            (CurrentInstruction == 0x90) ||
++            (CurrentInstruction == 0xb0) ||
++            (CurrentInstruction == 0xd0) ||
++            (CurrentInstruction == 0xf0))
++        {
++            if (Branched)
++            {
++                Cycles++;
++
++                if ((ProgramCounter & 0xff00) != ((PrePC + 2) & 0xff00)) {
++                    Cycles++;
++                }
++            }
++        }
++
++        Cycles += CyclesTable[CurrentInstruction] -
++                  CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
++
++        PerfWriter_WriteInstruction(
++            PrePC, ProgramCounter, (byte)CurrentInstruction, (byte)Cycles, 
++            Accumulator, XReg, YReg, PSR, StackReg,
++            LastReadWriteAddress, LastReadValue, LastWriteValue);
++
++        PollVIAs(Cycles - ViaCycles);
++        PollHardware(Cycles);
++
++        // Check for IRQ
++        DoIntCheck();
++        if (IntDue && (!GETIFLAG || iFlagJustSet) &&
++            (CyclesToInt <= (-2 - IOCycles) && !iFlagJustCleared))
++        {
++            // Int noticed 2 cycles before end of instruction - interrupt now
++            CyclesToInt = NO_TIMER_INT_DUE;
++            DoInterrupt();
++            PollHardware(IRQCycles);
++            PollVIAs(IRQCycles);
++            IRQCycles = 0;
++        }
++
++        // Check for NMI
++        if ((NMIStatus && !OldNMIStatus) || (NMIStatus & 1 << nmi_econet))
++        {
++            NMIStatus &= ~(1<<nmi_econet);
++            DoNMI();
++            PollHardware(IRQCycles);
++            PollVIAs(IRQCycles);
++            IRQCycles = 0;
++        }
++
++        OldNMIStatus = NMIStatus;
++
++        switch (TubeType)
++        {
++            case TubeDevice::Acorn65C02: // 3MHz
++                SyncTubeProcessor();
++                break;
++
++            case TubeDevice::AcornZ80: // TODO: 6MHz
++            case TubeDevice::TorchZ80: // TODO: 4MHz
++                Z80Execute();
++                break;
++
++            case TubeDevice::AcornArm: // TODO: 8MHz
++                arm->exec(4);
++                break;
++
++            case TubeDevice::SprowArm: // 64MHz
++                #if _DEBUG
++                sprow->Execute(2);
++                #else
++                sprow->Execute(32 * Cycles);
++                #endif
++                break;
++
++            case TubeDevice::Master512CoPro: // 8MHz
++                master512CoPro.Execute(4 * Cycles);
++                break;
++
++            default:
++                break;
++        }
++    }
  }
  
-@@ -3394,6 +3531,15 @@ void Load6502UEF(FILE *SUEF)
- 	NMIStatus = UEFRead8(SUEF);
- 	NMILock = UEFReadBool(SUEF);
- 	// AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
-+	StackFrameCount = UEFRead8(SUEF);
+ static void PollVIAs(unsigned int nCycles)
+ {
+-	if (nCycles != 0)
+-	{
+-		if (CyclesToInt != NO_TIMER_INT_DUE)
+-			CyclesToInt -= nCycles;
++    if (nCycles != 0)
++    {
++        if (CyclesToInt != NO_TIMER_INT_DUE)
++            CyclesToInt -= nCycles;
+ 
+-		SysVIA_poll(nCycles);
+-		UserVIA_poll(nCycles);
++        SysVIA_poll(nCycles);
++        UserVIA_poll(nCycles);
+ 
+-		ViaCycles += nCycles;
+-	}
++        ViaCycles += nCycles;
++    }
+ }
+ 
+ static void PollHardware(unsigned int nCycles)
+ {
+-	TotalCycles+=nCycles;
+-
+-	if (TotalCycles > CycleCountWrap)
+-	{
+-		TotalCycles -= CycleCountWrap;
+-		AdjustTrigger(AtoDTrigger);
+-		AdjustTrigger(SoundTrigger);
+-		AdjustTrigger(Disc8271Trigger);
+-		AdjustTrigger(TeletextAdapterTrigger);
+-		AdjustTrigger(AMXTrigger);
+-		AdjustTrigger(PrinterTrigger);
+-		AdjustTrigger(VideoTriggerCount);
+-		AdjustTrigger(TapeTrigger);
+-		AdjustTrigger(EconetTrigger);
+-		AdjustTrigger(EconetFlagFillTimeoutTrigger);
+-		AdjustTrigger(IP232RxTrigger);
+-		if (TubeType == TubeDevice::Acorn65C02)
+-			WrapTubeCycles();
+-	}
+-
+-	VideoPoll(nCycles);
+-	if (!BasicHardwareOnly) {
+-		AtoDPoll(nCycles);
+-		SerialPoll(nCycles);
+-	}
+-	Disc8271Poll();
+-	Music5000Poll(nCycles);
+-	SoundPoll();
+-
+-	#if ENABLE_SPEECH
+-	SpeechPoll(nCycles);
+-	#endif
+-
+-	TeletextPoll();
+-
+-	if (DisplayCycles>0) DisplayCycles-=nCycles; // Countdown time till end of display of info.
+-	if (MachineType == Model::Master128 || !NativeFDC) Poll1770(nCycles); // Do 1770 Background stuff
+-
+-	if (EconetEnabled && EconetPoll())
+-	{
+-		if (EconetNMIEnabled)
+-		{
+-			NMIStatus |= 1<<nmi_econet;
+-
+-			if (DebugEnabled)
+-				DebugDisplayTrace(DebugType::Econet, true, "Econet: NMI asserted");
+-		}
+-		else
+-		{
+-			if (DebugEnabled)
+-				DebugDisplayTrace(DebugType::Econet, true, "Econet: NMI requested but supressed");
+-		}
+-	}
++    TotalCycles+=nCycles;
++
++    if (TotalCycles > CycleCountWrap)
++    {
++        TotalCycles -= CycleCountWrap;
++        AdjustTrigger(AtoDTrigger);
++        AdjustTrigger(SoundTrigger);
++        AdjustTrigger(Disc8271Trigger);
++        AdjustTrigger(TeletextAdapterTrigger);
++        AdjustTrigger(AMXTrigger);
++        AdjustTrigger(PrinterTrigger);
++        AdjustTrigger(VideoTriggerCount);
++        AdjustTrigger(TapeTrigger);
++        AdjustTrigger(EconetTrigger);
++        AdjustTrigger(EconetFlagFillTimeoutTrigger);
++        AdjustTrigger(IP232RxTrigger);
++        if (TubeType == TubeDevice::Acorn65C02)
++            WrapTubeCycles();
++    }
++
++    VideoPoll(nCycles);
++    if (!BasicHardwareOnly) {
++        AtoDPoll(nCycles);
++        SerialPoll(nCycles);
++    }
++    Disc8271Poll();
++    Music5000Poll(nCycles);
++    SoundPoll();
++
++    #if ENABLE_SPEECH
++    SpeechPoll(nCycles);
++    #endif
++
++    TeletextPoll();
++
++    if (DisplayCycles>0) DisplayCycles-=nCycles; // Countdown time till end of display of info.
++    if (MachineType == Model::Master128 || !NativeFDC) Poll1770(nCycles); // Do 1770 Background stuff
++
++    if (EconetEnabled && EconetPoll())
++    {
++        if (EconetNMIEnabled)
++        {
++            NMIStatus |= 1<<nmi_econet;
++
++            if (DebugEnabled)
++                DebugDisplayTrace(DebugType::Econet, true, "Econet: NMI asserted");
++        }
++        else
++        {
++            if (DebugEnabled)
++                DebugDisplayTrace(DebugType::Econet, true, "Econet: NMI requested but supressed");
++        }
++    }
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -3351,7 +3478,7 @@ static void PollHardware(unsigned int nCycles)
+ 
+ int MillisecondsToCycles(int Time)
+ {
+-	return Time * CPU_CYCLES_PER_SECOND / 1000;
++    return Time * CPU_CYCLES_PER_SECOND / 1000;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -3360,49 +3487,68 @@ int MillisecondsToCycles(int Time)
+ 
+ int MicrosecondsToCycles(int Time)
+ {
+-	return Time * CPU_CYCLES_PER_SECOND / 1000000;
++    return Time * CPU_CYCLES_PER_SECOND / 1000000;
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+ void Save6502UEF(FILE *SUEF)
+ {
+-	UEFWrite16(ProgramCounter, SUEF);
+-	UEFWrite8(Accumulator, SUEF);
+-	UEFWrite8(XReg, SUEF);
+-	UEFWrite8(YReg, SUEF);
+-	UEFWrite8(StackReg, SUEF);
+-	UEFWrite8(PSR, SUEF);
+-	UEFWrite32(TotalCycles, SUEF);
+-	UEFWrite8(intStatus, SUEF);
+-	UEFWrite8(NMIStatus, SUEF);
+-	UEFWrite8(NMILock, SUEF);
+-	UEFWrite16(0, SUEF);
++    UEFWrite16(ProgramCounter, SUEF);
++    UEFWrite8(Accumulator, SUEF);
++    UEFWrite8(XReg, SUEF);
++    UEFWrite8(YReg, SUEF);
++    UEFWrite8(StackReg, SUEF);
++    UEFWrite8(PSR, SUEF);
++    UEFWrite32(TotalCycles, SUEF);
++    UEFWrite8(intStatus, SUEF);
++    UEFWrite8(NMIStatus, SUEF);
++    UEFWrite8(NMILock, SUEF);
++    SyncStackFrames(StackReg);
++    UEFWrite8(StackFrameCount, SUEF);
 +    for (int i = 0; i < StackFrameCount; i++) {
-+		StackFrames[i].Type = (StackFrameType)UEFRead8(SUEF);
-+		StackFrames[i].StartAddressPage = (MemPageType)UEFRead8(SUEF);
++        UEFWrite8(StackFrames[i].Type, SUEF);
++        UEFWrite8(StackFrames[i].StartAddressPage, SUEF);
++        UEFWrite16(StackFrames[i].StartAddress, SUEF);
++        UEFWrite8(StackFrames[i].ReturnAddressPage, SUEF);
++        UEFWrite16(StackFrames[i].ReturnAddress, SUEF);
++        UEFWrite8(StackFrames[i].ReturnStackReg, SUEF);
++    }
++    UEFWrite16(0, SUEF);
+ }
+ 
+ void Load6502UEF(FILE *SUEF)
+ {
+-	ProgramCounter = UEFRead16(SUEF);
+-	Accumulator = UEFRead8(SUEF);
+-	XReg = UEFRead8(SUEF);
+-	YReg = UEFRead8(SUEF);
+-	StackReg = UEFRead8(SUEF);
+-	PSR = UEFRead8(SUEF);
+-	// TotalCycles = fget32(SUEF);
+-	UEFRead32(SUEF); // Unused, was: Dlong
+-	intStatus = UEFRead8(SUEF);
+-	NMIStatus = UEFRead8(SUEF);
+-	NMILock = UEFReadBool(SUEF);
+-	// AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
++    ProgramCounter = UEFRead16(SUEF);
++    Accumulator = UEFRead8(SUEF);
++    XReg = UEFRead8(SUEF);
++    YReg = UEFRead8(SUEF);
++    StackReg = UEFRead8(SUEF);
++    PSR = UEFRead8(SUEF);
++    // TotalCycles = fget32(SUEF);
++    UEFRead32(SUEF); // Unused, was: Dlong
++    intStatus = UEFRead8(SUEF);
++    NMIStatus = UEFRead8(SUEF);
++    NMILock = UEFReadBool(SUEF);
++    // AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
++    StackFrameCount = UEFRead8(SUEF);
++    for (int i = 0; i < StackFrameCount; i++) {
++        StackFrames[i].Type = (StackFrameType)UEFRead8(SUEF);
++        StackFrames[i].StartAddressPage = (MemPageType)UEFRead8(SUEF);
 +        StackFrames[i].StartAddress = UEFRead16(SUEF);
-+		StackFrames[i].ReturnAddressPage = (MemPageType)UEFRead8(SUEF);
++        StackFrames[i].ReturnAddressPage = (MemPageType)UEFRead8(SUEF);
 +        StackFrames[i].ReturnAddress = UEFRead16(SUEF);
 +        StackFrames[i].ReturnStackReg = UEFRead8(SUEF);
-+	}
++    }
  }
  
  void WriteInstructionCounts(const char *FileName)
+ {
+-	FILE *file = fopen(FileName, "w");
+-	if (file) {
+-		for (int i = 0; i < 256; i++) {
+-			fprintf(file, "%02X\t%d\n", i, InstructionCount[i]);
+-		}
+-		fclose(file);
+-	}
++    FILE *file = fopen(FileName, "w");
++    if (file) {
++        for (int i = 0; i < 256; i++) {
++            fprintf(file, "%02X\t%d\n", i, InstructionCount[i]);
++        }
++        fclose(file);
++    }
+ }
 diff --git a/Src/6502core.h b/Src/6502core.h
-index 935ff6b..3534998 100644
+index 935ff6b..630a357 100644
 --- a/Src/6502core.h
 +++ b/Src/6502core.h
 @@ -99,4 +99,28 @@ void WriteInstructionCounts(const char *FileName);
@@ -962,7 +6205,7 @@ index 935ff6b..3534998 100644
  
 +enum StackFrameType
 +{
-+	StackFrameType_None = 0,
++	StackFrameType_Root = 0,
 +	StackFrameType_JSR = 1,
 +	StackFrameType_IRQ = 2,
 +	StackFrameType_NMI = 3,
