@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ExtractLabels": {
+      "commandName": "Project",
+      "commandLineArgs": "c:\\dev\\elite\\elite-source-code-bbc-micro-disc\\3-assembled-output\\compile.txt"
+    }
+  }
+}
