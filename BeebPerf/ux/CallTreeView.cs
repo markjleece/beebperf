@@ -200,7 +200,11 @@ namespace BeebPerf.ux
                     }
 
                     if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                    {
                         OpenTreeNode(rowIndex, treeNode);
+                        UpdateColumns();
+                    }
+
                     treeNode = treeNodeStack.Pop();
                 }
                 rowIndex++;
@@ -215,6 +219,7 @@ namespace BeebPerf.ux
                 if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
                     CloseTreeNode(rowIndex, treeNode);
             }
+            UpdateColumns();
         }
 
         private void ShowHotPathsInternal()
@@ -230,7 +235,7 @@ namespace BeebPerf.ux
                 if (hotChild)
                     OpenTreeNode(index, treeNode);
             }
-            RefreshExecutionCounts();
+            UpdateColumns();
             ScrollToTop();
         }
 
@@ -249,12 +254,18 @@ namespace BeebPerf.ux
                 {
                     if ((e.KeyCode == Keys.Right || e.KeyCode == Keys.Add || e.KeyCode == Keys.Space) &&
                         treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                    {
                         OpenTreeNode(cell.RowIndex, treeNode);
+                        UpdateColumns();
+                    }
                     else if ((e.KeyCode == Keys.Left || e.KeyCode == Keys.Subtract || e.KeyCode == Keys.Space) &&
                         treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                    {
                         CloseTreeNode(cell.RowIndex, treeNode);
+                        UpdateColumns();
+                    }
+                    e.Handled = true;
                 }
-                e.Handled = true;
             }
         }
 
@@ -275,9 +286,15 @@ namespace BeebPerf.ux
                         (cellX <= (treeNode.Depth + 1) * cell.Size.Height))
                     {
                         if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                        {
                             OpenTreeNode(hti.RowIndex, treeNode);
+                            UpdateColumns();
+                        }
                         else if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Open)
+                        {
                             CloseTreeNode(hti.RowIndex, treeNode);
+                            UpdateColumns();
+                        }
                         return; // we don't want the selection to change
                     }
                 }
@@ -312,8 +329,6 @@ namespace BeebPerf.ux
                 SelectRow(_SelectedDataRow);
             else
                 ClearSelection();
-            RefreshExecutionCounts();
-            AutoGrowColumns();
         }
 
         private void CloseTreeNode(int rowIndex, CallTreeNode treeNode)
@@ -324,6 +339,10 @@ namespace BeebPerf.ux
                 SelectRow(_SelectedDataRow);
             else
                 ClearSelection();
+        }
+
+        private void UpdateColumns()
+        {
             RefreshExecutionCounts();
             AutoGrowColumns();
         }

@@ -62,9 +62,19 @@ namespace BeebPerf.model
 
         public void Sort(Comparison<T> comparison)
         {
-            _Children.Sort(comparison);
-            foreach (var childNode in _Children)
-                childNode.Sort(comparison);
+            var stack = new Stack<TreeNode<T>>();
+            stack.Push(this);
+
+            while (stack.Count > 0)
+            {
+                var node = stack.Pop();
+
+                if (node._Children.Count > 1)
+                    node._Children.Sort(comparison);
+
+                for (int i = node._Children.Count - 1; i >= 0; i--)
+                    stack.Push(node._Children[i]);
+            }
         }
 
         public enum ExpansionType

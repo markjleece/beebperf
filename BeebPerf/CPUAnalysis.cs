@@ -639,9 +639,7 @@ namespace BeebPerf
 
             int excludedCycleCount = 0;
             if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
-            {
                 excludedCycleCount = CalculatedExcludedCycles(stackFrame);
-            }
 
             int childInclusiveCycleCount = 0;
             int childElapsedCycleCount = 0;
@@ -733,36 +731,11 @@ namespace BeebPerf
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateProgramCallTree(callStack, ProgramCallTree, treeNodesByStack);
+                    PopulateCallTree(callStack, ProgramCallTree, treeNodesByStack);
 
             ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
-
-        private static CallTreeNode? PopulateProgramCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
-        {
-            if (treeNodesByStack.TryGetValue(callStack, out CallTreeNode? treeNode))
-                return treeNode;
-
-            if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
-                return null;
-
-            var newTreeNode = new CallTreeNode(callStack);
-
-            var parentStackFrame = callStack.Parent;
-            if (parentStackFrame is not null)
-            {
-                var parentTreeNode = PopulateProgramCallTree(parentStackFrame, rootTreeNode, treeNodesByStack);
-                if (parentTreeNode is null)
-                    return null;
-
-                parentTreeNode.AddChild(newTreeNode);
-            }
-
-            treeNodesByStack[callStack] = newTreeNode;
-
-            return newTreeNode;
-        }
-
+        
         private void PopulateNonMaskableInterruptCallTree()
         {
             NonMaskableInterruptCallTree = null;
@@ -776,7 +749,7 @@ namespace BeebPerf
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateInterruptCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
+                    PopulateCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
 
             NonMaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
@@ -794,14 +767,14 @@ namespace BeebPerf
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateInterruptCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
+                    PopulateCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
 
             MaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
 
-        private static CallTreeNode? PopulateInterruptCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
+        private static CallTreeNode? PopulateCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
         {
-            if (treeNodesByStack.TryGetValue(callStack, out var treeNode))
+            if (treeNodesByStack.TryGetValue(callStack, out CallTreeNode? treeNode))
                 return treeNode;
 
             if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
@@ -812,7 +785,7 @@ namespace BeebPerf
             var parentStackFrame = callStack.Parent;
             if (parentStackFrame is not null)
             {
-                CallTreeNode? parentTreeNode = PopulateInterruptCallTree(parentStackFrame, rootTreeNode, treeNodesByStack);
+                CallTreeNode? parentTreeNode = PopulateCallTree(parentStackFrame, rootTreeNode, treeNodesByStack);
                 if (parentTreeNode is null)
                     return null;
 
