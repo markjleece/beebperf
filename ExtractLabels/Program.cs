@@ -55,14 +55,11 @@ namespace ExtractLabels
                 }
 
                 var addressMatch = addrRegex.Match(lines[i]);
-                if (addressMatch.Success)
+                if (addressMatch.Success && labelStr.Length > 0)
                 {
                     int address = Convert.ToInt32(addressMatch.Groups[1].Value, 16);
-                    if (labelStr.Length > 0)
-                    {
-                        results.Add((labelStr, address));
-                        labelStr = string.Empty;
-                    }
+                    results.Add((labelStr, address));
+                    labelStr = string.Empty;
                 }
             }
 
