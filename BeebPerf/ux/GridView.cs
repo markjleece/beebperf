@@ -72,12 +72,12 @@ namespace BeebPerf.ux
             SetRowsDataInternal(rowsData);
         }
 
-        protected void SelectRow(ROW_DATA_TYPE rowData)
+        protected void SelectRow(ROW_DATA_TYPE rowData, bool scrollIntoView)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            SelectRowInternal(rowData);
+            SelectRowInternal(rowData, scrollIntoView);
         }
 
         public void SetRowHeight(int height)
@@ -180,7 +180,7 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
-        private void SelectRowInternal(ROW_DATA_TYPE rowData)
+        private void SelectRowInternal(ROW_DATA_TYPE rowData, bool scrollIntoView)
         {
             for (int index = 0; index < _DataRows.Count; index++)
             {
@@ -190,7 +190,8 @@ namespace BeebPerf.ux
                 _SelectedDataRow = rowData;
                 Rows[index].Selected = true;
 
-                FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
+                if (scrollIntoView)
+                    FirstDisplayedScrollingRowIndex = Math.Clamp(index - DisplayedRowCount(false) + 1, 0, Rows.Count - 1);
                 return;
             }
 
@@ -271,7 +272,7 @@ namespace BeebPerf.ux
             BeginInvoke(new MethodInvoker(() =>
             {
                 if (_SelectedDataRow != null)
-                    SelectRow(_SelectedDataRow);
+                    SelectRow(_SelectedDataRow, scrollIntoView: true);
                 else
                     ClearSelection();
             }));
@@ -330,7 +331,7 @@ namespace BeebPerf.ux
 
             if (_SelectedDataRow != null)
             {
-                SelectRowInternal(_SelectedDataRow);
+                SelectRowInternal(_SelectedDataRow, scrollIntoView: true);
             }
             else
             {

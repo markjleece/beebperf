@@ -100,6 +100,7 @@ namespace BeebPerf.ux
 
             SetVScrollValue(vScrollPos);
             SetHScrollUnitValue(hScrollPos);
+            Invalidate();
 
             _PrevWidth = Width;
         }

@@ -30,7 +30,7 @@ namespace BeebPerf.ux
     {
         public BeebPerfForm() : base()
         {
-            _LabelResolver = new LabelResolver();
+            _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new();
             _VideoAnalysis = new();
@@ -46,7 +46,6 @@ namespace BeebPerf.ux
             FormClosing += BeebPerfForm_FormClosing;
             Resize += Spinner_Resize;
             tabControl.Resize += Spinner_Resize;
-
             tabControl.SelectedIndexChanged += TabControl_SelectedIndexChanged;
 
             _SelectedTab = tabControl.SelectedTab;
@@ -70,6 +69,19 @@ namespace BeebPerf.ux
             SaveAppState();
         }
 
+        private void BeebPerfForm_Load(object sender, EventArgs e)
+        {
+            SetState((AppStateFlags)0);
+
+            // load labels files (order not preserved)
+            foreach (var labelsFile in Decode(_LabelsFilesEncoding))
+                ReadLabelsFileAsync(labelsFile.FileName, labelsFile.LabelsEnabled);
+
+            // reopen last .perf file
+            if (_RecentPerfFilePathName.Length > 0 && File.Exists(_RecentPerfFilePathName))
+                OpenPerfFile(_RecentPerfFilePathName);
+        }
+
         private void ReadLabelsFileAsync(string fileName, bool labelsEnabled)
         {
             var task = new LabelsFileReader().ReadFileAsync(fileName);
@@ -83,19 +95,6 @@ namespace BeebPerf.ux
                     _LabelsFiles.Add(labelsFile);
                 }));
             });
-        }
-
-        private void BeebPerfForm_Load(object sender, EventArgs e)
-        {
-            SetState((AppStateFlags)0);
-
-            // load labels files (order not preserved)
-            foreach (var labelsFile in Decode(_LabelsFilesEncoding))
-                ReadLabelsFileAsync(labelsFile.FileName, labelsFile.LabelsEnabled);
-
-            // reopen last .perf file
-            if (_RecentPerfFilePathName.Length > 0 && File.Exists(_RecentPerfFilePathName))
-                OpenPerfFile(_RecentPerfFilePathName);
         }
 
         private void openButton_Click(object sender, EventArgs e)
@@ -188,19 +187,19 @@ namespace BeebPerf.ux
                     callTreeView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
                     callTreeView.SetCallTrees([
                         _CPUAnalysis!.ProgramCallTree,
-                        _CPUAnalysis!.NonMaskableInterruptCallTree,
-                        _CPUAnalysis!.MaskableInterruptCallTree ]);
+                        _CPUAnalysis!.NMICallTree,
+                        _CPUAnalysis!.IRQBRKCallTree ]);
                     callTreeView.ShowHotPaths();
 
                     // populate flame graph
                     if (_CPUAnalysis!.ProgramCallTree != null)
                         flameGraphView.AddCallTree(_CPUAnalysis!.ProgramCallTree!);
 
-                    if (_CPUAnalysis!.NonMaskableInterruptCallTree != null)
-                        flameGraphView.AddCallTree(_CPUAnalysis!.NonMaskableInterruptCallTree!);
+                    if (_CPUAnalysis!.NMICallTree != null)
+                        flameGraphView.AddCallTree(_CPUAnalysis!.NMICallTree!);
 
-                    if (_CPUAnalysis!.MaskableInterruptCallTree != null)
-                        flameGraphView.AddCallTree(_CPUAnalysis!.MaskableInterruptCallTree!);
+                    if (_CPUAnalysis!.IRQBRKCallTree != null)
+                        flameGraphView.AddCallTree(_CPUAnalysis!.IRQBRKCallTree!);
 
                     // caller/callee
                     callerCalleeView.Initialize(
@@ -488,13 +487,6 @@ namespace BeebPerf.ux
                 UpdateToolbarState();
         }
 
-        public void ClearSelectedMemoryAddress()
-        {
-            var operation = new SelectMemoryAddressOperation(this, null, _SelectedMemoryAddress);
-            if (_UndoRedoHistory.Execute(operation))
-                UpdateToolbarState();
-        }
-
         public void SetSelectedMemoryAddressInternal(CanonicalAddress address)
         {
             _SelectedMemoryAddress = address;
@@ -510,6 +502,13 @@ namespace BeebPerf.ux
                         memoryRoutinesView.SelectRoutine(_SelectedRoutine);
                 }));
             });
+        }
+
+        public void ClearSelectedMemoryAddress()
+        {
+            var operation = new SelectMemoryAddressOperation(this, null, _SelectedMemoryAddress);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
         }
 
         public void ClearSelectedMemoryAddressInternal()
@@ -564,6 +563,7 @@ namespace BeebPerf.ux
 
             // refresh all the labels
             _CPUAnalysis.ResolveRoutineLabels();
+
             routinesView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             callTreeView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             memoryView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
@@ -734,6 +734,7 @@ namespace BeebPerf.ux
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
             columnLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Vertical);
             rowLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Horizontal);
+            labelsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
         }
 
         private void SetState(AppStateFlags state)

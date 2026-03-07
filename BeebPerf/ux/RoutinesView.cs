@@ -98,7 +98,7 @@ namespace BeebPerf.ux
 
         private void SelectRoutineInternal(Routine routine)
         {
-            SelectRow(routine);
+            SelectRow(routine, scrollIntoView: true);
         }
 
         private void ShowHotRoutinesInternal()

@@ -137,7 +137,7 @@ namespace BeebPerf.ux
                 if (!routine.StartAddress.Equals(memoryAccess.Routine.StartAddress))
                     continue;
 
-                SelectRow(memoryAccess);
+                SelectRow(memoryAccess, scrollIntoView: true);
                 return;
             }
 

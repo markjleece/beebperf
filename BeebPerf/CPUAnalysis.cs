@@ -752,38 +752,38 @@ namespace BeebPerf
         
         private void PopulateNonMaskableInterruptCallTree()
         {
-            NonMaskableInterruptCallTree = null;
+            NMICallTree = null;
             if (_NMIRoutine is null || _NMIRoutine.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
             CallStack stack = _NMIRoutine.MetricsByStack.Keys.First();
-            NonMaskableInterruptCallTree = new CallTreeNode(stack);
-            interruptTreeNodesByStack.Add(stack, NonMaskableInterruptCallTree);
+            NMICallTree = new CallTreeNode(stack);
+            interruptTreeNodesByStack.Add(stack, NMICallTree);
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateCallTree(callStack, NonMaskableInterruptCallTree, interruptTreeNodesByStack);
+                    PopulateCallTree(callStack, NMICallTree, interruptTreeNodesByStack);
 
-            NonMaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
+            NMICallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
 
         private void PopulateMaskableInterruptCallTree()
         {
-            MaskableInterruptCallTree = null;
+            IRQBRKCallTree = null;
             if (_IRQBRKRoutine is null || _IRQBRKRoutine.MetricsByStack.Keys.Count == 0)
                 return;
 
             Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
             CallStack stack = _IRQBRKRoutine.MetricsByStack.Keys.First();
-            MaskableInterruptCallTree = new CallTreeNode(stack);
-            interruptTreeNodesByStack.Add(stack, MaskableInterruptCallTree);
+            IRQBRKCallTree = new CallTreeNode(stack);
+            interruptTreeNodesByStack.Add(stack, IRQBRKCallTree);
 
             foreach (var routine in RoutinesByAddress.Values)
                 foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateCallTree(callStack, MaskableInterruptCallTree, interruptTreeNodesByStack);
+                    PopulateCallTree(callStack, IRQBRKCallTree, interruptTreeNodesByStack);
 
-            MaskableInterruptCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
+            IRQBRKCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
 
         private static CallTreeNode? PopulateCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
@@ -816,18 +816,18 @@ namespace BeebPerf
             int count = 0;
             if (ProgramCallTree != null)
                 count += ProgramCallTree.Count;
-            if (NonMaskableInterruptCallTree != null)
-                count += NonMaskableInterruptCallTree.Count;
-            if (MaskableInterruptCallTree != null)
-                count += MaskableInterruptCallTree.Count;
+            if (NMICallTree != null)
+                count += NMICallTree.Count;
+            if (IRQBRKCallTree != null)
+                count += IRQBRKCallTree.Count;
 
             var treeNodes = new List<CallTreeNode>(count);
             if (ProgramCallTree != null)
                 PopulateCallTreeNodeList(ProgramCallTree, treeNodes);
-            if (NonMaskableInterruptCallTree != null)
-                PopulateCallTreeNodeList(NonMaskableInterruptCallTree, treeNodes);
-            if (MaskableInterruptCallTree != null)
-                PopulateCallTreeNodeList(MaskableInterruptCallTree, treeNodes);
+            if (NMICallTree != null)
+                PopulateCallTreeNodeList(NMICallTree, treeNodes);
+            if (IRQBRKCallTree != null)
+                PopulateCallTreeNodeList(IRQBRKCallTree, treeNodes);
 
             treeNodes.Sort((a, b) => (b.CPUMetrics.InclusiveCycleCount - a.CPUMetrics.InclusiveCycleCount));
 
@@ -1040,8 +1040,8 @@ namespace BeebPerf
         public Dictionary<CanonicalAddress, Routine> RoutinesByAddress = new();
         public List<Routine> HotRoutines = new();
         public CallTreeNode? ProgramCallTree;
-        public CallTreeNode? NonMaskableInterruptCallTree;
-        public CallTreeNode? MaskableInterruptCallTree;
+        public CallTreeNode? NMICallTree;
+        public CallTreeNode? IRQBRKCallTree;
         public int FirstInstructionIndex;
         public int LastInstructionIndex;
         public int StartCycleCount;

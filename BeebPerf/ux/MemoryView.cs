@@ -152,7 +152,7 @@ namespace BeebPerf.ux
             {
                 if (memoryAccess.Address.Equals(address))
                 {
-                    SelectRow(memoryAccess);
+                    SelectRow(memoryAccess, scrollIntoView: true);
                     break;
                 }
             }

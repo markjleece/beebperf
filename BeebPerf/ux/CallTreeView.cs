@@ -197,7 +197,7 @@ namespace BeebPerf.ux
                 {
                     if (treeNodeStack.Count == 0)
                     {
-                        SelectRow(treeNode);
+                        SelectRow(treeNode, scrollIntoView: true);
                         return;
                     }
 
@@ -328,7 +328,7 @@ namespace BeebPerf.ux
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Open;
             AddChildRows(rowIndex + 1, treeNode);
             if (_SelectedDataRow != null)
-                SelectRow(_SelectedDataRow);
+                SelectRow(_SelectedDataRow, scrollIntoView: false);
             else
                 ClearSelection();
         }
@@ -338,7 +338,7 @@ namespace BeebPerf.ux
             RemoveChildRows(rowIndex + 1, treeNode);
             treeNode.Expansion = TreeNode<CallTreeNode>.ExpansionType.Closed;
             if (_SelectedDataRow != null)
-                SelectRow(_SelectedDataRow);
+                SelectRow(_SelectedDataRow, scrollIntoView: false);
             else
                 ClearSelection();
         }

@@ -96,6 +96,29 @@ namespace BeebPerf.ux
                 }
             };
 
+            // show tool-tips if the text does not fit
+            labelsGridView.CellToolTipTextNeeded += (s, e) =>
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                    return;
+
+                var cell = labelsGridView[e.ColumnIndex, e.RowIndex];
+                var value = cell.Value?.ToString();
+                if (string.IsNullOrEmpty(value))
+                    return;
+
+                // measure rendered text width
+                var style = cell.InheritedStyle;
+                using var g = labelsGridView.CreateGraphics();
+                var textSize = g.MeasureString(value, style.Font);
+
+                // compare to actual cell width (minus padding)
+                int cellWidth = cell.Size.Width - 4;
+
+                if (textSize.Width > cellWidth)
+                    e.ToolTipText = value;
+            };
+
             // populate the grid rows
             foreach (var labelsFile in LabelsFiles)
                 labelsGridView.Rows.Add(labelsFile.FileName, ToStatusString(labelsFile), labelsFile.Enabled);
