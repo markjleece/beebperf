@@ -29,13 +29,11 @@ namespace BeebPerf
             model.StackFrame rootStackFrame,
             Instruction[] instructions,
             InstructionSet instructionSet,
-            Dictionary<ushort, string> labels,
             byte[][] snapshotMemory)
         {
             _RootStackFrame = rootStackFrame;
             _Instructions = instructions;
             _InstructionSet = instructionSet;
-            _Labels = labels;
             _SnapshotMemory = snapshotMemory;
         }
 
@@ -240,7 +238,6 @@ namespace BeebPerf
         private Instruction[] _Instructions = [];
         private InstructionSet? _InstructionSet;
         private model.StackFrame _RootStackFrame = new();
-        private Dictionary<ushort, string> _Labels = [];
         private byte[][] _SnapshotMemory = [];
     }
 }

@@ -48,6 +48,7 @@ namespace BeebPerf.ux
             toolStripSeparator4 = new ToolStripSeparator();
             columnLayoutButton = new ToolStripButton();
             rowLayoutButton = new ToolStripButton();
+            labelsButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
@@ -105,7 +106,8 @@ namespace BeebPerf.ux
                 flipViewButton, 
                 toolStripSeparator4, 
                 columnLayoutButton, 
-                rowLayoutButton, 
+                rowLayoutButton,
+                labelsButton,
                 settingsButton, 
                 helpButton
             });
@@ -254,6 +256,17 @@ namespace BeebPerf.ux
             rowLayoutButton.ToolTipText = "Arrange windows vertically";
             rowLayoutButton.Click += rowLayoutButton_Click;
             // 
+            // labelsButton
+            // 
+            labelsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            labelsButton.Image = (Image)resources.GetObject("labelsButton.Image");
+            labelsButton.ImageTransparentColor = Color.Magenta;
+            labelsButton.Name = "labelsButton";
+            labelsButton.Size = new Size(34, 28);
+            labelsButton.Text = "Labels";
+            labelsButton.ToolTipText = "Labels";
+            labelsButton.Click += labelsButton_Click;
+            // 
             // settingsButton
             // 
             settingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -261,8 +274,8 @@ namespace BeebPerf.ux
             settingsButton.ImageTransparentColor = Color.Magenta;
             settingsButton.Name = "settingsButton";
             settingsButton.Size = new Size(34, 28);
-            settingsButton.Text = "_Settings";
-            settingsButton.ToolTipText = "_Settings";
+            settingsButton.Text = "Settings";
+            settingsButton.ToolTipText = "Settings";
             settingsButton.Click += settingsButton_Click;
             // 
             // helpButton
@@ -504,6 +517,7 @@ namespace BeebPerf.ux
         private ToolStripSeparator toolStripSeparator4;
         private ToolStripButton rowLayoutButton;
         private ToolStripButton columnLayoutButton;
+        private ToolStripButton labelsButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
         private ToolStripButton openButton;

@@ -589,7 +589,7 @@ namespace BeebPerf.ux
             cancelButton.UseVisualStyleBackColor = true;
             // 
             // EditSettingsDialog
-            // 
+            //
             AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
@@ -604,8 +604,11 @@ namespace BeebPerf.ux
             Controls.Add(generalGroupBox);
             Controls.Add(okButton);
             Controls.Add(cancelButton);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
             Name = "EditSettingsDialog";
-            Text = "_Settings";
+            Text = "Settings";
             generalGroupBox.ResumeLayout(false);
             generalGroupBox.PerformLayout();
             addressGroupBox.ResumeLayout(false);

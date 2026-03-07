@@ -111,7 +111,8 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            BeebPerfForm form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
 
             foreach (var routineCell in _RoutineCells)
             {
@@ -648,14 +649,6 @@ namespace BeebPerf.ux
             return new Size(
                 Math.Max(Width - _VScrollBar.Width, 0),
                 Math.Max(Height - _HScrollBar.Height, 0));
-        }
-
-        private Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
         }
 
         private class RoutineCell

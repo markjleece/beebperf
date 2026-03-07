@@ -26,9 +26,6 @@ namespace BeebPerf.ux
     internal interface IGridView
     {
         public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
-        public void Clear();
-        public void ClearSelection();
-        public Dictionary<ushort, string> Labels { get; set; }
         public void SetRowHeight(int height);
     }
 
@@ -104,20 +101,6 @@ namespace BeebPerf.ux
             ClearSelectionInternal();
         }
 
-        public Dictionary<ushort, string> Labels
-        {
-            get
-            {
-                return _Labels;
-            }
-            set
-            {
-                _Labels = value;
-                _LabelAddresses = value.Keys.ToList();
-                _LabelAddresses.Sort();
-            }
-        }
-
         protected void AddColumn(string columnName, string headerText, GridViewCellTemplate? cellTemplate)
         {
             int columnIndex = Columns.Add(columnName, headerText);
@@ -173,13 +156,6 @@ namespace BeebPerf.ux
             ScrollToTopInternal();
         }
 
-        protected Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
-        }
 
         private void SetRowsDataInternal(List<ROW_DATA_TYPE> rowsData)
         {
@@ -315,7 +291,9 @@ namespace BeebPerf.ux
                 return;
             }
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             if (SelectedRows.Count == 1)
             {
                 var value = _DataRows[SelectedRows[0].Index];
@@ -418,24 +396,6 @@ namespace BeebPerf.ux
         {
             var countAndRange = OnRowDataCountAndRange(rowData, columnIndex);
             return FormatCountAndRange(countAndRange.value, countAndRange.range);
-        }
-
-        protected string FormatLabel(ushort address, bool withOffset)
-        {
-            int index = _LabelAddresses.BinarySearch(address);
-            if (index >= 0)
-                return _Labels[address];
-
-            index = ~index - 1;
-            if (index >= 0 && withOffset)
-            {
-                ushort lowerAddress = _LabelAddresses[index];
-                int offset = address - lowerAddress;
-                if (offset < 0x100)
-                    return $"{_Labels[lowerAddress]}+{offset}";
-            }
-
-            return string.Empty;
         }
 
         private void ScrollToTopInternal()
@@ -651,8 +611,6 @@ namespace BeebPerf.ux
 
         protected List<ROW_DATA_TYPE> _DataRows = [];
         protected ROW_DATA_TYPE? _SelectedDataRow;
-        private Dictionary<ushort, string> _Labels = new();
-        private List<ushort> _LabelAddresses = new();
         private System.Windows.Forms.Timer _ScrollTimer;
         private SelectionMode _SelectionMode;
         private ReentrancyGuard _ReentrancyGuard = new();

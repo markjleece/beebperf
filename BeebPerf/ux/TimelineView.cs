@@ -20,7 +20,6 @@
 // --------------------------------------------------------------
 
 using static BeebPerf.VideoAnalysis;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace BeebPerf.ux
 {
@@ -525,7 +524,9 @@ namespace BeebPerf.ux
             if (cycles != _RecordingDuration)
                 durationText += $" ({FormatCycles(cycles)} selected)";
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             form.StatusText = durationText;
         }
 
@@ -724,20 +725,14 @@ namespace BeebPerf.ux
             return Color.FromArgb(r, g, b);
         }
 
-        private Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
-        }
-
         private void OnRangeChange()
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             form.SetAnalysisRange(_AnalysisFrom, _AnalysisTo);
 
             Invalidate(_ThumbnailRect);

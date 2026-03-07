@@ -102,7 +102,9 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             if (treeNode != null)
                 form.SetSelectedRoutine(treeNode.Routine, treeNode.CallStack, memoryAccess: null);
             else
@@ -570,7 +572,10 @@ namespace BeebPerf.ux
                     size, size);
 
                 var callTreeDateView = (CallTreeView)DataGridView!;
-                BeebPerfForm form = (BeebPerfForm)callTreeDateView.GetParentForm();
+
+                var form = callTreeDateView.FindForm() as BeebPerfForm;
+                if (form is null) return;
+
                 graphics.DrawImage(form.FlameImage, rect);
             }
 

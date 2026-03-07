@@ -62,12 +62,12 @@ namespace BeebPerf.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string RecentFilePathName {
+        public string RecentPerfFilePathName {
             get {
-                return ((string)(this["RecentFilePathName"]));
+                return ((string)(this["RecentPerfFilePathName"]));
             }
             set {
-                this["RecentFilePathName"] = value;
+                this["RecentPerfFilePathName"] = value;
             }
         }
         
@@ -94,22 +94,7 @@ namespace BeebPerf.Properties {
                 this["PrimarySplitterDistance"] = value;
             }
         }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int SecondarySplitterDistance
-        {
-            get
-            {
-                return ((int)(this["SecondarySplitterDistance"]));
-            }
-            set
-            {
-                this["SecondarySplitterDistance"] = value;
-            }
-        }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
@@ -131,6 +116,42 @@ namespace BeebPerf.Properties {
             }
             set {
                 this["ColorTheme"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int SecondarySplitterDistance {
+            get {
+                return ((int)(this["SecondarySplitterDistance"]));
+            }
+            set {
+                this["SecondarySplitterDistance"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RecentLabelsFilePathName {
+            get {
+                return ((string)(this["RecentLabelsFilePathName"]));
+            }
+            set {
+                this["RecentLabelsFilePathName"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LabelsFiles {
+            get {
+                return ((string)(this["LabelsFiles"]));
+            }
+            set {
+                this["LabelsFiles"] = value;
             }
         }
     }

@@ -19,38 +19,34 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using BeebPerf.model;
-using BeebPerf.ux;
-
-namespace BeebPerf.operation
+namespace BeebPerf.model
 {
-    class SelectTabOperation : Operation
+    public enum LabelsFileStatus
     {
-        public SelectTabOperation(BeebPerfForm form, Panel? newTab, Panel? prevTab)
+        None = 0,
+        Loaded = 1,
+        Error_FileNotFound = 2,
+        Error_FileNotReadable = 4,
+        Error_InvalidFileFormat = 4,
+        Error_Other = 5
+    }
+
+    public class LabelsFile
+    {
+        public LabelsFile Clone()
         {
-            _Form = form;
-            _NewTab = newTab;
-            _PrevTab = prevTab;
+            return new()
+            {
+                FileName = FileName,
+                Labels = Labels.ToList(),
+                Status = Status,
+                Enabled = Enabled
+            };
         }
 
-        public override bool Execute()
-        {
-            Redo();
-            return true;
-        }
-
-        public override void Redo()
-        {
-            _Form.SelectTabInternal(_NewTab);
-        }
-
-        public override void Undo()
-        {
-            _Form.SelectTabInternal(_PrevTab);
-        }
-
-        private BeebPerfForm _Form;
-        private Panel? _NewTab;
-        private Panel? _PrevTab;
+        public string FileName = string.Empty;
+        public List<(string Name, ushort Address)> Labels = new();
+        public LabelsFileStatus Status = LabelsFileStatus.None;
+        public bool Enabled = false;
     }
 }

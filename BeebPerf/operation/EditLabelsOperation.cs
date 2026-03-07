@@ -24,33 +24,47 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
-    class SelectTabOperation : Operation
+    class EditLabelsOperation : Operation
     {
-        public SelectTabOperation(BeebPerfForm form, Panel? newTab, Panel? prevTab)
+        public EditLabelsOperation(
+            BeebPerfForm form,
+            List<LabelsFile> labelsFiles,
+            string recentLabelsFilePathName)
         {
             _Form = form;
-            _NewTab = newTab;
-            _PrevTab = prevTab;
+            _OldLabelsFiles = labelsFiles;
+            _NewLabelsFiles = [];
+            _RecentLabelsFilePathName = recentLabelsFilePathName;
         }
 
         public override bool Execute()
         {
-            Redo();
-            return true;
+            LabelsDialog dialog = new(_OldLabelsFiles, _RecentLabelsFilePathName);
+            dialog.Owner = _Form;
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                _NewLabelsFiles = dialog.LabelsFiles;
+                _RecentLabelsFilePathName = dialog.RecentLabelsFilePathName;
+                Redo();
+                return true;
+            }
+
+            return false;
         }
 
         public override void Redo()
         {
-            _Form.SelectTabInternal(_NewTab);
+            _Form.SetLabelsFiles(_NewLabelsFiles, _RecentLabelsFilePathName);
         }
 
         public override void Undo()
         {
-            _Form.SelectTabInternal(_PrevTab);
+            _Form.SetLabelsFiles(_OldLabelsFiles, _RecentLabelsFilePathName);
         }
 
+        private string _RecentLabelsFilePathName;
+        private List<LabelsFile> _OldLabelsFiles;
+        private List<LabelsFile> _NewLabelsFiles;
         private BeebPerfForm _Form;
-        private Panel? _NewTab;
-        private Panel? _PrevTab;
     }
 }

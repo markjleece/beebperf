@@ -76,7 +76,9 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             if (selection != null)
                 form.SetSelectedRoutine(selection.Routine, callStack: null, selection);
             else

@@ -112,7 +112,9 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             if (routine != null)
                 form.SetSelectedRoutine(routine, callStack: null, memoryAccess: null);
             else
@@ -186,7 +188,10 @@ namespace BeebPerf.ux
                     int size = cellBounds.Height / 2;
                     int inset = cellBounds.Height / 4;
                     var rect = new Rectangle(cellBounds.Left + inset / 2, cellBounds.Top + inset, size, size);
-                    BeebPerfForm form = (BeebPerfForm)routinesView.GetParentForm();
+
+                    var form = routinesView.FindForm() as BeebPerfForm;
+                    if (form is null) return;
+                    
                     graphics.DrawImage(form.FlameImage, rect);
                 }
             }

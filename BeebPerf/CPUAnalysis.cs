@@ -26,6 +26,11 @@ namespace BeebPerf
 {
     public class CPUAnalysis
     {
+        public CPUAnalysis(LabelResolver labelResolver)
+        {
+            _LabelResolver = labelResolver;
+        }
+
         public async Task<bool> StaticAnalysisAsync(Model model)
         {
             return await Task.Run(() => 
@@ -59,7 +64,6 @@ namespace BeebPerf
         {
             _Instructions = model.Instructions;
             _InstructionSet = model.InstructionSet;
-            _Labels = model.Labels;
             _InitialCallStack = model.Snapshot.StackFrames;
             _InitialStackPointer = model.Snapshot.StackPointer;
         }
@@ -273,7 +277,7 @@ namespace BeebPerf
             if (RoutinesByAddress.TryGetValue(address, out Routine? routine))
                 return routine;
 
-            string label = _Labels.TryGetValue(address.Address, out var lbl) ? lbl : string.Empty;
+            string label = _LabelResolver.Resolve(address);
             routine = new Routine(address, label);
 
             RoutinesByAddress.Add(address, routine);
@@ -585,6 +589,16 @@ namespace BeebPerf
             if (parent != null)
                 parent.Children.Add(stackFrame);
             return stackFrame;
+        }
+
+        public void ResolveRoutineLabels()
+        {
+            foreach (var routine in RoutinesByAddress.Values)
+            {
+                if (routine == _IRQBRKRoutine || routine == _NMIRoutine)
+                    continue;
+                routine.Label = _LabelResolver.Resolve(routine.StartAddress);
+            }
         }
 
         //
@@ -1038,7 +1052,7 @@ namespace BeebPerf
         private Routine? _NMIRoutine = null;
         private SortedCanonicalAddresses _SortedRoutineAddresses = new();
         private Instruction[] _Instructions = [];
-        private Dictionary<ushort, string> _Labels = [];
+        private LabelResolver _LabelResolver = new();
         private InstructionSet? _InstructionSet;
         private MiniStackFrame[] _InitialCallStack = [];
         private byte _InitialStackPointer;

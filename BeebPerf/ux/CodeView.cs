@@ -81,13 +81,13 @@ namespace BeebPerf.ux
         public void Initialize(
             Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
             Dictionary<CanonicalAddress, Routine> routinesByAddress,
-            Dictionary<ushort, string> labels,
+            LabelResolver labelResolver,
             InstructionSet instructionSet)
         {
             _CalculateInstructionMetrics = calculateInstructionMetrics;
             _RoutinesByAddress = routinesByAddress;
             _InstructionSet = instructionSet;
-            Labels = labels;
+            _LabelResolver = labelResolver;
         }
 
         public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
@@ -356,7 +356,7 @@ namespace BeebPerf.ux
                 bool measureOnly)
             {
                 ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
-                string label = codeView.FormatLabel(address, withOffset: false);
+                string label = codeView._LabelResolver.Resolve(address);
                 return PaintCodeElement(codeView, Setting.Label, label, indent: 0, graphics, cellBounds, cellStyle, measureOnly);
             }
 
@@ -396,7 +396,7 @@ namespace BeebPerf.ux
 
                     if (addressMode != InstructionSet.AddressingModeType.Immediate)
                     {
-                        string label = codeView.FormatLabel(operand, withOffset: true);
+                        string label = codeView._LabelResolver.ResolveWithOffset(operand);
                         if (label.Length > 0)
                             segments.Add(new Segment { Type = Setting.Label, Value = label.PadLeft(label.Length + 1) });
                     }
@@ -464,7 +464,8 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 bool measureOnly)
             {
-                var form = (BeebPerfForm)codeView.FindForm()!;
+                var form = codeView.FindForm() as BeebPerfForm;
+                if (form is null) return 0;
                 var displaySettings = form.DisplaySettings;
 
                 var text = displaySettings.Format(setting, value);
@@ -600,5 +601,6 @@ namespace BeebPerf.ux
         private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
         private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
         private RoutineMemoryAccess? _MemoryAccess;
+        private LabelResolver _LabelResolver = new();
     }
 }

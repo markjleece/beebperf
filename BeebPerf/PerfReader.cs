@@ -103,6 +103,8 @@ namespace BeebPerf
 
         private void ReadLabelData(Stream dataStream, Model model)
         {
+            List<(string Name, ushort Address)> labels = [];
+
             while (dataStream.Position < dataStream.Length)
             {
                 ushort address = ReadShort(dataStream);
@@ -114,8 +116,11 @@ namespace BeebPerf
                     label.Add(ch);
                 }
 
-                model.Labels[address] = Encoding.ASCII.GetString(label.ToArray<byte>(), index: 0, count: label.Count);
+                string name = Encoding.ASCII.GetString(label.ToArray<byte>(), index: 0, count: label.Count);
+                labels.Add((name, address));
             }
+
+            model.Labels = labels;
         }
 
         private void ReadSnapshotData(Stream dataStream, Model model)

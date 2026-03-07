@@ -23,7 +23,7 @@ namespace BeebPerf.model
 {
     public class Model
     {
-        public Model() 
+        public Model()
         {
         }
 
@@ -39,7 +39,6 @@ namespace BeebPerf.model
                 BBCModelType.BPlus => CPUType._6502,
                 _ => throw new ArgumentOutOfRangeException()
             });
-            Labels = new();
             Instructions = new Instruction[executionCount];
         }
         public Model Clone()
@@ -50,7 +49,7 @@ namespace BeebPerf.model
                 InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
-                Labels = new(Labels)
+                Labels = Labels.ToList()
             };
         }
 
@@ -110,6 +109,6 @@ namespace BeebPerf.model
         public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
-        public Dictionary<ushort, string> Labels = [];
+        public List<(string Name, ushort Address)> Labels = [];
     }
 }

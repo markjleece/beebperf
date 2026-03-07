@@ -21,6 +21,7 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using System.Text;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -29,6 +30,13 @@ namespace BeebPerf.ux
     {
         public BeebPerfForm() : base()
         {
+            _LabelResolver = new LabelResolver();
+            _CPUAnalysis = new(_LabelResolver);
+            _MemoryAnalysis = new();
+            _VideoAnalysis = new();
+            _UndoRedoHistory = new();
+            _Model = new();
+
             InitializeComponent();
             UpdateToolbarState();
 
@@ -62,19 +70,39 @@ namespace BeebPerf.ux
             SaveAppState();
         }
 
+        private void ReadLabelsFileAsync(string fileName, bool labelsEnabled)
+        {
+            var task = new LabelsFileReader().ReadFileAsync(fileName);
+            task.ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    var labelsFile = task.Result;
+                    if (labelsFile.Status == LabelsFileStatus.Loaded)
+                        labelsFile.Enabled = labelsEnabled;
+                    _LabelsFiles.Add(labelsFile);
+                }));
+            });
+        }
+
         private void BeebPerfForm_Load(object sender, EventArgs e)
         {
             SetState((AppStateFlags)0);
 
-            if (_RecentFilePathName.Length > 0 && File.Exists(_RecentFilePathName))
-                OpenPerfFile(_RecentFilePathName);
+            // load labels files (order not preserved)
+            foreach (var labelsFile in Decode(_LabelsFilesEncoding))
+                ReadLabelsFileAsync(labelsFile.FileName, labelsFile.LabelsEnabled);
+
+            // reopen last .perf file
+            if (_RecentPerfFilePathName.Length > 0 && File.Exists(_RecentPerfFilePathName))
+                OpenPerfFile(_RecentPerfFilePathName);
         }
 
         private void openButton_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new()
             {
-                InitialDirectory = Path.GetDirectoryName(_RecentFilePathName),
+                InitialDirectory = Path.GetDirectoryName(_RecentPerfFilePathName),
                 Filter = "Beeb .perf files (*.perf)|*.perf",
                 FilterIndex = 1,
                 RestoreDirectory = true
@@ -83,7 +111,7 @@ namespace BeebPerf.ux
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 string filePathName = openFileDialog.FileName;
-                _RecentFilePathName = filePathName;
+                _RecentPerfFilePathName = filePathName;
                 OpenPerfFile(openFileDialog.FileName);
             }
         }
@@ -102,6 +130,9 @@ namespace BeebPerf.ux
                     _Model = model.Result;
                     FilePathName = filePathName;
                     InstructionSet = _Model.InstructionSet;
+
+                    InsertPerfFileLabels(_LabelsFiles, filePathName, _Model.Labels);
+                    _LabelResolver.Initialize(_LabelsFiles);
 
                     StaticAnalysis();
                     VideoAnalysis();
@@ -181,7 +212,7 @@ namespace BeebPerf.ux
                     codeView.Initialize(
                         _CPUAnalysis.CalculateInstructionMetrics,
                         _CPUAnalysis.RoutinesByAddress,
-                        _Model.Labels,
+                        _LabelResolver,
                         _Model.InstructionSet!);
                 }));
             });
@@ -191,7 +222,6 @@ namespace BeebPerf.ux
                 _CPUAnalysis.RootStackFrame,
                 _Model.Instructions,
                 _Model.InstructionSet!,
-                _Model.Labels,
                 _Model.Snapshot.Memory);
 
             var memoryAnalysisTask = _MemoryAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount, memoryZeroPageCheckBox.Checked).ContinueWith((success) =>
@@ -199,8 +229,7 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
-                    memoryView.Labels = _Model.Labels;
-                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
+                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses, _LabelResolver);
                 }));
             });
         }
@@ -306,6 +335,13 @@ namespace BeebPerf.ux
             flameGraphView.FlipView();
         }
 
+        private void labelsButton_Click(object sender, EventArgs e)
+        {
+            var operation = new EditLabelsOperation(this, _LabelsFiles, _RecentLabelsFilePathName);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
         private void settingsButton_Click(object sender, EventArgs e)
         {
             var operation = new EditSettingsOperation(this, _BaseFont);
@@ -353,8 +389,7 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
-                    memoryView.Labels = _Model.Labels;
-                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses);
+                    memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses, _LabelResolver);
                 }));
             });
         }
@@ -463,7 +498,7 @@ namespace BeebPerf.ux
         public void SetSelectedMemoryAddressInternal(CanonicalAddress address)
         {
             _SelectedMemoryAddress = address;
-            memoryView.SelectMemoryAddress(address);
+            memoryView.SelectMemoryAddress(address, _LabelResolver);
             SetState(AppStateFlags.DynamicMemoryAddressAnalysis);
             var memoryAnalysisTask = _MemoryAnalysis.DynamicAddressAnalysisAsync(address, _CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount).ContinueWith((success) =>
             {
@@ -515,6 +550,72 @@ namespace BeebPerf.ux
             }
         }
 
+        public void SetLabelsFiles(List<LabelsFile> labelsFiles, string recentLabelsFilePathName)
+        {
+            // update preferences (saved when app closes)
+            _RecentLabelsFilePathName = recentLabelsFilePathName;
+            _LabelsFilesEncoding = Encode(labelsFiles);
+ 
+            // update labels member
+            _LabelsFiles = labelsFiles;
+           
+            // reinitialize resolver
+            _LabelResolver.Initialize(labelsFiles);
+
+            // refresh all the labels
+            _CPUAnalysis.ResolveRoutineLabels();
+            routinesView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            callTreeView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            memoryView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            memoryRoutinesView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            codeView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            Invalidate(true);
+        }
+
+        static private void InsertPerfFileLabels(
+            List<LabelsFile> labelsFiles,
+            string perfFileName,
+            List<(string Name, ushort Address)> labels)
+        {
+            var pseudoLabelsFile = new LabelsFile()
+            {
+                FileName = $"<{perfFileName}>",
+                Labels = labels,
+                Status = LabelsFileStatus.Loaded,
+                Enabled = true
+            };
+
+            if (labelsFiles.Count > 0 && labelsFiles[0].FileName.StartsWith('<'))
+                labelsFiles.RemoveAt(0);
+
+            labelsFiles.Insert(0, pseudoLabelsFile);
+        }
+
+        static private string Encode(List<LabelsFile> labelsFiles)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var labelsFile in labelsFiles)
+            {
+                if (!labelsFile.FileName.StartsWith('<'))
+                {
+                    if (sb.Length > 0) sb.Append('|');
+                    sb.Append(labelsFile.FileName);
+                    sb.Append('|');
+                    sb.Append(labelsFile.Enabled ? "true" : "false");
+                }
+            }
+            return sb.ToString();
+        }
+
+        static private List<(string FileName, bool LabelsEnabled)> Decode(string value)
+        {
+            List<(string FileName, bool LabelsEnabled)> result = new();
+            var values = value.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < values.Length; i += 2)
+                result.Add((FileName: values[i], LabelsEnabled: values[i + 1].Equals("true")));
+            return result;
+        }
+
         private void SaveAppState()
         {
             var bounds = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
@@ -523,7 +624,9 @@ namespace BeebPerf.ux
             Properties.Settings.Default.WindowLocation = bounds.Location;
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
-            Properties.Settings.Default.RecentFilePathName = _RecentFilePathName;
+            Properties.Settings.Default.RecentPerfFilePathName = _RecentPerfFilePathName;
+            Properties.Settings.Default.RecentLabelsFilePathName = _RecentLabelsFilePathName;
+            Properties.Settings.Default.LabelsFiles = _LabelsFilesEncoding;
             Properties.Settings.Default.WindowLayout = (int)secondarySplitContainer.Orientation;
             Properties.Settings.Default.PrimarySplitterDistance = primarySplitContainer.SplitterDistance;
             Properties.Settings.Default.SecondarySplitterDistance = secondarySplitContainer.SplitterDistance;
@@ -534,7 +637,9 @@ namespace BeebPerf.ux
 
         private void RestoreAppState()
         {
-            _RecentFilePathName = Properties.Settings.Default.RecentFilePathName;
+            _RecentPerfFilePathName = Properties.Settings.Default.RecentPerfFilePathName;
+            _RecentLabelsFilePathName = Properties.Settings.Default.RecentLabelsFilePathName;
+            _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
 
             var location = Properties.Settings.Default.WindowLocation;
             var size = Properties.Settings.Default.WindowSize;
@@ -757,15 +862,19 @@ namespace BeebPerf.ux
         private Panel? _SelectedTab;
         private CanonicalAddress? _SelectedMemoryAddress;
 
-        private string _RecentFilePathName = string.Empty;
+        private string _RecentPerfFilePathName = string.Empty;
+        private string _RecentLabelsFilePathName = string.Empty;
+        private string _LabelsFilesEncoding = string.Empty;
         private int _SuppressTabChange;
         private int _SuppressCheckBoxChange;
+        private List<LabelsFile> _LabelsFiles = [];
 
-        private UndoRedoHistory _UndoRedoHistory = new();
-        private Model _Model = new();
-        private CPUAnalysis _CPUAnalysis = new();
-        private MemoryAnalysis _MemoryAnalysis = new();
-        private VideoAnalysis _VideoAnalysis = new();
+        private UndoRedoHistory _UndoRedoHistory;
+        private Model _Model;
+        private LabelResolver _LabelResolver;
+        private CPUAnalysis _CPUAnalysis;
+        private MemoryAnalysis _MemoryAnalysis;
+        private VideoAnalysis _VideoAnalysis;
         private Font _BaseFont;
     }
 }

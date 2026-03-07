@@ -63,16 +63,20 @@ namespace BeebPerf.ux
             SetColumnSortMode(WriteCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
         }
 
-        public void SetMemoryAccesses(List<MemoryAccess> memoryAccesses)
+        public void SetMemoryAccesses(List<MemoryAccess> memoryAccesses, LabelResolver labelResolver)
         {
+            _LabelResolver = labelResolver;
+
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
             SetMemoryAccessesInternal(memoryAccesses);
         }
 
-        public void SelectMemoryAddress(CanonicalAddress address)
+        public void SelectMemoryAddress(CanonicalAddress address, LabelResolver labelResolver)
         {
+            _LabelResolver = labelResolver;
+
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
@@ -84,7 +88,9 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            var form = (BeebPerfForm)GetParentForm();
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
             if (selectedMemoryAccess != null)
                 form.SetSelectedMemoryAddress(selectedMemoryAccess.Address);
             else
@@ -109,7 +115,7 @@ namespace BeebPerf.ux
             {
                 AddressColumnIndex => memoryAccess.Address.ToString(),
                 PageColumnIndex => memoryAccess.Address.Page.ToString(),
-                LabelColumnIndex => FormatLabel(memoryAccess.Address.Address, withOffset: true),
+                LabelColumnIndex => _LabelResolver.ResolveWithOffset(memoryAccess.Address.Address),
                 _ => FormatCountAndRange(memoryAccess, columnIndex),
             };
         }
@@ -155,5 +161,6 @@ namespace BeebPerf.ux
         private int _TotalReadCount;
         private int _TotalWriteCount;
         private ReentrancyGuard _ReentrancyGuard = new();
+        private LabelResolver _LabelResolver = new();
     }
 }

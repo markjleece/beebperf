@@ -11,7 +11,7 @@
     <Setting Name="WindowState" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
-    <Setting Name="RecentFilePathName" Type="System.String" Scope="User">
+    <Setting Name="RecentPerfFilePathName" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="WindowLayout" Type="System.Int32" Scope="User">
@@ -28,6 +28,12 @@
     </Setting>
     <Setting Name="SecondarySplitterDistance" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="RecentLabelsFilePathName" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="LabelsFiles" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
   </Settings>
 </SettingsFile>

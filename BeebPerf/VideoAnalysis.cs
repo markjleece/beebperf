@@ -513,7 +513,7 @@ namespace BeebPerf
 
             _LastCycleCount = cycleCount;
 
-            for (int i = 0; i < characterCount; i++) // TODO: Need to deal with interlacing
+            for (int i = 0; i < characterCount; i++)
             {
                 // read screen memory and rasterize it to CRT bitmap, if not in blanking period
                 if (!_BlankSpace)

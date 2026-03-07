@@ -80,7 +80,9 @@ namespace BeebPerf.ux
 
                 SelectRoutineInternal(routineCell.Routine);
 
-                BeebPerfForm form = (BeebPerfForm)GetParentForm();
+                var form = FindForm() as BeebPerfForm;
+                if (form is null) continue;
+
                 form.SetSelectedRoutine(routineCell.Routine, callStack: null, memoryAccess : null);
                 return;
             }
@@ -464,14 +466,6 @@ namespace BeebPerf.ux
             int g = (int)(first.G * (1 - ratio) + second.G * ratio);
             int b = (int)(first.B * (1 - ratio) + second.B * ratio);
             return Color.FromArgb(r, g, b);
-        }
-
-        private Form GetParentForm()
-        {
-            Control control = this;
-            while (control is not Form)
-                control = control!.Parent!;
-            return (Form)control;
         }
 
         private enum RoutineCellType
