@@ -350,6 +350,9 @@ namespace BeebPerf.ux
 
         private void helpButton_Click(object sender, EventArgs e)
         {
+            var dialog = new HelpDialog();
+            dialog.Owner = this;
+            dialog.ShowDialog();
         }
 
         private void columnLayoutButton_Click(object sender, EventArgs e)
