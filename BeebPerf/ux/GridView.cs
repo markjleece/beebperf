@@ -438,7 +438,7 @@ namespace BeebPerf.ux
             DataGridViewCellStyle cellStyle)
         {
             var padding = cellStyle.Padding;
-            int contentPadding = cellStyle.Font.Height / 4;
+            int contentPadding = cellStyle.Font!.Height / 4;
             var textRect = new Rectangle(
                 cellBounds.X + padding.Left + contentPadding,
                 cellBounds.Y + padding.Top,
@@ -512,9 +512,9 @@ namespace BeebPerf.ux
                 int glyphWidth = 0;
                 if (column.SortMode == DataGridViewColumnSortMode.Automatic ||
                     column.SortMode == DataGridViewColumnSortMode.Programmatic)
-                    glyphWidth = cellStyle.Font.Height / 2;
+                    glyphWidth = cellStyle.Font!.Height / 2;
 
-                int contentPadding = cellStyle.Font.Height / 4;
+                int contentPadding = cellStyle.Font!.Height / 4;
 
                 return new Size(textSize.Width + 2 * contentPadding + glyphWidth + cellStyle.Padding.Horizontal, cellStyle.Font.Height + cellStyle.Padding.Vertical);
             }

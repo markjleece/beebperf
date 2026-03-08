@@ -242,7 +242,7 @@ namespace BeebPerf.ux
                      ColumnIndex == InstructionColumnIndex))
                 {
                     int measure = PaintCode(codeView, (InstructionMetrics)obj, graphics, cellBounds: null, cellStyle, rowIndex, measureOnly: true);
-                    int padding = cellStyle.Font.Height;
+                    int padding = cellStyle.Font!.Height;
                     size.Width = measure + padding + cellStyle.Padding.Horizontal;
                 }
 
@@ -470,7 +470,7 @@ namespace BeebPerf.ux
 
                 var text = displaySettings.Format(setting, value);
                 var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
-                using var font = displaySettings.GetFont(setting, cellStyle.Font);
+                using var font = displaySettings.GetFont(setting, cellStyle.Font!);
                 Size measure = TextRenderer.MeasureText(text, font, new Size(int.MaxValue, int.MaxValue), flags);
 
                 if (!measureOnly)
@@ -515,7 +515,7 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle)
             {
                 if (ColumnIndex == AddressColumnIndex || ColumnIndex == InstructionColumnIndex)
-                    graphics.DrawString("...", cellStyle.Font, new SolidBrush(cellStyle.ForeColor), cellBounds);
+                    graphics.DrawString("...", cellStyle.Font!, new SolidBrush(cellStyle.ForeColor), cellBounds);
             }
 
             private void PaintFallThrough(
@@ -530,7 +530,7 @@ namespace BeebPerf.ux
                 if (rowBounds.IsEmpty)
                     rowBounds = codeView.GetRowDisplayRectangle(rowIndex, cutOverflow: false);
 
-                using var font = new Font(cellStyle.Font, FontStyle.Italic);
+                using var font = new Font(cellStyle.Font!, FontStyle.Italic);
                 var text = "fall-through";
                 Size measure = TextRenderer.MeasureText(
                     text, font,

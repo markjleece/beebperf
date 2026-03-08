@@ -110,7 +110,7 @@ namespace BeebPerf.ux
                 // measure rendered text width
                 var style = cell.InheritedStyle;
                 using var g = labelsGridView.CreateGraphics();
-                var textSize = g.MeasureString(value, style.Font);
+                var textSize = g.MeasureString(value, style.Font!);
 
                 // compare to actual cell width (minus padding)
                 int cellWidth = cell.Size.Width - 4;
