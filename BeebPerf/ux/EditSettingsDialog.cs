@@ -2,7 +2,7 @@
 // An Adventure In Time - A Doctor Who fan game for the BBC Micro
 // Model B
 //
-// Copyright (C) 2025  Mark John Leece
+// Copyright (C) 2026  Mark John Leece
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License

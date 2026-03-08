@@ -1,7 +1,7 @@
 ﻿// --------------------------------------------------------------
 // BeebPerf - A BBC Micro Profiler
 //
-// Copyright (C) 2025  Mark John Leece
+// Copyright (C) 2026  Mark John Leece
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
