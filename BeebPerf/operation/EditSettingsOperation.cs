@@ -38,7 +38,7 @@ namespace BeebPerf.operation
 
         public override bool Execute()
         {
-            EditSettingsDialog dialog = new(_PrevSettings, _BaseFont);
+            SettingsDialog dialog = new(_PrevSettings, _BaseFont);
             dialog.Owner = _Form;
             if (dialog.ShowDialog() == DialogResult.OK)
             {

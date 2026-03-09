@@ -22,7 +22,7 @@
 
 namespace BeebPerf.ux
 {
-    partial class EditSettingsDialog
+    partial class SettingsDialog
     {
         /// <summary>
         /// Required designer variable.
