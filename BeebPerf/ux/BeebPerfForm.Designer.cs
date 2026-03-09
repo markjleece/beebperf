@@ -46,8 +46,6 @@ namespace BeebPerf.ux
             hotPathsButton = new ToolStripButton();
             flipViewButton = new ToolStripButton();
             toolStripSeparator4 = new ToolStripSeparator();
-            columnLayoutButton = new ToolStripButton();
-            rowLayoutButton = new ToolStripButton();
             labelsButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
@@ -105,8 +103,6 @@ namespace BeebPerf.ux
                 hotPathsButton, 
                 flipViewButton, 
                 toolStripSeparator4, 
-                columnLayoutButton, 
-                rowLayoutButton,
                 labelsButton,
                 settingsButton, 
                 helpButton
@@ -233,28 +229,6 @@ namespace BeebPerf.ux
             // 
             toolStripSeparator4.Name = "toolStripSeparator4";
             toolStripSeparator4.Size = new Size(6, 33);
-            // 
-            // columnLayoutButton
-            // 
-            columnLayoutButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            columnLayoutButton.Image = (Image)resources.GetObject("columnLayoutButton.Image");
-            columnLayoutButton.ImageTransparentColor = Color.Magenta;
-            columnLayoutButton.Name = "columnLayoutButton";
-            columnLayoutButton.Size = new Size(34, 28);
-            columnLayoutButton.Text = "Horizontal layout";
-            columnLayoutButton.ToolTipText = "Arrange windows Horizontally";
-            columnLayoutButton.Click += columnLayoutButton_Click;
-            // 
-            // rowLayoutButton
-            // 
-            rowLayoutButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            rowLayoutButton.Image = (Image)resources.GetObject("rowLayoutButton.Image");
-            rowLayoutButton.ImageTransparentColor = Color.Magenta;
-            rowLayoutButton.Name = "rowLayoutButton";
-            rowLayoutButton.Size = new Size(34, 28);
-            rowLayoutButton.Text = "Vertical layout";
-            rowLayoutButton.ToolTipText = "Arrange windows vertically";
-            rowLayoutButton.Click += rowLayoutButton_Click;
             // 
             // labelsButton
             // 
@@ -515,8 +489,6 @@ namespace BeebPerf.ux
         private ToolStripButton hotPathsButton;
         private ToolStripButton flipViewButton;
         private ToolStripSeparator toolStripSeparator4;
-        private ToolStripButton rowLayoutButton;
-        private ToolStripButton columnLayoutButton;
         private ToolStripButton labelsButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;

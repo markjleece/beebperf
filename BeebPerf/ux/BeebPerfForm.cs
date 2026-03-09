@@ -355,20 +355,6 @@ namespace BeebPerf.ux
             dialog.ShowDialog();
         }
 
-        private void columnLayoutButton_Click(object sender, EventArgs e)
-        {
-            secondarySplitContainer.Orientation = Orientation.Vertical;
-            secondarySplitContainer.SplitterDistance = secondarySplitContainer.Width / 2;
-            UpdateToolbarState();
-        }
-
-        private void rowLayoutButton_Click(object sender, EventArgs e)
-        {
-            secondarySplitContainer.Orientation = Orientation.Horizontal;
-            secondarySplitContainer.SplitterDistance = secondarySplitContainer.Height / 2;
-            UpdateToolbarState();
-        }
-
         private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
         {
             if (_SuppressCheckBoxChange > 0)
@@ -735,8 +721,6 @@ namespace BeebPerf.ux
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
-            columnLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Vertical);
-            rowLayoutButton.Checked = (secondarySplitContainer.Orientation == Orientation.Horizontal);
             labelsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
         }
 
