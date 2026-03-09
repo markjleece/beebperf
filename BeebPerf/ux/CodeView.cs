@@ -96,8 +96,8 @@ namespace BeebPerf.ux
             _MemoryAccess = memoryAccess;
             if (memoryAccess != null)
             {
-                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#, %]");
-                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#, %]");
+                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#]");
+                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#]");
             }
 
             SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
@@ -170,10 +170,14 @@ namespace BeebPerf.ux
             if (obj is not InstructionMetrics)
                 return string.Empty;
 
-            if (columnIndex == TailCallColumnIndex)
-                return ((InstructionMetrics)obj).TailCall ? "Yes" : string.Empty;
-            else
-                return FormatCountAndRange(obj, columnIndex);
+            var instructionMetrics = (InstructionMetrics)obj;
+            return columnIndex switch
+            {
+                TailCallColumnIndex => instructionMetrics.TailCall ? "Yes" : string.Empty,
+                MemoryReadCountColumnIndex => FormatMemoryAccessCount(GetMemoryReadCount(instructionMetrics.Instruction)),
+                MemoryWriteCountColumnIndex => FormatMemoryAccessCount(GetMemoryWriteCount(instructionMetrics.Instruction)),
+                _ => FormatCountAndRange(obj, columnIndex)
+            };
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)
@@ -571,20 +575,23 @@ namespace BeebPerf.ux
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
+        private string FormatMemoryAccessCount(int count)
+        {
+            return (count > 0) ? $"{count:N0}" : string.Empty;
+        }
+
         private int GetMemoryReadCount(CoreInstruction instruction)
         {
             if (_MemoryAccess != null && _MemoryAccess.InstructionReadCounts.TryGetValue(instruction, out var count))
                 return count;
-            else
-                return -1;
+            return -1;
         }
 
         private int GetMemoryWriteCount(CoreInstruction instruction)
         {
             if (_MemoryAccess != null && _MemoryAccess.InstructionWriteCounts.TryGetValue(instruction, out var count))
                 return count;
-            else
-                return -1;
+            return -1;
         }
 
         class Ellipses 

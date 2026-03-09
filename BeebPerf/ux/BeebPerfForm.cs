@@ -436,7 +436,6 @@ namespace BeebPerf.ux
             callerCalleeView.SelectRoutine(routine);
             callTreeView.SelectRoutine(routine, callStack!);
             flameGraphView.SelectRoutine(routine, callStack!);
-            
             memoryRoutinesView.SelectRoutine(routine);
         }
 
@@ -488,7 +487,14 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.DynamicMemoryAddressAnalysis);
                     memoryRoutinesView.SetMemoryAccesses(_MemoryAnalysis.RoutineAccesses);
                     if (_SelectedRoutine != null)
-                        memoryRoutinesView.SelectRoutine(_SelectedRoutine);
+                    {
+                        var memoryAccesses = _MemoryAnalysis.RoutineAccesses.Find(routineAccesses => _SelectedRoutine == routineAccesses.Routine);
+                        if (memoryAccesses != null)
+                        {
+                            memoryRoutinesView.SelectRoutine(_SelectedRoutine);
+                            codeView.SetCode(_SelectedRoutine, callStack: null, memoryAccesses);
+                        }
+                    }
                 }));
             });
         }

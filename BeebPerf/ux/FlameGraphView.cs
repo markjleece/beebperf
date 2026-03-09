@@ -486,6 +486,7 @@ namespace BeebPerf.ux
 
                 int marginSize = Font.Height / 2;
                 SetHScrollValue(routineCell.Rectangle.X - marginSize);
+                SetVScrollValue(routineCell.Rectangle.Y - marginSize);
                 break;
             }
         }
