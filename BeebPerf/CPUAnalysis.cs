@@ -976,6 +976,9 @@ namespace BeebPerf
         {
             Dictionary<CallStack, CPUMetrics> callerMetrics = new();
 
+            if (routine == _IRQBRKRoutine || routine == _NMIRoutine)
+                return [];
+
             foreach (var kvp in routine!.MetricsByStack)
             {
                 if (kvp.Key.Parent == null)

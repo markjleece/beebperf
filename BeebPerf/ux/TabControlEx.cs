@@ -47,8 +47,9 @@ namespace BeebPerf.ux
                 if (value != _SelectedIndex)
                 {
                     _SelectedIndex = value;
+                    _SelectedTab = (value >= 0) ? (Panel)Controls[value] : null;
                     SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
-                    SelectedTab = (value >= 0) ? (Panel)Controls[value] : null;
+                    SelectedTabChanged?.Invoke(this, EventArgs.Empty);
                     UpdateTabs();
                 }
             }
@@ -69,8 +70,9 @@ namespace BeebPerf.ux
                 if (value != _SelectedTab)
                 {
                     _SelectedTab = value;
+                    _SelectedIndex = index;
                     SelectedTabChanged?.Invoke(this, EventArgs.Empty);
-                    SelectedIndex = index;
+                    SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
                     UpdateTabs();
                 }
             }
