@@ -71,7 +71,7 @@ namespace BeebPerf.ux
 
         private void BeebPerfForm_Load(object sender, EventArgs e)
         {
-            SetState((AppStateFlags)0);
+            ClearState(AppStateFlags.All);
 
             // load labels files (order not preserved)
             foreach (var labelsFile in Decode(_LabelsFilesEncoding))
@@ -152,7 +152,7 @@ namespace BeebPerf.ux
             });
         }
 
-        public void StaticAnalysis()
+        private void StaticAnalysis()
         {
             // CPU analysis...
             SetState(AppStateFlags.StaticCPUAnalysis);
@@ -181,7 +181,7 @@ namespace BeebPerf.ux
             });
         }
 
-        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        private void DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
             // CPU analysis...
             SetState(AppStateFlags.DynamicCPUAnalysis);
@@ -251,15 +251,19 @@ namespace BeebPerf.ux
         private void undoButton_Click(object sender, EventArgs e)
         {
             if (_UndoRedoHistory.CanUndo())
+            {
                 _UndoRedoHistory.Undo();
-            UpdateToolbarState();
+                UpdateToolbarState();
+            }
         }
 
         private void redoButton_Click(object sender, EventArgs e)
         {
             if (_UndoRedoHistory.CanRedo())
+            {
                 _UndoRedoHistory.Redo();
-            UpdateToolbarState();
+                UpdateToolbarState();
+            }
         }
 
         private void zoomInButton_Click(object sender, EventArgs e)
@@ -400,22 +404,8 @@ namespace BeebPerf.ux
                 UpdateToolbarState();
         }
 
-        public void ClearSelectedRoutine()
-        {
-            if (_SelectedRoutine == null && _SelectedCallStack == null)
-                return;
-
-            var operation = new SelectRoutineOperation(
-                this,
-                null, null, null,
-                _SelectedRoutine, _SelectedCallStack, _SelectedMemoryAccess);
-
-            if (_UndoRedoHistory.Execute(operation))
-                UpdateToolbarState();
-        }
-
         public void SetSelectedRoutineInternal(
-            Routine routine, 
+            Routine routine,
             CallStack? callStack,
             RoutineMemoryAccess? memoryAccess)
         {
@@ -431,13 +421,27 @@ namespace BeebPerf.ux
             _SelectedMemoryAccess = memoryAccess;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-            codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess); 
+            codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess);
 
             routinesView.SelectRoutine(routine);
             callerCalleeView.SelectRoutine(routine);
             callTreeView.SelectRoutine(routine, callStack!);
             flameGraphView.SelectRoutine(routine, callStack!);
             memoryRoutinesView.SelectRoutine(routine);
+        }
+
+        public void ClearSelectedRoutine()
+        {
+            if (_SelectedRoutine == null && _SelectedCallStack == null)
+                return;
+
+            var operation = new SelectRoutineOperation(
+                this,
+                null, null, null,
+                _SelectedRoutine, _SelectedCallStack, _SelectedMemoryAccess);
+
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
         }
 
         public void ClearSelectedRoutineInternal()
@@ -798,6 +802,7 @@ namespace BeebPerf.ux
             DynamicMemoryAnalysis = 0x8,
             DynamicMemoryAddressAnalysis = 0x10,
             VideoAnalysis = 0x20,
+            All = 0x3F
         }
 
         private void ResizeSpinner()
