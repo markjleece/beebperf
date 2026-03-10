@@ -115,6 +115,20 @@ namespace BeebPerf.ux
             }
         }
 
+        private async Task<Model> ReadPerfFileAsync(string filePathName)
+        {
+            return await Task.Run(() =>
+            {
+                var perfReader = new PerfReader();
+
+                Model? model = perfReader.ReadFile(filePathName);
+                if (model == null)
+                    throw new Exception($"An error occurred reading {filePathName}");
+
+                return model;
+            });
+        }
+
         private void OpenPerfFile(string filePathName)
         {
             SetState(AppStateFlags.Loading);
@@ -133,28 +147,14 @@ namespace BeebPerf.ux
                     InsertPerfFileLabels(_LabelsFiles, filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
-                    StaticCPUAnalysis();
-                    StaticVideoAnalysis();
+                    StaticAnalysis();
                 }));
             });
         }
 
-        private async Task<Model> ReadPerfFileAsync(string filePathName)
+        public void StaticAnalysis()
         {
-            return await Task.Run(() =>
-            {
-                var perfReader = new PerfReader();
-
-                Model? model = perfReader.ReadFile(filePathName);
-                if (model == null)
-                    throw new Exception($"An error occurred reading {filePathName}");
-
-                return model;
-            });
-        }
-
-        public void StaticCPUAnalysis()
-        {
+            // CPU analysis...
             SetState(AppStateFlags.StaticCPUAnalysis);
 
             var staticAnalysisTask = _CPUAnalysis.StaticAnalysisAsync(_Model).ContinueWith((success) =>
@@ -164,15 +164,26 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.StaticCPUAnalysis);
 
                     timelineView.Duration = _CPUAnalysis.EndCycleCount;
+                    DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+                }));
+            });
 
-                    DynamicCPUAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
-                    DynamicMemoryAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+            // video analysis...
+            SetState(AppStateFlags.VideoAnalysis);
+
+            var dynamicAnalysisTask = _VideoAnalysis.AnalysisAsync(_Model.Instructions, InstructionSet!, _Model).ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    ClearState(AppStateFlags.VideoAnalysis);
+                    timelineView.FrameBitmaps = _VideoAnalysis.FrameBitmaps;
                 }));
             });
         }
 
-        public void DynamicCPUAnalysis(int startCycleCount, int endCycleCount)
+        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
         {
+            // CPU analysis...
             SetState(AppStateFlags.DynamicCPUAnalysis);
 
             var dynamicAnalysisTask = _CPUAnalysis.DynamicAnalysisAsync(startCycleCount, endCycleCount).ContinueWith((success) =>
@@ -217,10 +228,8 @@ namespace BeebPerf.ux
                         _Model.InstructionSet!);
                 }));
             });
-        }
 
-        public void DynamicMemoryAnalysis(int startCycleCount, int endCycleCount)
-        {
+            // memory analysis
             SetState(AppStateFlags.DynamicMemoryAnalysis);
             _MemoryAnalysis.Initialize(
                 _CPUAnalysis.RootStackFrame,
@@ -234,20 +243,7 @@ namespace BeebPerf.ux
                 {
                     ClearState(AppStateFlags.DynamicMemoryAnalysis);
                     memoryView.SetMemoryAccesses(_MemoryAnalysis.MemoryAccesses, _LabelResolver);
-                }));
-            });
-        }
-
-        public void StaticVideoAnalysis()
-        {
-            SetState(AppStateFlags.VideoAnalysis);
-
-            var dynamicAnalysisTask = _VideoAnalysis.AnalysisAsync(_Model.Instructions, InstructionSet!, _Model).ContinueWith((success) =>
-            {
-                this.Invoke((Action)(() =>
-                {
-                    ClearState(AppStateFlags.VideoAnalysis);
-                    timelineView.FrameBitmaps = _VideoAnalysis.FrameBitmaps;
+                    memoryRoutinesView.Clear();
                 }));
             });
         }
@@ -466,7 +462,8 @@ namespace BeebPerf.ux
 
         public void SetAnalysisRangeInternal(int analysisFrom, int analysisTo)
         {
-            DynamicCPUAnalysis(analysisFrom, analysisTo);
+            DynamicAnalysis(analysisFrom, analysisTo);
+
             if (analysisFrom == 0 && analysisTo == timelineView.Duration)
                 timelineView.SelectAll();
             else
