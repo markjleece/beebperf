@@ -133,8 +133,8 @@ namespace BeebPerf.ux
                     InsertPerfFileLabels(_LabelsFiles, filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
-                    StaticAnalysis();
-                    VideoAnalysis();
+                    StaticCPUAnalysis();
+                    StaticVideoAnalysis();
                 }));
             });
         }
@@ -153,7 +153,7 @@ namespace BeebPerf.ux
             });
         }
 
-        public void StaticAnalysis()
+        public void StaticCPUAnalysis()
         {
             SetState(AppStateFlags.StaticCPUAnalysis);
 
@@ -164,12 +164,14 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.StaticCPUAnalysis);
 
                     timelineView.Duration = _CPUAnalysis.EndCycleCount;
-                    DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+
+                    DynamicCPUAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+                    DynamicMemoryAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
                 }));
             });
         }
 
-        public void DynamicAnalysis(int startCycleCount, int endCycleCount)
+        public void DynamicCPUAnalysis(int startCycleCount, int endCycleCount)
         {
             SetState(AppStateFlags.DynamicCPUAnalysis);
 
@@ -215,7 +217,10 @@ namespace BeebPerf.ux
                         _Model.InstructionSet!);
                 }));
             });
+        }
 
+        public void DynamicMemoryAnalysis(int startCycleCount, int endCycleCount)
+        {
             SetState(AppStateFlags.DynamicMemoryAnalysis);
             _MemoryAnalysis.Initialize(
                 _CPUAnalysis.RootStackFrame,
@@ -233,7 +238,7 @@ namespace BeebPerf.ux
             });
         }
 
-        public void VideoAnalysis()
+        public void StaticVideoAnalysis()
         {
             SetState(AppStateFlags.VideoAnalysis);
 
@@ -461,7 +466,7 @@ namespace BeebPerf.ux
 
         public void SetAnalysisRangeInternal(int analysisFrom, int analysisTo)
         {
-            DynamicAnalysis(analysisFrom, analysisTo);
+            DynamicCPUAnalysis(analysisFrom, analysisTo);
             if (analysisFrom == 0 && analysisTo == timelineView.Duration)
                 timelineView.SelectAll();
             else
