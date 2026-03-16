@@ -32,16 +32,14 @@ namespace BeebPerf.ux
     internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView
         where ROW_DATA_TYPE : class
     {
-        public GridView(
-            DataGridViewAutoSizeColumnsMode autoSizeMode, 
-            SelectionMode selectionMode) : base()
+        public GridView(SelectionMode selectionMode) : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
             AllowUserToResizeColumns = false;
             AllowUserToResizeRows = false;
             AutoGenerateColumns = false;
-            AutoSizeColumnsMode = autoSizeMode;
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
             AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
             BackgroundColor = DefaultCellStyle.BackColor;
             CellBorderStyle = DataGridViewCellBorderStyle.None;

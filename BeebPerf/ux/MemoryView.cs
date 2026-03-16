@@ -33,9 +33,7 @@ namespace BeebPerf.ux
         private const int ReadCountColumnIndex = 4;
         private const int WriteCountColumnIndex = 5;
 
-        public MemoryView() : base(
-            DataGridViewAutoSizeColumnsMode.DisplayedCells, 
-            System.Windows.Forms.SelectionMode.One)
+        public MemoryView() : base(System.Windows.Forms.SelectionMode.One)
         {
             AddColumn("Address", "Address", cellTemplate: null);
             AddColumn("Page", "Page", cellTemplate: null);

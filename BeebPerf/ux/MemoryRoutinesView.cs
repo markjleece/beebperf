@@ -31,9 +31,7 @@ namespace BeebPerf.ux
         private const int ReadCountColumnIndex = 2;
         private const int WriteCountColumnIndex = 3;
 
-        public MemoryRoutinesView() : base(
-            DataGridViewAutoSizeColumnsMode.DisplayedCells,
-            System.Windows.Forms.SelectionMode.One)
+        public MemoryRoutinesView() : base(System.Windows.Forms.SelectionMode.One)
         {
             AddColumn("Routine", "Routine", cellTemplate: null);
             AddColumn("ReadWriteCount", "Reads/Writes [#, %]", cellTemplate: null);

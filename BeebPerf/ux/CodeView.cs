@@ -38,9 +38,7 @@ namespace BeebPerf.ux
         private const int BranchCountColumnIndex = 7;
         private const int ExecutionCountColumnIndex = 8;
 
-        public CodeView() : base(
-            DataGridViewAutoSizeColumnsMode.AllCells, 
-            System.Windows.Forms.SelectionMode.None)
+        public CodeView() : base(System.Windows.Forms.SelectionMode.None)
         {
             var cellTemplate = new CellTemplate();
             AddColumn("Address", "Address", cellTemplate);
@@ -161,7 +159,7 @@ namespace BeebPerf.ux
         {
             foreach (DataGridViewColumn column in Columns)
                 column.MinimumWidth = 2;
-            AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+            AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             Invalidate();
         }
 

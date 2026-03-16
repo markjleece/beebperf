@@ -34,9 +34,7 @@ namespace BeebPerf.ux
 
         public int TotalCycleCount;
 
-        public RoutinesView() : base(
-            DataGridViewAutoSizeColumnsMode.DisplayedCells, 
-            System.Windows.Forms.SelectionMode.One)
+        public RoutinesView() : base(System.Windows.Forms.SelectionMode.One)
         {
             var cellTemplate = new CellTemplate();
             AddColumn("Routine", "Routine", cellTemplate);

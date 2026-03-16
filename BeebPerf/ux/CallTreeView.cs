@@ -34,9 +34,7 @@ namespace BeebPerf.ux
 
         public int TotalCycleCount;
 
-        public CallTreeView() : base(
-            DataGridViewAutoSizeColumnsMode.DisplayedCells, 
-            System.Windows.Forms.SelectionMode.One)
+        public CallTreeView() : base(System.Windows.Forms.SelectionMode.One)
         {
             KeyDown += KeyDownFunc;
 
