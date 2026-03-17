@@ -520,9 +520,27 @@ namespace BeebPerf.ux
                 _ => throw new ArgumentOutOfRangeException()
             };
 
+            int cyclesFrom = _DragMode switch
+            {
+                DragMode.None => _AnalysisFrom,
+                DragMode.LeftHandle => PixelsToCycles(_LeftHandleRect.Right - 1),
+                DragMode.RightHandle => _AnalysisFrom,
+                DragMode.Range => Math.Min(PixelsToCycles(_LeftHandleRect.Right - 1), PixelsToCycles(_RightHandleRect.Left)),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
+            int cyclesTo = _DragMode switch
+            {
+                DragMode.None => _AnalysisTo,
+                DragMode.LeftHandle => _AnalysisTo,
+                DragMode.RightHandle => PixelsToCycles(_RightHandleRect.Left),
+                DragMode.Range => Math.Max(PixelsToCycles(_LeftHandleRect.Right - 1), PixelsToCycles(_RightHandleRect.Left)),
+                _ => throw new ArgumentOutOfRangeException()
+            };
+
             string durationText = $"Duration: {FormatCycles(_RecordingDuration)}";
             if (cycles != _RecordingDuration)
-                durationText += $" ({FormatCycles(cycles)} selected)";
+                durationText += $" ({FormatCycles(cycles)} selected from {FormatCycles(cyclesFrom)} to {FormatCycles(cyclesTo)})";
 
             var form = FindForm() as BeebPerfForm;
             if (form is null) return;

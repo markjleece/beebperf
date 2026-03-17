@@ -35,8 +35,9 @@ namespace BeebPerf.ux
         private const int MemoryWriteCountColumnIndex = 4;
         private const int TailCallColumnIndex = 5;
         private const int TotalCPUColumnIndex = 6;
-        private const int BranchCountColumnIndex = 7;
-        private const int ExecutionCountColumnIndex = 8;
+        private const int SelfCPUColumnIndex = 7;
+        private const int BranchCountColumnIndex = 8;
+        private const int ExecutionCountColumnIndex = 9;
 
         public CodeView() : base(System.Windows.Forms.SelectionMode.None)
         {
@@ -48,6 +49,7 @@ namespace BeebPerf.ux
             AddColumn("MemoryWriteCount", "Memory writes [#]", cellTemplate);
             AddColumn("TailCall", "Tail call", cellTemplate);
             AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
+            AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
             AddColumn("BranchCount", "Branch count [#, %]", cellTemplate);
             AddColumn("ExecutionCount", "Execution count [#, %]", cellTemplate);
 
@@ -60,6 +62,7 @@ namespace BeebPerf.ux
             SetColumnAlignment(TailCallColumnIndex, DataGridViewContentAlignment.MiddleCenter);
             SetColumnAlignment(BranchCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
             SetColumnHeaderToolTip(AddressColumnIndex, "Address");
@@ -68,7 +71,8 @@ namespace BeebPerf.ux
             SetColumnHeaderToolTip(MemoryReadCountColumnIndex, "Selected memory address read count");
             SetColumnHeaderToolTip(MemoryWriteCountColumnIndex, "Selected memory address write count");
             SetColumnHeaderToolTip(TailCallColumnIndex, "Whether a jump or branch instruction executes a tail call");
-            SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used executing instruction and routines it calls");
+            SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used executing instruction and invoked routines");
+            SetColumnHeaderToolTip(SelfCPUColumnIndex, "Total cycles used executing just the instruction");
             SetColumnHeaderToolTip(BranchCountColumnIndex, "Number of times the branch was taken");
             SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times the instruction was executed");
 
@@ -187,6 +191,7 @@ namespace BeebPerf.ux
             return columnIndex switch
             {
                 TotalCPUColumnIndex => (value: instructionMetrics.InclusiveCycleCount, range: _TotalCycleCount),
+                SelfCPUColumnIndex => (value: instructionMetrics.SelfCycleCount, range: _TotalCycleCount),
                 ExecutionCountColumnIndex => (value: instructionMetrics.ExecutionCount, range: _MaxExecutionCount),
                 BranchCountColumnIndex => (value: GetInstructionBranchCount(instructionMetrics), range: instructionMetrics.ExecutionCount),
                 MemoryReadCountColumnIndex => (value: GetMemoryReadCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),

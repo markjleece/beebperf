@@ -339,7 +339,7 @@ namespace BeebPerf.ux
                 {
                     textFormat.Trimming = StringTrimming.EllipsisCharacter;
                     textFormat.Alignment = StringAlignment.Center;
-                    graphics.DrawString(FormatRoutine(routineCell), Font, textBrush, clientRect, textFormat);
+                    graphics.DrawString(FormatCell(routineCell), Font, textBrush, clientRect, textFormat);
                 }
             }
         }
@@ -387,6 +387,16 @@ namespace BeebPerf.ux
             var routine = routineCell.Routine;
             if (routine.Label.Length > 0)
                 return $"{routine.StartAddress} {routine.Label}";
+            else
+                return routine.StartAddress.ToString();
+        }
+
+        private string FormatCell(RoutineCell routineCell)
+        {
+            var routine = routineCell.Routine;
+            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            if (routine.Label.Length > 0)
+                return $"{routine.StartAddress} {routine.Label} {percentage:F2}%";
             else
                 return routine.StartAddress.ToString();
         }

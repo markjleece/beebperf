@@ -54,6 +54,7 @@ namespace BeebPerf.model
         public int ExecutionCount;
         public int BranchCount;
         public int InclusiveCycleCount;
+        public int SelfCycleCount;
         public bool CodeModified;
         public bool TailCall;
     }

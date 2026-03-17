@@ -918,6 +918,7 @@ namespace BeebPerf
                         : instructionMetrics[coreInstruction] = new InstructionMetrics(coreInstruction, instructionOrdinal++);
 
                     metrics.InclusiveCycleCount += instructionCycleCount;
+                    metrics.SelfCycleCount += instructionCycleCount;
                     metrics.ExecutionCount += 1;
 
                     if (_InstructionSet!.IsBranch(instruction.Opcode) && instructionCycleCount > 2)

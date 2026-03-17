@@ -26,8 +26,8 @@ namespace BeebPerf.ux
     internal class RoutinesView : GridView<Routine>
     {
         private const int RoutineColumnIndex = 0;
-        private const int SelfCPUColumnIndex = 1;
-        private const int TotalCPUColumnIndex = 2;
+        private const int TotalCPUColumnIndex = 1;
+        private const int SelfCPUColumnIndex = 2;
         private const int ElapsedCPUColumnIndex = 3;
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
@@ -38,21 +38,21 @@ namespace BeebPerf.ux
         {
             var cellTemplate = new CellTemplate();
             AddColumn("Routine", "Routine", cellTemplate);
-            AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
             AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
+            AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
             AddColumn("ElapsedCPU", "Elapsed CPU [#cycles, %]", cellTemplate);
             AddColumn("Interrupts", "Interrupts [#cycles, %]", cellTemplate);
             AddColumn("ExecutionCount", "Execution count", cellTemplate);
 
-            SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ElapsedCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(InterruptsColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
             SetColumnHeaderToolTip(RoutineColumnIndex, "Routine address and label");
+            SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used by this routine and all routines it calls.");
             SetColumnHeaderToolTip(SelfCPUColumnIndex,"Cycles used just by this routine");
-            SetColumnHeaderToolTip(TotalCPUColumnIndex,"Total cycles used by this routine and all routines it calls.");
             SetColumnHeaderToolTip(ElapsedCPUColumnIndex, "Total cycles elapsed during execution of routine, including cycles in interrupts");
             SetColumnHeaderToolTip(InterruptsColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
             SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times this routine was executed");
