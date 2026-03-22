@@ -418,10 +418,14 @@ namespace BeebPerf.ux
                 int displayedCycleCount = totalCycleCount;
                 if (_SelectedRoutine != null)
                 {
+                    int selectedRoutineCycleCount;
                     if (_SelectedCallStack != null)
-                        displayedCycleCount = _SelectedRoutine.MetricsByStack.TryGetValue(_SelectedCallStack, out var metrics) ? metrics.InclusiveCycleCount : 0;
+                        selectedRoutineCycleCount = _SelectedRoutine.MetricsByStack.TryGetValue(_SelectedCallStack, out var metrics) ? metrics.InclusiveCycleCount : 0;
                     else
-                        displayedCycleCount = _SelectedRoutine.AggregateMetrics.InclusiveCycleCount;
+                        selectedRoutineCycleCount = _SelectedRoutine.AggregateMetrics.InclusiveCycleCount;
+
+                    if (selectedRoutineCycleCount > 0) 
+                        displayedCycleCount = selectedRoutineCycleCount;
                 }
 
                 // calc scaler

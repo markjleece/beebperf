@@ -6838,7 +6838,7 @@ index 9dae885..4d02094 100644
  {
  	int start;
 diff --git a/Src/Hardware/Acorn1770/Acorn1770.vcxproj b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
-index 72c4469..0eaf7a0 100644
+index 72c4469..52adc3b 100644
 --- a/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 +++ b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 @@ -22,32 +22,32 @@
@@ -6879,8 +6879,26 @@ index 72c4469..0eaf7a0 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
+@@ -80,6 +80,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+     <LinkIncremental>true</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+     <LinkIncremental>false</LinkIncremental>
+@@ -88,6 +90,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+     <LinkIncremental>false</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <ClCompile>
 diff --git a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
-index a880b0e..2343504 100644
+index a880b0e..32a2a20 100644
 --- a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 +++ b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 @@ -22,32 +22,32 @@
@@ -6921,8 +6939,26 @@ index a880b0e..2343504 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
+@@ -80,6 +80,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+     <LinkIncremental>true</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+     <LinkIncremental>false</LinkIncremental>
+@@ -88,6 +90,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+     <LinkIncremental>false</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <ClCompile>
 diff --git a/Src/Hardware/Watford/Watford.vcxproj b/Src/Hardware/Watford/Watford.vcxproj
-index c0de679..1a19cf5 100644
+index c0de679..168e033 100644
 --- a/Src/Hardware/Watford/Watford.vcxproj
 +++ b/Src/Hardware/Watford/Watford.vcxproj
 @@ -22,32 +22,32 @@
@@ -6963,6 +6999,24 @@ index c0de679..1a19cf5 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
+@@ -80,6 +80,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+     <LinkIncremental>true</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+     <LinkIncremental>false</LinkIncremental>
+@@ -88,6 +90,8 @@
+   </PropertyGroup>
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+     <LinkIncremental>false</LinkIncremental>
++    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Hardware\</OutDir>
++    <IntDir>$(Platform)\$(Configuration)\Hardware\</IntDir>
+   </PropertyGroup>
+   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <ClCompile>
 diff --git a/Src/InnoSetup/Installer.vcxproj b/Src/InnoSetup/Installer.vcxproj
 index c087f1f..def40d8 100644
 --- a/Src/InnoSetup/Installer.vcxproj

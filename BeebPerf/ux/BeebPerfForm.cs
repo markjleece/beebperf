@@ -111,6 +111,8 @@ namespace BeebPerf.ux
             {
                 string filePathName = openFileDialog.FileName;
                 _RecentPerfFilePathName = filePathName;
+                _RecentStartCycleCount = 0;
+                _RecentEndCycleCount = 0;
                 OpenPerfFile(openFileDialog.FileName);
             }
         }
@@ -164,6 +166,15 @@ namespace BeebPerf.ux
                     ClearState(AppStateFlags.StaticCPUAnalysis);
 
                     timelineView.Duration = _CPUAnalysis.EndCycleCount;
+
+                    if (_RecentStartCycleCount != 0 || _RecentEndCycleCount != 0)
+                    {
+                        _CPUAnalysis.StartCycleCount = Math.Max(_RecentStartCycleCount, 0);
+                        _CPUAnalysis.EndCycleCount = Math.Min(_RecentEndCycleCount, _CPUAnalysis.EndCycleCount);
+                        timelineView.SelectRange(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
+                        timelineView.ZoomIn();
+                    }
+
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
                 }));
             });
@@ -191,6 +202,10 @@ namespace BeebPerf.ux
                 this.Invoke((Action)(() =>
                 {
                     ClearState(AppStateFlags.DynamicCPUAnalysis);
+
+                    // remember selection
+                    _RecentStartCycleCount = _CPUAnalysis.StartCycleCount;
+                    _RecentEndCycleCount = _CPUAnalysis.EndCycleCount;
 
                     // populate routines
                     routinesView.TotalCycleCount = _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount;
@@ -627,6 +642,8 @@ namespace BeebPerf.ux
             Properties.Settings.Default.WindowState = (int)windowState;
             Properties.Settings.Default.RecentPerfFilePathName = _RecentPerfFilePathName;
             Properties.Settings.Default.RecentLabelsFilePathName = _RecentLabelsFilePathName;
+            Properties.Settings.Default.RecentStartCycleCount = _RecentStartCycleCount;
+            Properties.Settings.Default.RecentEndCycleCount = _RecentEndCycleCount;
             Properties.Settings.Default.LabelsFiles = _LabelsFilesEncoding;
             Properties.Settings.Default.WindowLayout = (int)secondarySplitContainer.Orientation;
             Properties.Settings.Default.PrimarySplitterDistance = primarySplitContainer.SplitterDistance;
@@ -639,6 +656,8 @@ namespace BeebPerf.ux
         private void RestoreAppState()
         {
             _RecentPerfFilePathName = Properties.Settings.Default.RecentPerfFilePathName;
+            _RecentStartCycleCount = Properties.Settings.Default.RecentStartCycleCount;
+            _RecentEndCycleCount = Properties.Settings.Default.RecentEndCycleCount;
             _RecentLabelsFilePathName = Properties.Settings.Default.RecentLabelsFilePathName;
             _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
 
@@ -864,6 +883,8 @@ namespace BeebPerf.ux
         private CanonicalAddress? _SelectedMemoryAddress;
 
         private string _RecentPerfFilePathName = string.Empty;
+        private int _RecentStartCycleCount = 0;
+        private int _RecentEndCycleCount = 0;
         private string _RecentLabelsFilePathName = string.Empty;
         private string _LabelsFilesEncoding = string.Empty;
         private int _SuppressTabChange;
