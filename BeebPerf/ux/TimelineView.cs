@@ -36,6 +36,26 @@ namespace BeebPerf.ux
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
             Layout += LayoutFunc;
+
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+            _EditSelectionButton = new Button() {
+                Image = (Image?)resources.GetObject("editSelectionButton.Image"),
+                Name = "editSelectionButton",
+                Size = new Size(34, 28),
+                Visible = false,
+                Parent = this
+            };
+            _EditSelectionButton.Click += editSelectionButton_Click;
+            _EditSelectionButton.MouseMove += editSelectionButton_MouseMove;
+            _EditSelectionButton.MouseLeave += editSelectionButton_MouseLeave;
+
+            _ToolTipTimer = new();
+            _ToolTipTimer.Interval = 500;
+            _ToolTipTimer.Tick += ToolTipTimer_Tick;
+        }
+
+        private void editSelectionButton_Click(object? sender, EventArgs e)
+        {
         }
 
         public List<FrameBitmap> FrameBitmaps
@@ -141,6 +161,12 @@ namespace BeebPerf.ux
             else
             {
                 FitSelectionInternal();
+            }
+
+            if (_EditSelectionButton != null)
+            {
+                int padding = (_TimelineRect.Height - _EditSelectionButton.Height) / 2;
+                _EditSelectionButton.Location = new Point(Width - _EditSelectionButton.Width - padding, padding);
             }
         }
 
@@ -614,6 +640,7 @@ namespace BeebPerf.ux
             _RecordingDuration = recordingDuration;
             _AnalysisFrom = 0;
             _AnalysisTo = recordingDuration;
+            _EditSelectionButton.Visible = recordingDuration > 0;
             FitSelectionInternal();
         }
 
@@ -888,6 +915,24 @@ namespace BeebPerf.ux
             return (int)double.Round((double)a * b / c);
         }
 
+        private void editSelectionButton_MouseMove(object? sender, EventArgs e)
+        {
+            _ToolTipTimer.Stop();
+            _ToolTipTimer.Start();
+        }
+
+        private void editSelectionButton_MouseLeave(object? sender, EventArgs e)
+        {
+            _ToolTipTimer.Stop();
+            _ToolTip.Hide(_EditSelectionButton);
+        }
+
+        private void ToolTipTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_EditSelectionButton.Visible)
+                _ToolTip.Show("Edit selection", _EditSelectionButton);
+        }
+
         private enum DragMode
         {
             None = 0,
@@ -927,5 +972,8 @@ namespace BeebPerf.ux
         private HScrollBar _ScrollBar;
         private ReentrancyGuard _ReentrancyGuard = new();
         private List<FrameBitmap> _FrameBitmaps = [];
+        private Button _EditSelectionButton;
+        private ToolTip _ToolTip = new ToolTip();
+        private System.Windows.Forms.Timer _ToolTipTimer = new();
     }
 }
