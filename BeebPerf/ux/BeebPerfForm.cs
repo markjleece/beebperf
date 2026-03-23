@@ -172,7 +172,7 @@ namespace BeebPerf.ux
                         _CPUAnalysis.StartCycleCount = Math.Max(_RecentStartCycleCount, 0);
                         _CPUAnalysis.EndCycleCount = Math.Min(_RecentEndCycleCount, _CPUAnalysis.EndCycleCount);
                         timelineView.SelectRange(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
-                        timelineView.ZoomIn();
+                        timelineView.FitSelection();
                     }
 
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
@@ -281,6 +281,11 @@ namespace BeebPerf.ux
             }
         }
 
+        private void selectAllButton_Click(object sender, EventArgs e)
+        {
+            SetAnalysisRange(analysisFrom: 0, analysisTo: timelineView.Duration);
+        }
+        
         private void zoomInButton_Click(object sender, EventArgs e)
         {
             timelineView.ZoomIn();
@@ -293,9 +298,16 @@ namespace BeebPerf.ux
             UpdateToolbarState();
         }
 
-        private void selectAllButton_Click(object sender, EventArgs e)
+        private void fitSelectionButton_Click(object sender, EventArgs e)
         {
-            SetAnalysisRange(analysisFrom: 0, analysisTo: timelineView.Duration);
+            timelineView.FitSelection();
+            UpdateToolbarState();
+        }
+
+        private void fitFramesButton_Click(object sender, EventArgs e)
+        {
+            timelineView.FitFrames();
+            UpdateToolbarState();
         }
 
         private void hotRoutinesButton_Click(object sender, EventArgs e)
@@ -745,9 +757,11 @@ namespace BeebPerf.ux
             openButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             undoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanUndo();
             redoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanRedo();
+            selectAllButton.Enabled = timelineView.CanSelectAll();
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
-            selectAllButton.Enabled = timelineView.CanSelectAll();
+            fitSelectionButton.Enabled = timelineView.CanFitSelection();
+            fitFramesButton.Enabled = timelineView.CanFitFrames();
             hotRoutinesButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);

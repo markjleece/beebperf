@@ -62,9 +62,24 @@ namespace BeebPerf.ux
             set => SetDurationInternal(value);
         }
 
-        public bool CanZoomIn()
+        public bool CanSelectAll()
         {
             return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
+        }
+
+        public void SelectAll()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            SelectAllInternal();
+        }
+
+        public bool CanZoomIn()
+        {
+            int newDisplayWidth = (_DisplayTo - _DisplayFrom) / 2;
+            int minDisplayRange = 4 * Width;
+            return (newDisplayWidth > minDisplayRange);
         }
 
         public void ZoomIn()
@@ -88,17 +103,30 @@ namespace BeebPerf.ux
             ZoomOutInternal();
         }
 
-        public bool CanSelectAll()
+        public bool CanFitSelection()
         {
-            return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
+            return true;
         }
 
-        public void SelectAll()
+        public void FitSelection()
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            SelectAllInternal();
+            FitSelectionInternal();
+        }
+
+        public bool CanFitFrames()
+        {
+            return true;
+        }
+            
+        public void FitFrames()
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            FitFramesInternal();
         }
 
         protected override void OnResize(EventArgs e)
@@ -112,7 +140,7 @@ namespace BeebPerf.ux
             }
             else
             {
-                ZoomOutInternal();
+                FitSelectionInternal();
             }
         }
 
@@ -289,21 +317,24 @@ namespace BeebPerf.ux
             int frameHeight = _ThumbnailRect.Height - Font.Height;
             int frameWidth = 4 * frameHeight / 3;
             int fromLeft = CyclesToPixels(0);
-            int frameSkipCount = 0;
+            bool skipFrames = false;
 
             for (int i = 0; i < FrameBitmaps.Count; i++)
             {
                 FrameBitmap frameBitmap = FrameBitmaps[i];
                 int pixels = CyclesToPixels(frameBitmap.StartCycleCount);
-                if (pixels < fromLeft || pixels > Width)
+                if (pixels > Width)
+                    break;
+
+                if (pixels < fromLeft)
                 {
-                    frameSkipCount++;
+                    skipFrames = true;
                     continue;
                 }
 
-                if (frameSkipCount > 0)
+                if (skipFrames)
                 {
-                    frameSkipCount = 0;
+                    skipFrames = false;
                     frameBitmap = FrameBitmaps[--i];
                     pixels = CyclesToPixels(frameBitmap.StartCycleCount);
                 }
@@ -351,7 +382,7 @@ namespace BeebPerf.ux
                     graphics.ExcludeClip(frameRect);
                 }
 
-                fromLeft = pixels + frameWidth;
+                fromLeft = pixels + frameWidth - 2;
             }
         }
 
@@ -435,7 +466,7 @@ namespace BeebPerf.ux
                 int cycles = PixelsToCycles(mousePos.X);
                 if (cycles >= 0.0 && cycles <= _RecordingDuration)
                 {
-                    Cursor = Cursors.VSplit;
+                    Cursor = Cursors.IBeam;
                     return;
                 }
             }
@@ -574,7 +605,7 @@ namespace BeebPerf.ux
         {
             _AnalysisFrom = Math.Max(0, analysisFrom);
             _AnalysisTo = Math.Min(_RecordingDuration, analysisTo);
-            ZoomOutInternal();
+            FitSelectionInternal();
             OnRangeChange();
         }
 
@@ -583,7 +614,7 @@ namespace BeebPerf.ux
             _RecordingDuration = recordingDuration;
             _AnalysisFrom = 0;
             _AnalysisTo = recordingDuration;
-            ZoomOutInternal();
+            FitSelectionInternal();
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
@@ -616,8 +647,96 @@ namespace BeebPerf.ux
             UpdateTimeline();
         }
 
+        private void SelectAllInternal()
+        {
+            _AnalysisFrom = 0;
+            _AnalysisTo = _RecordingDuration;
+            FitSelection();
+            FitSelectionInternal();
+        }
+
         private void ZoomInInternal()
-        { 
+        {
+            int displayWidth = _DisplayTo - _DisplayFrom;
+            int newDisplayWidth = displayWidth / 2;
+            int minDisplayRange = 4 * Width;
+            if (newDisplayWidth < minDisplayRange)
+                newDisplayWidth = minDisplayRange;
+
+            int delta = (displayWidth - newDisplayWidth) / 2;
+            _DisplayFrom += delta;
+            _DisplayTo -= delta;
+
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
+
+            UpdateDurationText();
+            UpdateTimeline();
+
+            int margin = Font.Height * 4;
+
+            _ScrollBar.Minimum = -margin;
+            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
+            _ScrollBar.LargeChange = Width;
+            _ScrollBar.SmallChange = DeviceDpi;
+            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
+            _ScrollBar.Enabled = true;
+        }
+
+        private void ZoomOutInternal()
+        {
+            int displayWidth = _DisplayTo - _DisplayFrom;
+            int newDisplayWidth = displayWidth * 2;
+
+            int margin = Font.Height * 4;
+            int range = Width - margin * 2;
+            int extends = MulDiv(_RecordingDuration, margin, range);
+
+            int minDisplayFrom = -extends;
+            int maxDisplayTo = _RecordingDuration + extends;
+
+            bool leftStop = _DisplayFrom - newDisplayWidth / 2 < minDisplayFrom;
+            bool rightStop = _DisplayTo + newDisplayWidth / 2 > maxDisplayTo;
+
+            if (leftStop && rightStop)
+            {
+                _DisplayFrom = minDisplayFrom;
+                _DisplayTo = maxDisplayTo;
+            }
+            else if (leftStop)
+            {
+                _DisplayFrom = minDisplayFrom;
+                _DisplayTo = _DisplayFrom + newDisplayWidth;
+            }
+            else if (rightStop)
+            {
+                _DisplayTo = maxDisplayTo;
+                _DisplayFrom = _DisplayTo - newDisplayWidth;
+            }
+            else
+            {
+                _DisplayFrom -= newDisplayWidth / 2;
+                _DisplayTo += newDisplayWidth / 2;
+            }
+
+            newDisplayWidth = _DisplayTo - _DisplayFrom;
+
+            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
+            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
+
+            UpdateDurationText();
+            UpdateTimeline();
+
+            _ScrollBar.Minimum = -margin;
+            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
+            _ScrollBar.LargeChange = Width;
+            _ScrollBar.SmallChange = DeviceDpi;
+            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
+            _ScrollBar.Enabled = !(leftStop && rightStop);
+        }
+
+        private void FitSelectionInternal()
+        {
             int margin = Font.Height * 4;
             int range = Width - margin * 2;
             int analysisSize = _AnalysisTo - _AnalysisFrom;
@@ -641,18 +760,20 @@ namespace BeebPerf.ux
             _ScrollBar.Maximum = CyclesToPixels(_RecordingDuration + extends);
             _ScrollBar.LargeChange = CyclesToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
             _ScrollBar.SmallChange = DeviceDpi;
-            _ScrollBar.Value = 0;
-            _ScrollBar.Enabled = true;
+            _ScrollBar.Value = CyclesToPixels(_DisplayFrom);
+            _ScrollBar.Enabled = (_AnalysisFrom != 0) || (_AnalysisTo != _RecordingDuration);
         }
 
-        private void ZoomOutInternal()
-        { 
-            int margin = Font.Height * 4;
-            int range = Width - margin * 2;
-            int extends = MulDiv(_RecordingDuration, margin, range);
+        private void FitFramesInternal()
+        {
+            int frameHeight = _ThumbnailRect.Height - Font.Height;
+            int frameWidth = 4 * frameHeight / 3;
+            int newDisplayWidth = MulDiv(40000, Width, frameWidth);
 
-            _DisplayFrom = -extends;
-            _DisplayTo = _RecordingDuration + extends;
+            int displayWidth = _DisplayTo - _DisplayFrom;
+            int delta = (displayWidth - newDisplayWidth) / 2;
+            _DisplayFrom += delta;
+            _DisplayTo -= delta;
 
             SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
             SetRightHandleRect(CyclesToPixels(_AnalysisTo));
@@ -660,15 +781,14 @@ namespace BeebPerf.ux
             UpdateDurationText();
             UpdateTimeline();
 
-            _ScrollBar.Enabled = false;
-        }
+            int margin = Font.Height * 4;
 
-        private void SelectAllInternal()
-        {
-            _AnalysisFrom = 0;
-            _AnalysisTo = _RecordingDuration;
-            ZoomOutInternal();
-            OnRangeChange();
+            _ScrollBar.Minimum = -margin;
+            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
+            _ScrollBar.LargeChange = Width;
+            _ScrollBar.SmallChange = frameWidth;
+            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
+            _ScrollBar.Enabled = true;
         }
 
         private void LayoutFunc(object? sender, LayoutEventArgs e)

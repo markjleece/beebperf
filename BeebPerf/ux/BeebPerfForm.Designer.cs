@@ -38,14 +38,17 @@ namespace BeebPerf.ux
             undoButton = new ToolStripButton();
             redoButton = new ToolStripButton();
             toolStripSeparator2 = new ToolStripSeparator();
-            zoomInButton = new ToolStripButton();
-            zoomOutButton = new ToolStripButton();
             selectAllButton = new ToolStripButton();
             toolStripSeparator3 = new ToolStripSeparator();
+            zoomInButton = new ToolStripButton();
+            zoomOutButton = new ToolStripButton();
+            fitSelectionButton = new ToolStripButton();
+            fitFramesButton = new ToolStripButton();
+            toolStripSeparator4 = new ToolStripSeparator();
             hotRoutinesButton = new ToolStripButton();
             hotPathsButton = new ToolStripButton();
             flipViewButton = new ToolStripButton();
-            toolStripSeparator4 = new ToolStripSeparator();
+            toolStripSeparator5 = new ToolStripSeparator();
             labelsButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
@@ -94,15 +97,18 @@ namespace BeebPerf.ux
                 toolStripSeparator1, 
                 undoButton, 
                 redoButton, 
-                toolStripSeparator2, 
+                toolStripSeparator2,
+                selectAllButton,
+                toolStripSeparator3,
                 zoomInButton, 
-                zoomOutButton, 
-                selectAllButton, 
-                toolStripSeparator3, 
+                zoomOutButton,
+                fitSelectionButton,
+                fitFramesButton,
+                toolStripSeparator4, 
                 hotRoutinesButton, 
                 hotPathsButton, 
-                flipViewButton, 
-                toolStripSeparator4, 
+                flipViewButton,
+                toolStripSeparator5, 
                 labelsButton,
                 settingsButton, 
                 helpButton
@@ -156,6 +162,21 @@ namespace BeebPerf.ux
             toolStripSeparator2.Name = "toolStripSeparator2";
             toolStripSeparator2.Size = new Size(6, 33);
             // 
+            // selectAllButton
+            // 
+            selectAllButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            selectAllButton.Image = (Image)resources.GetObject("selectAllButton.Image");
+            selectAllButton.ImageTransparentColor = Color.Magenta;
+            selectAllButton.Name = "selectAllButton";
+            selectAllButton.Size = new Size(34, 28);
+            selectAllButton.Text = "Select All";
+            selectAllButton.Click += selectAllButton_Click;
+            // 
+            // toolStripSeparator3
+            // 
+            toolStripSeparator3.Name = "toolStripSeparator3";
+            toolStripSeparator3.Size = new Size(6, 33);
+            // 
             // zoomInButton
             // 
             zoomInButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -177,20 +198,30 @@ namespace BeebPerf.ux
             zoomOutButton.Text = "Zoom Out";
             zoomOutButton.Click += zoomOutButton_Click;
             // 
-            // selectAllButton
+            // fitSelectionButton
             // 
-            selectAllButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            selectAllButton.Image = (Image)resources.GetObject("selectAllButton.Image");
-            selectAllButton.ImageTransparentColor = Color.Magenta;
-            selectAllButton.Name = "selectAllButton";
-            selectAllButton.Size = new Size(34, 28);
-            selectAllButton.Text = "Select All";
-            selectAllButton.Click += selectAllButton_Click;
+            fitSelectionButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            fitSelectionButton.Image = (Image)resources.GetObject("fitSelectionButton.Image");
+            fitSelectionButton.ImageTransparentColor = Color.Magenta;
+            fitSelectionButton.Name = "fitSelectionButton";
+            fitSelectionButton.Size = new Size(34, 28);
+            fitSelectionButton.Text = "Fit selection";
+            fitSelectionButton.Click += fitSelectionButton_Click;
             // 
-            // toolStripSeparator3
+            // fitFramesButton
             // 
-            toolStripSeparator3.Name = "toolStripSeparator3";
-            toolStripSeparator3.Size = new Size(6, 33);
+            fitFramesButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            fitFramesButton.Image = (Image)resources.GetObject("fitFramesButton.Image");
+            fitFramesButton.ImageTransparentColor = Color.Magenta;
+            fitFramesButton.Name = "fitFrames";
+            fitFramesButton.Size = new Size(34, 28);
+            fitFramesButton.Text = "Fit display frames";
+            fitFramesButton.Click += fitFramesButton_Click;
+            // 
+            // toolStripSeparator4
+            // 
+            toolStripSeparator4.Name = "toolStripSeparator4`";
+            toolStripSeparator4.Size = new Size(6, 33);
             // 
             // hotRoutinesButton
             // 
@@ -225,10 +256,10 @@ namespace BeebPerf.ux
             flipViewButton.ToolTipText = "Flip View";
             flipViewButton.Click += flipViewButton_Click;
             // 
-            // toolStripSeparator3
+            // toolStripSeparator5
             // 
-            toolStripSeparator4.Name = "toolStripSeparator4";
-            toolStripSeparator4.Size = new Size(6, 33);
+            toolStripSeparator5.Name = "toolStripSeparator5";
+            toolStripSeparator5.Size = new Size(6, 33);
             // 
             // labelsButton
             // 
@@ -481,14 +512,17 @@ namespace BeebPerf.ux
         private ToolStripButton undoButton;
         private ToolStripButton redoButton;
         private ToolStripSeparator toolStripSeparator2;
-        private ToolStripButton zoomInButton;
-        private ToolStripButton zoomOutButton;
         private ToolStripButton selectAllButton;
         private ToolStripSeparator toolStripSeparator3;
+        private ToolStripButton zoomInButton;
+        private ToolStripButton zoomOutButton;
+        private ToolStripButton fitSelectionButton;
+        private ToolStripButton fitFramesButton;
+        private ToolStripSeparator toolStripSeparator4;
         private ToolStripButton hotRoutinesButton;
         private ToolStripButton hotPathsButton;
         private ToolStripButton flipViewButton;
-        private ToolStripSeparator toolStripSeparator4;
+        private ToolStripSeparator toolStripSeparator5;
         private ToolStripButton labelsButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
