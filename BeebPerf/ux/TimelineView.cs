@@ -87,7 +87,7 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            ZoomInInternal();
+            ZoomInternal(0.5, Width / 2);
         }
 
         public bool CanZoomOut()
@@ -100,7 +100,7 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            ZoomOutInternal();
+            ZoomInternal(2.0, Width / 2);
         }
 
         public bool CanFitSelection()
@@ -620,8 +620,17 @@ namespace BeebPerf.ux
         protected override void OnMouseWheel(MouseEventArgs e)
         {
             base.OnMouseWheel(e);
-            if (_ScrollBar.Enabled)
+
+            bool controlKeyModifier = (Control.ModifierKeys & Keys.Control) != 0;
+            if (controlKeyModifier)
             {
+                // zoom timeline
+                double zoomFactor = 1.0 - (0.2 * (double)e.Delta / 120.0/*WHEEL_DELTA*/);
+                ZoomInternal(zoomFactor, e.X);
+            }
+            else if (_ScrollBar.Enabled)
+            {
+                // scroll timeline
                 int oldValue = _ScrollBar.Value;
                 int newValue = _ScrollBar.Value - (e.Delta * _ScrollBar.SmallChange / 120/*WHEEL_DELTA*/);
                 _ScrollBar.Value = Math.Clamp(newValue, _ScrollBar.Minimum, _ScrollBar.Maximum - _ScrollBar.LargeChange);
@@ -655,48 +664,46 @@ namespace BeebPerf.ux
             FitSelectionInternal();
         }
 
-        private void ZoomInInternal()
+        private void ZoomInternal(double zoomFactor, int origin)
         {
+            bool leftStop = false;
+            bool rightStop = false;
+
+            int margin = Font.Height * 4;
+
             int displayWidth = _DisplayTo - _DisplayFrom;
-            int newDisplayWidth = displayWidth / 2;
+            int newDisplayWidth = (int)double.Round(zoomFactor * displayWidth);
+
+            // limit zoom depth
             int minDisplayRange = 4 * Width;
-            if (newDisplayWidth < minDisplayRange)
+            if (newDisplayWidth < minDisplayRange && newDisplayWidth < displayWidth)
                 newDisplayWidth = minDisplayRange;
 
-            int delta = (displayWidth - newDisplayWidth) / 2;
-            _DisplayFrom += delta;
-            _DisplayTo -= delta;
+            // ensure scale origin is not in margins
+            int start = CyclesToPixels(0);
+            int end = CyclesToPixels(Duration);
+            if (origin < start)
+                origin = start;
+            else if (origin > end)
+                origin = end;
 
-            SetLeftHandleRect(CyclesToPixels(_AnalysisFrom));
-            SetRightHandleRect(CyclesToPixels(_AnalysisTo));
+            // calc deltas
+            int deltaDisplayFrom = MulDiv(origin, displayWidth - newDisplayWidth, Width);
+            int deltaDisplayTo = MulDiv(Width - origin, displayWidth - newDisplayWidth, Width);
 
-            UpdateDurationText();
-            UpdateTimeline();
-
-            int margin = Font.Height * 4;
-
-            _ScrollBar.Minimum = -margin;
-            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
-            _ScrollBar.LargeChange = Width;
-            _ScrollBar.SmallChange = DeviceDpi;
-            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
-            _ScrollBar.Enabled = true;
-        }
-
-        private void ZoomOutInternal()
-        {
-            int displayWidth = _DisplayTo - _DisplayFrom;
-            int newDisplayWidth = displayWidth * 2;
-
-            int margin = Font.Height * 4;
+            // constrain margins, so zoom-out doesn't enlarge them
             int range = Width - margin * 2;
             int extends = MulDiv(_RecordingDuration, margin, range);
+
+            int extendsScaled = MulDiv(extends, newDisplayWidth, _RecordingDuration + extends * 2);
+            if (extends > extendsScaled)
+                extends = extendsScaled;
 
             int minDisplayFrom = -extends;
             int maxDisplayTo = _RecordingDuration + extends;
 
-            bool leftStop = _DisplayFrom - newDisplayWidth / 2 < minDisplayFrom;
-            bool rightStop = _DisplayTo + newDisplayWidth / 2 > maxDisplayTo;
+            leftStop = _DisplayFrom + deltaDisplayFrom < minDisplayFrom;
+            rightStop = _DisplayTo - deltaDisplayTo > maxDisplayTo;
 
             if (leftStop && rightStop)
             {
@@ -715,8 +722,8 @@ namespace BeebPerf.ux
             }
             else
             {
-                _DisplayFrom -= newDisplayWidth / 2;
-                _DisplayTo += newDisplayWidth / 2;
+                _DisplayFrom += deltaDisplayFrom;
+                _DisplayTo -= deltaDisplayTo;
             }
 
             newDisplayWidth = _DisplayTo - _DisplayFrom;
@@ -731,7 +738,7 @@ namespace BeebPerf.ux
             _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
             _ScrollBar.LargeChange = Width;
             _ScrollBar.SmallChange = DeviceDpi;
-            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
+            _ScrollBar.Value = Math.Clamp(MulDiv(Width, _DisplayFrom, newDisplayWidth), _ScrollBar.Minimum, _ScrollBar.Maximum);
             _ScrollBar.Enabled = !(leftStop && rightStop);
         }
 
@@ -760,7 +767,7 @@ namespace BeebPerf.ux
             _ScrollBar.Maximum = CyclesToPixels(_RecordingDuration + extends);
             _ScrollBar.LargeChange = CyclesToPixels(_DisplayFrom + (_AnalysisTo - _AnalysisFrom) + extends * 2);
             _ScrollBar.SmallChange = DeviceDpi;
-            _ScrollBar.Value = CyclesToPixels(_DisplayFrom);
+            _ScrollBar.Value = Math.Clamp(CyclesToPixels(_DisplayFrom), _ScrollBar.Minimum, _ScrollBar.Maximum);
             _ScrollBar.Enabled = (_AnalysisFrom != 0) || (_AnalysisTo != _RecordingDuration);
         }
 
@@ -787,7 +794,7 @@ namespace BeebPerf.ux
             _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
             _ScrollBar.LargeChange = Width;
             _ScrollBar.SmallChange = frameWidth;
-            _ScrollBar.Value = MulDiv(Width, _DisplayFrom, newDisplayWidth);
+            _ScrollBar.Value = Math.Clamp(MulDiv(Width, _DisplayFrom, newDisplayWidth), _ScrollBar.Minimum, _ScrollBar.Maximum);
             _ScrollBar.Enabled = true;
         }
 
