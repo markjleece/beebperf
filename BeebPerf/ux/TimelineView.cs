@@ -62,7 +62,11 @@ namespace BeebPerf.ux
             SelectionDialog dialog = new(_AnalysisFrom, _AnalysisTo);
             dialog.Owner = form;
             if (dialog.ShowDialog() == DialogResult.OK)
-                form.SetAnalysisRange(dialog.AnalysisFrom, dialog.AnalysisTo);
+            {
+                int analysisFrom = Math.Clamp(dialog.AnalysisFrom, 0, _RecordingDuration);
+                int analysisTo = Math.Clamp(dialog.AnalysisTo, 0, _RecordingDuration);
+                form.SetAnalysisRange(analysisFrom, analysisTo);
+            }
         }
 
         public List<FrameBitmap> FrameBitmaps
@@ -715,7 +719,7 @@ namespace BeebPerf.ux
 
             // ensure scale origin is not in margins
             int start = CyclesToPixels(0);
-            int end = CyclesToPixels(Duration);
+            int end = CyclesToPixels(_RecordingDuration);
             if (origin < start)
                 origin = start;
             else if (origin > end)
@@ -769,7 +773,7 @@ namespace BeebPerf.ux
             UpdateTimeline();
 
             _ScrollBar.Minimum = -margin;
-            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
+            _ScrollBar.Maximum = MulDiv(Width, _RecordingDuration, newDisplayWidth) + margin;
             _ScrollBar.LargeChange = Width;
             _ScrollBar.SmallChange = DeviceDpi;
             _ScrollBar.Value = Math.Clamp(MulDiv(Width, _DisplayFrom, newDisplayWidth), _ScrollBar.Minimum, _ScrollBar.Maximum);
@@ -825,7 +829,7 @@ namespace BeebPerf.ux
             int margin = Font.Height * 4;
 
             _ScrollBar.Minimum = -margin;
-            _ScrollBar.Maximum = MulDiv(Width, Duration, newDisplayWidth) + margin;
+            _ScrollBar.Maximum = MulDiv(Width, _RecordingDuration, newDisplayWidth) + margin;
             _ScrollBar.LargeChange = Width;
             _ScrollBar.SmallChange = frameWidth;
             _ScrollBar.Value = Math.Clamp(MulDiv(Width, _DisplayFrom, newDisplayWidth), _ScrollBar.Minimum, _ScrollBar.Maximum);
