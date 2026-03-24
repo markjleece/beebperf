@@ -54,7 +54,7 @@ namespace BeebPerf.ux
             toCyclesTextBox.Text = AnalysisTo.ToString();
             _IgnoreTextChanges = false;
 
-            _Inputs = [FromCycles, ToCycles];
+            _InputsFlags = [FromCyclesFlag, ToCyclesFlag];
             UpdateState();
 
             fromCyclesTextBox.SelectionStart = fromCyclesTextBox.TextLength;
@@ -70,37 +70,37 @@ namespace BeebPerf.ux
         private void fromSecondsTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(FromSeconds);
+            UpdateInputs(FromSecondsFlag);
         }
 
         private void fromCyclesTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(FromCycles);
+            UpdateInputs(FromCyclesFlag);
         }
 
         private void toSecondsTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(ToSeconds);
+            UpdateInputs(ToSecondsFlag);
         }
 
         private void toCyclesTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(ToCycles);
+            UpdateInputs(ToCyclesFlag);
         }
 
         private void durationSecondsTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(DurationSeconds);
+            UpdateInputs(DurationSecondsFlag);
         }
 
         private void durationCyclesTextBox_TextChanged(object sender, EventArgs e)
         {
             if (_IgnoreTextChanges) return;
-            UpdateInputs(DurationCycles);
+            UpdateInputs(DurationCyclesFlag);
         }
 
         private void UpdateInputs(byte input)
@@ -108,24 +108,24 @@ namespace BeebPerf.ux
             // remove input and its sibling
             byte sibling = input switch
             {
-                FromSeconds => FromCycles,
-                FromCycles => FromSeconds,
-                ToSeconds => ToCycles,
-                ToCycles => ToSeconds,
-                DurationSeconds => DurationCycles,
-                DurationCycles => DurationSeconds,
+                FromSecondsFlag => FromCyclesFlag,
+                FromCyclesFlag => FromSecondsFlag,
+                ToSecondsFlag => ToCyclesFlag,
+                ToCyclesFlag => ToSecondsFlag,
+                DurationSecondsFlag => DurationCyclesFlag,
+                DurationCyclesFlag => DurationSecondsFlag,
                 _ => 0
             };
 
-            _Inputs.Remove(input);
-            _Inputs.Remove(sibling);
+            _InputsFlags.Remove(input);
+            _InputsFlags.Remove(sibling);
 
             // insert input
-            _Inputs.Insert(0, input);
+            _InputsFlags.Insert(0, input);
 
             // ensure there are only two inputs
-            while (_Inputs.Count > 2)
-                _Inputs.RemoveAt(2);
+            while (_InputsFlags.Count > 2)
+                _InputsFlags.RemoveAt(2);
 
             UpdateState();
         }
@@ -135,66 +135,66 @@ namespace BeebPerf.ux
             _IgnoreTextChanges = true;
 
             // convert input boxes pairs
-            int inputs = (_Inputs[0] | _Inputs[1]);
+            int inputsFlags = (_InputsFlags[0] | _InputsFlags[1]);
 
-            if ((inputs & FromSeconds) != 0)
+            if ((inputsFlags & FromSecondsFlag) != 0)
             {
                 double fromSeconds = ParseSeconds(fromSecondsTextBox.Text);
                 fromCyclesTextBox.Text = SecondsToCycles(fromSeconds).ToString();
             }
 
-            if ((inputs & FromCycles) != 0)
+            if ((inputsFlags & FromCyclesFlag) != 0)
             {
                 int fromCycles = ParseCycles(fromCyclesTextBox.Text);
                 fromSecondsTextBox.Text = CyclesToSeconds(fromCycles).ToString();
             }
 
-            if ((inputs & ToSeconds) != 0)
+            if ((inputsFlags & ToSecondsFlag) != 0)
             {
                 double toSeconds = ParseSeconds(toSecondsTextBox.Text);
                 toCyclesTextBox.Text = SecondsToCycles(toSeconds).ToString();
             }
 
-            if ((inputs & ToCycles) != 0)
+            if ((inputsFlags & ToCyclesFlag) != 0)
             {
                 int toCycles = ParseCycles(toCyclesTextBox.Text);
                 toSecondsTextBox.Text = CyclesToSeconds(toCycles).ToString();
             }
 
-            if ((inputs & DurationSeconds) != 0)
+            if ((inputsFlags & DurationSecondsFlag) != 0)
             {
                 double durationSeconds = ParseSeconds(durationSecondsTextBox.Text);
                 durationCyclesTextBox.Text = SecondsToCycles(durationSeconds).ToString();
             }
 
-            if ((inputs & DurationCycles) != 0)
+            if ((inputsFlags & DurationCyclesFlag) != 0)
             {
                 int durationCycles = ParseCycles(durationCyclesTextBox.Text);
                 durationSecondsTextBox.Text = CyclesToSeconds(durationCycles).ToString();
             }
 
             // highlight inputs
-            HighlightTextBox(fromSecondsTextBox, (inputs & FromSeconds) != 0);
-            HighlightTextBox(fromCyclesTextBox, (inputs & FromCycles) != 0);
-            HighlightTextBox(toSecondsTextBox, (inputs & ToSeconds) != 0);
-            HighlightTextBox(toCyclesTextBox, (inputs & ToCycles) != 0);
-            HighlightTextBox(durationSecondsTextBox, (inputs & DurationSeconds) != 0);
-            HighlightTextBox(durationCyclesTextBox, (inputs & DurationCycles) != 0);
+            HighlightTextBox(fromSecondsTextBox, (inputsFlags & FromSecondsFlag) != 0);
+            HighlightTextBox(fromCyclesTextBox, (inputsFlags & FromCyclesFlag) != 0);
+            HighlightTextBox(toSecondsTextBox, (inputsFlags & ToSecondsFlag) != 0);
+            HighlightTextBox(toCyclesTextBox, (inputsFlags & ToCyclesFlag) != 0);
+            HighlightTextBox(durationSecondsTextBox, (inputsFlags & DurationSecondsFlag) != 0);
+            HighlightTextBox(durationCyclesTextBox, (inputsFlags & DurationCyclesFlag) != 0);
 
             // compute non-input row
-            if ((inputs & (FromSeconds | FromCycles)) == 0)
+            if ((inputsFlags & (FromSecondsFlag | FromCyclesFlag)) == 0)
             {
                 int fromCycles = ParseCycles(toCyclesTextBox.Text) - ParseCycles(durationCyclesTextBox.Text);
                 fromCyclesTextBox.Text = fromCycles.ToString();
                 fromSecondsTextBox.Text = CyclesToSeconds(fromCycles).ToString();
             }
-            else if ((inputs & (ToSeconds | ToCycles)) == 0)
+            else if ((inputsFlags & (ToSecondsFlag | ToCyclesFlag)) == 0)
             {
                 int toCycles = ParseCycles(fromCyclesTextBox.Text) + ParseCycles(durationCyclesTextBox.Text);
                 toCyclesTextBox.Text = toCycles.ToString();
                 toSecondsTextBox.Text = CyclesToSeconds(toCycles).ToString();
             }
-            else if ((inputs & (DurationSeconds | DurationCycles)) == 0)
+            else if ((inputsFlags & (DurationSecondsFlag | DurationCyclesFlag)) == 0)
             {
                 int durationCycles = ParseCycles(toCyclesTextBox.Text) - ParseCycles(fromCyclesTextBox.Text);
                 durationCyclesTextBox.Text = durationCycles.ToString();
@@ -253,14 +253,14 @@ namespace BeebPerf.ux
             }
         }
 
-        private List<byte> _Inputs = [];
         private bool _IgnoreTextChanges = true;
+        private List<byte> _InputsFlags = [];
 
-        private const byte FromSeconds = 0x01;
-        private const byte FromCycles = 0x02;
-        private const byte ToSeconds = 0x04;
-        private const byte ToCycles = 0x08;
-        private const byte DurationSeconds = 0x10;
-        private const byte DurationCycles = 0x20;
+        private const byte FromSecondsFlag = 0x01;
+        private const byte FromCyclesFlag = 0x02;
+        private const byte ToSecondsFlag = 0x04;
+        private const byte ToCyclesFlag = 0x08;
+        private const byte DurationSecondsFlag = 0x10;
+        private const byte DurationCyclesFlag = 0x20;
     }
 }
