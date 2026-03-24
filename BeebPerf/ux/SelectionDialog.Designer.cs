@@ -1,6 +1,6 @@
 ﻿namespace BeebPerf.ux
 {
-    partial class selectionDialog
+    partial class SelectionDialog
     {
         /// <summary>
         /// Required designer variable.
@@ -28,163 +28,172 @@
         /// </summary>
         private void InitializeComponent()
         {
-            fromLabel = new Label();
-            toRadioButton = new RadioButton();
-            durationRadioButton = new RadioButton();
             secondsLabel = new Label();
             cyclesLabel = new Label();
+            fromLabel = new Label();
             fromSecondsTextBox = new TextBox();
             fromCyclesTextBox = new TextBox();
+            toLabel = new Label();
             toSecondsTextBox = new TextBox();
             toCyclesTextBox = new TextBox();
+            durationLabel = new Label();
             durationSecondsTextBox = new TextBox();
             durationCyclesTextBox = new TextBox();
             resetButton = new Button();
             okButton = new Button();
-            canelButton = new Button();
+            cancelButton = new Button();
             SuspendLayout();
-            // 
-            // fromLabel
-            // 
-            fromLabel.AutoSize = true;
-            fromLabel.Location = new Point(36, 40);
-            fromLabel.Name = "fromLabel";
-            fromLabel.Size = new Size(58, 25);
-            fromLabel.TabIndex = 2;
-            fromLabel.Text = "From:";
-            // 
-            // toRadioButton
-            // 
-            toRadioButton.AutoSize = true;
-            toRadioButton.Location = new Point(12, 75);
-            toRadioButton.Name = "toRadioButton";
-            toRadioButton.Size = new Size(59, 29);
-            toRadioButton.TabIndex = 0;
-            toRadioButton.TabStop = true;
-            toRadioButton.Text = "To:";
-            toRadioButton.UseVisualStyleBackColor = true;
-            // 
-            // durationRadioButton
-            // 
-            durationRadioButton.AutoSize = true;
-            durationRadioButton.Location = new Point(12, 112);
-            durationRadioButton.Name = "durationRadioButton";
-            durationRadioButton.Size = new Size(110, 29);
-            durationRadioButton.TabIndex = 1;
-            durationRadioButton.TabStop = true;
-            durationRadioButton.Text = "Duration:";
-            durationRadioButton.UseVisualStyleBackColor = true;
             // 
             // secondsLabel
             // 
             secondsLabel.AutoSize = true;
-            secondsLabel.Location = new Point(153, 9);
+            secondsLabel.Location = new Point(119, 9);
             secondsLabel.Name = "secondsLabel";
             secondsLabel.Size = new Size(79, 25);
-            secondsLabel.TabIndex = 4;
+            secondsLabel.TabIndex = 0;
             secondsLabel.Text = "Seconds";
             // 
             // cyclesLabel
             // 
             cyclesLabel.AutoSize = true;
-            cyclesLabel.Location = new Point(351, 9);
+            cyclesLabel.Location = new Point(317, 9);
             cyclesLabel.Name = "cyclesLabel";
             cyclesLabel.Size = new Size(61, 25);
-            cyclesLabel.TabIndex = 5;
+            cyclesLabel.TabIndex = 0;
             cyclesLabel.Text = "Cycles";
+            // 
+            // fromLabel
+            // 
+            fromLabel.AutoSize = true;
+            fromLabel.Location = new Point(12, 40);
+            fromLabel.Name = "fromLabel";
+            fromLabel.Size = new Size(58, 25);
+            fromLabel.TabIndex = 0;
+            fromLabel.Text = "From:";
             // 
             // fromSecondsTextBox
             // 
-            fromSecondsTextBox.Location = new Point(153, 37);
+            fromSecondsTextBox.Location = new Point(119, 37);
             fromSecondsTextBox.Name = "fromSecondsTextBox";
             fromSecondsTextBox.Size = new Size(150, 31);
-            fromSecondsTextBox.TabIndex = 3;
+            fromSecondsTextBox.TabIndex = 0;
+            fromSecondsTextBox.TextChanged += fromSecondsTextBox_TextChanged;
             // 
             // fromCyclesTextBox
             // 
-            fromCyclesTextBox.Location = new Point(351, 37);
+            fromCyclesTextBox.Location = new Point(317, 37);
             fromCyclesTextBox.Name = "fromCyclesTextBox";
             fromCyclesTextBox.Size = new Size(150, 31);
-            fromCyclesTextBox.TabIndex = 6;
+            fromCyclesTextBox.TabIndex = 0;
+            fromCyclesTextBox.TextChanged += fromCyclesTextBox_TextChanged;
+            // 
+            // toLabel
+            // 
+            toLabel.AutoSize = true;
+            toLabel.Location = new Point(12, 76);
+            toLabel.Name = "toLabel";
+            toLabel.Size = new Size(34, 25);
+            toLabel.TabIndex = 0;
+            toLabel.Text = "To:";
             // 
             // toSecondsTextBox
             // 
-            toSecondsTextBox.Location = new Point(153, 73);
+            toSecondsTextBox.Location = new Point(119, 73);
             toSecondsTextBox.Name = "toSecondsTextBox";
             toSecondsTextBox.Size = new Size(150, 31);
-            toSecondsTextBox.TabIndex = 13;
+            toSecondsTextBox.TabIndex = 0;
+            toSecondsTextBox.TextChanged += toSecondsTextBox_TextChanged;
             // 
             // toCyclesTextBox
             // 
-            toCyclesTextBox.Location = new Point(351, 74);
+            toCyclesTextBox.Location = new Point(317, 74);
             toCyclesTextBox.Name = "toCyclesTextBox";
             toCyclesTextBox.Size = new Size(150, 31);
-            toCyclesTextBox.TabIndex = 8;
+            toCyclesTextBox.TabIndex = 0;
+            toCyclesTextBox.TextChanged += toCyclesTextBox_TextChanged;
+            // 
+            // durationLabel
+            // 
+            durationLabel.AutoSize = true;
+            durationLabel.Location = new Point(12, 114);
+            durationLabel.Name = "durationLabel";
+            durationLabel.Size = new Size(85, 25);
+            durationLabel.TabIndex = 0;
+            durationLabel.Text = "Duration:";
             // 
             // durationSecondsTextBox
             // 
-            durationSecondsTextBox.Location = new Point(153, 111);
+            durationSecondsTextBox.Location = new Point(119, 111);
             durationSecondsTextBox.Name = "durationSecondsTextBox";
             durationSecondsTextBox.Size = new Size(150, 31);
-            durationSecondsTextBox.TabIndex = 9;
+            durationSecondsTextBox.TabIndex = 0;
+            durationSecondsTextBox.TextChanged += durationSecondsTextBox_TextChanged;
             // 
             // durationCyclesTextBox
             // 
-            durationCyclesTextBox.Location = new Point(351, 111);
+            durationCyclesTextBox.Location = new Point(317, 111);
             durationCyclesTextBox.Name = "durationCyclesTextBox";
             durationCyclesTextBox.Size = new Size(150, 31);
-            durationCyclesTextBox.TabIndex = 10;
+            durationCyclesTextBox.TabIndex = 0;
+            durationCyclesTextBox.TextChanged += durationCyclesTextBox_TextChanged;
             // 
             // resetButton
             // 
-            resetButton.Location = new Point(153, 164);
+            resetButton.Location = new Point(119, 164);
             resetButton.Name = "resetButton";
             resetButton.Size = new Size(112, 34);
             resetButton.TabIndex = 0;
             resetButton.Text = "Reset";
             resetButton.UseVisualStyleBackColor = true;
+            resetButton.Click += resetButton_Click;
             // 
             // okButton
             // 
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point(271, 164);
+            okButton.Location = new Point(237, 164);
             okButton.Name = "okButton";
             okButton.Size = new Size(112, 34);
             okButton.TabIndex = 0;
             okButton.Text = "Ok";
             okButton.UseVisualStyleBackColor = true;
+            okButton.Click += OkButton_Click;
             // 
             // canelButton
             // 
-            canelButton.DialogResult = DialogResult.Cancel;
-            canelButton.Location = new Point(389, 164);
-            canelButton.Name = "canelButton";
-            canelButton.Size = new Size(112, 34);
-            canelButton.TabIndex = 0;
-            canelButton.Text = "Cancel";
-            canelButton.UseVisualStyleBackColor = true;
+            cancelButton.DialogResult = DialogResult.Cancel;
+            cancelButton.Location = new Point(355, 164);
+            cancelButton.Name = "canelButton";
+            cancelButton.Size = new Size(112, 34);
+            cancelButton.TabIndex = 0;
+            cancelButton.Text = "Cancel";
+            cancelButton.UseVisualStyleBackColor = true;
             // 
-            // selectionDialog
+            // SelectionDialog
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(510, 206);
-            Controls.Add(canelButton);
-            Controls.Add(okButton);
-            Controls.Add(resetButton);
-            Controls.Add(durationRadioButton);
-            Controls.Add(toRadioButton);
-            Controls.Add(durationCyclesTextBox);
-            Controls.Add(durationSecondsTextBox);
-            Controls.Add(toCyclesTextBox);
-            Controls.Add(toSecondsTextBox);
-            Controls.Add(fromCyclesTextBox);
-            Controls.Add(fromSecondsTextBox);
-            Controls.Add(fromLabel);
-            Controls.Add(cyclesLabel);
+            ClientSize = new Size(477, 206);
+            CancelButton = cancelButton;
             Controls.Add(secondsLabel);
-            Name = "selectionDialog";
+            Controls.Add(cyclesLabel);
+            Controls.Add(fromLabel);
+            Controls.Add(fromSecondsTextBox);
+            Controls.Add(fromCyclesTextBox);
+            Controls.Add(toLabel);
+            Controls.Add(toSecondsTextBox);
+            Controls.Add(toCyclesTextBox);
+            Controls.Add(durationLabel);
+            Controls.Add(durationSecondsTextBox);
+            Controls.Add(durationCyclesTextBox);
+            Controls.Add(resetButton);
+            Controls.Add(okButton);
+            Controls.Add(cancelButton);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            Name = "SelectionDialog";
             Text = "Selection";
+            Shown += SelectionDialog_Shown;
             ResumeLayout(false);
             PerformLayout();
         }
@@ -194,8 +203,8 @@
         private Label secondsLabel;
         private Label cyclesLabel;
         private Label fromLabel;
-        private RadioButton toRadioButton;
-        private RadioButton durationRadioButton;
+        private Label toLabel;
+        private Label durationLabel;
         private TextBox fromSecondsTextBox;
         private TextBox fromCyclesTextBox;
         private TextBox toSecondsTextBox;
@@ -204,6 +213,6 @@
         private TextBox durationCyclesTextBox;
         private Button resetButton;
         private Button okButton;
-        private Button canelButton;
+        private Button cancelButton;
     }
 }

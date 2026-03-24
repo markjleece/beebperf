@@ -56,6 +56,13 @@ namespace BeebPerf.ux
 
         private void editSelectionButton_Click(object? sender, EventArgs e)
         {
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
+            SelectionDialog dialog = new(_AnalysisFrom, _AnalysisTo);
+            dialog.Owner = form;
+            if (dialog.ShowDialog() == DialogResult.OK)
+                form.SetAnalysisRange(dialog.AnalysisFrom, dialog.AnalysisTo);
         }
 
         public List<FrameBitmap> FrameBitmaps
@@ -917,6 +924,7 @@ namespace BeebPerf.ux
 
         private void editSelectionButton_MouseMove(object? sender, EventArgs e)
         {
+            Cursor = Cursors.Default;
             _ToolTipTimer.Stop();
             _ToolTipTimer.Start();
         }
