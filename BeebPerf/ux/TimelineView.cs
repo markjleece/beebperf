@@ -30,28 +30,35 @@ namespace BeebPerf.ux
         public TimelineView() : base()
         {
             DoubleBuffered = true;
+
             _ScrollBar = new HScrollBar();
             _ScrollBar.Dock = DockStyle.Bottom;
             _ScrollBar.Scroll += ScrollBar_Scroll;
             _ScrollBar.Enabled = false;
             Controls.Add(_ScrollBar);
+
             Layout += LayoutFunc;
 
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
-            _EditSelectionButton = new Button() {
-                Image = (Image?)resources.GetObject("editSelectionButton.Image"),
+            _EditSelectionButton = new () {
                 Name = "editSelectionButton",
-                Size = new Size(34, 28),
-                Visible = false,
+                ImageResourceName = "editSelectionButton.Image",
+                ToolTipText = "Edit selection",
                 Parent = this
             };
             _EditSelectionButton.Click += editSelectionButton_Click;
-            _EditSelectionButton.MouseMove += editSelectionButton_MouseMove;
-            _EditSelectionButton.MouseLeave += editSelectionButton_MouseLeave;
 
-            _ToolTipTimer = new();
-            _ToolTipTimer.Interval = 500;
-            _ToolTipTimer.Tick += ToolTipTimer_Tick;
+            _CopyFrameButton = new()
+            {
+                Name = "copyFrameButton",
+                ImageResourceName = "copyButton.Image",
+                ToolTipText = "Copy bitmap",
+                Parent = this
+            };
+            _CopyFrameButton.Click += copyFrameButton_Click;
+
+            _ShowCopyFrameButtonTimer = new();
+            _ShowCopyFrameButtonTimer.Interval = 500;
+            _ShowCopyFrameButtonTimer.Tick += ShowCopyFrameButtonTimer_Tick;
         }
 
         private void editSelectionButton_Click(object? sender, EventArgs e)
@@ -66,6 +73,16 @@ namespace BeebPerf.ux
                 int analysisFrom = Math.Clamp(dialog.AnalysisFrom, 0, _RecordingDuration);
                 int analysisTo = Math.Clamp(dialog.AnalysisTo, 0, _RecordingDuration);
                 form.SetAnalysisRange(analysisFrom, analysisTo);
+            }
+        }
+
+        private void copyFrameButton_Click(object? sender, EventArgs e)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form != null && _FocusFrame != null)
+            {
+                var bitmap = _FocusFrame.Value.Bitmap;
+                Exporter.CopyToClipboard(form, bitmap.Bitmap!, bitmap.AspectRatio);
             }
         }
 
@@ -176,8 +193,10 @@ namespace BeebPerf.ux
 
             if (_EditSelectionButton != null)
             {
+                SuspendLayout();
                 int padding = (_TimelineRect.Height - _EditSelectionButton.Height) / 2;
                 _EditSelectionButton.Location = new Point(Width - _EditSelectionButton.Width - padding, padding);
+                ResumeLayout(performLayout: false);
             }
         }
 
@@ -226,6 +245,7 @@ namespace BeebPerf.ux
             switch (_DragMode)
             {
                 case DragMode.None:
+                    UpdateCopyFrameButton(e.X, e.Y);
                     return;
 
                 case DragMode.LeftHandle:
@@ -252,6 +272,62 @@ namespace BeebPerf.ux
 
             UpdateDurationText();
             Update();
+        }
+
+        private void UpdateCopyFrameButton(int mouseX, int mouseY)
+        {
+            bool found = false;
+
+            foreach (var frame in _Frames)
+            {
+                if (frame.Rect.Contains(mouseX, mouseY))
+                {
+                    found = true;
+                    ShowCopyFrameButton(frame);
+                    break;
+                }
+            }
+
+            if (!found)
+                HideCopyFrameButton();
+        }
+
+        private void ShowCopyFrameButton(Frame frame)
+        {
+            if (!frame.Equals(_FocusFrame))
+            {
+                _FocusFrame = frame;
+                _ShowCopyFrameButtonTimer.Stop();
+                _ShowCopyFrameButtonTimer.Start();
+            }
+        }
+
+        private void HideCopyFrameButton()
+        {
+            _FocusFrame = null;
+            _ShowCopyFrameButtonTimer.Stop();
+            if (_CopyFrameButton != null)
+            {
+                SuspendLayout();
+                _CopyFrameButton.Visible = false;
+                ResumeLayout(performLayout: false);
+            }
+        }
+
+        private void ShowCopyFrameButtonTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_FocusFrame == null)
+                return;
+
+            SuspendLayout();
+            var frame = (Frame)_FocusFrame;
+            _CopyFrameButton.Location = new()
+            {
+                X = frame.Rect.Right - _CopyFrameButton.Width,
+                Y = frame.Rect.Top,
+            };
+            _CopyFrameButton.Visible = true;
+            ResumeLayout(performLayout: false);
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -332,13 +408,13 @@ namespace BeebPerf.ux
             DrawRulerForeground(graphics, highlightPen, highlightBrush);
             graphics.Restore(state);
 
-            // draw thumbnails
-            DrawThumbnails(graphics);
+            // draw frames
+            DrawFrames(graphics);
         }
 
-        private void DrawThumbnails(Graphics graphics)
+        private void DrawFrames(Graphics graphics)
         {
-            if (_ThumbnailRect.Height == 0)
+            if (_FramesRect.Height == 0)
                 return;
 
             StringFormat textFormat = new StringFormat
@@ -351,75 +427,46 @@ namespace BeebPerf.ux
             using var greyPen = new Pen(Color.Gray);
             using var textBrush = new SolidBrush(ForeColor);
 
-            int frameHeight = _ThumbnailRect.Height - Font.Height;
-            int frameWidth = 4 * frameHeight / 3;
-            int fromLeft = CyclesToPixels(0);
-            bool skipFrames = false;
-
-            for (int i = 0; i < FrameBitmaps.Count; i++)
+            foreach (var frame in _Frames)
             {
-                FrameBitmap frameBitmap = FrameBitmaps[i];
-                int pixels = CyclesToPixels(frameBitmap.StartCycleCount);
-                if (pixels > Width)
-                    break;
+                var frameBitmap = frame.Bitmap;
+                var frameRect = frame.Rect;
 
-                if (pixels < fromLeft)
-                {
-                    skipFrames = true;
-                    continue;
-                }
+                int frameWidth = frameRect.Width;
+                var frameHeight = frameRect.Height;
 
-                if (skipFrames)
-                {
-                    skipFrames = false;
-                    frameBitmap = FrameBitmaps[--i];
-                    pixels = CyclesToPixels(frameBitmap.StartCycleCount);
-                }
+                graphics.FillRectangle(blackBrush, frameRect);
+                graphics.DrawRectangle(greyPen, frameRect);
 
-                if (pixels < Width && pixels + frameWidth > 0)
-                {
-                    // paint background and border
-                    var frameRect = new Rectangle(
-                        pixels,
-                        _ThumbnailRect.Top,
-                        frameWidth,
-                        frameHeight);
+                // paint thumbnail image
+                double aspectRatio = frameBitmap.AspectRatio * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
+                int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
+                int indent = (frameWidth - bitmapWidth) / 2;
+                var imageRect = new Rectangle(
+                    frameRect.Left + indent + 2,
+                    _FramesRect.Top + 2,
+                    bitmapWidth - 3,
+                    frameHeight - 3);
 
-                    graphics.FillRectangle(blackBrush, frameRect);
-                    graphics.DrawRectangle(greyPen, frameRect);
+                graphics.DrawImage(frameBitmap.Bitmap, imageRect);
 
-                    // paint thumbnail image
-                    double aspectRatio = frameBitmap.AspectRatio * frameBitmap.Bitmap!.Width / frameBitmap.Bitmap!.Height;
-                    int bitmapWidth = Math.Min((int)double.Round(aspectRatio * frameHeight), frameWidth);
-                    int indent = (frameWidth - bitmapWidth) / 2;
-                    var imageRect = new Rectangle(
-                        pixels + indent + 2,
-                        _ThumbnailRect.Top + 2,
-                        bitmapWidth - 3,
-                        frameHeight - 3);
+                // paint frame number
+                var textRect = new Rectangle(
+                    frameRect.Left,
+                    _FramesRect.Top + frameHeight,
+                    frameWidth,
+                    Font.Height);
 
-                    graphics.DrawImage(frameBitmap.Bitmap, imageRect);
+                graphics.DrawString($"{frameBitmap.FrameNumber}", Font, textBrush, textRect, textFormat);
 
-                    // paint frame number
-                    var textRect = new Rectangle(
-                        pixels,
-                        _ThumbnailRect.Top + frameHeight,
-                        frameWidth,
-                        Font.Height);
+                // exclude thumbnail from clipping area
+                frameRect = new Rectangle(
+                    frameRect.Left,
+                    frameRect.Top,
+                    frameRect.Width + 1, 
+                    frameHeight + 1);
 
-                    graphics.DrawString($"{frameBitmap.FrameNumber}", Font, textBrush, textRect, textFormat);
-
-                    // exclude thumbnail from clipping area
-                    frameRect = new Rectangle(
-                        frameRect.Left,
-                        frameRect.Top,
-                        frameRect.Width + 1, 
-                        frameHeight + 1);
-
-                    graphics.ExcludeClip(frameRect);
-                }
-
-                fromLeft = pixels + frameWidth - 2;
+                graphics.ExcludeClip(frameRect);
             }
         }
 
@@ -811,7 +858,7 @@ namespace BeebPerf.ux
 
         private void FitFramesInternal()
         {
-            int frameHeight = _ThumbnailRect.Height - Font.Height;
+            int frameHeight = _FramesRect.Height - Font.Height;
             int frameWidth = 4 * frameHeight / 3;
             int newDisplayWidth = MulDiv(40000, Width, frameWidth);
 
@@ -848,15 +895,16 @@ namespace BeebPerf.ux
         {
             int dividerHeight = Math.Max(2, Font.Height / 8);
             int rulerHeight = 3 * Font.Height / 2;
-            int thumbnailHeight = Height - _ScrollBar.Height - rulerHeight - dividerHeight;
+            int framesHeight = Height - _ScrollBar.Height - rulerHeight - dividerHeight;
 
-            if (thumbnailHeight < 0)
-                thumbnailHeight = 0;
+            if (framesHeight < 0)
+                framesHeight = 0;
 
             _TimelineRect = new Rectangle(0, 0, Width, rulerHeight);
-            _ThumbnailRect = new Rectangle(0, rulerHeight + dividerHeight, Width, thumbnailHeight);
+            _FramesRect = new Rectangle(0, rulerHeight + dividerHeight, Width, framesHeight);
 
             ComputeTicks();
+            ComputeFrames();
             Invalidate();
         }
 
@@ -900,6 +948,52 @@ namespace BeebPerf.ux
             }
         }
 
+        private void ComputeFrames()
+        {
+            _Frames = [];
+
+            int top = _FramesRect.Top;
+            int height = _FramesRect.Height - Font.Height;
+            int width = 4 * height / 3;
+            
+            int leftEdge = CyclesToPixels(0);
+            bool overlappingFrames = false;
+
+            int lastFrameIndex = FrameBitmaps.Count - 1;
+            for (int frameIndex = 0; frameIndex <= lastFrameIndex; frameIndex++)
+            {
+                var frameBitmap = FrameBitmaps[frameIndex];
+
+                int left = CyclesToPixels(frameBitmap.StartCycleCount);
+                if (left > Width + width)
+                    break;
+
+                if (frameIndex < lastFrameIndex && left < leftEdge)
+                {
+                    overlappingFrames = true;
+                    continue;
+                }
+
+                if (overlappingFrames)
+                {
+                    overlappingFrames = false;
+
+                    frameBitmap = FrameBitmaps[--frameIndex];
+                    left = CyclesToPixels(frameBitmap.StartCycleCount);
+                }
+
+                if (left < Width && left + width > 0)
+                {
+                    var rect = new Rectangle(left, top, width, height);
+                    _Frames.Add(new Frame() { Bitmap = frameBitmap, Rect = rect });
+                }
+
+                leftEdge = left + width;
+            }
+
+            HideCopyFrameButton();
+        }
+
         private Color Blend(Color first, Color second, double ratio)
         {
             int r = (int)(first.R * (1 - ratio) + second.R * ratio);
@@ -918,31 +1012,12 @@ namespace BeebPerf.ux
 
             form.SetAnalysisRange(_AnalysisFrom, _AnalysisTo);
 
-            Invalidate(_ThumbnailRect);
+            Invalidate(_FramesRect);
         }
 
         private int MulDiv(int a, int b, int c)
         {
             return (int)double.Round((double)a * b / c);
-        }
-
-        private void editSelectionButton_MouseMove(object? sender, EventArgs e)
-        {
-            Cursor = Cursors.Default;
-            _ToolTipTimer.Stop();
-            _ToolTipTimer.Start();
-        }
-
-        private void editSelectionButton_MouseLeave(object? sender, EventArgs e)
-        {
-            _ToolTipTimer.Stop();
-            _ToolTip.Hide(_EditSelectionButton);
-        }
-
-        private void ToolTipTimer_Tick(object? sender, EventArgs e)
-        {
-            if (_EditSelectionButton.Visible)
-                _ToolTip.Show("Edit selection", _EditSelectionButton);
         }
 
         private enum DragMode
@@ -968,24 +1043,32 @@ namespace BeebPerf.ux
             public int Minor;
         }
 
+        private struct Frame
+        {
+            public FrameBitmap Bitmap;
+            public Rectangle Rect;
+        }
+
         private int _RecordingDuration;
         private int _DisplayFrom;
         private int _DisplayTo;
         private int _AnalysisFrom;
         private int _AnalysisTo;
         private Rectangle _TimelineRect;
-        private Rectangle _ThumbnailRect;
+        private Rectangle _FramesRect;
         private Rectangle _LeftHandleRect;
         private Rectangle _RightHandleRect;
         private DragMode _DragMode;
         private int _DragOffset;
         private int _DragOrigin;
         private List<Tick> _Ticks = [];
+        private List<Frame> _Frames = [];
         private HScrollBar _ScrollBar;
         private ReentrancyGuard _ReentrancyGuard = new();
         private List<FrameBitmap> _FrameBitmaps = [];
-        private Button _EditSelectionButton;
-        private ToolTip _ToolTip = new ToolTip();
-        private System.Windows.Forms.Timer _ToolTipTimer = new();
+        private Frame? _FocusFrame = null;
+        private ButtonEx _EditSelectionButton;
+        private ButtonEx _CopyFrameButton;
+        private System.Windows.Forms.Timer _ShowCopyFrameButtonTimer = new();
     }
 }
