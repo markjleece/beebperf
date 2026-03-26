@@ -178,5 +178,17 @@ namespace BeebPerf.Properties {
                 this["RecentEndCycleCount"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RecentExportFolderPath {
+            get {
+                return ((string)(this["RecentExportFolderPath"]));
+            }
+            set {
+                this["RecentExportFolderPath"] = value;
+            }
+        }
     }
 }

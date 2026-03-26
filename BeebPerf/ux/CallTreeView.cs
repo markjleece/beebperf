@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
 
 namespace BeebPerf.ux
 {
@@ -31,6 +32,22 @@ namespace BeebPerf.ux
         private const int ElapsedCPUColumnIndex = 3;
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
+
+        private const int ExportCallTreeDepthColumnIndex = 0;
+        private const int ExportRoutineAddressColumnIndex = 1;
+        private const int ExportRoutinePageColumnIndex = 2;
+        private const int ExportRoutineLabelColumnIndex = 3;
+        private const int ExportTotalCPUCountColumnIndex = 4;
+        private const int ExportTotalCPUPercentageColumnIndex = 5;
+        private const int ExportSelfCPUCountColumnIndex = 6;
+        private const int ExportSelfCPUPercentageColumnIndex = 7;
+        private const int ExportElapsedCPUCountColumnIndex = 8;
+        private const int ExportElapsedCPUPercentageColumnIndex = 9;
+        private const int ExportInteruptsCountColumnIndex = 10;
+        private const int ExportInteruptsPercentageColumnIndex = 11;
+        private const int ExportExecutionCountColumnIndex = 12;
+        private const int ExportExecutionPercentColumnIndex = 13;
+        private const int ExportColumnCount = 14;
 
         public int TotalCycleCount;
 
@@ -137,22 +154,103 @@ namespace BeebPerf.ux
         protected override string OnFormatRowData(CallTreeNode treeNode, int columnIndex, int rowIndex)
         {
             if (columnIndex == RoutineColumnIndex)
-                return $"{"".PadLeft(treeNode.HotPath ? 4 : 0)}{treeNode.Routine.StartAddress} {treeNode.Routine.Label}";
+                return $"{"".PadLeft(treeNode.HotPath ? 4 : 0)}{FormatAddress(treeNode.Routine.StartAddress)} {treeNode.Routine.Label}";
             else
                 return FormatCountAndRange(treeNode, columnIndex);
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
         {
+            var metrics = treeNode.CPUMetrics;
             return columnIndex switch
             {
-
-                SelfCPUColumnIndex => (value: treeNode.CPUMetrics.SelfCycleCount, range: TotalCycleCount),
-                TotalCPUColumnIndex => (value: treeNode.CPUMetrics.InclusiveCycleCount, range: TotalCycleCount),
-                ElapsedCPUColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount, range: TotalCycleCount),
-                InterruptsColumnIndex => (value: treeNode.CPUMetrics.ElapsedCycleCount - treeNode.CPUMetrics.InclusiveCycleCount, range: treeNode.CPUMetrics.ElapsedCycleCount),
-                ExecutionCountColumnIndex => (value: treeNode.CPUMetrics.ExecutionCount, range: _MaxExecutionCount),
+                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount),
+                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount),
+                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount),
+                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount),
+                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount),
                 _ => (value: -1, range: 1)
+            };
+        }
+
+        protected override string[] OnGetExportHeaders()
+        {
+            string[] headers = [
+                "Call tree depth",
+                "Routine address",
+                "Routine page",
+                "Routine label",
+                "Total CPU [#]",
+                "Total CPU [%]",
+                "Self CPU [#]",
+                "Self CPU [%]",
+                "Elapsed CPU [#]",
+                "Elapsed CPU [%]",
+                "Interrupts [#]",
+                "Interrupts [%]",
+                "Execution count [#]",
+                "Execution count [%]"
+            ];
+
+            Debug.Assert(headers.Length == ExportColumnCount);
+            return headers;
+        }
+
+        private IEnumerable<CallTreeNode> TraverseCallTree(CallTreeNode node)
+        {
+            yield return node;
+            foreach (var child in node.Children)
+                foreach (var descendant in TraverseCallTree(child))
+                    yield return descendant;
+        }
+
+        protected override int OnGetExportRowCount()
+        {
+            _ExportTreeNodes.Clear();
+
+            foreach (var treeNode in _DataRows)
+                if (treeNode.Depth == 0)
+                    foreach (var node in TraverseCallTree(treeNode)) 
+                        _ExportTreeNodes.Add(node);
+
+            return _ExportTreeNodes.Count;
+        }
+
+        protected override string[] OnGetExportRowValues(int rowIndex)
+        {
+            List<string> rowValues = new();
+
+            var treeNode = _ExportTreeNodes[rowIndex];
+
+            if (rowIndex == _ExportTreeNodes.Count - 1)
+                _ExportTreeNodes.Clear();
+
+            for (int columnIndex = 0; columnIndex < ExportColumnCount; columnIndex++)
+                rowValues.Add(FormatExportCell(treeNode, columnIndex));
+
+            return rowValues.ToArray();
+        }
+
+        private string FormatExportCell(CallTreeNode treeNode, int columnIndex)
+        {
+            var metrics = treeNode.CPUMetrics;
+            return columnIndex switch
+            {
+                ExportCallTreeDepthColumnIndex => treeNode.Depth.ToString(),
+                ExportRoutineAddressColumnIndex => FormatAddress(treeNode.Routine.StartAddress),
+                ExportRoutinePageColumnIndex => treeNode.Routine.StartAddress.Page.ToString(),
+                ExportRoutineLabelColumnIndex => treeNode.Routine.Label,
+                ExportTotalCPUCountColumnIndex => metrics.InclusiveCycleCount.ToString(),
+                ExportTotalCPUPercentageColumnIndex => FormatExportPercentage(metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportSelfCPUCountColumnIndex => metrics.SelfCycleCount.ToString(),
+                ExportSelfCPUPercentageColumnIndex => FormatExportPercentage(metrics.SelfCycleCount, TotalCycleCount),
+                ExportElapsedCPUCountColumnIndex => metrics.ElapsedCycleCount.ToString(),
+                ExportElapsedCPUPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount, TotalCycleCount),
+                ExportInteruptsCountColumnIndex => (metrics.ElapsedCycleCount - metrics.InclusiveCycleCount).ToString(),
+                ExportInteruptsPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportExecutionCountColumnIndex => metrics.ExecutionCount.ToString(),
+                ExportExecutionPercentColumnIndex => FormatExportPercentage(metrics.ExecutionCount, _MaxExecutionCount),
+                _ => string.Empty
             };
         }
 
@@ -345,6 +443,7 @@ namespace BeebPerf.ux
         {
             RefreshExecutionCounts();
             AutoGrowColumns();
+            UpdateButtons();
         }
 
         private int AddChildRows(int index, CallTreeNode treeNode)
@@ -587,5 +686,6 @@ namespace BeebPerf.ux
 
         private int _MaxExecutionCount;
         private ReentrancyGuard _ReentrancyGuard = new();
+        private List<CallTreeNode> _ExportTreeNodes = [];
     }
 }

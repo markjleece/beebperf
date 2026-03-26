@@ -656,6 +656,7 @@ namespace BeebPerf.ux
             Properties.Settings.Default.RecentLabelsFilePathName = _RecentLabelsFilePathName;
             Properties.Settings.Default.RecentStartCycleCount = _RecentStartCycleCount;
             Properties.Settings.Default.RecentEndCycleCount = _RecentEndCycleCount;
+            Properties.Settings.Default.RecentExportFolderPath = RecentExportFolderPath;
             Properties.Settings.Default.LabelsFiles = _LabelsFilesEncoding;
             Properties.Settings.Default.WindowLayout = (int)secondarySplitContainer.Orientation;
             Properties.Settings.Default.PrimarySplitterDistance = primarySplitContainer.SplitterDistance;
@@ -672,6 +673,7 @@ namespace BeebPerf.ux
             _RecentEndCycleCount = Properties.Settings.Default.RecentEndCycleCount;
             _RecentLabelsFilePathName = Properties.Settings.Default.RecentLabelsFilePathName;
             _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
+            RecentExportFolderPath = Properties.Settings.Default.RecentExportFolderPath;
 
             var location = Properties.Settings.Default.WindowLocation;
             var size = Properties.Settings.Default.WindowSize;
@@ -889,6 +891,7 @@ namespace BeebPerf.ux
         public AppStateFlags AppState;
         public Image FlameImage;
         public InstructionSet? InstructionSet;
+        public string RecentExportFolderPath = string.Empty;
 
         private Routine? _SelectedRoutine;
         private CallStack? _SelectedCallStack;

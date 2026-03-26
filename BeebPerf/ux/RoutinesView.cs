@@ -20,6 +20,8 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
+using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
@@ -32,6 +34,21 @@ namespace BeebPerf.ux
         private const int InterruptsColumnIndex = 4;
         private const int ExecutionCountColumnIndex = 5;
 
+        private const int ExportRoutineAddressColumnIndex = 0;
+        private const int ExportRoutinePageColumnIndex = 1;
+        private const int ExportRoutineLabelColumnIndex = 2;
+        private const int ExportTotalCPUColumnIndex = 3;
+        private const int ExportTotalCPUPercentageIndex = 4;
+        private const int ExportSelfCPUColumnIndex = 5;
+        private const int ExportSelfCPUPercentageIndex = 6;
+        private const int ExportElapsedCPUColumnIndex = 7;
+        private const int ExportElapsedCPUPercentageIndex = 8;
+        private const int ExportInterruptsColumnIndex = 9;
+        private const int ExportInterruptsPercentageIndex = 10;
+        private const int ExportExecutionCountColumnIndex = 11;
+        private const int ExportExecutionPercentageColumnIndex = 12;
+        private const int ExportColumnCount = 13;
+
         public int TotalCycleCount;
 
         public RoutinesView() : base(System.Windows.Forms.SelectionMode.One)
@@ -42,7 +59,7 @@ namespace BeebPerf.ux
             AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
             AddColumn("ElapsedCPU", "Elapsed CPU [#cycles, %]", cellTemplate);
             AddColumn("Interrupts", "Interrupts [#cycles, %]", cellTemplate);
-            AddColumn("ExecutionCount", "Execution count", cellTemplate);
+            AddColumn("ExecutionCount", "Execution count [#, %]", cellTemplate);
 
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
@@ -121,39 +138,97 @@ namespace BeebPerf.ux
 
         protected override int OnSortCompare(Routine a, Routine b, int columnIndex)
         {
+            var metrics_a = a.AggregateMetrics;
+            var metrics_b = b.AggregateMetrics;
+
             return columnIndex switch
             {
                 RoutineColumnIndex => a.StartAddress.Address.CompareTo(b.StartAddress.Address),
-                SelfCPUColumnIndex => a.AggregateMetrics.SelfCycleCount.CompareTo(b.AggregateMetrics.SelfCycleCount),
-                TotalCPUColumnIndex => a.AggregateMetrics.InclusiveCycleCount.CompareTo(b.AggregateMetrics.InclusiveCycleCount),
-                ElapsedCPUColumnIndex => a.AggregateMetrics.ElapsedCycleCount.CompareTo(b.AggregateMetrics.ElapsedCycleCount),
-                InterruptsColumnIndex => (a.AggregateMetrics.ElapsedCycleCount - a.AggregateMetrics.InclusiveCycleCount).CompareTo(
-                                         (b.AggregateMetrics.ElapsedCycleCount - b.AggregateMetrics.InclusiveCycleCount)),
-                ExecutionCountColumnIndex => a.AggregateMetrics.ExecutionCount.CompareTo(b.AggregateMetrics.ExecutionCount),
+                SelfCPUColumnIndex => metrics_a.SelfCycleCount.CompareTo(metrics_b.SelfCycleCount),
+                TotalCPUColumnIndex => metrics_a.InclusiveCycleCount.CompareTo(metrics_b.InclusiveCycleCount),
+                ElapsedCPUColumnIndex => metrics_a.ElapsedCycleCount.CompareTo(metrics_b.ElapsedCycleCount),
+                InterruptsColumnIndex => (metrics_a.ElapsedCycleCount - metrics_a.InclusiveCycleCount).CompareTo(
+                                         (metrics_b.ElapsedCycleCount - metrics_b.InclusiveCycleCount)),
+                ExecutionCountColumnIndex => metrics_a.ExecutionCount.CompareTo(metrics_b.ExecutionCount),
                 _ => 0
             };
         }
 
         protected override string OnFormatRowData(Routine routine, int columnIndex, int rowIndex)
         {
-            return columnIndex switch
-            {
-                RoutineColumnIndex => $"{"".PadLeft(routine.HotRoutine ? 4 : 0)}{routine.StartAddress} {routine.Label}",
-                ExecutionCountColumnIndex => $"{routine.AggregateMetrics.ExecutionCount:N0}",
-                _ => FormatCountAndRange(routine, columnIndex),
-            };
+            if (columnIndex == RoutineColumnIndex)
+                return $"{"".PadLeft(routine.HotRoutine ? 4 : 0)}{FormatAddress(routine.StartAddress)} {routine.Label}";
+            else
+                return FormatCountAndRange(routine, columnIndex);
         }
 
         protected override (int value, int range) OnRowDataCountAndRange(Routine routine, int columnIndex)
         {
+            var metrics = routine.AggregateMetrics;
             return columnIndex switch
             {
-                SelfCPUColumnIndex => (value: routine.AggregateMetrics.SelfCycleCount, range: TotalCycleCount),
-                TotalCPUColumnIndex => (value: routine.AggregateMetrics.InclusiveCycleCount, range: TotalCycleCount),
-                ElapsedCPUColumnIndex => (value: routine.AggregateMetrics.ElapsedCycleCount, range: TotalCycleCount),
-                InterruptsColumnIndex => (value: routine.AggregateMetrics.ElapsedCycleCount - routine.AggregateMetrics.InclusiveCycleCount, range: routine.AggregateMetrics.ElapsedCycleCount),
-                ExecutionCountColumnIndex => (value: routine.AggregateMetrics.ExecutionCount, range: _MaxExecutionCount),
+                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount),
+                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount),
+                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount),
+                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount),
+                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount),
                 _ => (value: -1, range: 1)
+            };
+        }
+
+        protected override string[] OnGetExportHeaders()
+        {
+            string[] headers = [
+                "Routine address",
+                "Routine page",
+                "Routine label",
+                "Total CPU [#]",
+                "Total CPU [%]",
+                "Self CPU [#]",
+                "Self CPU [%]",
+                "Elapsed CPU [#]",
+                "Elapsed CPU [%]",
+                "Interrupts [#]",
+                "Interrupts [%]",
+                "Execution count [#]",
+                "Execution count [%]"
+            ];
+
+            Debug.Assert(headers.Length == ExportColumnCount);
+            return headers;
+        }
+
+        protected override string[] OnGetExportRowValues(int rowIndex)
+        {
+            List<string> rowValues = new();
+
+            var rowData = _DataRows[rowIndex];
+
+            for (int columnIndex = 0; columnIndex < ExportColumnCount; columnIndex++)
+                rowValues.Add(FormatExportCell(rowData, columnIndex));
+
+            return rowValues.ToArray();
+        }
+
+        private string FormatExportCell(Routine routine, int columnIndex)
+        {
+            var metrics = routine.AggregateMetrics;
+            return columnIndex switch
+            {
+                ExportRoutineAddressColumnIndex => FormatAddress(routine.StartAddress),
+                ExportRoutinePageColumnIndex => routine.StartAddress.Page.ToString(),
+                ExportRoutineLabelColumnIndex => routine.Label,
+                ExportTotalCPUColumnIndex => metrics.InclusiveCycleCount.ToString(),
+                ExportTotalCPUPercentageIndex => FormatExportPercentage(metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportSelfCPUColumnIndex => metrics.SelfCycleCount.ToString(),
+                ExportSelfCPUPercentageIndex => FormatExportPercentage(metrics.SelfCycleCount, TotalCycleCount),
+                ExportElapsedCPUColumnIndex => metrics.ElapsedCycleCount.ToString(),
+                ExportElapsedCPUPercentageIndex => FormatExportPercentage(metrics.ElapsedCycleCount, TotalCycleCount),
+                ExportInterruptsColumnIndex => (metrics.ElapsedCycleCount - metrics.InclusiveCycleCount).ToString(),
+                ExportInterruptsPercentageIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportExecutionCountColumnIndex => metrics.ExecutionCount.ToString(),
+                ExportExecutionPercentageColumnIndex => FormatExportPercentage(metrics.ExecutionCount, _MaxExecutionCount),
+                _ => string.Empty
             };
         }
 

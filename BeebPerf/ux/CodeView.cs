@@ -20,7 +20,9 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
+using System.Text;
 using static BeebPerf.MemoryAnalysis;
 using static BeebPerf.model.DisplaySettings;
 
@@ -38,6 +40,24 @@ namespace BeebPerf.ux
         private const int SelfCPUColumnIndex = 7;
         private const int BranchCountColumnIndex = 8;
         private const int ExecutionCountColumnIndex = 9;
+
+        private const int ExportAddressColumnIndex = 0;
+        private const int ExportPageColumnIndex = 1;
+        private const int ExportLabelColumnIndex = 2;
+        private const int ExportCodeModifiedColumnIndex = 3;
+        private const int ExportInstructionColumnIndex = 4;
+        private const int ExportMemoryReadCountColumnIndex = 5;
+        private const int ExportMemoryWriteCountColumnIndex = 6;
+        private const int ExportTailCallColumnIndex = 7;
+        private const int ExportTotalCPUCountColumnIndex = 8;
+        private const int ExportTotalCPUPercentageColumnIndex = 9;
+        private const int ExportSelfCPUCountColumnIndex = 10;
+        private const int ExportSelfCPUPercentageColumnIndex = 11;
+        private const int ExportBranchCountColumnIndex = 12;
+        private const int ExportBranchPercentageColumnIndex = 13;
+        private const int ExportExecutionCountColumnIndex = 14;
+        private const int ExportExecutionPercentColumnIndex = 15;
+        private const int ExportColumnCount = 16;
 
         public CodeView() : base(System.Windows.Forms.SelectionMode.None)
         {
@@ -98,8 +118,8 @@ namespace BeebPerf.ux
             _MemoryAccess = memoryAccess;
             if (memoryAccess != null)
             {
-                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {memoryAccess.Address} [#]");
-                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {memoryAccess.Address} [#]");
+                SetColumnHeaderText(MemoryReadCountColumnIndex, $"Reads from {FormatAddress(memoryAccess.Address)} [#]");
+                SetColumnHeaderText(MemoryWriteCountColumnIndex, $"Writes to {FormatAddress(memoryAccess.Address)} [#]");
             }
 
             SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
@@ -233,6 +253,202 @@ namespace BeebPerf.ux
             string octal = Convert.ToString(operand, 8).PadLeft(size == 2 ? 3 : 6, '0');
             string binary = Convert.ToString(operand, 2).PadLeft(size == 2 ? 8 : 16, '0');
             return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
+        }
+
+        protected override string[] OnGetExportHeaders()
+        {
+            var headers = new List<string>();
+            
+            headers.Add("Address");
+            headers.Add("Page");
+            headers.Add("Label");
+            headers.Add("Code modified");
+            headers.Add("Instruction");
+            
+            if (_MemoryAccess != null)
+            {
+                headers.Add($"Reads from {FormatAddress(_MemoryAccess.Address)} [#]");
+                headers.Add($"Writes from {FormatAddress(_MemoryAccess.Address)} [#]");
+            }
+            
+            headers.Add("Tail call");
+            headers.Add("Total CPU [#]");
+            headers.Add("Total CPU [%]");
+            headers.Add("Self CPU [#]");
+            headers.Add("Self CPU [%]");
+            headers.Add("Branch [#]");
+            headers.Add("Branch [%]");
+            headers.Add("Execution count [#]");
+            headers.Add("Execution count [%]");
+
+            int exportHeaderCount = (_MemoryAccess != null) ? ExportColumnCount : ExportColumnCount - 2;
+            Debug.Assert(headers.Count == exportHeaderCount);
+
+            return headers.ToArray();
+        }
+
+        protected override string[] OnGetExportRowValues(int rowIndex)
+        {
+            List<string> rowValues = new();
+
+            var rowData = _DataRows[rowIndex];
+
+            for (int columnIndex = 0; columnIndex < ExportColumnCount; columnIndex++)
+            {
+                if (_MemoryAccess == null && columnIndex == ExportMemoryReadCountColumnIndex)
+                    columnIndex += 2; // skip over memory read/write columns
+
+                rowValues.Add(FormatExportCell(rowData, columnIndex));
+            }
+
+            return rowValues.ToArray();
+        }
+
+        private string FormatExportCell(object value, int columnIndex)
+        {
+            if (value is Ellipses)
+                return (columnIndex == ExportAddressColumnIndex || columnIndex == ExportInstructionColumnIndex) ? "..." : string.Empty;
+            else if (value is FallThrough)
+                return (columnIndex == ExportInstructionColumnIndex) ? "fall through" : string.Empty;
+
+            var instructionMetrics = (InstructionMetrics)value;
+            return columnIndex switch
+            {
+                ExportAddressColumnIndex => FormatAddress(instructionMetrics.Instruction.OpcodeAddress),
+                ExportPageColumnIndex => instructionMetrics.Instruction.OpcodeAddress.Page.ToString(),
+                ExportLabelColumnIndex => FormatLabel(instructionMetrics),
+                ExportCodeModifiedColumnIndex => instructionMetrics.CodeModified ? "yes" : string.Empty,
+                ExportInstructionColumnIndex => FormatCode(instructionMetrics),
+                ExportMemoryReadCountColumnIndex => FormatMemoryAccessCount(GetMemoryReadCount(instructionMetrics.Instruction)),
+                ExportMemoryWriteCountColumnIndex => FormatMemoryAccessCount(GetMemoryWriteCount(instructionMetrics.Instruction)),
+                ExportTailCallColumnIndex => instructionMetrics.TailCall ? "yes" : string.Empty,
+                ExportTotalCPUCountColumnIndex => instructionMetrics.InclusiveCycleCount.ToString(),
+                ExportTotalCPUPercentageColumnIndex => FormatExportPercentage(instructionMetrics.InclusiveCycleCount, _TotalCycleCount),
+                ExportSelfCPUCountColumnIndex => instructionMetrics.SelfCycleCount.ToString(),
+                ExportSelfCPUPercentageColumnIndex => FormatExportPercentage(instructionMetrics.SelfCycleCount, _TotalCycleCount),
+                ExportBranchCountColumnIndex => FormatBranchCount(instructionMetrics),
+                ExportBranchPercentageColumnIndex => FormatBranchPercentage(instructionMetrics),
+                ExportExecutionCountColumnIndex => instructionMetrics.ExecutionCount.ToString(),
+                ExportExecutionPercentColumnIndex => FormatExportPercentage(instructionMetrics.ExecutionCount, _MaxExecutionCount),
+                _ => string.Empty
+            };
+        }
+
+        private string FormatBranchCount(InstructionMetrics instructionMetrics)
+        {
+            if (_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+                return instructionMetrics.BranchCount.ToString();
+            else
+                return string.Empty;
+        }
+
+        private string FormatBranchPercentage(InstructionMetrics instructionMetrics)
+        {
+            if (_InstructionSet!.IsBranch(instructionMetrics.Instruction.Opcode))
+                return FormatExportPercentage(instructionMetrics.BranchCount, instructionMetrics.ExecutionCount);
+            else
+                return string.Empty;
+        }
+
+        private string FormatLabel(InstructionMetrics instructionMetrics)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return string.Empty;
+
+            ushort address = instructionMetrics.Instruction.OpcodeAddress.Address;
+            string label = _LabelResolver.Resolve(address);
+            return form.DisplaySettings.Format(Setting.Label, label);
+        }
+
+        private string FormatCode(InstructionMetrics instructionMetrics)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return string.Empty;
+
+            var codeElements = GetCodeElements(instructionMetrics);
+
+            var sb = new StringBuilder();
+            foreach (var codeElement in codeElements)
+                sb.Append(form.DisplaySettings.Format(codeElement.Type, codeElement.Value));
+            return sb.ToString();
+        }
+
+        private List<CodeElement> GetCodeElements(InstructionMetrics instructionMetrics)
+        {
+            List<CodeElement> codeElements = [];
+
+            byte opcode = instructionMetrics.Instruction.Opcode;
+            ushort operand = instructionMetrics.Instruction.Operand;
+
+            var instructionSet = _InstructionSet!;
+            int opSize = instructionSet.Size(opcode);
+            string mnemonic = instructionSet.Mnemonic(opcode);
+            InstructionSet.AddressingModeType addressMode = instructionSet.AddressingMode(opcode);
+
+            if (addressMode == InstructionSet.AddressingModeType.Relative)
+            {
+                int branchAddress = instructionMetrics.Instruction.OpcodeAddress.Address;
+                operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
+            }
+
+            codeElements.Add(new CodeElement { Type = Setting.Mnemonic, Value = mnemonic });
+
+            if (opSize > 1)
+            {
+                Object address = operand;
+                if (opSize == 2 && addressMode != InstructionSet.AddressingModeType.Relative)
+                    address = (byte)operand;
+
+                var type = (addressMode == InstructionSet.AddressingModeType.Immediate) ? Setting.Literal : Setting.Address;
+                codeElements.Add(new CodeElement { Type = type, Value = address });
+
+                if (addressMode != InstructionSet.AddressingModeType.Immediate)
+                {
+                    string label = _LabelResolver.ResolveWithOffset(operand);
+                    if (label.Length > 0)
+                        codeElements.Add(new CodeElement { Type = Setting.Label, Value = label.PadLeft(label.Length + 1) });
+                }
+            }
+
+            switch (addressMode)
+            {
+                case InstructionSet.AddressingModeType.Accumulator:
+                    codeElements.Add(new CodeElement { Type = Setting.Mnemonic, Value = "A" });
+                    break;
+
+                case InstructionSet.AddressingModeType.Immediate:
+                    codeElements.Insert(1, new CodeElement { Type = Setting.Punctuation, Value = "#" });
+                    break;
+
+                case InstructionSet.AddressingModeType.ZeroPageX:
+                case InstructionSet.AddressingModeType.AbsoluteX:
+                    codeElements.Add(new CodeElement { Type = Setting.Punctuation, Value = ",X" });
+                    break;
+
+                case InstructionSet.AddressingModeType.ZeroPageY:
+                case InstructionSet.AddressingModeType.AbsoluteY:
+                    codeElements.Add(new CodeElement { Type = Setting.Punctuation, Value = ",Y", });
+                    break;
+
+                case InstructionSet.AddressingModeType.Indirect:
+                    codeElements.Insert(1, new CodeElement { Type = Setting.Punctuation, Value = "(" });
+                    codeElements.Add(new CodeElement { Type = Setting.Punctuation, Value = ")" });
+                    break;
+
+                case InstructionSet.AddressingModeType.IndirectX:
+                    codeElements.Insert(1, new CodeElement { Type = Setting.Punctuation, Value = "(" });
+                    codeElements.Add(new CodeElement { Type = Setting.Punctuation, Value = ",X)" });
+                    break;
+
+                case InstructionSet.AddressingModeType.IndirectY:
+                    codeElements.Insert(1, new CodeElement { Type = Setting.Punctuation, Value = "(" });
+                    codeElements.Add(new CodeElement { Type = Setting.Punctuation, Value = "),Y" });
+                    break;
+                default:
+                    break;
+            }
+
+            return codeElements;
         }
 
         public class CellTemplate : GridViewCellTemplate
@@ -375,81 +591,11 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 bool measureOnly)
             {
-                byte opcode = instructionMetrics.Instruction.Opcode;
-                ushort operand = instructionMetrics.Instruction.Operand;
-
-                var instructionSet = codeView._InstructionSet!;
-                int opSize = instructionSet.Size(opcode);
-                string mnemonic = instructionSet.Mnemonic(opcode);
-                InstructionSet.AddressingModeType addressMode = instructionSet.AddressingMode(opcode);
-
-                if (addressMode == InstructionSet.AddressingModeType.Relative)
-                {
-                    int branchAddress = instructionMetrics.Instruction.OpcodeAddress.Address;
-                    operand = (ushort)unchecked(branchAddress + 2 + (sbyte)operand);
-                }
-
-                List<Segment> segments = new();
-                segments.Add(new Segment { Type = Setting.Mnemonic, Value = mnemonic });
-
-                if (opSize > 1)
-                {
-                    Object address = operand;
-                    if (opSize == 2 && addressMode != InstructionSet.AddressingModeType.Relative)
-                        address = (byte)operand;
-
-                    var type = (addressMode == InstructionSet.AddressingModeType.Immediate) ? Setting.Literal : Setting.Address;
-                    segments.Add(new Segment { Type = type, Value = address });
-
-                    if (addressMode != InstructionSet.AddressingModeType.Immediate)
-                    {
-                        string label = codeView._LabelResolver.ResolveWithOffset(operand);
-                        if (label.Length > 0)
-                            segments.Add(new Segment { Type = Setting.Label, Value = label.PadLeft(label.Length + 1) });
-                    }
-                }
-
-                switch (addressMode)
-                {
-                    case InstructionSet.AddressingModeType.Accumulator:
-                        segments.Add(new Segment { Type = Setting.Mnemonic, Value = "A" });
-                        break;
-
-                    case InstructionSet.AddressingModeType.Immediate:
-                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "#" });
-                        break;
-
-                    case InstructionSet.AddressingModeType.ZeroPageX:
-                    case InstructionSet.AddressingModeType.AbsoluteX:
-                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X" });
-                        break;
-
-                    case InstructionSet.AddressingModeType.ZeroPageY:
-                    case InstructionSet.AddressingModeType.AbsoluteY:
-                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",Y",  });
-                        break;
-
-                    case InstructionSet.AddressingModeType.Indirect:
-                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "("  });
-                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ")" });
-                        break;
-
-                    case InstructionSet.AddressingModeType.IndirectX:
-                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
-                        segments.Add(new Segment { Type = Setting.Punctuation, Value = ",X)" });
-                        break;
-
-                    case InstructionSet.AddressingModeType.IndirectY:
-                        segments.Insert(1, new Segment { Type = Setting.Punctuation, Value = "(" });
-                        segments.Add(new Segment { Type = Setting.Punctuation, Value = "),Y" });
-                        break;
-                    default:
-                        break;
-                }
+                var codeElements = codeView.GetCodeElements(instructionMetrics);
 
                 int measureWidth = 0;
-                foreach (var segment in segments)
-                    measureWidth += PaintCodeElement(codeView, segment.Type, segment.Value, indent: measureWidth, graphics, cellBounds, cellStyle, measureOnly);
+                foreach (var codeElement in codeElements)
+                    measureWidth += PaintCodeElement(codeView, codeElement.Type, codeElement.Value, indent: measureWidth, graphics, cellBounds, cellStyle, measureOnly);
 
                 if (!measureOnly && instructionMetrics.CodeModified)
                 {
@@ -569,12 +715,6 @@ namespace BeebPerf.ux
                 }
             }
 
-            private struct Segment
-            {
-                public DisplaySettings.Setting Type;
-                public Object Value;
-            };
-
             private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
@@ -603,6 +743,12 @@ namespace BeebPerf.ux
 
         class FallThrough 
         { 
+        };
+
+        private struct CodeElement
+        {
+            public DisplaySettings.Setting Type;
+            public Object Value;
         };
 
         private InstructionSet? _InstructionSet;

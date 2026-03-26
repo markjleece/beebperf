@@ -56,6 +56,15 @@ namespace BeebPerf.ux
             _ToolTipTimer.Start();
         }
 
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+
+            Cursor = Cursors.Default;
+            _ToolTipTimer.Stop();
+            _ToolTipTimer.Start();
+        }
+
         protected override void OnMouseLeave(EventArgs e)
         {
             base.OnMouseLeave(e);
@@ -66,6 +75,7 @@ namespace BeebPerf.ux
 
         private void ToolTipTimer_Tick(object? sender, EventArgs e)
         {
+            _ToolTipTimer.Stop();
             if (Visible & ToolTipText != null)
                 _ToolTip.Show(ToolTipText, this);
         }

@@ -19,7 +19,9 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.model;
 using System.Drawing.Drawing2D;
+using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
@@ -27,9 +29,10 @@ namespace BeebPerf.ux
     {
         public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
         public void SetRowHeight(int height);
+        public void UpdateButtons();
     }
 
-    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView
+    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView, IGridExporter
         where ROW_DATA_TYPE : class
     {
         public GridView(SelectionMode selectionMode) : base()
@@ -60,6 +63,8 @@ namespace BeebPerf.ux
             _ScrollTimer = new System.Windows.Forms.Timer { Interval = 500 };
             _ScrollTimer.Tick += ScrollTimerTickFunc;
             Scroll += ScrollFunc;
+
+            InitializeButtons();
         }
 
         protected void SetRowsData(List<ROW_DATA_TYPE> rowsData)
@@ -167,6 +172,7 @@ namespace BeebPerf.ux
             RowCount = rowsData.Count;
 
             ClearSelectionInternal();
+            UpdateButtons();
             Invalidate();
         }
 
@@ -175,6 +181,7 @@ namespace BeebPerf.ux
             _DataRows = [];
             _SelectedDataRow = null;
             RowCount = 0;
+            UpdateButtons();
             Invalidate();
         }
 
@@ -404,6 +411,126 @@ namespace BeebPerf.ux
             Invalidate();
         }
 
+        protected string FormatExportPercentage(int value, int range)
+        {
+            value = Math.Clamp(value, 0, range);
+            var percentage = 100.0 * (double)value / (double)range;
+            return percentage.ToString();
+        }
+
+        protected string FormatAddress(CanonicalAddress address)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return string.Empty;
+
+            return form.DisplaySettings.Format(Setting.Address, address.Address);
+        }
+
+        private void copyButton_Click(object? sender, EventArgs e)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form != null)
+                Exporter.CopyToClipboard(form, this);
+        }
+
+        private void exportButton_Click(object? sender, EventArgs e)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            string recentFolderPath = form.RecentExportFolderPath;
+            Exporter.ExportCSVFile(form, this, ref recentFolderPath);
+            form.RecentExportFolderPath = recentFolderPath;
+        }
+
+        virtual protected string[] OnGetExportHeaders()
+        {
+            return [];
+        }
+
+        string[] IGridExporter.GetHeaders()
+        {
+            return OnGetExportHeaders();
+        }
+
+        virtual protected int OnGetExportRowCount()
+        {
+            return _DataRows.Count;
+        }
+
+        int IGridExporter.GetRowCount()
+        {
+            return OnGetExportRowCount();
+        }
+
+        virtual protected string[] OnGetExportRowValues(int rowIndex)
+        {
+            return [];
+        }
+
+        string[] IGridExporter.GetRowValues(int rowIndex)
+        {
+            return OnGetExportRowValues(rowIndex);
+        }
+
+        private void InitializeButtons()
+        {
+            _CopyButton = new()
+            {
+                Name = "copyButton",
+                ImageResourceName = "copyButton.Image",
+                ToolTipText = "Copy",
+                Parent = this
+            };
+            _CopyButton.Click += copyButton_Click;
+
+            _ExportButton = new()
+            {
+                Name = "exportButton",
+                ImageResourceName = "exportButton.Image",
+                ToolTipText = "Export",
+                Parent = this
+            };
+            _ExportButton.Click += exportButton_Click;
+        }
+
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            base.OnLayout(e);
+            UpdateButtons();
+        }
+
+        public void UpdateButtons()
+        {
+            if (_CopyButton == null || _ExportButton == null)
+                return;
+
+            int width = Width;
+            var vScrollBar = GetVScrollBar();
+            if (vScrollBar != null && vScrollBar.Visible)
+                width -= vScrollBar.Width;
+
+            int padding = (ColumnHeadersHeight - _CopyButton.Height) / 2;
+            bool visible = _DataRows.Count > 0;
+
+            SuspendLayout();
+            _CopyButton.Location = new Point(width - _CopyButton.Width - _ExportButton.Width - padding, padding);
+            _ExportButton.Location = new Point(width - _ExportButton.Width - padding, padding);
+            _CopyButton.Visible = visible;
+            _ExportButton.Visible = visible;
+            ResumeLayout(performLayout: false);
+        }
+
+        private VScrollBar? GetVScrollBar()
+        {
+            foreach (Control control in Controls)
+            {
+                if (control is VScrollBar vScroll)
+                    return vScroll;
+            }
+            return null;
+        }
+
         private void CellPaintingFunc(object? sender, DataGridViewCellPaintingEventArgs e)
         {
             if (e.RowIndex > -1 || e.ColumnIndex < 0)
@@ -614,5 +741,7 @@ namespace BeebPerf.ux
         private SelectionMode _SelectionMode;
         private ReentrancyGuard _ReentrancyGuard = new();
         private bool _SuppressSelectionChangeEvent;
+        private ButtonEx _CopyButton = new();
+        private ButtonEx _ExportButton = new();
     }
 }

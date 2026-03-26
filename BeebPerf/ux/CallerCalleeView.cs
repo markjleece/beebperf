@@ -21,6 +21,7 @@
 
 using BeebPerf.model;
 using static BeebPerf.CPUAnalysis;
+using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
@@ -298,9 +299,17 @@ namespace BeebPerf.ux
         {
             var routine = routineCell.Routine;
             if (routine.Label.Length > 0)
-                return $"{routine.StartAddress} {routine.Label}";
+                return $"{FormatAddress(routine.StartAddress)} {routine.Label}";
             else
-                return routine.StartAddress.ToString();
+                return FormatAddress(routine.StartAddress);
+        }
+
+        private string FormatAddress(CanonicalAddress address)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return string.Empty;
+
+            return form.DisplaySettings.Format(Setting.Address, address.Address);
         }
 
         private void LayoutRoutineCells()

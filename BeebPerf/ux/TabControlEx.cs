@@ -51,6 +51,8 @@ namespace BeebPerf.ux
                     SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
                     SelectedTabChanged?.Invoke(this, EventArgs.Empty);
                     UpdateTabs();
+                    if (_SelectedTab != null)
+                        UpdateGridViewButtons(_SelectedTab);
                 }
             }
         }
@@ -74,8 +76,20 @@ namespace BeebPerf.ux
                     SelectedTabChanged?.Invoke(this, EventArgs.Empty);
                     SelectedIndexChanged?.Invoke(this, EventArgs.Empty);
                     UpdateTabs();
+                    if (_SelectedTab != null)
+                        UpdateGridViewButtons(_SelectedTab);
                 }
             }
+        }
+
+        private void UpdateGridViewButtons(Control control)
+        {
+            var gridView = control as IGridView;
+            if (gridView != null)
+                gridView.UpdateButtons();
+
+            foreach (Control child in control.Controls)
+                UpdateGridViewButtons(child);
         }
 
         private void MouseClickFunc(object? sender, MouseEventArgs e)

@@ -21,8 +21,6 @@
 
 using BeebPerf.ux;
 using System.Text;
-using static BeebPerf.VideoAnalysis;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace BeebPerf
 {
@@ -144,6 +142,9 @@ namespace BeebPerf
         static private string FormatValue(string value, char delimiter)
         {
             value = value.Trim();
+
+            if (value.StartsWith('$'))
+                value = '\'' + value;
 
             if (value.Length == 0)
                 return "\"\"";

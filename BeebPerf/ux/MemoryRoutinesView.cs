@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -30,6 +31,17 @@ namespace BeebPerf.ux
         private const int ReadWriteCountColumnIndex = 1;
         private const int ReadCountColumnIndex = 2;
         private const int WriteCountColumnIndex = 3;
+
+        private const int ExportRoutineAddressColumnIndex = 0;
+        private const int ExportRoutinePageColumnIndex = 1;
+        private const int ExportRoutineLabelColumnIndex = 2;
+        private const int ExportReadWriteCountColumnIndex = 3;
+        private const int ExportReadWritePercentageColumnIndex = 4;
+        private const int ExportReadCountColumnIndex = 5;
+        private const int ExportReadPercentageColumnIndex = 6;
+        private const int ExportWriteCountColumnIndex = 7;
+        private const int ExportWritePercentageColumnIndex = 8;
+        private const int ExportColumnCount = 9;
 
         public MemoryRoutinesView() : base(System.Windows.Forms.SelectionMode.One)
         {
@@ -97,7 +109,7 @@ namespace BeebPerf.ux
         protected override string OnFormatRowData(RoutineMemoryAccess memoryAccess, int columnIndex, int rowIndex)
         {
             if (columnIndex == RoutineColumnIndex)
-                return $"{memoryAccess.Routine.StartAddress} {memoryAccess.Routine.Label}";
+                return $"{FormatAddress(memoryAccess.Routine.StartAddress)} {memoryAccess.Routine.Label}";
             else
                 return FormatCountAndRange(memoryAccess, columnIndex);
         }
@@ -110,6 +122,53 @@ namespace BeebPerf.ux
                 ReadCountColumnIndex => (value: memoryAccess.ReadCount, range: _TotalReadCount),
                 WriteCountColumnIndex => (value: memoryAccess.WriteCount, range: _TotalWriteCount),
                 _ => (value: -1, range: 1)
+            };
+        }
+
+        protected override string[] OnGetExportHeaders()
+        {
+            string[] headers = [
+                "Routine address",
+                "Routine page",
+                "Routine label",
+                "Reads/writes [#]",
+                "Reads/writes [%]",
+                "Reads [#]",
+                "Reads [%]",
+                "Writes [#]",
+                "Writes [%]"
+            ];
+
+            Debug.Assert(headers.Length == ExportColumnCount);
+            return headers;
+        }
+
+        protected override string[] OnGetExportRowValues(int rowIndex)
+        {
+            List<string> rowValues = new();
+
+            var rowData = _DataRows[rowIndex];
+
+            for (int columnIndex = 0; columnIndex < ExportColumnCount; columnIndex++)
+                rowValues.Add(FormatExportCell(rowData, columnIndex));
+
+            return rowValues.ToArray();
+        }
+
+        private string FormatExportCell(RoutineMemoryAccess memoryAccess, int columnIndex)
+        {
+            return columnIndex switch
+            {
+                ExportRoutineAddressColumnIndex => FormatAddress(memoryAccess.Routine.StartAddress),
+                ExportRoutinePageColumnIndex => memoryAccess.Routine.StartAddress.Page.ToString(),
+                ExportRoutineLabelColumnIndex => memoryAccess.Routine.Label,
+                ExportReadWriteCountColumnIndex => (memoryAccess.ReadCount + memoryAccess.WriteCount).ToString(),
+                ExportReadWritePercentageColumnIndex => FormatExportPercentage(memoryAccess.ReadCount + memoryAccess.WriteCount, _TotalReadCount + _TotalWriteCount),
+                ExportReadCountColumnIndex => memoryAccess.ReadCount.ToString(),
+                ExportReadPercentageColumnIndex => FormatExportPercentage(memoryAccess.ReadCount, _TotalReadCount),
+                ExportWriteCountColumnIndex => memoryAccess.WriteCount.ToString(),
+                ExportWritePercentageColumnIndex => FormatExportPercentage(memoryAccess.WriteCount, _TotalWriteCount),
+                _ => string.Empty
             };
         }
 
