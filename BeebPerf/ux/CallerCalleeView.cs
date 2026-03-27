@@ -25,7 +25,7 @@ using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
-    internal class CallerCalleeView : Panel
+    internal class CallerCalleeView : Panel, IDataView
     {
         public CallerCalleeView() : base() 
         {
@@ -34,6 +34,8 @@ namespace BeebPerf.ux
             _ToolTipTimer = new();
             _ToolTipTimer.Interval = 500;
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
+
+            InitializeButtons();
         }
 
         public void Initialize(
@@ -130,6 +132,7 @@ namespace BeebPerf.ux
             _Callers = _GetCallerMetrics!.Invoke(routine);
             _Callees = _GetCalleeMetrics!.Invoke(routine);
             LayoutRoutineCells();
+            (this as IDataView).UpdateButtons();
             Invalidate();
         }
 
@@ -139,6 +142,7 @@ namespace BeebPerf.ux
             _Callers = new();
             _Callees = new();
             _RoutineCells.Clear();
+            (this as IDataView).UpdateButtons();
             Invalidate();
         }
 
@@ -291,7 +295,7 @@ namespace BeebPerf.ux
 
         private string FormatMetrics(RoutineCell routineCell)
         {
-            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            var percentage = double.Min(100.0 * routineCell.CycleCount / routineCell.TotalCycleCount, 100);
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
@@ -352,6 +356,7 @@ namespace BeebPerf.ux
                     Rectangle = rect,
                     Routine = _Routine!,
                     CycleCount = _Routine!.AggregateMetrics.InclusiveCycleCount,
+                    TotalCycleCount = _TotalCycleCount,
                     ExecutionCount = _Routine!.AggregateMetrics.ExecutionCount,
                     CellType = RoutineCellType.Self
                 });
@@ -366,6 +371,7 @@ namespace BeebPerf.ux
                     Rectangle = rect,
                     Routine = _Routine!,
                     CycleCount = _Routine!.AggregateMetrics.SelfCycleCount,
+                    TotalCycleCount = _TotalCycleCount,
                     ExecutionCount = _Routine!.AggregateMetrics.ExecutionCount,
                     CellType = RoutineCellType.SelfBody,
                     ShowHotness = true
@@ -404,12 +410,62 @@ namespace BeebPerf.ux
                         Rectangle = rect,
                         Routine = routineMetric.Routine,
                         CycleCount = routineMetric.CPUMetrics.InclusiveCycleCount,
+                        TotalCycleCount = _SiblingPercentages ? totalInclusiveCycles : _TotalCycleCount,
                         ExecutionCount = routineMetric.CPUMetrics.ExecutionCount,
                         ShowHotness = (cellType == RoutineCellType.Callee),
                         CellType = cellType
                     });
                 }
             }
+        }
+
+        private void InitializeButtons()
+        {
+            _PercentageButton = new()
+            {
+                Name = "percentageButton",
+                ImageResourceName = "percentageButton.Image",
+                ToolTipText = "global/relative percentages",
+                Parent = this
+            };
+            _PercentageButton.Click += percentageButton_Click;
+        }
+
+        private VScrollBar? GetVScrollBar()
+        {
+            foreach (Control control in Controls)
+            {
+                if (control is VScrollBar vScroll)
+                    return vScroll;
+            }
+            return null;
+        }
+
+        void IDataView.UpdateButtons()
+        {
+            if (_PercentageButton == null)
+                return;
+
+            int width = Width;
+            var vScrollBar = GetVScrollBar();
+            if (vScrollBar != null && vScrollBar.Visible)
+                width -= vScrollBar.Width;
+
+            int padding = 2;
+
+            SuspendLayout();
+
+            _PercentageButton.Location = new Point(width - _PercentageButton.Width - padding, padding);
+            _PercentageButton.Visible = (_Routine != null);
+
+            ResumeLayout(performLayout: false);
+        }
+
+        private void percentageButton_Click(object? sender, EventArgs e)
+        {
+            _SiblingPercentages = !_SiblingPercentages;
+            LayoutRoutineCells();
+            Invalidate();
         }
 
         private void ShowToolTip(RoutineCell routineCell, Point mousePosition)
@@ -490,6 +546,7 @@ namespace BeebPerf.ux
             public required Routine Routine;
             public required Rectangle Rectangle;
             public required int CycleCount;
+            public required int TotalCycleCount;
             public required int ExecutionCount;
             public required RoutineCellType CellType;
             public bool ShowHotness;
@@ -510,5 +567,7 @@ namespace BeebPerf.ux
         private string _ToolTipText = string.Empty;
         private Point _ToolTipLocation;
         private System.Windows.Forms.Timer _ToolTipTimer = new();
+        private ButtonEx? _PercentageButton = null;
+        private bool _SiblingPercentages = false;
     }
 }

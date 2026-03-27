@@ -25,7 +25,7 @@ using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class RoutinesView : GridView<Routine>
+    internal class RoutinesView : GridView<Routine>, IGridExporter
     {
         private const int RoutineColumnIndex = 0;
         private const int TotalCPUColumnIndex = 1;
@@ -51,7 +51,7 @@ namespace BeebPerf.ux
 
         public int TotalCycleCount;
 
-        public RoutinesView() : base(System.Windows.Forms.SelectionMode.One)
+        public RoutinesView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
             var cellTemplate = new CellTemplate();
             AddColumn("Routine", "Routine", cellTemplate);
@@ -176,7 +176,23 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override string[] OnGetExportHeaders()
+        override protected void OnCopyButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, this);
+        }
+
+        override protected void OnExportButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.ExportCSVFile(form, this);
+        }
+
+        string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
                 "Routine address",
@@ -198,7 +214,12 @@ namespace BeebPerf.ux
             return headers;
         }
 
-        protected override string[] OnGetExportRowValues(int rowIndex)
+        int IGridExporter.GetRowCount()
+        {
+            return _DataRows.Count;
+        }
+
+        string[] IGridExporter.GetRowValues(int rowIndex)
         {
             List<string> rowValues = new();
 

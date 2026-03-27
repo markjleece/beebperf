@@ -24,7 +24,7 @@ using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
-    internal class FlameGraphView : Panel
+    internal class FlameGraphView : Panel, IDataView
     {
         public FlameGraphView() : base() 
         {
@@ -46,6 +46,8 @@ namespace BeebPerf.ux
             _ToolTipTimer = new();
             _ToolTipTimer.Interval = 500;
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
+
+            InitializeButtons();
         }
 
         public void AddCallTree(CallTreeNode treeNode)
@@ -78,13 +80,6 @@ namespace BeebPerf.ux
             if (token == null) return;
 
             ClearSelectionInternal();
-        }
-
-        public void FlipView()
-        {
-            _FlipView = !_FlipView;
-            SetVScrollValue(0);
-            Invalidate();
         }
 
         protected override void OnResize(EventArgs eventArgs)
@@ -243,14 +238,37 @@ namespace BeebPerf.ux
             Color lineColor = lightMode ? Color.DarkRed : _ColorLightRed;
             Color fillColor = lightMode ? _ColorLightRed : Color.DarkRed;
 
-            using var linePen = new Pen(lineColor);
-            using var selectedLinePen = new Pen(lineColor, 2);
-            using var fillBrush = new SolidBrush(fillColor);
-            using var focusFillBrush = new SolidBrush(Blend(fillColor, ForeColor, 0.1));
+            using var colorPen = new Pen(lineColor);
+            using var colorSelectedPen = new Pen(lineColor, 2);
+            using var colorBrush = new SolidBrush(fillColor);
+            using var colorFocusBrush = new SolidBrush(Blend(fillColor, ForeColor, 0.1));
+
+            Color grayFillColor = lightMode ? Color.LightGray : Color.Gray;
+            Color grayLineColor = Blend(lightMode ? Color.LightGray : Color.Gray, ForeColor, 0.1);
+
+            using var grayPen = new Pen(grayLineColor);
+            using var graySelectedPen = new Pen(grayLineColor, 2);
+            using var grayBrush = new SolidBrush(grayFillColor);
+            using var grayFocusBrush = new SolidBrush(Blend(grayFillColor, ForeColor, 0.1));
+
             using var textBrush = new SolidBrush(ForeColor);
 
             foreach (var routineCell in _RoutineCells)
-                PaintRoutineCell(routineCell, e, linePen, selectedLinePen, fillBrush, focusFillBrush, textBrush);
+            {
+                var callType = routineCell.CallStack.CallType;
+                bool isTailCallOrFallthrough = (callType == CallType.TailCall || callType == CallType.FallThrough);
+
+                if (!_ShowCallTypes)
+                    isTailCallOrFallthrough = false;
+
+                PaintRoutineCell(
+                    routineCell, e,
+                    isTailCallOrFallthrough ? grayPen : colorPen,
+                    isTailCallOrFallthrough ? graySelectedPen : colorSelectedPen,
+                    isTailCallOrFallthrough ? grayBrush : colorBrush,
+                    isTailCallOrFallthrough ? grayFocusBrush : colorFocusBrush,
+                    textBrush);
+            }
         }
 
         private void PaintRoutineCell(
@@ -379,7 +397,7 @@ namespace BeebPerf.ux
 
         private string FormatMetrics(RoutineCell routineCell)
         {
-            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            var percentage = double.Min(100.0 * routineCell.CycleCount / routineCell.TotalCycleCount, 100);
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
@@ -395,7 +413,7 @@ namespace BeebPerf.ux
         private string FormatCell(RoutineCell routineCell)
         {
             var routine = routineCell.Routine;
-            var percentage = double.Min(100.0 * routineCell.CycleCount / _TotalCycleCount, 100);
+            var percentage = double.Min(100.0 * routineCell.CycleCount / routineCell.TotalCycleCount, 100);
             if (routine.Label.Length > 0)
                 return $"{FormatAddress(routine.StartAddress)} {routine.Label} {percentage:F2}%";
             else
@@ -466,6 +484,14 @@ namespace BeebPerf.ux
             var sortedSiblings = siblings.ToList();
             sortedSiblings.Sort((a, b) => b.CPUMetrics.InclusiveCycleCount.CompareTo(a.CPUMetrics.InclusiveCycleCount));
 
+            // calculate total cycle count
+            int totalCycleCount = 0;
+            if (_SiblingPercentages)
+                foreach (var sibling in sortedSiblings)
+                    totalCycleCount += sibling.CPUMetrics.InclusiveCycleCount;
+            else 
+                totalCycleCount = _TotalCycleCount;
+
             // layout siblings
             int cycleCount = 0;
             foreach (var sibling in sortedSiblings)
@@ -484,7 +510,8 @@ namespace BeebPerf.ux
                         Routine = sibling.Routine,
                         CallStack = sibling.CallStack,
                         Rectangle = rect,
-                        CycleCount = sibling.CPUMetrics.InclusiveCycleCount
+                        CycleCount = sibling.CPUMetrics.InclusiveCycleCount,
+                        TotalCycleCount = totalCycleCount
                     });
                 }
 
@@ -661,6 +688,93 @@ namespace BeebPerf.ux
             }
         }
 
+        private void InitializeButtons()
+        {
+            _PercentageButton = new()
+            {
+                Name = "percentageButton",
+                ImageResourceName = "percentageButton.Image",
+                ToolTipText = "global/sibling percentages",
+                Parent = this
+            };
+            _PercentageButton.Click += percentageButton_Click;
+
+            _CallTypesButton = new()
+            {
+                Name = "callTypesButton",
+                ImageResourceName = "callTypesButton.Image",
+                ToolTipText = "Call types",
+                Parent = this
+            };
+            _CallTypesButton.Click += callTypesButton_Click;
+
+            _FlipViewButton = new()
+            {
+                Name = "flipViewButton",
+                ImageResourceName = "flipViewButton.Image",
+                ToolTipText = "Flip view",
+                Parent = this
+            };
+            _FlipViewButton.Click += flipViewButton_Click;
+
+        }
+
+        private VScrollBar? GetVScrollBar()
+        {
+            foreach (Control control in Controls)
+            {
+                if (control is VScrollBar vScroll)
+                    return vScroll;
+            }
+            return null;
+        }
+
+        void IDataView.UpdateButtons()
+        {
+            if (_PercentageButton == null || _CallTypesButton == null || _FlipViewButton == null)
+                return;
+
+            int width = Width;
+            var vScrollBar = GetVScrollBar();
+            if (vScrollBar != null && vScrollBar.Visible)
+                width -= vScrollBar.Width;
+
+            int padding = 2;
+
+            SuspendLayout();
+
+            _PercentageButton.Location = new Point(width - _PercentageButton.Width - padding, padding);
+            _PercentageButton.Visible = true;
+
+            _CallTypesButton.Location = new Point(width - _PercentageButton.Width - _CallTypesButton.Width - padding, padding);
+            _CallTypesButton.Visible = true;
+
+            _FlipViewButton.Location = new Point(width - _FlipViewButton.Width  - _PercentageButton.Width - _CallTypesButton.Width - padding, padding);
+            _FlipViewButton.Visible = true;
+
+            ResumeLayout(performLayout: false);
+        }
+
+        private void percentageButton_Click(object? sender, EventArgs e)
+        {
+            _SiblingPercentages = !_SiblingPercentages;
+            LayoutRoutineCells();
+            Invalidate();
+        }
+
+        private void callTypesButton_Click(object? sender, EventArgs e)
+        {
+            _ShowCallTypes = !_ShowCallTypes;
+            Invalidate();
+        }
+
+        public void flipViewButton_Click(object? sender, EventArgs e)
+        {
+            _FlipView = !_FlipView;
+            SetVScrollValue(0);
+            Invalidate();
+        }
+
         private Color Blend(Color first, Color second, double ratio)
         {
             int r = (int)(first.R * (1 - ratio) + second.R * ratio);
@@ -682,11 +796,11 @@ namespace BeebPerf.ux
             public required CallStack CallStack;
             public required Rectangle Rectangle;
             public required int CycleCount;
+            public required int TotalCycleCount;
         }
 
         private Routine? _SelectedRoutine = null;
         private CallStack? _SelectedCallStack = null;
-        private bool _FlipView;
         private RoutineCell? _FocusRoutineCell;
         private List<RoutineCell> _RoutineCells = new();
         private List<CallTreeNode> _CallTrees = new();
@@ -704,5 +818,11 @@ namespace BeebPerf.ux
         private int _PrevWidth = 0;
         private VScrollBar _VScrollBar;
         private HScrollBar _HScrollBar;
+        private ButtonEx? _PercentageButton = null;
+        private ButtonEx? _CallTypesButton = null;
+        private ButtonEx? _FlipViewButton = null;
+        private bool _SiblingPercentages = false;
+        private bool _ShowCallTypes = false;
+        private bool _FlipView = false;
     }
 }

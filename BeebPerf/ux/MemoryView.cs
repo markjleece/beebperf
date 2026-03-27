@@ -25,7 +25,7 @@ using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class MemoryView : GridView<MemoryAccess>
+    internal class MemoryView : GridView<MemoryAccess>, IGridExporter
     {
         private const int AddressColumnIndex = 0;
         private const int PageColumnIndex = 1;
@@ -45,7 +45,7 @@ namespace BeebPerf.ux
         private const int ExportWritePercentageColumnIndex = 8;
         private const int ExportColumnCount = 9;
 
-        public MemoryView() : base(System.Windows.Forms.SelectionMode.One)
+        public MemoryView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
             AddColumn("Address", "Address", cellTemplate: null);
             AddColumn("Page", "Page", cellTemplate: null);
@@ -141,7 +141,23 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override string[] OnGetExportHeaders()
+        override protected void OnCopyButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, this);
+        }
+
+        override protected void OnExportButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.ExportCSVFile(form, this);
+        }
+
+        string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
                 "Memory address",
@@ -159,7 +175,12 @@ namespace BeebPerf.ux
             return headers;
         }
 
-        protected override string[] OnGetExportRowValues(int rowIndex)
+        int IGridExporter.GetRowCount()
+        {
+            return _DataRows.Count;
+        }
+
+        string[] IGridExporter.GetRowValues(int rowIndex)
         {
             List<string> rowValues = new();
 

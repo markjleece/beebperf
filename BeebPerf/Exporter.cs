@@ -63,7 +63,7 @@ namespace BeebPerf
             Clipboard.SetText(text);
         }
 
-        static public void ExportCSVFile(BeebPerfForm form, IGridExporter gridExporter, ref string recentExportFolderPath)
+        static public void ExportCSVFile(BeebPerfForm form, IGridExporter gridExporter)
         {
             SaveFileDialog exportDialog = new()
             {
@@ -72,12 +72,12 @@ namespace BeebPerf
                 DefaultExt = "csv",
                 AddExtension = true,
                 OverwritePrompt = true,
-                InitialDirectory = recentExportFolderPath
+                InitialDirectory = form.RecentExportFolderPath
             };
 
             if (exportDialog.ShowDialog() == DialogResult.OK)
             {
-                recentExportFolderPath = Path.GetDirectoryName(exportDialog.FileName)!;
+                form.RecentExportFolderPath = Path.GetDirectoryName(exportDialog.FileName)!;
 
                 string csvText = FormatData(gridExporter, ',');
 

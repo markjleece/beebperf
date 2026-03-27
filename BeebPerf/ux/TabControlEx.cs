@@ -84,9 +84,9 @@ namespace BeebPerf.ux
 
         private void UpdateGridViewButtons(Control control)
         {
-            var gridView = control as IGridView;
-            if (gridView != null)
-                gridView.UpdateButtons();
+            var dataView = control as IDataView;
+            if (dataView != null)
+                dataView.UpdateButtons();
 
             foreach (Control child in control.Controls)
                 UpdateGridViewButtons(child);

@@ -25,17 +25,28 @@ using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
-    internal interface IGridView
+    internal interface IDataView
     {
-        public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
-        public void SetRowHeight(int height);
         public void UpdateButtons();
     }
 
-    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView, IGridExporter
+    internal interface IGridView : IDataView
+    {
+        public void AutoResizeColumns(DataGridViewAutoSizeColumnsMode mode);
+        public void SetRowHeight(int height);
+    }
+
+    internal class GridView<ROW_DATA_TYPE> : DataGridView, IGridView
         where ROW_DATA_TYPE : class
     {
-        public GridView(SelectionMode selectionMode) : base()
+        public enum ButtonType : int
+        {
+            Percentage = 0x1,
+            Copy = 0x2,
+            Export = 0x4
+        };
+
+        public GridView(SelectionMode selectionMode, ButtonType buttons) : base()
         {
             AllowUserToAddRows = false;
             AllowUserToDeleteRows = false;
@@ -64,7 +75,7 @@ namespace BeebPerf.ux
             _ScrollTimer.Tick += ScrollTimerTickFunc;
             Scroll += ScrollFunc;
 
-            InitializeButtons();
+            InitializeButtons(buttons);
         }
 
         protected void SetRowsData(List<ROW_DATA_TYPE> rowsData)
@@ -172,7 +183,7 @@ namespace BeebPerf.ux
             RowCount = rowsData.Count;
 
             ClearSelectionInternal();
-            UpdateButtons();
+            (this as IDataView).UpdateButtons();
             Invalidate();
         }
 
@@ -181,7 +192,7 @@ namespace BeebPerf.ux
             _DataRows = [];
             _SelectedDataRow = null;
             RowCount = 0;
-            UpdateButtons();
+            (this as IDataView).UpdateButtons();
             Invalidate();
         }
 
@@ -426,83 +437,54 @@ namespace BeebPerf.ux
             return form.DisplaySettings.Format(Setting.Address, address.Address);
         }
 
-        private void copyButton_Click(object? sender, EventArgs e)
+        private void InitializeButtons(ButtonType buttons)
         {
-            var form = FindForm() as BeebPerfForm;
-            if (form != null)
-                Exporter.CopyToClipboard(form, this);
-        }
-
-        private void exportButton_Click(object? sender, EventArgs e)
-        {
-            var form = FindForm() as BeebPerfForm;
-            if (form == null) return;
-
-            string recentFolderPath = form.RecentExportFolderPath;
-            Exporter.ExportCSVFile(form, this, ref recentFolderPath);
-            form.RecentExportFolderPath = recentFolderPath;
-        }
-
-        virtual protected string[] OnGetExportHeaders()
-        {
-            return [];
-        }
-
-        string[] IGridExporter.GetHeaders()
-        {
-            return OnGetExportHeaders();
-        }
-
-        virtual protected int OnGetExportRowCount()
-        {
-            return _DataRows.Count;
-        }
-
-        int IGridExporter.GetRowCount()
-        {
-            return OnGetExportRowCount();
-        }
-
-        virtual protected string[] OnGetExportRowValues(int rowIndex)
-        {
-            return [];
-        }
-
-        string[] IGridExporter.GetRowValues(int rowIndex)
-        {
-            return OnGetExportRowValues(rowIndex);
-        }
-
-        private void InitializeButtons()
-        {
-            _CopyButton = new()
+            if ((buttons & ButtonType.Percentage) != 0)
             {
-                Name = "copyButton",
-                ImageResourceName = "copyButton.Image",
-                ToolTipText = "Copy",
-                Parent = this
-            };
-            _CopyButton.Click += copyButton_Click;
+                _PercentageButton = new()
+                {
+                    Name = "percentageButton",
+                    ImageResourceName = "percentageButton.Image",
+                    ToolTipText = "global/sibling percentages",
+                    Parent = this
+                };
+                _PercentageButton.Click += percentageButton_Click;
+            }
 
-            _ExportButton = new()
+            if ((buttons & ButtonType.Copy) != 0)
             {
-                Name = "exportButton",
-                ImageResourceName = "exportButton.Image",
-                ToolTipText = "Export",
-                Parent = this
-            };
-            _ExportButton.Click += exportButton_Click;
+                _CopyButton = new()
+                {
+                    Name = "copyButton",
+                    ImageResourceName = "copyButton.Image",
+                    ToolTipText = "Copy",
+                    Parent = this
+                };
+                _CopyButton.Click += copyButton_Click;
+            }
+
+            if ((buttons & ButtonType.Export) != 0)
+            {
+                _ExportButton = new()
+                {
+                    Name = "exportButton",
+                    ImageResourceName = "exportButton.Image",
+                    ToolTipText = "Export",
+                    Parent = this
+                };
+                _ExportButton.Click += exportButton_Click;
+            }
         }
 
         protected override void OnLayout(LayoutEventArgs e)
         {
             base.OnLayout(e);
-            UpdateButtons();
+            (this as IDataView).UpdateButtons();
         }
 
-        public void UpdateButtons()
+        void IDataView.UpdateButtons()
         {
-            if (_CopyButton == null || _ExportButton == null)
+            if (_PercentageButton == null && _CopyButton == null && _ExportButton == null)
                 return;
 
             int width = Width;
@@ -510,14 +492,41 @@ namespace BeebPerf.ux
             if (vScrollBar != null && vScrollBar.Visible)
                 width -= vScrollBar.Width;
 
-            int padding = (ColumnHeadersHeight - _CopyButton.Height) / 2;
+            int buttonHeight = 0;
+            if (_PercentageButton != null)
+                buttonHeight = _PercentageButton.Height;
+            else if (_CopyButton != null)
+                buttonHeight = _CopyButton.Height;
+            else if (_ExportButton != null)
+                buttonHeight = _ExportButton.Height;
+
+            int padding = (ColumnHeadersHeight - buttonHeight) / 2;
+            width -= padding;
+
             bool visible = _DataRows.Count > 0;
 
             SuspendLayout();
-            _CopyButton.Location = new Point(width - _CopyButton.Width - _ExportButton.Width - padding, padding);
-            _ExportButton.Location = new Point(width - _ExportButton.Width - padding, padding);
-            _CopyButton.Visible = visible;
-            _ExportButton.Visible = visible;
+
+            if (_ExportButton != null)
+            {
+                _ExportButton.Location = new Point(width - _ExportButton.Width, padding);
+                _ExportButton.Visible = visible;
+                width -= _ExportButton.Width;
+            }
+
+            if (_CopyButton != null)
+            {
+                _CopyButton.Location = new Point(width - _CopyButton.Width, padding);
+                _CopyButton.Visible = visible;
+                width -= _CopyButton.Width;
+            }
+
+            if (_PercentageButton != null)
+            {
+                _PercentageButton.Location = new Point(width - _PercentageButton.Width, padding);
+                _PercentageButton.Visible = visible;
+            }
+
             ResumeLayout(performLayout: false);
         }
 
@@ -529,6 +538,36 @@ namespace BeebPerf.ux
                     return vScroll;
             }
             return null;
+        }
+
+        virtual protected void OnPercentageButtonClick()
+        {
+            return;
+        }
+
+        private void percentageButton_Click(object? sender, EventArgs e)
+        {
+            OnPercentageButtonClick();
+        }
+
+        virtual protected void OnCopyButtonClick()
+        {
+            return;
+        }
+
+        private void copyButton_Click(object? sender, EventArgs e)
+        {
+            OnCopyButtonClick();
+        }
+
+        virtual protected void OnExportButtonClick()
+        {
+            return;
+        }
+
+        private void exportButton_Click(object? sender, EventArgs e)
+        {
+            OnExportButtonClick();
         }
 
         private void CellPaintingFunc(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -741,7 +780,8 @@ namespace BeebPerf.ux
         private SelectionMode _SelectionMode;
         private ReentrancyGuard _ReentrancyGuard = new();
         private bool _SuppressSelectionChangeEvent;
-        private ButtonEx _CopyButton = new();
-        private ButtonEx _ExportButton = new();
+        private ButtonEx? _PercentageButton = null;
+        private ButtonEx? _CopyButton = new();
+        private ButtonEx? _ExportButton = new();
     }
 }

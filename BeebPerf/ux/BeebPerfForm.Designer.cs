@@ -34,6 +34,8 @@ namespace BeebPerf.ux
             DataGridViewCellStyle dataGridViewCellStyle = new DataGridViewCellStyle();
             toolStrip = new ToolStrip();
             openButton = new ToolStripButton();
+            hotRoutinesButton = new ToolStripButton();
+            hotPathsButton = new ToolStripButton();
             toolStripSeparator1 = new ToolStripSeparator();
             undoButton = new ToolStripButton();
             redoButton = new ToolStripButton();
@@ -45,10 +47,6 @@ namespace BeebPerf.ux
             fitSelectionButton = new ToolStripButton();
             fitFramesButton = new ToolStripButton();
             toolStripSeparator4 = new ToolStripSeparator();
-            hotRoutinesButton = new ToolStripButton();
-            hotPathsButton = new ToolStripButton();
-            flipViewButton = new ToolStripButton();
-            toolStripSeparator5 = new ToolStripSeparator();
             labelsButton = new ToolStripButton();
             settingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
@@ -93,7 +91,9 @@ namespace BeebPerf.ux
             toolStrip.ImageScalingSize = new Size(24, 24);
             toolStrip.Items.AddRange(new ToolStripItem[] 
             { 
-                openButton, 
+                openButton,
+                hotRoutinesButton,
+                hotPathsButton,
                 toolStripSeparator1, 
                 undoButton, 
                 redoButton, 
@@ -105,10 +105,6 @@ namespace BeebPerf.ux
                 fitSelectionButton,
                 fitFramesButton,
                 toolStripSeparator4, 
-                hotRoutinesButton, 
-                hotPathsButton, 
-                flipViewButton,
-                toolStripSeparator5, 
                 labelsButton,
                 settingsButton, 
                 helpButton
@@ -129,6 +125,28 @@ namespace BeebPerf.ux
             openButton.Text = "Open";
             openButton.ToolTipText = "Open";
             openButton.Click += openButton_Click;
+            // 
+            // hotRoutinesButton
+            // 
+            hotRoutinesButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            hotRoutinesButton.Image = (Image)resources.GetObject("hotRoutinesButton.Image");
+            hotRoutinesButton.ImageTransparentColor = Color.Magenta;
+            hotRoutinesButton.Name = "hotRoutinesButton";
+            hotRoutinesButton.Size = new Size(34, 28);
+            hotRoutinesButton.Text = "Hot Routines";
+            hotRoutinesButton.ToolTipText = "Hot Routines";
+            hotRoutinesButton.Click += hotRoutinesButton_Click;
+            // 
+            // hotPathsButton
+            // 
+            hotPathsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            hotPathsButton.Image = (Image)resources.GetObject("hotPathsButton.Image");
+            hotPathsButton.ImageTransparentColor = Color.Magenta;
+            hotPathsButton.Name = "hotPathsButton";
+            hotPathsButton.Size = new Size(34, 28);
+            hotPathsButton.Text = "Hot Paths";
+            hotPathsButton.ToolTipText = "Hot Paths";
+            hotPathsButton.Click += hotPathsButton_Click;
             // 
             // toolStripSeparator1
             // 
@@ -222,44 +240,6 @@ namespace BeebPerf.ux
             // 
             toolStripSeparator4.Name = "toolStripSeparator4`";
             toolStripSeparator4.Size = new Size(6, 33);
-            // 
-            // hotRoutinesButton
-            // 
-            hotRoutinesButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            hotRoutinesButton.Image = (Image)resources.GetObject("hotRoutinesButton.Image");
-            hotRoutinesButton.ImageTransparentColor = Color.Magenta;
-            hotRoutinesButton.Name = "hotRoutinesButton";
-            hotRoutinesButton.Size = new Size(34, 28);
-            hotRoutinesButton.Text = "Hot Routines";
-            hotRoutinesButton.ToolTipText = "Hot Routines";
-            hotRoutinesButton.Click += hotRoutinesButton_Click;
-            // 
-            // hotPathsButton
-            // 
-            hotPathsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            hotPathsButton.Image = (Image)resources.GetObject("hotPathsButton.Image");
-            hotPathsButton.ImageTransparentColor = Color.Magenta;
-            hotPathsButton.Name = "hotPathsButton";
-            hotPathsButton.Size = new Size(34, 28);
-            hotPathsButton.Text = "Hot Paths";
-            hotPathsButton.ToolTipText = "Hot Paths";
-            hotPathsButton.Click += hotPathsButton_Click;
-            // 
-            // flipViewButton
-            // 
-            flipViewButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            flipViewButton.Image = (Image)resources.GetObject("flipViewButton.Image");
-            flipViewButton.ImageTransparentColor = Color.Magenta;
-            flipViewButton.Name = "flipViewButton";
-            flipViewButton.Size = new Size(34, 28);
-            flipViewButton.Text = "Flip View";
-            flipViewButton.ToolTipText = "Flip View";
-            flipViewButton.Click += flipViewButton_Click;
-            // 
-            // toolStripSeparator5
-            // 
-            toolStripSeparator5.Name = "toolStripSeparator5";
-            toolStripSeparator5.Size = new Size(6, 33);
             // 
             // labelsButton
             // 
@@ -508,6 +488,9 @@ namespace BeebPerf.ux
         #endregion
 
         private ToolStrip toolStrip;
+        private ToolStripButton openButton;
+        private ToolStripButton hotRoutinesButton;
+        private ToolStripButton hotPathsButton;
         private ToolStripSeparator toolStripSeparator1;
         private ToolStripButton undoButton;
         private ToolStripButton redoButton;
@@ -519,14 +502,9 @@ namespace BeebPerf.ux
         private ToolStripButton fitSelectionButton;
         private ToolStripButton fitFramesButton;
         private ToolStripSeparator toolStripSeparator4;
-        private ToolStripButton hotRoutinesButton;
-        private ToolStripButton hotPathsButton;
-        private ToolStripButton flipViewButton;
-        private ToolStripSeparator toolStripSeparator5;
         private ToolStripButton labelsButton;
         private ToolStripButton settingsButton;
         private ToolStripButton helpButton;
-        private ToolStripButton openButton;
         private TimelineView timelineView;
         private SplitContainer primarySplitContainer;
         private SplitContainer secondarySplitContainer;

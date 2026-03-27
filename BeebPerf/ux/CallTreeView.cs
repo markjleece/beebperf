@@ -21,10 +21,11 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
+using System.Xml.Linq;
 
 namespace BeebPerf.ux
 {
-    internal class CallTreeView : GridView<CallTreeNode>
+    internal class CallTreeView : GridView<CallTreeNode>, IGridExporter
     {
         private const int RoutineColumnIndex = 0;
         private const int TotalCPUColumnIndex = 1;
@@ -51,7 +52,7 @@ namespace BeebPerf.ux
 
         public int TotalCycleCount;
 
-        public CallTreeView() : base(System.Windows.Forms.SelectionMode.One)
+        public CallTreeView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Percentage | ButtonType.Copy | ButtonType.Export))
         {
             KeyDown += KeyDownFunc;
 
@@ -159,21 +160,75 @@ namespace BeebPerf.ux
                 return FormatCountAndRange(treeNode, columnIndex);
         }
 
+        private CPUMetrics GetSiblingTotals(CallTreeNode treeNode)
+        {
+            Debug.Assert(_SiblingPercentages);
+
+            var metrics = new CPUMetrics();
+            if (treeNode.Parent != null)
+            {
+                foreach (var node in treeNode.Parent.Children)
+                    metrics.Add(node.CPUMetrics);
+            }
+            else
+            {
+                foreach (var node in _DataRows)
+                    if (node.Depth == 0)
+                        metrics.Add(node.CPUMetrics);
+            }
+            return metrics;
+        }
+
         protected override (int value, int range) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
         {
+            CPUMetrics? siblingTotals = _SiblingPercentages ? GetSiblingTotals(treeNode) : null;
+
             var metrics = treeNode.CPUMetrics;
             return columnIndex switch
             {
-                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount),
-                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount),
-                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount),
-                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount),
+                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: siblingTotals != null
+                    ? siblingTotals.SelfCycleCount
+                    : TotalCycleCount),
+                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: siblingTotals != null
+                    ? siblingTotals.InclusiveCycleCount
+                    : TotalCycleCount),
+                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: siblingTotals != null
+                    ? siblingTotals.ElapsedCycleCount
+                    : TotalCycleCount),
+                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: siblingTotals != null
+                    ? siblingTotals.ElapsedCycleCount - siblingTotals.InclusiveCycleCount
+                    : TotalCycleCount),
                 ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount),
                 _ => (value: -1, range: 1)
             };
         }
 
-        protected override string[] OnGetExportHeaders()
+        override protected void OnPercentageButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            _SiblingPercentages = !_SiblingPercentages;
+            Invalidate();
+        }
+
+        override protected void OnCopyButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, this);
+        }
+
+        override protected void OnExportButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.ExportCSVFile(form, this);
+        }
+
+        string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
                 "Call tree depth",
@@ -204,7 +259,7 @@ namespace BeebPerf.ux
                     yield return descendant;
         }
 
-        protected override int OnGetExportRowCount()
+        int IGridExporter.GetRowCount()
         {
             _ExportTreeNodes.Clear();
 
@@ -216,7 +271,7 @@ namespace BeebPerf.ux
             return _ExportTreeNodes.Count;
         }
 
-        protected override string[] OnGetExportRowValues(int rowIndex)
+        string[] IGridExporter.GetRowValues(int rowIndex)
         {
             List<string> rowValues = new();
 
@@ -233,6 +288,8 @@ namespace BeebPerf.ux
 
         private string FormatExportCell(CallTreeNode treeNode, int columnIndex)
         {
+            CPUMetrics? siblingTotals = _SiblingPercentages ? GetSiblingTotals(treeNode) : null;
+
             var metrics = treeNode.CPUMetrics;
             return columnIndex switch
             {
@@ -241,13 +298,21 @@ namespace BeebPerf.ux
                 ExportRoutinePageColumnIndex => treeNode.Routine.StartAddress.Page.ToString(),
                 ExportRoutineLabelColumnIndex => treeNode.Routine.Label,
                 ExportTotalCPUCountColumnIndex => metrics.InclusiveCycleCount.ToString(),
-                ExportTotalCPUPercentageColumnIndex => FormatExportPercentage(metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportTotalCPUPercentageColumnIndex => FormatExportPercentage(metrics.InclusiveCycleCount, siblingTotals != null 
+                        ? siblingTotals.InclusiveCycleCount 
+                        : TotalCycleCount),
                 ExportSelfCPUCountColumnIndex => metrics.SelfCycleCount.ToString(),
-                ExportSelfCPUPercentageColumnIndex => FormatExportPercentage(metrics.SelfCycleCount, TotalCycleCount),
+                ExportSelfCPUPercentageColumnIndex => FormatExportPercentage(metrics.SelfCycleCount, siblingTotals != null 
+                        ? siblingTotals.SelfCycleCount 
+                        : TotalCycleCount),
                 ExportElapsedCPUCountColumnIndex => metrics.ElapsedCycleCount.ToString(),
-                ExportElapsedCPUPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount, TotalCycleCount),
+                ExportElapsedCPUPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount, siblingTotals != null 
+                        ? siblingTotals.ElapsedCycleCount 
+                        : TotalCycleCount),
                 ExportInteruptsCountColumnIndex => (metrics.ElapsedCycleCount - metrics.InclusiveCycleCount).ToString(),
-                ExportInteruptsPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, TotalCycleCount),
+                ExportInteruptsPercentageColumnIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, siblingTotals != null 
+                        ? siblingTotals.ElapsedCycleCount - siblingTotals.InclusiveCycleCount 
+                        : TotalCycleCount),
                 ExportExecutionCountColumnIndex => metrics.ExecutionCount.ToString(),
                 ExportExecutionPercentColumnIndex => FormatExportPercentage(metrics.ExecutionCount, _MaxExecutionCount),
                 _ => string.Empty
@@ -443,7 +508,7 @@ namespace BeebPerf.ux
         {
             RefreshExecutionCounts();
             AutoGrowColumns();
-            UpdateButtons();
+            (this as IDataView).UpdateButtons();
         }
 
         private int AddChildRows(int index, CallTreeNode treeNode)
@@ -687,5 +752,6 @@ namespace BeebPerf.ux
         private int _MaxExecutionCount;
         private ReentrancyGuard _ReentrancyGuard = new();
         private List<CallTreeNode> _ExportTreeNodes = [];
+        private bool _SiblingPercentages = false;
     }
 }

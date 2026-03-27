@@ -28,7 +28,7 @@ using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
-    internal class CodeView : GridView<object>
+    internal class CodeView : GridView<object>, IGridExporter
     {
         private const int AddressColumnIndex = 0;
         private const int LabelColumnIndex = 1;
@@ -59,7 +59,7 @@ namespace BeebPerf.ux
         private const int ExportExecutionPercentColumnIndex = 15;
         private const int ExportColumnCount = 16;
 
-        public CodeView() : base(System.Windows.Forms.SelectionMode.None)
+        public CodeView() : base(System.Windows.Forms.SelectionMode.None, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
             var cellTemplate = new CellTemplate();
             AddColumn("Address", "Address", cellTemplate);
@@ -255,7 +255,23 @@ namespace BeebPerf.ux
             return $"Hex: &{hex}\nDec: {operand}\nOct: {octal}\nBin: {binary}";
         }
 
-        protected override string[] OnGetExportHeaders()
+        override protected void OnCopyButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, this);
+        }
+
+        override protected void OnExportButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.ExportCSVFile(form, this);
+        }
+
+        string[] IGridExporter.GetHeaders()
         {
             var headers = new List<string>();
             
@@ -287,7 +303,12 @@ namespace BeebPerf.ux
             return headers.ToArray();
         }
 
-        protected override string[] OnGetExportRowValues(int rowIndex)
+        int IGridExporter.GetRowCount()
+        {
+            return _DataRows.Count;
+        }
+
+        string[] IGridExporter.GetRowValues(int rowIndex)
         {
             List<string> rowValues = new();
 

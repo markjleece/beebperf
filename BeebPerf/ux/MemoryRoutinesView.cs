@@ -25,7 +25,7 @@ using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class MemoryRoutinesView : GridView<RoutineMemoryAccess>
+    internal class MemoryRoutinesView : GridView<RoutineMemoryAccess>, IGridExporter
     {
         private const int RoutineColumnIndex = 0;
         private const int ReadWriteCountColumnIndex = 1;
@@ -43,7 +43,7 @@ namespace BeebPerf.ux
         private const int ExportWritePercentageColumnIndex = 8;
         private const int ExportColumnCount = 9;
 
-        public MemoryRoutinesView() : base(System.Windows.Forms.SelectionMode.One)
+        public MemoryRoutinesView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
             AddColumn("Routine", "Routine", cellTemplate: null);
             AddColumn("ReadWriteCount", "Reads/Writes [#, %]", cellTemplate: null);
@@ -125,7 +125,23 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override string[] OnGetExportHeaders()
+        override protected void OnCopyButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, this);
+        }
+
+        override protected void OnExportButtonClick()
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.ExportCSVFile(form, this);
+        }
+
+        string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
                 "Routine address",
@@ -143,7 +159,12 @@ namespace BeebPerf.ux
             return headers;
         }
 
-        protected override string[] OnGetExportRowValues(int rowIndex)
+        int IGridExporter.GetRowCount()
+        {
+            return _DataRows.Count;
+        }
+
+        string[] IGridExporter.GetRowValues(int rowIndex)
         {
             List<string> rowValues = new();
 

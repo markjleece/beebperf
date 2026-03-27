@@ -354,18 +354,6 @@ namespace BeebPerf.ux
             callTreeView.ShowHotPaths();
         }
 
-        private void flipViewButton_Click(object sender, EventArgs e)
-        {
-            var operation = new FlipFlameGraphOperation(this);
-            if (_UndoRedoHistory.Execute(operation))
-                UpdateToolbarState();
-        }
-
-        public void FlipFlameGraphInternal()
-        {
-            flameGraphView.FlipView();
-        }
-
         private void labelsButton_Click(object sender, EventArgs e)
         {
             var operation = new EditLabelsOperation(this, _LabelsFiles, _RecentLabelsFilePathName);
@@ -766,7 +754,6 @@ namespace BeebPerf.ux
             fitFramesButton.Enabled = timelineView.CanFitFrames();
             hotRoutinesButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
             hotPathsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
-            flipViewButton.Enabled = (tabControl.SelectedTab == flameGraphTabPage);
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
             labelsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
         }
