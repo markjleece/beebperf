@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics.CodeAnalysis;
 using static BeebPerf.CPUAnalysis;
 using static BeebPerf.model.DisplaySettings;
 
@@ -419,6 +420,7 @@ namespace BeebPerf.ux
             }
         }
 
+        [MemberNotNull(nameof(_PercentageButton))]
         private void InitializeButtons()
         {
             _PercentageButton = new()
@@ -443,9 +445,6 @@ namespace BeebPerf.ux
 
         void IDataView.UpdateButtons()
         {
-            if (_PercentageButton == null)
-                return;
-
             int width = Width;
             var vScrollBar = GetVScrollBar();
             if (vScrollBar != null && vScrollBar.Visible)
@@ -454,10 +453,8 @@ namespace BeebPerf.ux
             int padding = 2;
 
             SuspendLayout();
-
             _PercentageButton.Location = new Point(width - _PercentageButton.Width - padding, padding);
             _PercentageButton.Visible = (_Routine != null);
-
             ResumeLayout(performLayout: false);
         }
 
@@ -567,7 +564,7 @@ namespace BeebPerf.ux
         private string _ToolTipText = string.Empty;
         private Point _ToolTipLocation;
         private System.Windows.Forms.Timer _ToolTipTimer = new();
-        private ButtonEx? _PercentageButton = null;
+        private ButtonEx _PercentageButton;
         private bool _SiblingPercentages = false;
     }
 }

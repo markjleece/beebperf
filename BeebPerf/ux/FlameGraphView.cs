@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics.CodeAnalysis;
 using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
@@ -687,7 +688,8 @@ namespace BeebPerf.ux
                 Update();
             }
         }
-
+        
+        [MemberNotNull(nameof(_PercentageButton), nameof(_CallTypesButton), nameof(_FlipViewButton))]
         private void InitializeButtons()
         {
             _PercentageButton = new()
@@ -731,9 +733,6 @@ namespace BeebPerf.ux
 
         void IDataView.UpdateButtons()
         {
-            if (_PercentageButton == null || _CallTypesButton == null || _FlipViewButton == null)
-                return;
-
             int width = Width;
             var vScrollBar = GetVScrollBar();
             if (vScrollBar != null && vScrollBar.Visible)
@@ -818,9 +817,9 @@ namespace BeebPerf.ux
         private int _PrevWidth = 0;
         private VScrollBar _VScrollBar;
         private HScrollBar _HScrollBar;
-        private ButtonEx? _PercentageButton = null;
-        private ButtonEx? _CallTypesButton = null;
-        private ButtonEx? _FlipViewButton = null;
+        private ButtonEx _PercentageButton;
+        private ButtonEx _CallTypesButton;
+        private ButtonEx _FlipViewButton;
         private bool _SiblingPercentages = false;
         private bool _ShowCallTypes = false;
         private bool _FlipView = false;
