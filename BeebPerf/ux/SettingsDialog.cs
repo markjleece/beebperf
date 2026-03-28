@@ -39,6 +39,15 @@ namespace BeebPerf.ux
 
             InitializeComponent();
 
+            // show wait cursor
+            Capture = true;
+            Cursor = Cursors.WaitCursor;
+            Shown += SettingDialog_Shown;
+
+            // workaround: Theme changes can sometime break mouse-click to form-click event routing
+            okButton.MouseClick += OkButton_MouseClick;
+            cancelButton.MouseClick += CancelButton_MouseClick;
+
             // initialize controls
             sampleCodePanel.DisplaySettings = _Settings;
 
@@ -71,6 +80,12 @@ namespace BeebPerf.ux
             ApplyFontScaling(this, settings.FontScaling);
         }
 
+        private void SettingDialog_Shown(object? sender, EventArgs e)
+        {
+            Capture = false;
+            Cursor = Cursors.Default;
+        }
+
         private void ApplyFontScaling(Control control, int fontScaling)
         {
             int fontSize = (int)float.Round(_BaseFont.SizeInPoints * fontScaling / 100.0f);
@@ -87,6 +102,21 @@ namespace BeebPerf.ux
 
             foreach (Control child in control.Controls)
                 ApplyFontToAllControls(child, font);
+        }
+
+        private void CancelButton_MouseClick(object? sender, EventArgs e)
+        {
+            // workaround: Theme changes can sometime break mouse-click to form-click event routing
+            DialogResult = DialogResult.Cancel;
+            Close();
+        }
+
+        private void OkButton_MouseClick(object? sender, EventArgs e)
+        {
+            // workaround: Theme changes can sometime break mouse-click to form-click event routing
+            Settings = _Settings;
+            DialogResult = DialogResult.OK;
+            Close();
         }
 
         private void OkButton_Click(object sender, EventArgs e)

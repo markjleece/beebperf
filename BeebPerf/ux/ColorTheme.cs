@@ -92,6 +92,7 @@ namespace BeebPerf
             if (form.Owner != null)
                 ApplyTheme(form.Owner, darkMode);
         }
+
         private static bool IsSystemInDarkMode()
         {
             using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
@@ -125,6 +126,16 @@ namespace BeebPerf
                 comboBox.ForeColor = foreColor;
                 comboBox.BackColor = foreColor;
                 comboBox.BackColor = backColor;
+            }
+            else if (control is Button)
+            {
+                var button = (Button)control;
+                var foreColor = button.ForeColor;
+                var backColor = button.BackColor;
+                button.ForeColor = backColor;
+                button.ForeColor = foreColor;
+                button.BackColor = foreColor;
+                button.BackColor = backColor;
             }
 
             control.Invalidate();
