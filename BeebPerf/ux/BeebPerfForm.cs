@@ -682,11 +682,24 @@ namespace BeebPerf.ux
             if (orientation < 0)
                 orientation = (int)Orientation.Horizontal;
 
-            if (primarySplitterDistance <= 0)
-                primarySplitterDistance = Height / 4; // 1/4 height
-
-            if (secondarySplitterDistance <= 0)
-                secondarySplitterDistance = 3 * Height / 8; // 3/8 height
+            if (primarySplitterDistance <= 0 || secondarySplitterDistance <= 0)
+            {
+                primarySplitterDistance = Height / 4;
+                secondarySplitterDistance = 4 * Height / 8;
+            }
+            else
+            {
+                if (primarySplitterDistance > Height / 2)
+                {
+                    primarySplitterDistance = Height / 2;
+                    secondarySplitterDistance = Height / 3;
+                }
+                else if (secondarySplitterDistance > Height / 2)
+                {
+                    secondarySplitterDistance = Height / 2;
+                    primarySplitterDistance = Height / 4;
+                }
+            }
 
             var screenBounds = Screen.FromPoint(location).WorkingArea;
             if (!screenBounds.Contains(new Rectangle(location, size)))
