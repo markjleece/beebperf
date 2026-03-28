@@ -20,6 +20,8 @@
 // --------------------------------------------------------------
 
 using BeebPerf.ux;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace BeebPerf
@@ -29,6 +31,11 @@ namespace BeebPerf
         string[] GetHeaders();
         int GetRowCount();
         string[] GetRowValues(int rowIndex);
+    }
+
+    public interface IEMFExporter
+    {
+        void Paint(Graphics graphics);
     }
 
     public class Exporter
@@ -55,6 +62,35 @@ namespace BeebPerf
             }
 
             Clipboard.SetImage(newBitmap);
+        }
+
+        static public void CopyToClipboard(Form form, Size extents, IEMFExporter emfExporter)
+        {
+            using Graphics refGraphics = form.CreateGraphics();
+            IntPtr hDC = refGraphics.GetHdc();
+
+            try
+            {
+                var stream = new MemoryStream();
+                var metafile = new Metafile(
+                    stream,
+                    hDC,
+                    new Rectangle(0, 0, extents.Width, extents.Height),
+                    MetafileFrameUnit.Pixel,
+                    EmfType.EmfPlusDual,
+                    "Clipboard EMF");
+
+                using (Graphics graphics = Graphics.FromImage(metafile))
+                {
+                    emfExporter.Paint(graphics);
+                }
+
+                CopyEmfToClipboard(metafile, form);
+            }
+            finally
+            {
+                refGraphics.ReleaseHdc(hDC);
+            }
         }
 
         static public void CopyToClipboard(BeebPerfForm form, IGridExporter gridExporter)
@@ -156,6 +192,51 @@ namespace BeebPerf
                 return "\"" + value.Replace("\"", "\"\"") + "\"";
 
             return value;
+        }
+
+        [DllImport("gdi32.dll")]
+        public static extern IntPtr CopyEnhMetaFile(IntPtr hemfSrc, IntPtr hNULL);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool DeleteEnhMetaFile(IntPtr hemf);
+
+        [DllImport("user32.dll")]
+        public static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+        [DllImport("user32.dll")]
+        public static extern bool EmptyClipboard();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+        [DllImport("user32.dll")]
+        public static extern bool CloseClipboard();
+
+        private const uint CF_ENHMETAFILE = 14;
+
+        static private void CopyEmfToClipboard(Metafile metafile, IWin32Window owner)
+        {
+            IntPtr hemf = metafile.GetHenhmetafile();
+            IntPtr hemfCopy = CopyEnhMetaFile(hemf, IntPtr.Zero);
+
+            if (hemfCopy == IntPtr.Zero)
+                return;
+
+            if (OpenClipboard(owner?.Handle ?? IntPtr.Zero))
+            {
+                try
+                {
+                    EmptyClipboard();
+                    SetClipboardData(CF_ENHMETAFILE, hemfCopy);
+                    hemfCopy = IntPtr.Zero; // ownership of hemfCopy is now with the clipboard
+                }
+                finally
+                {
+                    CloseClipboard();
+                    if (hemfCopy != IntPtr.Zero)
+                        DeleteEnhMetaFile(hemfCopy);
+                }
+            }
         }
     }
 }

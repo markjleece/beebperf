@@ -21,33 +21,21 @@
 
 using BeebPerf.model;
 using System.Diagnostics.CodeAnalysis;
+using System.Drawing.Imaging.Effects;
+using System.Xml.Serialization;
 using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux
 {
-    internal class FlameGraphView : Panel, IDataView
+    internal class FlameGraphView : Panel, IDataView, IEMFExporter
     {
         public FlameGraphView() : base() 
         {
             DoubleBuffered = true;
             VisibleChanged += OnVisibleChanged;
 
-            _VScrollBar = new VScrollBar();
-            _VScrollBar.Dock = DockStyle.Right;
-            _VScrollBar.Scroll += ScrollBar_VScroll;
-            _VScrollBar.Enabled = false;
-            Controls.Add(_VScrollBar);
-
-            _HScrollBar = new HScrollBar();
-            _HScrollBar.Dock = DockStyle.Bottom;
-            _HScrollBar.Scroll += ScrollBar_HScroll;
-            _HScrollBar.Enabled = false;
-            Controls.Add(_HScrollBar);
-
-            _ToolTipTimer = new();
-            _ToolTipTimer.Interval = 500;
-            _ToolTipTimer.Tick += ToolTipTimer_Tick;
-
+            InitializeScrollBars();
+            InitializeToolTips();
             InitializeButtons();
         }
 
@@ -215,6 +203,11 @@ namespace BeebPerf.ux
                 HideToolTip();
         }
 
+        void IEMFExporter.Paint(Graphics graphics)
+        {
+            DoPaint(graphics, paintEMF: true);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -235,6 +228,11 @@ namespace BeebPerf.ux
                 _InvalidLayout = false;
             }
 
+            DoPaint(e.Graphics, paintEMF: false);
+        }
+
+        private void DoPaint(Graphics graphics, bool paintEMF)
+        {
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
             Color lineColor = lightMode ? Color.DarkRed : _ColorLightRed;
             Color fillColor = lightMode ? _ColorLightRed : Color.DarkRed;
@@ -263,7 +261,9 @@ namespace BeebPerf.ux
                     isTailCallOrFallthrough = false;
 
                 PaintRoutineCell(
-                    routineCell, e,
+                    graphics,
+                    paintEMF,
+                    routineCell,
                     isTailCallOrFallthrough ? grayPen : colorPen,
                     isTailCallOrFallthrough ? graySelectedPen : colorSelectedPen,
                     isTailCallOrFallthrough ? grayBrush : colorBrush,
@@ -273,17 +273,16 @@ namespace BeebPerf.ux
         }
 
         private void PaintRoutineCell(
+            Graphics graphics,
+            bool paintEMF,
             RoutineCell routineCell,
-            PaintEventArgs e,
             Pen linePen,
             Pen selectedLinePen,
             Brush fillBrush, 
             Brush focusFillBrush,
             Brush textBrush)
         {
-            Graphics graphics = e.Graphics;
-
-            var clientRect = LayoutToPixels(routineCell.Rectangle);
+            var clientRect = LayoutToPixels(routineCell.Rectangle, ignoreVScrollValue: paintEMF);
 
             // paint background
             if (clientRect.Width > 1)
@@ -364,7 +363,7 @@ namespace BeebPerf.ux
             }
         }
 
-        private Rectangle LayoutToPixels(Rectangle rect)
+        private Rectangle LayoutToPixels(Rectangle rect, bool ignoreVScrollValue = false)
         {
             int x = rect.X - GetHScrollValue();
 
@@ -372,10 +371,18 @@ namespace BeebPerf.ux
             if (!_FlipView)
                 y = GetClientExtents().Height - y - rect.Height;
 
-            if (_FlipView)
-                y -= GetVScrollValue();
+            if (ignoreVScrollValue)
+            {
+                if (!_FlipView)
+                    y += (_VScrollBar.Maximum - _VScrollBar.LargeChange);
+            }
             else
-                y += GetVScrollValue();
+            {
+                if (_FlipView)
+                    y -= GetVScrollValue();
+                else
+                    y += GetVScrollValue();
+            }
 
             return new Rectangle(x, y, rect.Width, rect.Height);
         }
@@ -542,6 +549,22 @@ namespace BeebPerf.ux
             }
         }
 
+        [MemberNotNull(nameof(_VScrollBar), nameof(_HScrollBar))]
+        private void InitializeScrollBars()
+        {
+            _VScrollBar = new VScrollBar();
+            _VScrollBar.Dock = DockStyle.Right;
+            _VScrollBar.Scroll += ScrollBar_VScroll;
+            _VScrollBar.Enabled = false;
+            Controls.Add(_VScrollBar);
+
+            _HScrollBar = new HScrollBar();
+            _HScrollBar.Dock = DockStyle.Bottom;
+            _HScrollBar.Scroll += ScrollBar_HScroll;
+            _HScrollBar.Enabled = false;
+            Controls.Add(_HScrollBar);
+        }
+
         private void UpdateScrollBars()
         {
             Size clientExtents = GetClientExtents();
@@ -647,6 +670,14 @@ namespace BeebPerf.ux
             return maxDepth;
         }
 
+        [MemberNotNull(nameof(_ToolTipTimer))]
+        private void InitializeToolTips()
+        {
+            _ToolTipTimer = new();
+            _ToolTipTimer.Interval = 500;
+            _ToolTipTimer.Tick += ToolTipTimer_Tick;
+        }
+
         private void ShowToolTip(RoutineCell routineCell, Point mousePosition)
         {
             _ToolTipTimer.Stop();
@@ -688,10 +719,19 @@ namespace BeebPerf.ux
                 Update();
             }
         }
-        
-        [MemberNotNull(nameof(_PercentageButton), nameof(_CallTypesButton), nameof(_FlipViewButton))]
+
+        [MemberNotNull(nameof(_PercentageButton), nameof(_CopyButton), nameof(_CallTypesButton), nameof(_FlipViewButton))]
         private void InitializeButtons()
         {
+            _CopyButton = new()
+            {
+                Name = "copyButton",
+                ImageResourceName = "copyButton.Image",
+                ToolTipText = "Copy",
+                Parent = this
+            };
+            _CopyButton.Click += copyButton_Click;
+
             _PercentageButton = new()
             {
                 Name = "percentageButton",
@@ -718,7 +758,6 @@ namespace BeebPerf.ux
                 Parent = this
             };
             _FlipViewButton.Click += flipViewButton_Click;
-
         }
 
         private VScrollBar? GetVScrollBar()
@@ -742,13 +781,20 @@ namespace BeebPerf.ux
 
             SuspendLayout();
 
-            _PercentageButton.Location = new Point(width - _PercentageButton.Width - padding, padding);
+            int left = width - _CopyButton.Width - padding;
+            _CopyButton.Location = new Point(left, padding);
+            _CopyButton.Visible = true;
+
+            left -= _PercentageButton.Width;
+            _PercentageButton.Location = new Point(left, padding);
             _PercentageButton.Visible = true;
 
-            _CallTypesButton.Location = new Point(width - _PercentageButton.Width - _CallTypesButton.Width - padding, padding);
+            left -= _CallTypesButton.Width;
+            _CallTypesButton.Location = new Point(left, padding);
             _CallTypesButton.Visible = true;
 
-            _FlipViewButton.Location = new Point(width - _FlipViewButton.Width  - _PercentageButton.Width - _CallTypesButton.Width - padding, padding);
+            left -= _FlipViewButton.Width;
+            _FlipViewButton.Location = new Point(left, padding);
             _FlipViewButton.Visible = true;
 
             ResumeLayout(performLayout: false);
@@ -759,6 +805,14 @@ namespace BeebPerf.ux
             _SiblingPercentages = !_SiblingPercentages;
             LayoutRoutineCells();
             Invalidate();
+        }
+
+        private void copyButton_Click(object? sender, EventArgs e)
+        {
+            var form = FindForm() as BeebPerfForm;
+            if (form == null) return;
+
+            Exporter.CopyToClipboard(form, _LayoutExtents, this);
         }
 
         private void callTypesButton_Click(object? sender, EventArgs e)
@@ -817,6 +871,7 @@ namespace BeebPerf.ux
         private int _PrevWidth = 0;
         private VScrollBar _VScrollBar;
         private HScrollBar _HScrollBar;
+        private ButtonEx _CopyButton;
         private ButtonEx _PercentageButton;
         private ButtonEx _CallTypesButton;
         private ButtonEx _FlipViewButton;
