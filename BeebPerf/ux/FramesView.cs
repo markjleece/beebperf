@@ -135,7 +135,6 @@ namespace BeebPerf.ux
         }
 
         [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
-
         private void InitializeComponent()
         {
             // 
@@ -322,6 +321,7 @@ namespace BeebPerf.ux
         private List<FrameMetrics> _FrameMetricsList = [];
         private List<FrameSettings>? _FrameSettingsList = [];
         private FrameSettings? _SelectedFrameSettings = null;
+        private ReentrancyGuard _ReentrancyGuard = new();
 
         // controls
         private Label _SettingsLabel;
@@ -333,6 +333,5 @@ namespace BeebPerf.ux
         private ButtonEx _CopyButton;
         private ButtonEx _ExportButton;
         private FramesGridView _GridView;
-        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }
