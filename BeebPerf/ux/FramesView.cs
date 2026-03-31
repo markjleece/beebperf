@@ -134,7 +134,7 @@ namespace BeebPerf.ux
             Exporter.ExportCSVFile(form, _GridView);
         }
 
-        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView), nameof(_ToolbarPanel))]
+        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
 
         private void InitializeComponent()
         {
@@ -220,26 +220,20 @@ namespace BeebPerf.ux
             _ExportButton.ToolTipText = "Export";
             _ExportButton.Click += ExportButton_Click;
             // 
-            // _ToolbarPanel
-            // 
-            _ToolbarPanel = new Panel();
-            _ToolbarPanel.BackColor = SystemColors.Control;
-            _ToolbarPanel.BorderStyle = BorderStyle.None;
-            _ToolbarPanel.Controls.Add(_SettingsLabel);
-            _ToolbarPanel.Controls.Add(_SettingsComboBoxPanel);
-            _ToolbarPanel.Controls.Add(_AddButton);
-            _ToolbarPanel.Controls.Add(_EditButton);
-            _ToolbarPanel.Controls.Add(_RemoveButton);
-            _ToolbarPanel.Controls.Add(_CopyButton);
-            _ToolbarPanel.Controls.Add(_ExportButton);
-            // 
             // _GridView
             // 
             _GridView = new FramesGridView(this);
+            _GridView.BackColor = SystemColors.Control;
             // 
-            // FramesView
+            // FramesView - Add controls directly
             // 
-            Controls.Add(_ToolbarPanel);
+            Controls.Add(_SettingsLabel);
+            Controls.Add(_SettingsComboBoxPanel);
+            Controls.Add(_AddButton);
+            Controls.Add(_EditButton);
+            Controls.Add(_RemoveButton);
+            Controls.Add(_CopyButton);
+            Controls.Add(_ExportButton);
             Controls.Add(_GridView);
         }
 
@@ -291,13 +285,8 @@ namespace BeebPerf.ux
                 child.Location = new Point(right, padding + (maxHeight - child.Height) / 2);
             }
 
-            // layout toolbar panel
-            int toolbarHeight = maxHeight + padding * 2;
-            _ToolbarPanel.Location = new Point(0, 0);
-            _ToolbarPanel.Width = Width;
-            _ToolbarPanel.Height = toolbarHeight;
-
             // layout grid view
+            int toolbarHeight = maxHeight + padding * 2;
             _GridView.Location = new Point(0, toolbarHeight);
             _GridView.Width = Width;
             _GridView.Height = Height - toolbarHeight;
@@ -343,7 +332,6 @@ namespace BeebPerf.ux
         private Button _RemoveButton;
         private ButtonEx _CopyButton;
         private ButtonEx _ExportButton;
-        private Panel _ToolbarPanel;
         private FramesGridView _GridView;
         private ReentrancyGuard _ReentrancyGuard = new();
     }

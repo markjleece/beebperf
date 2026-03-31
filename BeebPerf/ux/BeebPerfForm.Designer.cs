@@ -464,7 +464,7 @@ namespace BeebPerf.ux
             // 
             // framesView
             // 
-            framesView.BackColor = SystemColors.Window;
+            framesView.BackColor = SystemColors.Control;
             framesView.Dock = DockStyle.Fill;
             framesView.Location = new Point(3, 3);
             framesView.Name = "framesView";
