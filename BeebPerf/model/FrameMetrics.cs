@@ -1,4 +1,4 @@
-﻿// --------------------------------------------------------------
+// --------------------------------------------------------------
 // BeebPerf - A BBC Micro Profiler
 //
 // Copyright (C) 2026  Mark John Leece
@@ -19,22 +19,28 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Reflection;
-
-namespace BeebPerf.ux
+namespace BeebPerf.model
 {
-    public partial class HelpDialog : Form
+    public class FrameMetrics
     {
-        public HelpDialog(BeebPerfForm form)
+        public FrameMetrics Clone()
         {
-            InitializeComponent();
-            Owner = form;
-
-            // populate help text
-            var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpDialog));
-            var bytes = (byte[])resources.GetObject("help.RTF")!;
-            using var ms = new MemoryStream(bytes!);
-            richTextBox.LoadFile(ms, RichTextBoxStreamType.RichText);
+            return new FrameMetrics()
+            {
+                FrameNumber = FrameNumber,
+                StartCycleCount = StartCycleCount,
+                EndCycleCount = EndCycleCount,
+                DisplayFrameOffset = DisplayFrameOffset,
+                WritesBeforeDisplayRead = WritesBeforeDisplayRead,
+                WritesAfterDisplayRead = WritesAfterDisplayRead,
+            };
         }
+
+        public required int FrameNumber;
+        public required int StartCycleCount;
+        public required int EndCycleCount;
+        public required int DisplayFrameOffset;
+        public required int WritesBeforeDisplayRead;
+        public required int WritesAfterDisplayRead;
     }
 }

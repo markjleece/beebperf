@@ -26,9 +26,13 @@ namespace BeebPerf.ux
         public List<model.LabelsFile> LabelsFiles;
         public string RecentLabelsFilePathName;
 
-        public LabelsDialog(List<model.LabelsFile> labelsFiles, string recentLabelsFilePathName)
+        public LabelsDialog(
+            List<model.LabelsFile> labelsFiles, 
+            string recentLabelsFilePathName,
+            BeebPerfForm form)
         {
             InitializeComponent();
+            Owner = form;
 
             // deep copy arguments. The copies are modified by actions within the dialog
             LabelsFiles = new();

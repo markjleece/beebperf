@@ -24,46 +24,39 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
-    class EditLabelsOperation : Operation
+    class SelectFrameSettingsOperation : Operation
     {
-        public EditLabelsOperation(
-            BeebPerfForm form,
-            List<LabelsFile> labelsFiles,
-            string recentLabelsFilePathName)
+        public SelectFrameSettingsOperation(BeebPerfForm form, FrameSettings? newFrameSettings, FrameSettings? oldFrameSettings)
         {
             _Form = form;
-            _OldLabelsFiles = labelsFiles;
-            _NewLabelsFiles = [];
-            _RecentLabelsFilePathName = recentLabelsFilePathName;
+            _NewFrameSettings = newFrameSettings;
+            _OldFrameSettings = oldFrameSettings;
         }
 
         public override bool Execute()
         {
-            var dialog = new LabelsDialog(_OldLabelsFiles, _RecentLabelsFilePathName, _Form);
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                _NewLabelsFiles = dialog.LabelsFiles;
-                _RecentLabelsFilePathName = dialog.RecentLabelsFilePathName;
-                Redo();
-                return true;
-            }
-
-            return false;
+            Redo();
+            return true;
         }
 
         public override void Redo()
         {
-            _Form.SetLabelsFiles(_NewLabelsFiles, _RecentLabelsFilePathName);
+            if (_NewFrameSettings != null)
+                _Form.SetSelectedFrameSettingsInternal(_NewFrameSettings);
+            else
+                _Form.ClearSelectedFrameSettingsInternal();
         }
 
         public override void Undo()
         {
-            _Form.SetLabelsFiles(_OldLabelsFiles, _RecentLabelsFilePathName);
+            if (_OldFrameSettings != null)
+                _Form.SetSelectedFrameSettingsInternal(_OldFrameSettings);
+            else
+                _Form.ClearSelectedMemoryAddressInternal();
         }
 
-        private string _RecentLabelsFilePathName;
-        private List<LabelsFile> _OldLabelsFiles;
-        private List<LabelsFile> _NewLabelsFiles;
         private BeebPerfForm _Form;
+        private FrameSettings? _NewFrameSettings;
+        private FrameSettings? _OldFrameSettings;
     }
 }

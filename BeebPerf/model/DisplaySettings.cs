@@ -128,20 +128,50 @@ namespace BeebPerf.model
             }
         }
 
-        private string FormatAddress(Object value)
+        public string FormatAddress(Object value, bool withPrefix = true)
         {
             int integer = Convert.ToInt32(value);
             bool zeroPage = value is byte;
-            return ColorThemeSettings.AddressSettings.Format switch
+
+            string text = string.Empty;
+            switch (ColorThemeSettings.AddressSettings.Format)
             {
-                AddressFormat.AndUppercase => zeroPage ? $"&{integer:X2}" : $"&{integer:X4}",
-                AddressFormat.AndLowercase => zeroPage ? $"&{integer:x2}" : $"&{integer:x4}",
-                AddressFormat.DollarUppercase => zeroPage ? $"${integer:X2}" : $"${integer:X4}",
-                AddressFormat.DollarLowercase => zeroPage ? $"${integer:x2}" : $"${integer:x4}",
-                AddressFormat.OxUppercase => zeroPage ? $"0x{integer:X2}" : $"0x{integer:X4}",
-                AddressFormat.OxLowercase => zeroPage ? $"0x{integer:x2}" : $"0x{integer:x4}",
-                _ => throw new ArgumentOutOfRangeException()
-            };
+                case AddressFormat.AndUppercase:
+                case AddressFormat.DollarUppercase:
+                case AddressFormat.OxUppercase:
+                    text = zeroPage ? $"{integer:X2}" : $"{integer:X4}";
+                    break;
+
+                case AddressFormat.AndLowercase:
+                case AddressFormat.DollarLowercase:
+                case AddressFormat.OxLowercase:
+                    text = zeroPage ? $"{integer:x2}" : $"{integer:x4}";
+                    break;
+            }
+            
+            if (withPrefix)
+                text = GetAddressPrefix() + text;
+            
+            return text;
+        }
+
+        public string GetAddressPrefix()
+        {
+            switch (ColorThemeSettings.AddressSettings.Format)
+            {
+                case AddressFormat.AndUppercase:
+                case AddressFormat.AndLowercase:
+                    return "&";
+
+                case AddressFormat.DollarUppercase:
+                case AddressFormat.DollarLowercase:
+                    return "$";
+
+                case AddressFormat.OxUppercase:
+                case AddressFormat.OxLowercase:
+                    return "0x";
+            }
+            return string.Empty;
         }
 
         public enum Setting

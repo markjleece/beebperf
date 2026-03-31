@@ -190,5 +190,29 @@ namespace BeebPerf.Properties {
                 this["RecentExportFolderPath"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string FrameSettingsList {
+            get {
+                return ((string)(this["FrameSettingsList"]));
+            }
+            set {
+                this["FrameSettingsList"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string RecentSelectedFrameSettings {
+            get {
+                return ((string)(this["RecentSelectedFrameSettings"]));
+            }
+            set {
+                this["RecentSelectedFrameSettings"] = value;
+            }
+        }
     }
 }

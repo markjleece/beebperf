@@ -74,7 +74,7 @@ namespace BeebPerf.ux
             ClearState(AppStateFlags.All);
 
             // load labels files (order not preserved)
-            foreach (var labelsFile in Decode(_LabelsFilesEncoding))
+            foreach (var labelsFile in DecodeLabels(_LabelsFilesEncoding))
                 ReadLabelsFileAsync(labelsFile.FileName, labelsFile.LabelsEnabled);
 
             // reopen last .perf file
@@ -370,8 +370,7 @@ namespace BeebPerf.ux
 
         private void helpButton_Click(object sender, EventArgs e)
         {
-            var dialog = new HelpDialog();
-            dialog.Owner = this;
+            var dialog = new HelpDialog(this);
             dialog.ShowDialog();
         }
 
@@ -538,6 +537,55 @@ namespace BeebPerf.ux
             memoryRoutinesView.Clear();
         }
 
+        public void SetSelectedFrameSettings(FrameSettings frameSettings)
+        {
+            var operation = new SelectFrameSettingsOperation(this, frameSettings, _SelectedFrameSettings);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void SetSelectedFrameSettingsInternal(FrameSettings frameSettings)
+        {
+            _SelectedFrameSettings = frameSettings;
+            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
+            // TODO: Get results...
+        }
+
+        public void ClearSelectedFrameSettings()
+        {
+            var operation = new SelectFrameSettingsOperation(this, null, _SelectedFrameSettings);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void ClearSelectedFrameSettingsInternal()
+        {
+            _SelectedFrameSettings = null;
+            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
+            framesView.SetResults([]);
+        }
+
+        public void AddFrameSettings()
+        {
+            var operation = new AddFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList, _Model.Instructions);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void EditFrameSettings()
+        {
+            var operation = new EditFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList, _Model.Instructions);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
+        public void RemoveFrameSettings()
+        {
+            var operation = new RemoveFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList);
+            if (_UndoRedoHistory.Execute(operation))
+                UpdateToolbarState();
+        }
+
         private void TabControl_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (_SuppressTabChange > 0)
@@ -569,7 +617,7 @@ namespace BeebPerf.ux
         {
             // update preferences (saved when app closes)
             _RecentLabelsFilePathName = recentLabelsFilePathName;
-            _LabelsFilesEncoding = Encode(labelsFiles);
+            _LabelsFilesEncoding = EncodeLabels(labelsFiles);
  
             // update labels member
             _LabelsFiles = labelsFiles;
@@ -607,7 +655,7 @@ namespace BeebPerf.ux
             labelsFiles.Insert(0, pseudoLabelsFile);
         }
 
-        static private string Encode(List<LabelsFile> labelsFiles)
+        static private string EncodeLabels(List<LabelsFile> labelsFiles)
         {
             StringBuilder sb = new StringBuilder();
             foreach (var labelsFile in labelsFiles)
@@ -623,12 +671,32 @@ namespace BeebPerf.ux
             return sb.ToString();
         }
 
-        static private List<(string FileName, bool LabelsEnabled)> Decode(string value)
+        static private List<(string FileName, bool LabelsEnabled)> DecodeLabels(string value)
         {
-            List<(string FileName, bool LabelsEnabled)> result = new();
+            List<(string FileName, bool LabelsEnabled)> result = [];
             var values = value.Split('|', StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < values.Length; i += 2)
                 result.Add((FileName: values[i], LabelsEnabled: values[i + 1].Equals("true")));
+            return result;
+        }
+
+        static private string EncodeFrameSettings(List<FrameSettings> frameSettingsList)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (var frameSettings in frameSettingsList)
+            {
+                if (sb.Length > 0) sb.Append('|');
+                sb.Append(FrameSettings.Serialize(frameSettings));
+            }
+            return sb.ToString();
+        }
+
+        static private List<FrameSettings> DecodeFrameSettings(string value)
+        {
+            List<FrameSettings> result = [];
+            var values = value.Split('|', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < values.Length; i++)
+                result.Add(FrameSettings.DeSerialize(values[i]));
             return result;
         }
 
@@ -637,6 +705,7 @@ namespace BeebPerf.ux
             var bounds = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
             var windowState = (WindowState == FormWindowState.Minimized) ? FormWindowState.Normal : WindowState;
             var displaySettings = DisplaySettings.Serialize(this.DisplaySettings!);
+            var recentFrameSettings = _SelectedFrameSettings != null ? _SelectedFrameSettings.Name : string.Empty;
             Properties.Settings.Default.WindowLocation = bounds.Location;
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
@@ -651,6 +720,8 @@ namespace BeebPerf.ux
             Properties.Settings.Default.SecondarySplitterDistance = secondarySplitContainer.SplitterDistance;
             Properties.Settings.Default.DisplaySettings = displaySettings;
             Properties.Settings.Default.ColorTheme = (int)ColorTheme.Get();
+            Properties.Settings.Default.FrameSettingsList = EncodeFrameSettings(_FrameSettingsList);
+            Properties.Settings.Default.RecentSelectedFrameSettings = recentFrameSettings;
             Properties.Settings.Default.Save();
         }
 
@@ -662,6 +733,18 @@ namespace BeebPerf.ux
             _RecentLabelsFilePathName = Properties.Settings.Default.RecentLabelsFilePathName;
             _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
             RecentExportFolderPath = Properties.Settings.Default.RecentExportFolderPath;
+
+            _FrameSettingsList = DecodeFrameSettings(Properties.Settings.Default.FrameSettingsList);
+            var recentFrameSettings = Properties.Settings.Default.RecentSelectedFrameSettings;
+            foreach (var frameSettings in _FrameSettingsList)
+            {
+                if (frameSettings.Name == recentFrameSettings)
+                {
+                    _SelectedFrameSettings = frameSettings;
+                    break;
+                }
+            }
+            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
 
             var location = Properties.Settings.Default.WindowLocation;
             var size = Properties.Settings.Default.WindowSize;
@@ -898,6 +981,7 @@ namespace BeebPerf.ux
         private RoutineMemoryAccess? _SelectedMemoryAccess;
         private Panel? _SelectedTab;
         private CanonicalAddress? _SelectedMemoryAddress;
+        private FrameSettings? _SelectedFrameSettings;
 
         private string _RecentPerfFilePathName = string.Empty;
         private int _RecentStartCycleCount = 0;
@@ -907,6 +991,7 @@ namespace BeebPerf.ux
         private int _SuppressTabChange;
         private int _SuppressCheckBoxChange;
         private List<LabelsFile> _LabelsFiles = [];
+        private List<FrameSettings> _FrameSettingsList = [];
 
         private UndoRedoHistory _UndoRedoHistory;
         private Model _Model;

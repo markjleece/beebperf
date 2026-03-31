@@ -179,7 +179,7 @@ namespace BeebPerf.ux
             return metrics;
         }
 
-        protected override (int value, int range) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(CallTreeNode treeNode, int columnIndex)
         {
             CPUMetrics? siblingTotals = _SiblingPercentages ? GetSiblingTotals(treeNode) : null;
 
@@ -188,18 +188,18 @@ namespace BeebPerf.ux
             {
                 SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: siblingTotals != null
                     ? siblingTotals.SelfCycleCount
-                    : TotalCycleCount),
+                    : TotalCycleCount, clamp: true),
                 TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: siblingTotals != null
                     ? siblingTotals.InclusiveCycleCount
-                    : TotalCycleCount),
+                    : TotalCycleCount, clamp: true),
                 ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: siblingTotals != null
                     ? siblingTotals.ElapsedCycleCount
-                    : TotalCycleCount),
+                    : TotalCycleCount, clamp: true),
                 InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: siblingTotals != null
                     ? siblingTotals.ElapsedCycleCount - siblingTotals.InclusiveCycleCount
-                    : TotalCycleCount),
-                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount),
-                _ => (value: -1, range: 1)
+                    : TotalCycleCount, clamp: true),
+                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount, clamp: true),
+                _ => (value: -1, range: 1, clamp: false)
             };
         }
 

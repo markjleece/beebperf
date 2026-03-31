@@ -66,8 +66,7 @@ namespace BeebPerf.ux
             var form = FindForm() as BeebPerfForm;
             if (form is null) return;
 
-            SelectionDialog dialog = new(_AnalysisFrom, _AnalysisTo);
-            dialog.Owner = form;
+            var dialog = new SelectionDialog(_AnalysisFrom, _AnalysisTo, form);
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 int analysisFrom = Math.Clamp(dialog.AnalysisFrom, 0, _RecordingDuration);

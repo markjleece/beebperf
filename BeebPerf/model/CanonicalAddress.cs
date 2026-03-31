@@ -87,6 +87,33 @@ namespace BeebPerf.model
             }
         }
 
+        public bool IsValid()
+        {
+            var page = Page;
+            ushort addr = Address;
+
+            switch (page)
+            {
+                case MemoryPage.WholeRam:
+                    return true;
+
+                case MemoryPage.HiddenRam:
+                    return addr < 0x100;
+
+                case MemoryPage.ShadowRam:
+                    return addr >= 0x3000 && addr < 0x8000;
+
+                case MemoryPage.PrivateRam:
+                    return addr >= 0x8000 && addr < 0xB000;
+
+                case MemoryPage.FilingSystemRam:
+                    return addr >= 0xC000 && addr < 0xE000;
+
+                default:
+                    return addr >= 0x8000 && addr < 0xC000;
+            }
+        }
+
         private int _PageAddress;
     }
 

@@ -62,12 +62,14 @@ namespace BeebPerf.ux
             routinesView = new RoutinesView();
             flameGraphTabPage = new Panel();
             memoryTabPage = new Panel();
+            framesTabPage = new Panel();
             codeView = new CodeView();
             callerCalleeView = new CallerCalleeView();
             flameGraphView = new FlameGraphView();
             memoryZeroPageCheckBox = new CheckBox();
             memoryView = new MemoryView();
             memoryRoutinesView = new MemoryRoutinesView();
+            framesView = new FramesView();
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -313,6 +315,7 @@ namespace BeebPerf.ux
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(flameGraphTabPage);
             tabControl.Controls.Add(memoryTabPage);
+            tabControl.Controls.Add(framesTabPage);
             tabControl.SelectedIndex = 0;
             tabControl.Dock = DockStyle.Fill;
             tabControl.Location = new Point(0, 0);
@@ -332,23 +335,23 @@ namespace BeebPerf.ux
             dataGridViewCellStyle.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle.WrapMode = DataGridViewTriState.False;
             // 
-            // callTreeTabPage
+            // routinesTabPage
             // 
-            callTreeTabPage.Controls.Add(callTreeView);
-            callTreeTabPage.Name = "callTreeTabPage";
-            callTreeTabPage.Padding = new Padding(3);
-            callTreeTabPage.TabIndex = 1;
-            callTreeTabPage.Text = "Call Tree";
+            routinesTabPage.Controls.Add(routinesView);
+            routinesTabPage.Name = "routinesTabPage";
+            routinesTabPage.Padding = new Padding(3);
+            routinesTabPage.TabIndex = 0;
+            routinesTabPage.Text = "Routines";
             // 
-            // callTreeView
+            // routinesView
             // 
-            callTreeView.DefaultCellStyle = dataGridViewCellStyle;
-            callTreeView.Dock = DockStyle.Fill;
-            callTreeView.Location = new Point(3, 3);
-            callTreeView.Name = "callTreeView";
-            callTreeView.RowHeadersWidth = 62;
-            callTreeView.Size = new Size(1731, 442);
-            callTreeView.TabIndex = 0;
+            routinesView.DefaultCellStyle = dataGridViewCellStyle;
+            routinesView.Dock = DockStyle.Fill;
+            routinesView.Location = new Point(3, 3);
+            routinesView.Name = "routinesView";
+            routinesView.RowHeadersWidth = 62;
+            routinesView.Size = new Size(1731, 442);
+            routinesView.TabIndex = 0;
             // 
             // callerCalleeTabPage
             // 
@@ -367,33 +370,34 @@ namespace BeebPerf.ux
             callerCalleeView.Size = new Size(1731, 442);
             callerCalleeView.TabIndex = 0;
             // 
-            // routinesTabPage
+            // callTreeTabPage
             // 
-            routinesTabPage.Controls.Add(routinesView);
-            routinesTabPage.Name = "routinesTabPage";
-            routinesTabPage.Padding = new Padding(3);
-            routinesTabPage.TabIndex = 3;
-            routinesTabPage.Text = "Routines";
+            callTreeTabPage.Controls.Add(callTreeView);
+            callTreeTabPage.Name = "callTreeTabPage";
+            callTreeTabPage.Padding = new Padding(3);
+            callTreeTabPage.TabIndex = 0;
+            callTreeTabPage.Text = "Call Tree";
             // 
-            // routinesView
+            // callTreeView
             // 
-            routinesView.DefaultCellStyle = dataGridViewCellStyle;
-            routinesView.Dock = DockStyle.Fill;
-            routinesView.Location = new Point(3, 3);
-            routinesView.Name = "routinesView";
-            routinesView.RowHeadersWidth = 62;
-            routinesView.Size = new Size(1731, 442);
-            routinesView.TabIndex = 0;
+            callTreeView.DefaultCellStyle = dataGridViewCellStyle;
+            callTreeView.Dock = DockStyle.Fill;
+            callTreeView.Location = new Point(3, 3);
+            callTreeView.Name = "callTreeView";
+            callTreeView.RowHeadersWidth = 62;
+            callTreeView.Size = new Size(1731, 442);
+            callTreeView.TabIndex = 0;
             // 
             // flameGraphTabPage
             // 
             flameGraphTabPage.Controls.Add(flameGraphView);
             flameGraphTabPage.Name = "flameGraphTabPage";
+            flameGraphTabPage.Dock = DockStyle.Fill;
             flameGraphTabPage.Padding = new Padding(3);
-            flameGraphTabPage.TabIndex = 4;
+            flameGraphTabPage.TabIndex = 0;
             flameGraphTabPage.Text = "Flame Graph";
             // 
-            // callerCalleeView
+            // flameGraphView
             // 
             flameGraphView.BackColor = SystemColors.Window;
             flameGraphView.Dock = DockStyle.Fill;
@@ -447,6 +451,25 @@ namespace BeebPerf.ux
             memoryRoutinesView.Name = "memoryRoutinesView";
             memoryRoutinesView.Size = new Size(1745, 487);
             memoryRoutinesView.TabIndex = 0;
+            // 
+            // framesTabPage
+            // 
+            framesTabPage.Controls.Add(framesView);
+            framesTabPage.BackColor = SystemColors.Window;
+            framesTabPage.Dock = DockStyle.Fill;
+            framesTabPage.Name = "framesTabPage";
+            framesTabPage.Padding = new Padding(3);
+            framesTabPage.TabIndex = 0;
+            framesTabPage.Text = "Frames";
+            // 
+            // framesView
+            // 
+            framesView.BackColor = SystemColors.Window;
+            framesView.Dock = DockStyle.Fill;
+            framesView.Location = new Point(3, 3);
+            framesView.Name = "framesView";
+            framesView.Size = new Size(1731, 442);
+            framesView.TabIndex = 0;
             // 
             // codeView
             // 
@@ -514,6 +537,7 @@ namespace BeebPerf.ux
         private Panel routinesTabPage;
         private Panel flameGraphTabPage;
         private Panel memoryTabPage;
+        private Panel framesTabPage;
         private RoutinesView routinesView;
         private CallTreeView callTreeView;
         private CodeView codeView;
@@ -523,6 +547,7 @@ namespace BeebPerf.ux
         private CheckBox memoryZeroPageCheckBox;
         private MemoryView memoryView;
         private MemoryRoutinesView memoryRoutinesView;
+        private FramesView framesView;
         private Spinner spinner;
     }
 }

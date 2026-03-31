@@ -24,46 +24,35 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
-    class EditLabelsOperation : Operation
+    class RemoveFrameSettingsOperation : Operation
     {
-        public EditLabelsOperation(
-            BeebPerfForm form,
-            List<LabelsFile> labelsFiles,
-            string recentLabelsFilePathName)
+        public RemoveFrameSettingsOperation(BeebPerfForm form, FrameSettings frameSettings, List<FrameSettings> frameSettingsList)
         {
             _Form = form;
-            _OldLabelsFiles = labelsFiles;
-            _NewLabelsFiles = [];
-            _RecentLabelsFilePathName = recentLabelsFilePathName;
+            _FrameSettingsList = frameSettingsList;
+            _FrameSettings = frameSettings;
         }
 
         public override bool Execute()
         {
-            var dialog = new LabelsDialog(_OldLabelsFiles, _RecentLabelsFilePathName, _Form);
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                _NewLabelsFiles = dialog.LabelsFiles;
-                _RecentLabelsFilePathName = dialog.RecentLabelsFilePathName;
-                Redo();
-                return true;
-            }
-
-            return false;
+            Redo();
+            return true;
         }
 
         public override void Redo()
         {
-            _Form.SetLabelsFiles(_NewLabelsFiles, _RecentLabelsFilePathName);
+            _FrameSettingsList.Remove(_FrameSettings);
+            _Form.ClearSelectedFrameSettingsInternal();
         }
 
         public override void Undo()
         {
-            _Form.SetLabelsFiles(_OldLabelsFiles, _RecentLabelsFilePathName);
+            _FrameSettingsList.Add(_FrameSettings);
+            _Form.SetSelectedFrameSettingsInternal(_FrameSettings);
         }
 
-        private string _RecentLabelsFilePathName;
-        private List<LabelsFile> _OldLabelsFiles;
-        private List<LabelsFile> _NewLabelsFiles;
         private BeebPerfForm _Form;
+        private FrameSettings _FrameSettings;
+        private List<FrameSettings> _FrameSettingsList;
     }
 }

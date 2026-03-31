@@ -30,7 +30,7 @@ namespace BeebPerf.ux
     {
         public DisplaySettings? Settings;
 
-        internal SettingsDialog(DisplaySettings settings, Font baseFont)
+        internal SettingsDialog(DisplaySettings settings, Font baseFont, BeebPerfForm form)
         {
             _SuppressChangeEvents++;
 
@@ -38,6 +38,7 @@ namespace BeebPerf.ux
             _Settings = settings.Clone();
 
             InitializeComponent();
+            Owner = form;
 
             // show wait cursor
             Capture = true;

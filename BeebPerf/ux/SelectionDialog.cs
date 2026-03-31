@@ -28,9 +28,10 @@ namespace BeebPerf.ux
         public int AnalysisFrom;
         public int AnalysisTo;
 
-        public SelectionDialog(int analysisFrom, int analysisTo)
+        public SelectionDialog(int analysisFrom, int analysisTo, BeebPerfForm form)
         {
             InitializeComponent();
+            Owner = form;
 
             AnalysisFrom = analysisFrom;
             AnalysisTo = analysisTo;

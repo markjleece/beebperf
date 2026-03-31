@@ -170,7 +170,6 @@ namespace BeebPerf.ux
             ScrollToTopInternal();
         }
 
-
         private void SetRowsDataInternal(List<ROW_DATA_TYPE> rowsData)
         {
             RowCount = 0;
@@ -234,9 +233,9 @@ namespace BeebPerf.ux
             return string.Empty;
         }
 
-        protected virtual (int value, int range) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
+        protected virtual (int value, int range, bool clamp) OnRowDataCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
         {
-            return (value: -1, range: 1);
+            return (value: -1, range: 1, clamp: false);
         }
 
         protected void SetColumnAlignment(int columnIndex, DataGridViewContentAlignment alignment)
@@ -253,6 +252,14 @@ namespace BeebPerf.ux
             if (token == null) return;
 
             Columns[columnIndex].SortMode = sortMode;
+        }
+
+        protected void SetColumnAutoSize(int columnIndex, DataGridViewAutoSizeColumnMode autoSizeMode)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            Columns[columnIndex].AutoSizeMode = autoSizeMode;
         }
 
         protected void SetColumnHeaderToolTip(int columnIndex, string text)
@@ -400,9 +407,13 @@ namespace BeebPerf.ux
             e.MinimumHeight = RowTemplate.Height;
         }
 
-        protected string FormatCountAndRange(int value, int range)
+        protected string FormatCountAndRange(int value, int range, bool clamp)
         {
-            var percentage = double.Min(100.0 * value / range, 100.0);
+            var percentage = 100.0 * value / range;
+
+            if (clamp)
+                percentage = Math.Min(percentage, 100.0);
+
             if (percentage >= 0)
                 return $"{value:N0} ({percentage:F2}%)";
             else
@@ -412,7 +423,7 @@ namespace BeebPerf.ux
         protected string FormatCountAndRange(ROW_DATA_TYPE rowData, int columnIndex)
         {
             var countAndRange = OnRowDataCountAndRange(rowData, columnIndex);
-            return FormatCountAndRange(countAndRange.value, countAndRange.range);
+            return FormatCountAndRange(countAndRange.value, countAndRange.range, countAndRange.clamp);
         }
 
         private void ScrollToTopInternal()
@@ -741,7 +752,7 @@ namespace BeebPerf.ux
 
                 if (ratio < 0)
                     return;
-                else if (ratio > 1.0)
+                else if (countAndRange.clamp && ratio > 1.0)
                     ratio = 1.0;
 
                 int margin = cellBounds.Height / 8;
@@ -755,6 +766,9 @@ namespace BeebPerf.ux
                     cellBounds.Height - margin * 2);
 
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
+
+                if (ratio > 1.0)
+                    backColor = Color.Red;
 
                 var color = Blend(
                     backColor,

@@ -202,21 +202,21 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override (int value, int range) OnRowDataCountAndRange(object obj, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(object obj, int columnIndex)
         {
             if (obj is not InstructionMetrics)
-                return (value: -1, range: 1);
+                return (value: -1, range: 1, clamp: false);
 
             var instructionMetrics = (InstructionMetrics)obj;
             return columnIndex switch
             {
-                TotalCPUColumnIndex => (value: instructionMetrics.InclusiveCycleCount, range: _TotalCycleCount),
-                SelfCPUColumnIndex => (value: instructionMetrics.SelfCycleCount, range: _TotalCycleCount),
-                ExecutionCountColumnIndex => (value: instructionMetrics.ExecutionCount, range: _MaxExecutionCount),
-                BranchCountColumnIndex => (value: GetInstructionBranchCount(instructionMetrics), range: instructionMetrics.ExecutionCount),
-                MemoryReadCountColumnIndex => (value: GetMemoryReadCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
-                MemoryWriteCountColumnIndex => (value: GetMemoryWriteCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount),
-                _ => (value: -1, range: 1)
+                TotalCPUColumnIndex => (value: instructionMetrics.InclusiveCycleCount, range: _TotalCycleCount, clamp: true),
+                SelfCPUColumnIndex => (value: instructionMetrics.SelfCycleCount, range: _TotalCycleCount, clamp: true),
+                ExecutionCountColumnIndex => (value: instructionMetrics.ExecutionCount, range: _MaxExecutionCount, clamp: true),
+                BranchCountColumnIndex => (value: GetInstructionBranchCount(instructionMetrics), range: instructionMetrics.ExecutionCount, clamp: true),
+                MemoryReadCountColumnIndex => (value: GetMemoryReadCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount, clamp: true),
+                MemoryWriteCountColumnIndex => (value: GetMemoryWriteCount(instructionMetrics.Instruction), range: instructionMetrics.ExecutionCount, clamp: true),
+                _ => (value: -1, range: 1, clamp: false)
             };
         }
 

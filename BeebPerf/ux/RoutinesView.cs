@@ -162,17 +162,17 @@ namespace BeebPerf.ux
                 return FormatCountAndRange(routine, columnIndex);
         }
 
-        protected override (int value, int range) OnRowDataCountAndRange(Routine routine, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(Routine routine, int columnIndex)
         {
             var metrics = routine.AggregateMetrics;
             return columnIndex switch
             {
-                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount),
-                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount),
-                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount),
-                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount),
-                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount),
-                _ => (value: -1, range: 1)
+                SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount, clamp: true),
+                TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount, clamp: true),
+                ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount, clamp: true),
+                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount, clamp: true),
+                ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount, clamp: true),
+                _ => (value: -1, range: 1, clamp: false)
             };
         }
 

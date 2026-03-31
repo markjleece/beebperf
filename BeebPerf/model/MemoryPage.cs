@@ -36,6 +36,7 @@ namespace BeebPerf.model
         PageRom10 = 10,
         PageRom11 = 11,
         PageRom12 = 12,
+        PageRom13 = 13,
         PageRom14 = 14,
         PageRom15 = 15,
         WholeRam = 16,

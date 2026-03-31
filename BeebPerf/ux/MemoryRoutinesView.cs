@@ -114,14 +114,14 @@ namespace BeebPerf.ux
                 return FormatCountAndRange(memoryAccess, columnIndex);
         }
 
-        protected override (int value, int range) OnRowDataCountAndRange(RoutineMemoryAccess memoryAccess, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(RoutineMemoryAccess memoryAccess, int columnIndex)
         {
             return columnIndex switch
             {
-                ReadWriteCountColumnIndex => (value: memoryAccess.ReadCount + memoryAccess.WriteCount, range: _TotalReadCount + _TotalWriteCount),
-                ReadCountColumnIndex => (value: memoryAccess.ReadCount, range: _TotalReadCount),
-                WriteCountColumnIndex => (value: memoryAccess.WriteCount, range: _TotalWriteCount),
-                _ => (value: -1, range: 1)
+                ReadWriteCountColumnIndex => (value: memoryAccess.ReadCount + memoryAccess.WriteCount, range: _TotalReadCount + _TotalWriteCount, clamp: true),
+                ReadCountColumnIndex => (value: memoryAccess.ReadCount, range: _TotalReadCount, clamp: true),
+                WriteCountColumnIndex => (value: memoryAccess.WriteCount, range: _TotalWriteCount, clamp: true),
+                _ => (value: -1, range: 1, clamp: false)
             };
         }
 
