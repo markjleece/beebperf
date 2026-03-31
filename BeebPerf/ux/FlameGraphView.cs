@@ -21,8 +21,6 @@
 
 using BeebPerf.model;
 using System.Diagnostics.CodeAnalysis;
-using System.Drawing.Imaging.Effects;
-using System.Xml.Serialization;
 using static BeebPerf.model.DisplaySettings;
 
 namespace BeebPerf.ux

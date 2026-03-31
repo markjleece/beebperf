@@ -19,8 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Reflection;
-
 namespace BeebPerf.ux
 {
     public partial class HelpDialog : Form

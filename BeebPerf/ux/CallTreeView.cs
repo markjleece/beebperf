@@ -21,7 +21,6 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
-using System.Xml.Linq;
 
 namespace BeebPerf.ux
 {

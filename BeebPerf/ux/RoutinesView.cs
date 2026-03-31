@@ -21,7 +21,6 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
-using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
 {

@@ -83,7 +83,7 @@ namespace BeebPerf
             bool darkMode = IsDarkMode();
 
 #pragma warning disable WFO5001
-        var colorMode = darkMode ? SystemColorMode.Dark : SystemColorMode.Classic;
+            var colorMode = darkMode ? SystemColorMode.Dark : SystemColorMode.Classic;
             Application.SetColorMode(colorMode);
 #pragma warning restore WFO5001
 
