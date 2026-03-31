@@ -134,7 +134,7 @@ namespace BeebPerf.ux
             Exporter.ExportCSVFile(form, _GridView);
         }
 
-        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
+        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView), nameof(_ToolbarPanel))]
 
         private void InitializeComponent()
         {
@@ -156,9 +156,20 @@ namespace BeebPerf.ux
             _SettingsComboBox.Font = new Font("Segoe UI", 9F);
             _SettingsComboBox.FormattingEnabled = true;
             _SettingsComboBox.Name = "settingsComboBox";
-            _SettingsComboBox.Size = new Size(182, 33);
             _SettingsComboBox.TabIndex = 0;
+            _SettingsComboBox.Location = new Point(0, 0);
+            _SettingsComboBox.Size = new Size(200, 33);
             _SettingsComboBox.SelectedIndexChanged += SettingsComboBox_SelectedIndexChanged;
+            //
+            // _SettingsComboBoxPanel
+            //
+            _SettingsComboBoxPanel = new();
+            _SettingsComboBoxPanel.BorderStyle = BorderStyle.FixedSingle;
+            _SettingsComboBoxPanel.BackColor = SystemColors.Window;
+            _SettingsComboBoxPanel.Size = new Size(200, 33);
+            _SettingsComboBoxPanel.AutoSize = false;
+            _SettingsComboBoxPanel.TabIndex = 0;
+            _SettingsComboBoxPanel.Controls.Add(_SettingsComboBox);
             // 
             // _AddButton
             // 
@@ -168,7 +179,7 @@ namespace BeebPerf.ux
             _AddButton.Size = new Size(112, 34);
             _AddButton.TabIndex = 0;
             _AddButton.Text = "Add...";
-            _AddButton.UseVisualStyleBackColor = true;
+            _AddButton.BackColor = SystemColors.ControlLightLight;
             _AddButton.Click += AddButton_Click;
             // 
             // _EditButton
@@ -179,7 +190,7 @@ namespace BeebPerf.ux
             _EditButton.Size = new Size(130, 34);
             _EditButton.TabIndex = 0;
             _EditButton.Text = "Edit...";
-            _EditButton.UseVisualStyleBackColor = true;
+            _EditButton.BackColor = SystemColors.ControlLightLight;
             _EditButton.Click += EditButton_Click;
             // 
             // _RemoveButton
@@ -190,7 +201,7 @@ namespace BeebPerf.ux
             _RemoveButton.Size = new Size(112, 34);
             _RemoveButton.TabIndex = 0;
             _RemoveButton.Text = "Remove";
-            _RemoveButton.UseVisualStyleBackColor = true;
+            _RemoveButton.BackColor = SystemColors.ControlLightLight;
             _RemoveButton.Click += RemoveButton_Click;
             //
             // _CopyButton
@@ -209,19 +220,26 @@ namespace BeebPerf.ux
             _ExportButton.ToolTipText = "Export";
             _ExportButton.Click += ExportButton_Click;
             // 
+            // _ToolbarPanel
+            // 
+            _ToolbarPanel = new Panel();
+            _ToolbarPanel.BackColor = SystemColors.Control;
+            _ToolbarPanel.BorderStyle = BorderStyle.None;
+            _ToolbarPanel.Controls.Add(_SettingsLabel);
+            _ToolbarPanel.Controls.Add(_SettingsComboBoxPanel);
+            _ToolbarPanel.Controls.Add(_AddButton);
+            _ToolbarPanel.Controls.Add(_EditButton);
+            _ToolbarPanel.Controls.Add(_RemoveButton);
+            _ToolbarPanel.Controls.Add(_CopyButton);
+            _ToolbarPanel.Controls.Add(_ExportButton);
+            // 
             // _GridView
             // 
             _GridView = new FramesGridView(this);
             // 
             // FramesView
             // 
-            Controls.Add(_SettingsLabel);
-            Controls.Add(_SettingsComboBox);
-            Controls.Add(_AddButton);
-            Controls.Add(_EditButton);
-            Controls.Add(_RemoveButton);
-            Controls.Add(_CopyButton);
-            Controls.Add(_ExportButton);
+            Controls.Add(_ToolbarPanel);
             Controls.Add(_GridView);
         }
 
@@ -232,7 +250,7 @@ namespace BeebPerf.ux
             // layout children
             Control[] leftAlignedControls = [
                 _SettingsLabel,
-                _SettingsComboBox,
+                _SettingsComboBoxPanel,
                 _AddButton,
                 _EditButton,
                 _RemoveButton ];
@@ -258,9 +276,10 @@ namespace BeebPerf.ux
                 if (!child.Visible)
                     continue;
 
-                Size preferredSize = child.GetPreferredSize(new Size(Width, 0));
-                child.Location = new Point(left, padding + (maxHeight - child.Height) / 2);
-                child.Width = preferredSize.Width;
+                Size size = child is Panel ? child.Size : child.GetPreferredSize(new Size(0, 0));
+                child.Location = new Point(left, padding + (maxHeight - size.Height) / 2);
+                child.Width = size.Width;
+                child.Height = size.Height;
                 left += child.Width + (child is Label ? 3 : 6);
             }
 
@@ -272,11 +291,16 @@ namespace BeebPerf.ux
                 child.Location = new Point(right, padding + (maxHeight - child.Height) / 2);
             }
 
+            // layout toolbar panel
+            int toolbarHeight = maxHeight + padding * 2;
+            _ToolbarPanel.Location = new Point(0, 0);
+            _ToolbarPanel.Width = Width;
+            _ToolbarPanel.Height = toolbarHeight;
+
             // layout grid view
-            int topMargin = maxHeight + padding * 2;
-            _GridView.Location = new Point(0, topMargin);
+            _GridView.Location = new Point(0, toolbarHeight);
             _GridView.Width = Width;
-            _GridView.Height = Height - topMargin;
+            _GridView.Height = Height - toolbarHeight;
         }
 
         private void UpdateState()
@@ -296,7 +320,7 @@ namespace BeebPerf.ux
                 _SettingsComboBox.SelectedIndex = selectedIndex;
             }
 
-            _SettingsComboBox.Visible = hasSettings;
+            _SettingsComboBoxPanel.Visible = hasSettings;
             _EditButton.Visible = hasSettings;
             _RemoveButton.Visible = hasSettings;
 
@@ -312,12 +336,14 @@ namespace BeebPerf.ux
 
         // controls
         private Label _SettingsLabel;
+        private Panel _SettingsComboBoxPanel;
         private ComboBox _SettingsComboBox;
         private Button _AddButton;
         private Button _EditButton;
         private Button _RemoveButton;
         private ButtonEx _CopyButton;
         private ButtonEx _ExportButton;
+        private Panel _ToolbarPanel;
         private FramesGridView _GridView;
         private ReentrancyGuard _ReentrancyGuard = new();
     }
