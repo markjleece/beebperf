@@ -72,6 +72,14 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
+        public void SelectRange(int analysisFrom, int analysisTo)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            _GridView.SelectRange(analysisFrom, analysisTo);
+        }
+
         private void SettingsComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             using var token = _ReentrancyGuard.TryEnter();

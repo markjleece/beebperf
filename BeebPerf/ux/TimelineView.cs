@@ -19,7 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using static BeebPerf.VideoAnalysis;
+using static BeebPerf.FrameAnalysis;
 
 namespace BeebPerf.ux
 {
@@ -85,12 +85,13 @@ namespace BeebPerf.ux
             }
         }
 
-        public List<FrameBitmap> FrameBitmaps
+        public List<DisplayFrameBitmap> FrameBitmaps
         {
             get => _FrameBitmaps;
             set
             {
                 _FrameBitmaps = value;
+                ComputeFrames();
                 Invalidate();
             }
         }
@@ -1044,7 +1045,7 @@ namespace BeebPerf.ux
 
         private struct Frame
         {
-            public FrameBitmap Bitmap;
+            public DisplayFrameBitmap Bitmap;
             public Rectangle Rect;
         }
 
@@ -1064,7 +1065,7 @@ namespace BeebPerf.ux
         private List<Frame> _Frames = [];
         private HScrollBar _ScrollBar;
         private ReentrancyGuard _ReentrancyGuard = new();
-        private List<FrameBitmap> _FrameBitmaps = [];
+        private List<DisplayFrameBitmap> _FrameBitmaps = [];
         private Frame? _FocusFrame = null;
         private ButtonEx _EditSelectionButton;
         private ButtonEx _CopyFrameButton;

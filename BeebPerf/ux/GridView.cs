@@ -750,9 +750,11 @@ namespace BeebPerf.ux
                 var countAndRange = gridView.OnRowDataCountAndRange(dataRow, ColumnIndex);
                 double ratio = (double)countAndRange.value / countAndRange.range;
 
+                bool highlight = ratio > 1.0 && !countAndRange.clamp;
+
                 if (ratio < 0)
                     return;
-                else if (countAndRange.clamp && ratio > 1.0)
+                else if (ratio > 1.0)
                     ratio = 1.0;
 
                 int margin = cellBounds.Height / 8;
@@ -767,12 +769,9 @@ namespace BeebPerf.ux
 
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
-                if (ratio > 1.0)
-                    backColor = Color.Red;
-
                 var color = Blend(
                     backColor,
-                    gridView.DefaultCellStyle.SelectionBackColor,
+                    highlight ? Color.Red : gridView.DefaultCellStyle.SelectionBackColor,
                     selected ? 0.75 : 0.25);
 
                 using var brush = new SolidBrush(color);

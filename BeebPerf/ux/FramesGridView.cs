@@ -58,11 +58,17 @@ namespace BeebPerf.ux
 
             SetColumnAutoSize(VisualizationColumnIndex, DataGridViewAutoSizeColumnMode.Fill);
 
+            SetColumnAlignment(FrameNumberColumnIndex, DataGridViewContentAlignment.MiddleCenter);
+            SetColumnAlignment(DurationColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(DisplayOffsetColumnIndex, DataGridViewContentAlignment.MiddleCenter);
+            SetColumnAlignment(WritesBeforeDisplayColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(WritesAfterDisplayColumnIndex, DataGridViewContentAlignment.MiddleRight);
+
             SetColumnHeaderToolTip(FrameNumberColumnIndex, "Frame number");
             SetColumnHeaderToolTip(DurationColumnIndex, "Number of cycles, percentage of cycles to threshold");
             SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "Cycles before display scan starts");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the display memory read");
-            SetColumnHeaderToolTip(WritesAfterDisplayColumnIndex, "Nunber of screen memory writes after the display memory read");
+            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Nunber of screen memory writes after the display memory read");
             SetColumnHeaderToolTip(VisualizationColumnIndex, "Visualization");
 
             SetColumnSortMode(FrameNumberColumnIndex, DataGridViewColumnSortMode.Programmatic);
@@ -77,15 +83,49 @@ namespace BeebPerf.ux
             bool highlightWritesBeforeDisplay,
             bool highlightWritesAfterDisplay)
         {
-            _FrameMetricsList = frameMetricsList;
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
             _FrameSettings = frameSettings;
             _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
             _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
 
-            if (_FrameMetricsList.Count > 0)
-                base.SetRowsData(_FrameMetricsList);
+            if (frameMetricsList.Count > 0)
+                base.SetRowsData(frameMetricsList);
             else
                 base.Clear();
+        }
+
+        public void SelectRange(int analysisFrom, int analysisTo)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            foreach (var frameMetrics in base._DataRows)
+            {
+                if (frameMetrics.StartCycleCount == analysisFrom && 
+                    frameMetrics.EndCycleCount == analysisTo)
+                {
+                    SelectRow(frameMetrics, scrollIntoView: true);
+                    return;
+                }
+            }
+
+            base.ClearSelection();
+        }
+
+        protected override void OnSelectionChange(object? sender, FrameMetrics? frameMetrics)
+        {
+            using var token = _ReentrancyGuard.TryEnter();
+            if (token == null) return;
+
+            var form = FindForm() as BeebPerfForm;
+            if (form is null) return;
+
+            if (frameMetrics != null)
+                form.SetAnalysisRange(frameMetrics.StartCycleCount, frameMetrics.EndCycleCount);
+            else
+                form.SetAnalysisRange(0, int.MaxValue);
         }
 
         protected override int OnSortCompare(FrameMetrics a, FrameMetrics b, int columnIndex)
@@ -149,7 +189,7 @@ namespace BeebPerf.ux
         {
             int duration = frameMetrics.EndCycleCount - frameMetrics.StartCycleCount;
             int range = _FrameSettings!.ThresholdCycles;
-            double percentage = (int)double.Round(duration, range);
+            double percentage = (int)double.Round(100.0 * duration / range);
             return $"{duration:N0} ({percentage:F2}%)";
         }
 
@@ -208,9 +248,9 @@ namespace BeebPerf.ux
         }
 
         private FramesView _FramesView;
-        private List<FrameMetrics> _FrameMetricsList = [];
         private FrameSettings? _FrameSettings = null;
         private bool _HighlightWritesBeforeDisplay = false;
         private bool _HighlightWritesAfterDisplay = false;
+        private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

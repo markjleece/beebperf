@@ -33,7 +33,7 @@ namespace BeebPerf.ux
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new();
-            _VideoAnalysis = new();
+            _FrameAnalysis = new();
             _UndoRedoHistory = new();
             _Model = new();
 
@@ -149,12 +149,19 @@ namespace BeebPerf.ux
                     InsertPerfFileLabels(_LabelsFiles, filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
-                    StaticAnalysis();
+                    // defer frame analysis if its dependent on static analysis
+                    bool deferFrameAnalysis = 
+                        (_SelectedFrameSettings != null && _SelectedFrameSettings.Type != FrameSettings.FrameType.StartAndEndAddresses);
+
+                    StaticAnalysis(deferFrameAnalysis);
+
+                    if (!deferFrameAnalysis)
+                        FrameAnalysis();
                 }));
             });
         }
 
-        private void StaticAnalysis()
+        private void StaticAnalysis(bool performFrameAnalysis)
         {
             // CPU analysis...
             SetState(AppStateFlags.StaticCPUAnalysis);
@@ -175,19 +182,12 @@ namespace BeebPerf.ux
                         timelineView.FitSelection();
                     }
 
+                    // execute dynamic analysis for the selected range (or whole range if no selection)
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
-                }));
-            });
 
-            // video analysis...
-            SetState(AppStateFlags.VideoAnalysis);
-
-            var dynamicAnalysisTask = _VideoAnalysis.AnalysisAsync(_Model.Instructions, InstructionSet!, _Model).ContinueWith((success) =>
-            {
-                this.Invoke((Action)(() =>
-                {
-                    ClearState(AppStateFlags.VideoAnalysis);
-                    timelineView.FrameBitmaps = _VideoAnalysis.FrameBitmaps;
+                    // execute frame analysis
+                    if (performFrameAnalysis)
+                        FrameAnalysis();
                 }));
             });
         }
@@ -261,6 +261,28 @@ namespace BeebPerf.ux
                     memoryRoutinesView.Clear();
                 }));
             });
+        }
+
+        private void FrameAnalysis()
+        {
+            // frame analysis...
+            SetState(AppStateFlags.FrameAnalysis);
+
+            var frameAnalysisTask = _FrameAnalysis.AnalysisAsync(
+                _Model.Instructions,
+                InstructionSet!,
+                _Model,
+                _SelectedFrameSettings,
+                _CPUAnalysis.RootStackFrame).ContinueWith((success) =>
+                {
+                    this.Invoke((Action)(() =>
+                    {
+                        ClearState(AppStateFlags.FrameAnalysis);
+
+                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrameBitmaps;
+                        framesView.SetResults(_FrameAnalysis.FrameMetrics);
+                    }));
+                });
         }
 
         private void undoButton_Click(object sender, EventArgs e)
@@ -473,6 +495,9 @@ namespace BeebPerf.ux
 
         public void SetAnalysisRange(int analysisFrom, int analysisTo)
         {
+            analysisFrom = Math.Max(analysisFrom, 0);
+            analysisTo = Math.Min(analysisTo, timelineView.Duration);
+
             var operation = new SelectAnalysisRangeOperation(this, analysisFrom, analysisTo, _CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
@@ -486,6 +511,8 @@ namespace BeebPerf.ux
                 timelineView.SelectAll();
             else
                 timelineView.SelectRange(analysisFrom, analysisTo);
+
+            framesView.SelectRange(analysisFrom, analysisTo);
         }
 
         public void SetSelectedMemoryAddress(CanonicalAddress address)
@@ -548,7 +575,7 @@ namespace BeebPerf.ux
         {
             _SelectedFrameSettings = frameSettings;
             framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
-            // TODO: Get results...
+            FrameAnalysis();
         }
 
         public void ClearSelectedFrameSettings()
@@ -891,7 +918,7 @@ namespace BeebPerf.ux
                 state == AppStateFlags.DynamicCPUAnalysis ||
                 state == AppStateFlags.DynamicMemoryAnalysis ||
                 state == AppStateFlags.DynamicMemoryAddressAnalysis ||
-                state == AppStateFlags.VideoAnalysis);
+                state == AppStateFlags.FrameAnalysis);
 
             AppState |= state;
             UpdateToolbarState();
@@ -908,7 +935,7 @@ namespace BeebPerf.ux
                  AppStateFlags.DynamicCPUAnalysis | 
                  AppStateFlags.DynamicMemoryAnalysis |
                  AppStateFlags.DynamicMemoryAddressAnalysis |
-                 AppStateFlags.VideoAnalysis)) == 0)
+                 AppStateFlags.FrameAnalysis)) == 0)
                 spinner.Visible = false;
         }
 
@@ -919,7 +946,7 @@ namespace BeebPerf.ux
             DynamicCPUAnalysis = 0x04,
             DynamicMemoryAnalysis = 0x8,
             DynamicMemoryAddressAnalysis = 0x10,
-            VideoAnalysis = 0x20,
+            FrameAnalysis = 0x20,
             All = 0x3F
         }
 
@@ -998,7 +1025,7 @@ namespace BeebPerf.ux
         private LabelResolver _LabelResolver;
         private CPUAnalysis _CPUAnalysis;
         private MemoryAnalysis _MemoryAnalysis;
-        private VideoAnalysis _VideoAnalysis;
+        private FrameAnalysis _FrameAnalysis;
         private Font _BaseFont;
     }
 }

@@ -68,6 +68,47 @@ namespace BeebPerf.model
             };
         }
 
+        public bool Match(Instruction[] instructions)
+        {
+            return Type switch
+            {
+                FrameSettings.FrameType.StartAndEndAddresses =>
+                    AddressMatchesInstruction(StartAddress, instructions) &&
+                    AddressMatchesInstruction(EndAddress, instructions),
+                FrameSettings.FrameType.RoutineAddress =>
+                    AddressMatchesInstruction(StartAddress, instructions),
+                FrameSettings.FrameType.JSRAddress =>
+                    AddressMatchesJSRInstruction(StartAddress, instructions),
+                _ => false
+            };
+        }
+
+        private static bool AddressMatchesInstruction(CanonicalAddress address, Instruction[] instructions)
+        {
+            for (int i = 0; i < instructions.Length; i++)
+            {
+                ref var instruction = ref instructions[i];
+                if (instruction.IsInstruction &&
+                    instruction.OpcodeAddress.Equals(address))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool AddressMatchesJSRInstruction(CanonicalAddress address, Instruction[] instructions)
+        {
+            for (int i = 0; i < instructions.Length; i++)
+            {
+                ref var instruction = ref instructions[i];
+                if (instruction.IsInstruction &&
+                    instruction.OpcodeAddress.Equals(address) &&
+                    instruction.Opcode == 0x20/*JSR*/)
+                    return true;
+            }
+            return false;
+        }
+
+
         public required FrameType Type;
         public required string Name;
         public required CanonicalAddress StartAddress;

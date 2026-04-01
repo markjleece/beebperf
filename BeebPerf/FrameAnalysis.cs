@@ -20,11 +20,19 @@
 // --------------------------------------------------------------
 
 //
-// Code derived from the BeebEm project, specifically portions of
-// the Video class. Uses the same SAA5050 font loading and
-// font file, and SAA5050 state machine logic.
+// Acknowlegment: Video related code is derived from the BeebEm project,
+// specifically portions of the Video class. Uses the same SAA5050 font
+// loading and font file, and SAA5050 state machine logic.
 //
-// The code emulates the 6845, ULA, and SAA5050 at a
+// The code generates a list of analysis frames, which captures
+// how long each game-loop iteration takes, and a list of display
+// frames, which captures the displayed CRT frames.
+//
+// Analysis frames also capture the number of screen writes
+// that occur before and after the screen memory is read for display,
+// and their offset (cycles) from the next display frame.
+// 
+// The video code emulates the 6845, ULA, and SAA5050 at a
 // character/address level.
 //
 // The code renders frame bitmaps in 4bpp indexed format, where
@@ -53,12 +61,12 @@ using System.Drawing.Imaging;
 
 namespace BeebPerf
 {
-    public class VideoAnalysis
+    public class FrameAnalysis
     {
         private delegate byte ReadScreenData();
         private delegate void WriteBitmapData(byte value);
 
-        static VideoAnalysis()
+        static FrameAnalysis()
         {
             Color[] colors = [
                 Color.Black,
@@ -81,7 +89,7 @@ namespace BeebPerf
             _ColorPalette = new(colors);
         }
 
-        public VideoAnalysis()
+        public FrameAnalysis()
         {
             _WriteBitmapDataFunc = WriteBitmapData_Void;
             _ReadScreenDataFunc = ReadScreenData_Void;
@@ -95,19 +103,27 @@ namespace BeebPerf
         public async Task<bool> AnalysisAsync(
             Instruction[] instructions,
             InstructionSet instructionSet,
-            Model model)
+            Model model,
+            FrameSettings? frameSettings,
+            model.StackFrame rootStackFrame)
         {
             return await Task.Run(() =>
             {
-                return Analysis(instructions, instructionSet, model);
+                return Analysis(instructions, instructionSet, model, frameSettings, rootStackFrame);
             });
         }
 
         private bool Analysis(
             Instruction[] instructions,
             InstructionSet instructionSet,
-            Model model)
+            Model model,
+            FrameSettings? frameSettings,
+            model.StackFrame? rootStackFrame)
         {
+            _RootStackFrame = rootStackFrame;
+            _Instructions = instructions;
+            _InstructionSet = instructionSet;
+
             // initialize from snapshot
             _BBCModel = model.BBCModel;
 
@@ -144,14 +160,36 @@ namespace BeebPerf
             _RegisterModified = true;
 
             _DisplayFrame = false;
-            _FrameCount = 1;
+            _DisplayFrameCount = 1;
             _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
 
-            // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate frames
-            FrameBitmaps = [];
+            // frame analysis
+            FrameMetrics = [];
+            if (frameSettings != null && !frameSettings.Match(model.Instructions))
+                frameSettings = null;
+            _FrameSettings = frameSettings;
+            _FrameStartInstructionIndex = -1;
+            _FrameEndInstructionIndex = -1;
+
+            if (frameSettings != null)
+                _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress);
+
+            _FrameCount = 0;
+
+            // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate
+            // display frames whilst also creating analysis frames based on the provided frame settings
+            DisplayFrameBitmaps = [];
             int cycleCount = 0;
-            foreach (var instruction in instructions)
+            for (int instructionIndex = 0; instructionIndex < instructions.Length; instructionIndex++)
             {
+                ref var instruction = ref instructions[instructionIndex];
+                int postCycleCount = cycleCount + instruction.CycleCount;
+
+                if (instructionIndex == _FrameStartInstructionIndex)
+                    StartAnalysisFrame(cycleCount, instructionIndex);
+                if (instructionIndex == _FrameEndInstructionIndex)
+                    EndAnalysisFrame(postCycleCount, instructionIndex);
+
                 if (instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
@@ -165,16 +203,128 @@ namespace BeebPerf
                 }
                 else if (instruction.IsBeginDisplayEvent)
                 {
-                    StartFrame(cycleCount);
+                    StartDisplayFrame(cycleCount);
                 }
 
-                cycleCount += instruction.CycleCount;
+                cycleCount = postCycleCount;
 
                 if (_DisplayFrame)
                     DisplayMemory(cycleCount);
             }
 
             return true;
+        }
+
+        private void StartAnalysisFrame(int cycleCount, int instructionIndex)
+        {
+            _FrameStartCycleCount = cycleCount;
+
+            // find end instruction index based on frame settings
+            _FrameEndInstructionIndex = -1;
+            switch (_FrameSettings!.Type)
+            {
+                case FrameSettings.FrameType.StartAndEndAddresses:
+                    _FrameEndInstructionIndex = FindInstructionIndex(instructionIndex, _FrameSettings.EndAddress);
+                    break;
+
+                case FrameSettings.FrameType.RoutineAddress:
+                    var stackFrame = FindStackFrame(instructionIndex);
+                    var lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                    _FrameEndInstructionIndex = GetNearestInstructionIndex(lastInstructionIndex);
+                    break;
+
+                case FrameSettings.FrameType.JSRAddress:
+                    var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
+                    stackFrame = FindStackFrame(instructionIndex);
+                    foreach (var childStackFrame in stackFrame.Children)
+                    {
+                        if (_Instructions[childStackFrame.FirstInstructionIndex].OpcodeAddress.Equals(destinationAddress))
+                        {
+                            lastInstructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                            _FrameEndInstructionIndex = GetNearestInstructionIndex(lastInstructionIndex);
+                            break;
+                        }
+                    }
+                    Debug.Assert(_FrameEndInstructionIndex >= 0);
+                    break;
+            }
+
+            // reset counts
+            _WritesBeforeDisplayRead = 0;
+            _WritesAfterDisplayRead = 0;
+        }
+
+        private void EndAnalysisFrame(int cycleCount, int instructionIndex)
+        {
+            // create display frame
+            FrameMetrics.Add(new model.FrameMetrics()
+            {
+                FrameNumber = ++_FrameCount,
+                StartCycleCount = _FrameStartCycleCount,
+                EndCycleCount = cycleCount,
+                WritesBeforeDisplayRead = _WritesBeforeDisplayRead,
+                WritesAfterDisplayRead = _WritesAfterDisplayRead,
+                DisplayFrameOffset = 0 // TODO: calculate offset to next display frame
+            });
+
+            _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex, _FrameSettings!.StartAddress);
+            _FrameEndInstructionIndex = -1;
+        }
+
+        private int FindInstructionIndex(int indexFrom, CanonicalAddress address)
+        {
+            for (int instructionIndex = indexFrom; instructionIndex < _Instructions.Length; instructionIndex++)
+            {
+                ref var instruction = ref _Instructions[instructionIndex];
+                if (instruction.IsInstruction && instruction.OpcodeAddress.Equals(address))
+                    return instructionIndex;
+            }
+            return -1;
+        }
+
+        private model.StackFrame FindStackFrame(int instructionIndex)
+        {
+            Debug.Assert(_RootStackFrame != null);
+            var result = FindStackFrame(_RootStackFrame!, instructionIndex);
+            return result!;
+        }
+
+        private static model.StackFrame? FindStackFrame(model.StackFrame stackFrame, int instructionIndex)
+        {
+            // bounds check to avoid unnecessary recursion
+            if (instructionIndex < stackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex &&
+                instructionIndex > stackFrame.GetLastInstructionStackFrame().LastInstructionIndex)
+                return null;
+
+            // check children first, as they will be more specific than the parent stack frame
+            foreach (var childStackFrame in stackFrame.Children)
+            {
+                var result = FindStackFrame(childStackFrame, instructionIndex);
+                if (result != null)
+                    return result;
+            }
+
+            // check stack frame itself
+            if (instructionIndex >= stackFrame.FirstInstructionIndex &&
+                instructionIndex <= stackFrame.LastInstructionIndex)
+                return stackFrame;
+
+            return null;
+        }
+
+        private int GetNearestInstructionIndex(int index)
+        {
+            while (index < _Instructions.Length)
+                if (_Instructions[index++].IsInstruction)
+                    return index;
+
+            index = _Instructions.Length - 1;
+
+            while (index > 0)
+                if (_Instructions[index--].IsInstruction)
+                    return index;
+
+            return 0;
         }
 
         private void UpdateVideoState()
@@ -186,11 +336,11 @@ namespace BeebPerf
 
             bool interlacedSync = (_CtrlR8_InterlaceAndDelay & 0x1) != 0;
             _CRTBitmapScanlineOffsetIncrement = (interlacedSync ? 2 : 1) * _CRTBitmapStride;
-            _CRTBitmapScanlineOffsetReset = (interlacedSync ? _FrameCount % 2 : 0) * _CRTBitmapStride;
+            _CRTBitmapScanlineOffsetReset = (interlacedSync ? _DisplayFrameCount % 2 : 0) * _CRTBitmapStride;
 
             bool interlacedVideo = (_CtrlR8_InterlaceAndDelay & 0x2) != 0;
             _ScanlineCounterIncrement = interlacedVideo ? 2 : 1;
-            _ScanlineCounterReset = interlacedVideo ? _FrameCount % 2 : 0;
+            _ScanlineCounterReset = interlacedVideo ? _DisplayFrameCount % 2 : 0;
 
             _ScanlinesPerCharAdjust = (interlacedSync && interlacedVideo) ? 2 : 1;
 
@@ -293,10 +443,10 @@ namespace BeebPerf
                 _CRTBitmapHeight = bitmapHeight;
         }
 
-        private void StartFrame(int cycleCount)
+        private void StartDisplayFrame(int cycleCount)
         {
             if (_DisplayFrame)
-                EndFrame(cycleCount); // shouldn't happen
+                EndDisplayFrame(cycleCount); // shouldn't happen
 
             _DisplayFrame = true;
 
@@ -325,7 +475,7 @@ namespace BeebPerf
             _CRTBitmapScanlineOffset = _CRTBitmapScanlineOffsetReset;
         }
 
-        private void EndFrame(int cycleCount)
+        private void EndDisplayFrame(int cycleCount)
         {
             Debug.Assert(cycleCount - _StartCycleCount < 480000);
 
@@ -362,10 +512,10 @@ namespace BeebPerf
                 }
             }
 
-            FrameBitmaps.Add(new()
+            DisplayFrameBitmaps.Add(new()
             {
                 AspectRatio = _CRTAspectRatio,
-                FrameNumber = _FrameCount++,
+                FrameNumber = _DisplayFrameCount++,
                 StartCycleCount = _StartCycleCount,
                 EndCycleCount = cycleCount,
                 Bitmap = bitmap
@@ -380,6 +530,7 @@ namespace BeebPerf
 
             if (address < 0x8000)
             {
+                // TODO: Read frame map, to determine if write occurs before of after screen read
                 if (memoryAddress.Page == MemoryPage.WholeRam)
                     _Memory[address] = value;
                 else if (memoryAddress.Page == MemoryPage.ShadowRam)
@@ -534,7 +685,7 @@ namespace BeebPerf
                         _RowCounter++;
 
                         if (_RowCounter == _CtrlR6_VerticalDisplayed)
-                            EndFrame(cycleCount);
+                            EndDisplayFrame(cycleCount);
                     }
 
                     _BlankSpace = (_RowCounter >= _CtrlR6_VerticalDisplayed);
@@ -573,6 +724,7 @@ namespace BeebPerf
 
         private byte ReadDisplayMemory(int address)
         {
+            // TODO: Update frame map, to record that screen read has occured.
             if (_DisplayShadowRam)
             {
                 if (address < 0x3000)
@@ -1066,7 +1218,7 @@ namespace BeebPerf
             return (directory != null) ? directory.FullName : string.Empty;
         }
 
-        public class FrameBitmap
+        public class DisplayFrameBitmap
         {
             public int FrameNumber; // 1, 2, 3...
             public int StartCycleCount;
@@ -1075,7 +1227,12 @@ namespace BeebPerf
             public float AspectRatio;
         }
 
-        public List<FrameBitmap> FrameBitmaps = [];
+        public List<DisplayFrameBitmap> DisplayFrameBitmaps = [];
+        public List<FrameMetrics> FrameMetrics = [];
+
+        private model.StackFrame? _RootStackFrame = null;
+        private Instruction[] _Instructions = [];
+        private InstructionSet? _InstructionSet;
 
         private WriteBitmapData _WriteBitmapDataFunc;
         private ReadScreenData _ReadScreenDataFunc;
@@ -1088,6 +1245,15 @@ namespace BeebPerf
         private int _StartCycleCount;
         private int _LastCycleCount;
         private bool _RegisterModified;
+
+        // analysis frames
+        private FrameSettings? _FrameSettings;
+        private int _WritesBeforeDisplayRead;
+        private int _WritesAfterDisplayRead;
+        private int _FrameStartInstructionIndex;
+        private int _FrameEndInstructionIndex;
+        private int _FrameStartCycleCount;
+        private int _FrameCount = 0;
 
         // 6845...
         private bool _DisplayFrame;
@@ -1108,7 +1274,7 @@ namespace BeebPerf
         private int _ScreenSize;
         private int _ScreenAddress;
         private int _ScreenStartAddress;
-        private int _FrameCount;
+        private int _DisplayFrameCount;
 
         // ULA...
         private byte _ULARegister;
