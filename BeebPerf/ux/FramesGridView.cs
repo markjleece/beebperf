@@ -152,8 +152,8 @@ namespace BeebPerf.ux
             {
                 FrameNumberColumnIndex => frameMetrics.FrameNumber.ToString(),
                 DurationColumnIndex => FormatDuration(frameMetrics),
-                WritesBeforeDisplayColumnIndex => frameMetrics.WritesBeforeDisplayRead > 0 ? $"{frameMetrics.WritesBeforeDisplayRead:No}" : string.Empty,
-                WritesAfterDisplayColumnIndex => frameMetrics.WritesAfterDisplayRead > 0 ? $"{frameMetrics.WritesAfterDisplayRead:No}" : string.Empty,
+                WritesBeforeDisplayColumnIndex => $"{frameMetrics.WritesBeforeDisplayRead:N0}",
+                WritesAfterDisplayColumnIndex => $"{frameMetrics.WritesAfterDisplayRead:N0}",
                 DisplayOffsetColumnIndex => $"{frameMetrics.DisplayFrameOffset:N0}",
                 
                 _ => FormatCountAndRange(frameMetrics, columnIndex)

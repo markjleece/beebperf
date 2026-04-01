@@ -146,9 +146,13 @@ namespace BeebPerf
             if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
                 Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
 
-            _FilingSystemRam = new byte[0x1000];
+            _FilingSystemRam = new byte[8192];
             if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 1024);
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
+
+            _MemoryDisplayFrame = new int[65536];
+            _ShadowRamDisplayFrame = new int[20480];
+            _FilingSystemRamDisplayFrame = new int[8192];
 
             _ScreenAddress = model.Snapshot.ScreenAddress;
             _ScreenSize = 0x8000 - _ScreenAddress;
@@ -530,13 +534,33 @@ namespace BeebPerf
 
             if (address < 0x8000)
             {
-                // TODO: Read frame map, to determine if write occurs before of after screen read
+                int displayFrame;
+
                 if (memoryAddress.Page == MemoryPage.WholeRam)
+                {
                     _Memory[address] = value;
+                    displayFrame = _MemoryDisplayFrame[address];
+                }
                 else if (memoryAddress.Page == MemoryPage.ShadowRam)
-                    _ShadowRam[address - 0x3000] = value;
+                {
+                    address -= 0x3000;
+                    _ShadowRam[address] = value;
+                    displayFrame = _ShadowRamDisplayFrame[address];
+                }
                 else if (memoryAddress.Page == MemoryPage.FilingSystemRam)
+                {
+                    address -= 0xC000;
                     _FilingSystemRam[address] = value;
+                    displayFrame = _FilingSystemRamDisplayFrame[address];
+                }
+                else
+                    return;
+
+                if (displayFrame < _DisplayFrameCount)
+                    _WritesBeforeDisplayRead++;
+                else
+                    _WritesAfterDisplayRead++;
+
                 return;
             }
 
@@ -724,21 +748,34 @@ namespace BeebPerf
 
         private byte ReadDisplayMemory(int address)
         {
-            // TODO: Update frame map, to record that screen read has occured.
             if (_DisplayShadowRam)
             {
                 if (address < 0x3000)
                 {
                     if (_BBCModel == BBCModelType.Master128 || _BBCModel == BBCModelType.MasterET)
-                        return _FilingSystemRam[address & 0x0FFF]; // is this correct?
+                    {
+                        address -= 0xC000;
+                        _FilingSystemRamDisplayFrame[address] = _DisplayFrameCount;
+                        return _FilingSystemRam[address];
+                    }
                     else
+                    {
+                        _MemoryDisplayFrame[address] = _DisplayFrameCount;
                         return _Memory[address];
+                    }
                 }
                 else
-                    return _ShadowRam[address - 0x3000];
+                {
+                    address -= 0x3000;
+                    _ShadowRamDisplayFrame[address] = _DisplayFrameCount;
+                    return _ShadowRam[address];
+                }
             }
             else
+            {
+                _MemoryDisplayFrame[address] = _DisplayFrameCount;
                 return _Memory[address];
+            }
         }
 
         private void WriteBitmapData_Void(byte value)
@@ -1240,6 +1277,11 @@ namespace BeebPerf
         private byte[] _Memory = [];
         private byte[] _ShadowRam = [];
         private byte[] _FilingSystemRam = [];
+
+        private int[] _MemoryDisplayFrame = [];
+        private int[] _ShadowRamDisplayFrame = [];
+        private int[] _FilingSystemRamDisplayFrame = [];
+
         private byte _SystemVIA_DataDirection;
         private byte _ScreenAddressLatch;
         private int _StartCycleCount;
