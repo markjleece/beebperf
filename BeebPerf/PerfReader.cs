@@ -165,7 +165,7 @@ namespace BeebPerf
             }
 
             byte screenAddress = ReadByte(dataStream);
-            model.Snapshot.ScreenAddress = screenAddress switch
+            model.Snapshot.ScreenWrapAddress = screenAddress switch
             {
                 0 => 0x4000,
                 1 => 0x6000,

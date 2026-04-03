@@ -79,7 +79,7 @@ namespace BeebPerf.model
                     StackFrames = (MiniStackFrame[])StackFrames.Clone(),
                     RomPagingRegister = RomPagingRegister,
                     AccessControlRegister = AccessControlRegister,
-                    ScreenAddress = ScreenAddress,
+                    ScreenWrapAddress = ScreenWrapAddress,
                     HiddenRamAddress = HiddenRamAddress,
                     VideoULARegister = VideoULARegister,
                     VideoULAPalette = (byte[])VideoULAPalette.Clone(),
@@ -98,7 +98,7 @@ namespace BeebPerf.model
             public MiniStackFrame[] StackFrames = [];
             public byte RomPagingRegister;
             public byte AccessControlRegister;
-            public ushort ScreenAddress;
+            public ushort ScreenWrapAddress;
             public byte HiddenRamAddress;
             public byte VideoULARegister;
             public byte[] VideoULAPalette = [];

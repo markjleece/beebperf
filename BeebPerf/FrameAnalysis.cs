@@ -139,8 +139,8 @@ namespace BeebPerf
             _CtrlR12_ScreenStartHigh = model.Snapshot.VideoCtrlRegisters[12];
             _CtrlR13_ScreenStartLow = model.Snapshot.VideoCtrlRegisters[13];
 
-            _Memory = new byte[65536];
-            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 65536);
+            _Memory = new byte[32768];
+            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 32768);
 
             _ShadowRam = new byte[20480];
             if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
@@ -150,35 +150,33 @@ namespace BeebPerf
             if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
                 Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
 
-            _MemoryDisplayFrame = new int[65536];
-            _ShadowRamDisplayFrame = new int[20480];
-            _FilingSystemRamDisplayFrame = new int[8192];
-
-            _ScreenAddress = model.Snapshot.ScreenAddress;
-            _ScreenSize = 0x8000 - _ScreenAddress;
+            _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
+            _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
 
             SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
 
             // initialize video state
-            _ScreenStartAddress = 0;
-            _RegisterModified = true;
+            UpdateVideoState();
 
             _DisplayFrame = false;
             _DisplayFrameCount = 1;
             _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
 
-            // frame analysis
+            // initialize frame analysis
             FrameMetrics = [];
+            _FrameCount = 1;
+
             if (frameSettings != null && !frameSettings.Match(model.Instructions))
                 frameSettings = null;
+
             _FrameSettings = frameSettings;
-            _FrameStartInstructionIndex = -1;
+
+            _FrameStartInstructionIndex = (frameSettings != null) ? FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress) : -1;
             _FrameEndInstructionIndex = -1;
-
-            if (frameSettings != null)
-                _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress);
-
-            _FrameCount = 0;
+            
+            _MemoryDisplayFrame = new int[32768];
+            _ShadowRamDisplayFrame = new int[20480];
+            _FilingSystemRamDisplayFrame = new int[8192];
 
             // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate
             // display frames whilst also creating analysis frames based on the provided frame settings
@@ -263,7 +261,7 @@ namespace BeebPerf
             // create display frame
             FrameMetrics.Add(new model.FrameMetrics()
             {
-                FrameNumber = ++_FrameCount,
+                FrameNumber = _FrameCount++,
                 StartCycleCount = _FrameStartCycleCount,
                 EndCycleCount = cycleCount,
                 WritesBeforeDisplayRead = _WritesBeforeDisplayRead,
@@ -357,14 +355,23 @@ namespace BeebPerf
             }
 
             if (_TeletextMode)
+            {
+                _ScreenStartAddressDiv8 = 0; // not used in teletext mode
                 _ScreenStartAddress = (((_CtrlR12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CtrlR13_ScreenStartLow;
+                _ScreenSize = _CtrlR6_VerticalDisplayed * _CtrlR1_HorizontalDisplayed;
+            }
             else
-                _ScreenStartAddress = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
+            {
+                _ScreenStartAddressDiv8 = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
+                _ScreenStartAddress = _ScreenStartAddressDiv8 * 8;
+                _ScreenSize = _CtrlR6_VerticalDisplayed * _CtrlR1_HorizontalDisplayed * 8;
+            }
 
             _ReadScreenDataFunc = _TeletextMode ? ReadScreenData_Teletext : ReadScreenData_NonTeletext;
 
             int horizontalMultiplier;
             int bitmapWidth, bitmapHeight;
+
             if (!_TeletextMode)
             {
                 switch ((_ULARegister >> 2) & 0x7)
@@ -528,40 +535,55 @@ namespace BeebPerf
             _DisplayFrame = false;
         }
 
+        private bool IsScreenAddress(ushort address)
+        {
+            int screenEndAddress = _ScreenStartAddress + _ScreenSize;
+            int screenWrapSize = screenEndAddress - 0x8000;
+
+            if (screenWrapSize <= 0)
+                return (address >= _ScreenStartAddress && address < screenEndAddress);
+            else
+                return ((address >= _ScreenStartAddress && address < 0x8000) ||
+                        (address >= _ScreenWrapAddress && address < _ScreenWrapAddress + screenWrapSize));
+        }
+
         private void MemoryWrite(CanonicalAddress memoryAddress, byte value)
         {
             ushort address = memoryAddress.Address;
 
-            if (address < 0x8000)
+            if (address < 0xE000)
             {
-                int displayFrame;
+                int displayFrame = -1;
 
-                if (memoryAddress.Page == MemoryPage.WholeRam)
+                if (memoryAddress.Page == MemoryPage.WholeRam && address < 0x8000)
                 {
                     _Memory[address] = value;
-                    displayFrame = _MemoryDisplayFrame[address];
+
+                    if (IsScreenAddress(address))
+                        displayFrame = _MemoryDisplayFrame[address];
                 }
                 else if (memoryAddress.Page == MemoryPage.ShadowRam)
                 {
-                    address -= 0x3000;
-                    _ShadowRam[address] = value;
-                    displayFrame = _ShadowRamDisplayFrame[address];
+                    _ShadowRam[address - 0x3000] = value;
+
+                    if (IsScreenAddress(address))
+                        displayFrame = _ShadowRamDisplayFrame[address - 0x3000];
                 }
                 else if (memoryAddress.Page == MemoryPage.FilingSystemRam)
                 {
-                    address -= 0xC000;
-                    _FilingSystemRam[address] = value;
-                    displayFrame = _FilingSystemRamDisplayFrame[address];
+                    _FilingSystemRam[address - 0xC000] = value;
+
+                    if (IsScreenAddress(address))
+                        displayFrame = _FilingSystemRamDisplayFrame[address - 0xC000];
                 }
-                else
-                    return;
 
-                if (displayFrame < _DisplayFrameCount)
-                    _WritesBeforeDisplayRead++;
-                else
-                    _WritesAfterDisplayRead++;
-
-                return;
+                if (displayFrame != -1)
+                {
+                    if (displayFrame < _DisplayFrameCount)
+                        _WritesBeforeDisplayRead++;
+                    else
+                        _WritesAfterDisplayRead++;
+                }
             }
 
             if (memoryAddress.Page != MemoryPage.WholeRam)
@@ -633,18 +655,18 @@ namespace BeebPerf
             {
                 _SystemVIA_DataDirection = value;
             }
-            else if (address == 0xFE40) // set screen wrap direction
+            else if (address == 0xFE40) // set screen wrap address
             {
                 if ((_SystemVIA_DataDirection & 0xF) == 0xF)
                 {
                     int latchIndex = (value & 0x07);
                     int latchValue = (value >> 3) & 0x01;
                     if (latchIndex == 4)
-                        _ScreenAddressLatch = (byte)((_ScreenAddressLatch & 0xFE) | latchValue);
+                        _ScreenWrapAddressLatch = (byte)((_ScreenWrapAddressLatch & 0xFE) | latchValue);
                     else if (latchIndex == 5)
-                        _ScreenAddressLatch = (byte)((_ScreenAddressLatch & 0xFD) | latchValue);
+                        _ScreenWrapAddressLatch = (byte)((_ScreenWrapAddressLatch & 0xFD) | latchValue);
 
-                    _ScreenAddress = _ScreenAddressLatch switch
+                    _ScreenWrapAddress = _ScreenWrapAddressLatch switch
                     {
                         0 => 0x4000,
                         1 => 0x6000,
@@ -652,10 +674,10 @@ namespace BeebPerf
                         3 => 0x5800,
                         _ => throw new ArgumentOutOfRangeException()
                     };
-
-                    _ScreenSize = 0x8000 - _ScreenAddress;
+                    _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
                 }
             }
+
             if (address >= 0xFE34 && address < 0xFE38)
             {
                 SetDisplayShadowRam(value);
@@ -726,8 +748,8 @@ namespace BeebPerf
         {
             int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
 
-            if (characterAddress > 0x8000)
-                characterAddress -= _ScreenSize;
+            if (characterAddress >= 0x8000)
+                characterAddress -= _ScreenWrapOffset;
 
             return ReadDisplayMemory(characterAddress);
         }
@@ -737,11 +759,11 @@ namespace BeebPerf
             if (_ScanlineCounter >= 8)
                 return 0;
 
-            int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
+            int characterAddress = _ScreenStartAddressDiv8 + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
             int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
 
-            if (memoryAddress > 0x8000)
-                memoryAddress -= _ScreenSize;
+            if (memoryAddress >= 0x8000)
+                memoryAddress -= _ScreenWrapOffset;
 
             return ReadDisplayMemory(memoryAddress);
         }
@@ -1283,7 +1305,7 @@ namespace BeebPerf
         private int[] _FilingSystemRamDisplayFrame = [];
 
         private byte _SystemVIA_DataDirection;
-        private byte _ScreenAddressLatch;
+        private byte _ScreenWrapAddressLatch;
         private int _StartCycleCount;
         private int _LastCycleCount;
         private bool _RegisterModified;
@@ -1313,8 +1335,10 @@ namespace BeebPerf
         private int _ScanlineCounter;
         private int _ScanlineCounterIncrement;
         private int _ScanlineCounterReset;
+        private int _ScreenWrapAddress;
+        private int _ScreenWrapOffset;
         private int _ScreenSize;
-        private int _ScreenAddress;
+        private int _ScreenStartAddressDiv8;
         private int _ScreenStartAddress;
         private int _DisplayFrameCount;
 
