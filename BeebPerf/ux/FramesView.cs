@@ -44,30 +44,14 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
-        public void SetResults(List<FrameMetrics> frameMetricsList)
+        public void SetResults(List<FrameAnalysis.Frame> frames)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            _FrameMetricsList = frameMetricsList;
+            _Frames = frames;
 
-            int totalWritesBeforeDisplay = 0;
-            int totalWritesAfterDisplay = 0;
-            foreach (var frameMetics in frameMetricsList)
-            {
-                totalWritesBeforeDisplay += frameMetics.WritesBeforeDisplayRead;
-                totalWritesAfterDisplay += frameMetics.WritesAfterDisplayRead;
-            }
-
-            bool highlightWritesBeforeDisplay = false;
-            bool highlightWritesAfterDisplay = false;
-            if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
-            {
-                highlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
-                highlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
-            }
-
-            _GridView.Initialize(_FrameMetricsList, _SelectedFrameSettings, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
+            _GridView.Initialize(_Frames, _SelectedFrameSettings);
 
             UpdateState();
         }
@@ -229,7 +213,7 @@ namespace BeebPerf.ux
             // 
             // _GridView
             // 
-            _GridView = new FramesGridView(this);
+            _GridView = new FramesGridView();
             _GridView.BackColor = SystemColors.Control;
             // 
             // FramesView - Add controls directly
@@ -322,11 +306,11 @@ namespace BeebPerf.ux
 
             _EditButton.Enabled = _SelectedFrameSettings != null;
             _RemoveButton.Enabled = _SelectedFrameSettings != null;
-            _CopyButton.Enabled = _FrameMetricsList.Count > 0;
-            _ExportButton.Enabled = _FrameMetricsList.Count > 0;
+            _CopyButton.Enabled = _Frames.Count > 0;
+            _ExportButton.Enabled = _Frames.Count > 0;
         }
 
-        private List<FrameMetrics> _FrameMetricsList = [];
+        private List<FrameAnalysis.Frame> _Frames = [];
         private List<FrameSettings>? _FrameSettingsList = [];
         private FrameSettings? _SelectedFrameSettings = null;
         private ReentrancyGuard _ReentrancyGuard = new();

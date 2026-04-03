@@ -41,6 +41,7 @@ namespace BeebPerf.model
             });
             Instructions = new Instruction[executionCount];
         }
+
         public Model Clone()
         {
             return new Model()

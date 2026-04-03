@@ -279,8 +279,8 @@ namespace BeebPerf.ux
                     {
                         ClearState(AppStateFlags.FrameAnalysis);
 
-                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrameBitmaps;
-                        framesView.SetResults(_FrameAnalysis.FrameMetrics);
+                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrames;
+                        framesView.SetResults(_FrameAnalysis.Frames);
                     }));
                 });
         }

@@ -123,64 +123,14 @@ namespace BeebPerf
             _RootStackFrame = rootStackFrame;
             _Instructions = instructions;
             _InstructionSet = instructionSet;
-
-            // initialize from snapshot
             _BBCModel = model.BBCModel;
 
-            _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
-            _ULARegister = model.Snapshot.VideoULARegister;
-
-            _CtrlR0_HorizontalTotal = model.Snapshot.VideoCtrlRegisters[0];
-            _CtrlR1_HorizontalDisplayed = model.Snapshot.VideoCtrlRegisters[1];
-            _CtrlR4_VerticalTotal = model.Snapshot.VideoCtrlRegisters[4];
-            _CtrlR6_VerticalDisplayed = model.Snapshot.VideoCtrlRegisters[6];
-            _CtrlR8_InterlaceAndDelay = model.Snapshot.VideoCtrlRegisters[8];
-            _CtrlR9_ScanLinesPerChar = model.Snapshot.VideoCtrlRegisters[9];
-            _CtrlR12_ScreenStartHigh = model.Snapshot.VideoCtrlRegisters[12];
-            _CtrlR13_ScreenStartLow = model.Snapshot.VideoCtrlRegisters[13];
-
-            _Memory = new byte[32768];
-            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 32768);
-
-            _ShadowRam = new byte[20480];
-            if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
-
-            _FilingSystemRam = new byte[8192];
-            if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
-
-            _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
-            _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
-
-            SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
-
-            // initialize video state
-            UpdateVideoState();
-
-            _DisplayFrame = false;
-            _DisplayFrameCount = 1;
-            _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
-
-            // initialize frame analysis
-            FrameMetrics = [];
-            _FrameCount = 1;
-
-            if (frameSettings != null && !frameSettings.Match(model.Instructions))
-                frameSettings = null;
-
-            _FrameSettings = frameSettings;
-
-            _FrameStartInstructionIndex = (frameSettings != null) ? FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress) : -1;
-            _FrameEndInstructionIndex = -1;
-            
-            _MemoryDisplayFrame = new int[32768];
-            _ShadowRamDisplayFrame = new int[20480];
-            _FilingSystemRamDisplayFrame = new int[8192];
+            InitializeVideo(model);
+            InitializeFrames(frameSettings);
 
             // process instructions whilst emulating 6845, ULA, and SAA5050 behavior to generate
             // display frames whilst also creating analysis frames based on the provided frame settings
-            DisplayFrameBitmaps = [];
+            DisplayFrames = [];
             int cycleCount = 0;
             for (int instructionIndex = 0; instructionIndex < instructions.Length; instructionIndex++)
             {
@@ -214,7 +164,114 @@ namespace BeebPerf
                     DisplayMemory(cycleCount);
             }
 
+            UpdateFrames();
+
             return true;
+        }
+
+        private void InitializeVideo(Model model)
+        {
+            _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
+            _ULARegister = model.Snapshot.VideoULARegister;
+
+            _CtrlR0_HorizontalTotal = model.Snapshot.VideoCtrlRegisters[0];
+            _CtrlR1_HorizontalDisplayed = model.Snapshot.VideoCtrlRegisters[1];
+            _CtrlR4_VerticalTotal = model.Snapshot.VideoCtrlRegisters[4];
+            _CtrlR6_VerticalDisplayed = model.Snapshot.VideoCtrlRegisters[6];
+            _CtrlR8_InterlaceAndDelay = model.Snapshot.VideoCtrlRegisters[8];
+            _CtrlR9_ScanLinesPerChar = model.Snapshot.VideoCtrlRegisters[9];
+            _CtrlR12_ScreenStartHigh = model.Snapshot.VideoCtrlRegisters[12];
+            _CtrlR13_ScreenStartLow = model.Snapshot.VideoCtrlRegisters[13];
+
+            _Memory = new byte[32768];
+            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 32768);
+
+            _ShadowRam = new byte[20480];
+            if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
+
+            _FilingSystemRam = new byte[8192];
+            if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
+
+            _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
+            _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
+
+            SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
+
+            _DisplayFrame = false;
+            _DisplayFrameCount = 1;
+            _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
+
+            UpdateVideoState();
+        }
+
+        private void InitializeFrames(FrameSettings? frameSettings)
+        {
+            Frames = [];
+            _FrameCount = 1;
+
+            if (frameSettings != null && !frameSettings.Match(_Instructions))
+                frameSettings = null;
+
+            _FrameSettings = frameSettings;
+
+            _FrameStartInstructionIndex = (frameSettings != null) ? FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress) : -1;
+            _FrameEndInstructionIndex = -1;
+
+            _MemoryDisplayFrame = new int[32768];
+            _ShadowRamDisplayFrame = new int[20480];
+            _FilingSystemRamDisplayFrame = new int[8192];
+        }
+
+        private void UpdateFrames()
+        {
+            int displayFrameIndex = 0;
+            DisplayFrame? displayFrame = DisplayFrames.Count > 0 ? DisplayFrames[displayFrameIndex] : null;
+
+            for (int frameIndex = 0; frameIndex < Frames.Count; frameIndex++)
+            {
+                var frame = Frames[frameIndex];
+                var displayFrameSpans = new List<Frame.DisplayFrameSpan>();
+                int nextFrameStartCycleCount = -1;
+
+                // skip any prior display frames 
+                while (displayFrame != null && displayFrame.EndCycleCount < frame.StartCycleCount)
+                {
+                    displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
+                }
+
+                // process intersecting frames
+                while (displayFrame != null && displayFrame.StartCycleCount < frame.EndCycleCount)
+                {
+                    if (nextFrameStartCycleCount == -1)
+                        nextFrameStartCycleCount = displayFrame.StartCycleCount;
+
+                    displayFrameSpans.Add(new Frame.DisplayFrameSpan()
+                    {
+                        StartCycleCount = displayFrame.StartCycleCount,
+                        EndCycleCount = displayFrame.EndCycleCount
+                    });
+
+                    displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
+                }
+
+                if (displayFrame != null)
+                {
+                    if (nextFrameStartCycleCount == -1)
+                        nextFrameStartCycleCount = displayFrame.StartCycleCount;
+
+                    // back up to deal with cross spans
+                    displayFrame = DisplayFrames[--displayFrameIndex];
+                }
+
+                frame.DisplayFrameSpans = displayFrameSpans.ToArray();
+
+                if (nextFrameStartCycleCount != 0)
+                    frame.DisplayFrameOffset = nextFrameStartCycleCount - frame.StartCycleCount;
+                else
+                    frame.DisplayFrameOffset = 0;
+            }
         }
 
         private void StartAnalysisFrame(int cycleCount, int instructionIndex)
@@ -259,14 +316,13 @@ namespace BeebPerf
         private void EndAnalysisFrame(int cycleCount, int instructionIndex)
         {
             // create display frame
-            FrameMetrics.Add(new model.FrameMetrics()
+            Frames.Add(new FrameAnalysis.Frame()
             {
                 FrameNumber = _FrameCount++,
                 StartCycleCount = _FrameStartCycleCount,
                 EndCycleCount = cycleCount,
                 WritesBeforeDisplayRead = _WritesBeforeDisplayRead,
                 WritesAfterDisplayRead = _WritesAfterDisplayRead,
-                DisplayFrameOffset = 0 // TODO: calculate offset to next display frame
             });
 
             _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex, _FrameSettings!.StartAddress);
@@ -523,7 +579,7 @@ namespace BeebPerf
                 }
             }
 
-            DisplayFrameBitmaps.Add(new()
+            DisplayFrames.Add(new()
             {
                 AspectRatio = _CRTAspectRatio,
                 FrameNumber = _DisplayFrameCount++,
@@ -1277,7 +1333,24 @@ namespace BeebPerf
             return (directory != null) ? directory.FullName : string.Empty;
         }
 
-        public class DisplayFrameBitmap
+        public class Frame
+        {
+            public struct DisplayFrameSpan
+            {
+                public int StartCycleCount;
+                public int EndCycleCount;
+            }
+
+            public required int FrameNumber; // 1, 2, 3...
+            public required int StartCycleCount;
+            public required int EndCycleCount;
+            public required int WritesBeforeDisplayRead;
+            public required int WritesAfterDisplayRead;
+            public int DisplayFrameOffset;
+            public DisplayFrameSpan[] DisplayFrameSpans = [];
+        }
+
+        public class DisplayFrame
         {
             public int FrameNumber; // 1, 2, 3...
             public int StartCycleCount;
@@ -1286,8 +1359,8 @@ namespace BeebPerf
             public float AspectRatio;
         }
 
-        public List<DisplayFrameBitmap> DisplayFrameBitmaps = [];
-        public List<FrameMetrics> FrameMetrics = [];
+        public List<Frame> Frames = [];
+        public List<DisplayFrame> DisplayFrames = [];
 
         private model.StackFrame? _RootStackFrame = null;
         private Instruction[] _Instructions = [];

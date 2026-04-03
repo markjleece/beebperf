@@ -21,10 +21,11 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
+using static BeebPerf.FrameAnalysis.Frame;
 
 namespace BeebPerf.ux
 {
-    internal class FramesGridView : GridView<FrameMetrics>, IGridExporter
+    internal class FramesGridView : GridView<FrameAnalysis.Frame>, IGridExporter
     {
         private const int FrameNumberColumnIndex = 0;
         private const int DurationColumnIndex = 1;
@@ -45,16 +46,15 @@ namespace BeebPerf.ux
         private const int ExportWritePercentageAfterDisplayColumnIndex = 9;
         private const int ExportColumnCount = 10;
 
-        public FramesGridView(FramesView framesView) : base(System.Windows.Forms.SelectionMode.One, (ButtonType)0)
+        public FramesGridView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)0)
         {
-            _FramesView = framesView;
-
-            AddColumn("FrameNumber", "Frame [#]", cellTemplate: null);
-            AddColumn("Duration", "Duration [#, %]", cellTemplate: null);
-            AddColumn("DisplayFrameOffset", "Offset [#]", cellTemplate: null);
-            AddColumn("ScreenWritesBeforeDisplayRead", "Writes before display [#, %]", cellTemplate: null);
-            AddColumn("ScreenWritesBeforeDisplayRead", "Writes after display [#, %]", cellTemplate: null);
-            AddColumn("Visualization", "Visualization", cellTemplate: null);
+            var cellTemplate = new CellTemplate();
+            AddColumn("FrameNumber", "Frame [#]", cellTemplate);
+            AddColumn("Duration", "Duration [#, %]", cellTemplate);
+            AddColumn("DisplayFrameOffset", "Offset [#]", cellTemplate);
+            AddColumn("ScreenWritesBeforeDisplayRead", "Writes before display [#, %]", cellTemplate);
+            AddColumn("ScreenWritesBeforeDisplayRead", "Writes after display [#, %]", cellTemplate);
+            AddColumn("Visualization", "Visualization", cellTemplate);
 
             SetColumnAutoSize(VisualizationColumnIndex, DataGridViewAutoSizeColumnMode.Fill);
 
@@ -77,21 +77,38 @@ namespace BeebPerf.ux
             SetColumnSortMode(VisualizationColumnIndex, DataGridViewColumnSortMode.NotSortable);
         }
 
-        public void Initialize(
-            List<FrameMetrics> frameMetricsList,
-            FrameSettings? frameSettings,
-            bool highlightWritesBeforeDisplay,
-            bool highlightWritesAfterDisplay)
+        public void Initialize(List<FrameAnalysis.Frame> frames, FrameSettings? frameSettings)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
             _FrameSettings = frameSettings;
-            _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
-            _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
 
-            if (frameMetricsList.Count > 0)
-                base.SetRowsData(frameMetricsList);
+            // determine whether to highlight writes before or writes after
+            int totalWritesBeforeDisplay = 0;
+            int totalWritesAfterDisplay = 0;
+            foreach (var frame in frames)
+            {
+                totalWritesBeforeDisplay += frame.WritesBeforeDisplayRead;
+                totalWritesAfterDisplay += frame.WritesAfterDisplayRead;
+            }
+
+            _HighlightWritesBeforeDisplay = false;
+            _HighlightWritesAfterDisplay = false;
+            if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
+            {
+                _HighlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
+                _HighlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
+            }
+
+            // calculate max cycle count
+            _MaxCycleCount = 0;
+            foreach (var frame in frames)
+                _MaxCycleCount = int.Max(_MaxCycleCount, frame.EndCycleCount - frame.StartCycleCount);
+
+            // set data
+            if (frames.Count > 0)
+                base.SetRowsData(frames);
             else
                 base.Clear();
         }
@@ -101,12 +118,12 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            foreach (var frameMetrics in base._DataRows)
+            foreach (var frame in base._DataRows)
             {
-                if (frameMetrics.StartCycleCount == analysisFrom && 
-                    frameMetrics.EndCycleCount == analysisTo)
+                if (frame.StartCycleCount == analysisFrom &&
+                    frame.EndCycleCount == analysisTo)
                 {
-                    SelectRow(frameMetrics, scrollIntoView: true);
+                    SelectRow(frame, scrollIntoView: true);
                     return;
                 }
             }
@@ -114,7 +131,7 @@ namespace BeebPerf.ux
             base.ClearSelection();
         }
 
-        protected override void OnSelectionChange(object? sender, FrameMetrics? frameMetrics)
+        protected override void OnSelectionChange(object? sender, FrameAnalysis.Frame? frame)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
@@ -122,13 +139,13 @@ namespace BeebPerf.ux
             var form = FindForm() as BeebPerfForm;
             if (form is null) return;
 
-            if (frameMetrics != null)
-                form.SetAnalysisRange(frameMetrics.StartCycleCount, frameMetrics.EndCycleCount);
+            if (frame != null)
+                form.SetAnalysisRange(frame.StartCycleCount, frame.EndCycleCount);
             else
                 form.SetAnalysisRange(0, int.MaxValue);
         }
 
-        protected override int OnSortCompare(FrameMetrics a, FrameMetrics b, int columnIndex)
+        protected override int OnSortCompare(FrameAnalysis.Frame a, FrameAnalysis.Frame b, int columnIndex)
         {
             int result = columnIndex switch
             {
@@ -146,38 +163,38 @@ namespace BeebPerf.ux
             return result;
         }
 
-        protected override string OnFormatRowData(FrameMetrics frameMetrics, int columnIndex, int rowIndex)
+        protected override string OnFormatRowData(FrameAnalysis.Frame frame, int columnIndex, int rowIndex)
         {
             return columnIndex switch
             {
-                FrameNumberColumnIndex => frameMetrics.FrameNumber.ToString(),
-                DurationColumnIndex => FormatDuration(frameMetrics),
-                WritesBeforeDisplayColumnIndex => $"{frameMetrics.WritesBeforeDisplayRead:N0}",
-                WritesAfterDisplayColumnIndex => $"{frameMetrics.WritesAfterDisplayRead:N0}",
-                DisplayOffsetColumnIndex => $"{frameMetrics.DisplayFrameOffset:N0}",
+                FrameNumberColumnIndex => frame.FrameNumber.ToString(),
+                DurationColumnIndex => FormatDuration(frame),
+                WritesBeforeDisplayColumnIndex => $"{frame.WritesBeforeDisplayRead:N0}",
+                WritesAfterDisplayColumnIndex => $"{frame.WritesAfterDisplayRead:N0}",
+                DisplayOffsetColumnIndex => $"{frame.DisplayFrameOffset:N0}",
                 
-                _ => FormatCountAndRange(frameMetrics, columnIndex)
+                _ => FormatCountAndRange(frame, columnIndex)
             };
         }
 
-        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(FrameMetrics frameMetrics, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(FrameAnalysis.Frame frame, int columnIndex)
         {
             switch (columnIndex)
             {
                 case WritesBeforeDisplayColumnIndex:
-                    if (_HighlightWritesBeforeDisplay && frameMetrics.WritesBeforeDisplayRead > 0)
+                    if (_HighlightWritesBeforeDisplay && frame.WritesBeforeDisplayRead > 0)
                         return (value: 2, range: 1, clamp: false); // highlight cell
                     else
                         return (value: -1, range: 1, clamp: false); // no highlight
 
                 case WritesAfterDisplayColumnIndex:
-                    if (_HighlightWritesAfterDisplay && frameMetrics.WritesAfterDisplayRead > 0)
+                    if (_HighlightWritesAfterDisplay && frame.WritesAfterDisplayRead > 0)
                         return (value: 2, range: 1, clamp: false); // highlight cell
                     else
                         return (value: -1, range: 1, clamp: false); // no highlight
 
                 case DurationColumnIndex:
-                    int cycles = frameMetrics.EndCycleCount - frameMetrics.StartCycleCount;
+                    int cycles = frame.EndCycleCount - frame.StartCycleCount;
                     return (value: cycles, range: _FrameSettings!.ThresholdCycles, clamp: false);
 
                 default:
@@ -185,9 +202,9 @@ namespace BeebPerf.ux
             }
         }
 
-        private string FormatDuration(FrameMetrics frameMetrics)
+        private string FormatDuration(FrameAnalysis.Frame frame)
         {
-            int duration = frameMetrics.EndCycleCount - frameMetrics.StartCycleCount;
+            int duration = frame.EndCycleCount - frame.StartCycleCount;
             int range = _FrameSettings!.ThresholdCycles;
             double percentage = (int)double.Round(100.0 * duration / range);
             return $"{duration:N0} ({percentage:F2}%)";
@@ -229,28 +246,159 @@ namespace BeebPerf.ux
             return rowValues.ToArray();
         }
 
-        private string FormatExportCell(FrameMetrics frameMetrics, int columnIndex)
+        private string FormatExportCell(FrameAnalysis.Frame frame, int columnIndex)
         {
             return columnIndex switch
             {
-                ExportFrameNumberColumnIndex => frameMetrics.FrameNumber.ToString(),
-                ExportStartCycleCountColumnIndex => frameMetrics.StartCycleCount.ToString(),
-                ExportEndCycleCountColumnIndex => frameMetrics.EndCycleCount.ToString(),
-                ExportDurationColumnIndex => (frameMetrics.EndCycleCount - frameMetrics.StartCycleCount).ToString(),
-                ExportDurationPercentageColumnIndex => FormatExportPercentage(frameMetrics.EndCycleCount - frameMetrics.StartCycleCount, _FrameSettings!.ThresholdCycles),
-                ExportWriteCountBeforeDisplayColumnIndex => frameMetrics.WritesBeforeDisplayRead.ToString(),
-                ExportWritePercentageBeforeDisplayColumnIndex => FormatExportPercentage(frameMetrics.WritesBeforeDisplayRead, frameMetrics.WritesBeforeDisplayRead + frameMetrics.WritesAfterDisplayRead),
-                ExportWriteCountAfterDisplayColumnIndex => frameMetrics.WritesAfterDisplayRead.ToString(),
-                ExportWritePercentageAfterDisplayColumnIndex => FormatExportPercentage(frameMetrics.WritesAfterDisplayRead, frameMetrics.WritesBeforeDisplayRead + frameMetrics.WritesAfterDisplayRead),
-                ExportDisplayOffsetColumnIndex => frameMetrics.DisplayFrameOffset.ToString(),
+                ExportFrameNumberColumnIndex => frame.FrameNumber.ToString(),
+                ExportStartCycleCountColumnIndex => frame.StartCycleCount.ToString(),
+                ExportEndCycleCountColumnIndex => frame.EndCycleCount.ToString(),
+                ExportDurationColumnIndex => (frame.EndCycleCount - frame.StartCycleCount).ToString(),
+                ExportDurationPercentageColumnIndex => FormatExportPercentage(frame.EndCycleCount - frame.StartCycleCount, _FrameSettings!.ThresholdCycles),
+                ExportWriteCountBeforeDisplayColumnIndex => frame.WritesBeforeDisplayRead.ToString(),
+                ExportWritePercentageBeforeDisplayColumnIndex => FormatExportPercentage(frame.WritesBeforeDisplayRead, frame.WritesBeforeDisplayRead + frame.WritesAfterDisplayRead),
+                ExportWriteCountAfterDisplayColumnIndex => frame.WritesAfterDisplayRead.ToString(),
+                ExportWritePercentageAfterDisplayColumnIndex => FormatExportPercentage(frame.WritesAfterDisplayRead, frame.WritesBeforeDisplayRead + frame.WritesAfterDisplayRead),
+                ExportDisplayOffsetColumnIndex => frame.DisplayFrameOffset.ToString(),
                 _ => string.Empty
             };
         }
 
-        private FramesView _FramesView;
+        public class CellTemplate : GridViewCellTemplate
+        {
+            protected override void Paint(
+                Graphics graphics,
+                Rectangle clipBounds,
+                Rectangle cellBounds,
+                int rowIndex,
+                DataGridViewElementStates cellState,
+                object? value,
+                object? formattedValue,
+                string? errorText,
+                DataGridViewCellStyle cellStyle,
+                DataGridViewAdvancedBorderStyle advancedBorderStyle,
+                DataGridViewPaintParts paintParts)
+            {
+                if (ColumnIndex != VisualizationColumnIndex)
+                {
+                    base.Paint(
+                        graphics, clipBounds, cellBounds, rowIndex, cellState, value, formattedValue, errorText,
+                        cellStyle, advancedBorderStyle, paintParts);
+                    return;
+                }
+
+                var gridView = (FramesGridView)DataGridView!;
+                var frame = (FrameAnalysis.Frame)gridView._DataRows[rowIndex];
+                var frameSettings = gridView._FrameSettings;
+                bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
+
+                // draw background
+                var backPaintParts = paintParts &
+                    (DataGridViewPaintParts.Border |
+                     DataGridViewPaintParts.Background |
+                     DataGridViewPaintParts.SelectionBackground);
+                base.Paint(
+                    graphics, clipBounds, cellBounds, rowIndex, cellState, 
+                    value, formattedValue, errorText,
+                    cellStyle, advancedBorderStyle, backPaintParts);
+
+                // save state & constrain painting within the cell bounds
+                var graphicsState = graphics.Save();
+                graphics.IntersectClip(cellBounds);
+
+                // calc cycles extents
+                int maxCycleCount = gridView._MaxCycleCount;
+                if (frameSettings != null && frameSettings.ThresholdCycles > 0)
+                    maxCycleCount = int.Max(gridView._MaxCycleCount, frameSettings.ThresholdCycles);
+
+                // draw display frames spans
+                foreach (var displayFrameSpan in frame.DisplayFrameSpans)
+                {
+                    int relativeStartCycleCount = displayFrameSpan.StartCycleCount - frame.StartCycleCount;
+                    int relativeEndCycleCount = displayFrameSpan.EndCycleCount - frame.StartCycleCount;
+                    int startX = CyclesToCell(relativeStartCycleCount, maxCycleCount, cellBounds);
+                    int endX = CyclesToCell(relativeEndCycleCount, maxCycleCount, cellBounds);
+
+                    int topY = cellBounds.Top + cellBounds.Height / 8;
+                    int bottomY = cellBounds.Top + cellBounds.Height / 8 + cellBounds.Height / 4;
+                    int midY = (topY + bottomY) / 2;
+
+                    var foreColor = gridView.DefaultCellStyle.ForeColor;
+                    if (selected)
+                        foreColor = gridView.DefaultCellStyle.SelectionForeColor;
+                    using var arrowPen = new Pen(foreColor, 3);
+                    var arrowHeadLength = cellBounds.Height / 4;
+
+                    graphics.DrawLine(
+                        arrowPen, 
+                        cellBounds.Left + startX + arrowHeadLength, midY, 
+                        cellBounds.Left + endX - arrowHeadLength, midY);
+
+                    using var arrowHeadPen = new Pen(foreColor, 1);
+                    using var arrowHeadBrush = new SolidBrush(foreColor);
+
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+
+                    Point[] startArrowHeadPoints = [
+                        new() { X = cellBounds.Left + startX, Y = midY },
+                        new() { X = cellBounds.Left + startX + arrowHeadLength, Y = topY },
+                        new() { X = cellBounds.Left + startX + arrowHeadLength, Y = bottomY },
+                    ];
+                    graphics.FillPolygon(arrowHeadBrush, startArrowHeadPoints);
+                    graphics.DrawPolygon(arrowHeadPen, startArrowHeadPoints);
+
+                    Point[] endArrowHeadPoints = [
+                        new() { X = cellBounds.Left + endX, Y = midY },
+                        new() { X = cellBounds.Left + endX - arrowHeadLength, Y = topY },
+                        new() { X = cellBounds.Left + endX - arrowHeadLength, Y = bottomY },
+                    ];
+                    graphics.FillPolygon(arrowHeadBrush, endArrowHeadPoints);
+                    graphics.DrawPolygon(arrowHeadPen, endArrowHeadPoints);
+
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+                }
+
+                // draw frame bar
+                int width = CyclesToCell(frame.EndCycleCount - frame.StartCycleCount, maxCycleCount, cellBounds);
+                var rect = new Rectangle(
+                    cellBounds.Left,
+                    cellBounds.Top + cellBounds.Height / 8 + cellBounds.Height / 4,
+                    width,
+                    cellBounds.Height / 2);
+
+                Color barColor = gridView.DefaultCellStyle.SelectionBackColor;
+                if (selected)
+                    barColor = Blend(barColor, gridView.DefaultCellStyle.SelectionForeColor, 0.75);
+                using var brush = new SolidBrush(barColor);
+
+                graphics.FillRectangle(brush, rect);
+
+                // draw threshold
+                if (frameSettings != null && frameSettings.ThresholdCycles > 0)
+                {
+                    int xPos = CyclesToCell(frameSettings.ThresholdCycles, maxCycleCount, cellBounds);
+                    
+                    var backColor = gridView.DefaultCellStyle.BackColor;
+                    var thresholdColor = backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed;
+                    using var thresholdPen = new Pen(thresholdColor, 2);
+                    graphics.DrawLine(thresholdPen, cellBounds.Left + xPos, cellBounds.Top, cellBounds.Left + xPos, cellBounds.Bottom);
+                }
+
+                // restore state
+                graphics.Restore(graphicsState);
+            }
+
+            private int CyclesToCell(int value, int range, Rectangle cellBounds)
+            {
+                int padding = cellBounds.Height / 2;
+                return (int)double.Round((double)(cellBounds.Width - padding) * (double)value / (double)range);
+            }
+        }
+
         private FrameSettings? _FrameSettings = null;
         private bool _HighlightWritesBeforeDisplay = false;
         private bool _HighlightWritesAfterDisplay = false;
+        private int _MaxCycleCount = 0;
         private ReentrancyGuard _ReentrancyGuard = new();
     }
 }

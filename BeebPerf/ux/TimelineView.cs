@@ -85,7 +85,7 @@ namespace BeebPerf.ux
             }
         }
 
-        public List<DisplayFrameBitmap> FrameBitmaps
+        public List<DisplayFrame> FrameBitmaps
         {
             get => _FrameBitmaps;
             set
@@ -1045,7 +1045,7 @@ namespace BeebPerf.ux
 
         private struct Frame
         {
-            public DisplayFrameBitmap Bitmap;
+            public DisplayFrame Bitmap;
             public Rectangle Rect;
         }
 
@@ -1065,7 +1065,7 @@ namespace BeebPerf.ux
         private List<Frame> _Frames = [];
         private HScrollBar _ScrollBar;
         private ReentrancyGuard _ReentrancyGuard = new();
-        private List<DisplayFrameBitmap> _FrameBitmaps = [];
+        private List<DisplayFrame> _FrameBitmaps = [];
         private Frame? _FocusFrame = null;
         private ButtonEx _EditSelectionButton;
         private ButtonEx _CopyFrameButton;
