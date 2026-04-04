@@ -249,6 +249,7 @@ namespace BeebPerf
 
                     displayFrameSpans.Add(new Frame.DisplayFrameSpan()
                     {
+                        FrameNumber = displayFrame.FrameNumber,
                         StartCycleCount = displayFrame.StartCycleCount,
                         EndCycleCount = displayFrame.EndCycleCount
                     });
@@ -1337,8 +1338,9 @@ namespace BeebPerf
         {
             public struct DisplayFrameSpan
             {
-                public int StartCycleCount;
-                public int EndCycleCount;
+                public required int FrameNumber;
+                public required int StartCycleCount;
+                public required int EndCycleCount;
             }
 
             public required int FrameNumber; // 1, 2, 3...

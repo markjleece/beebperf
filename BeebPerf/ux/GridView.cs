@@ -726,7 +726,7 @@ namespace BeebPerf.ux
                 // paint content background
                 var contentBackgroundPaintParts = paintParts & DataGridViewPaintParts.ContentBackground;
                 if (contentBackgroundPaintParts != DataGridViewPaintParts.None)
-                    DrawBar(rowIndex, graphics, cellBounds, gridView.DefaultCellStyle.BackColor, cellState);
+                    DrawBar(rowIndex, graphics, cellBounds, cellStyle, cellState);
 
                 // draw foreground
                 var contentForegroundPaintParts = paintParts & DataGridViewPaintParts.ContentForeground;
@@ -741,7 +741,7 @@ namespace BeebPerf.ux
                 int rowIndex,
                 Graphics graphics,
                 Rectangle cellBounds,
-                Color backColor,
+                DataGridViewCellStyle cellStyle,
                 DataGridViewElementStates cellState)
             {
                 var gridView = (GridView<ROW_DATA_TYPE>)DataGridView!;
@@ -770,15 +770,15 @@ namespace BeebPerf.ux
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
                 var color = Blend(
-                    backColor,
-                    highlight ? Color.Red : gridView.DefaultCellStyle.SelectionBackColor,
+                    cellStyle.BackColor,
+                    highlight ? Color.Red : cellStyle.SelectionBackColor,
                     selected ? 0.75 : 0.25);
 
                 using var brush = new SolidBrush(color);
                 graphics.FillRectangle(brush, rect);
             }
 
-            protected Color Blend(Color first, Color second, double ratio)
+            protected static Color Blend(Color first, Color second, double ratio)
             {
                 int r = (int)(first.R * (1 - ratio) + second.R * ratio);
                 int g = (int)(first.G * (1 - ratio) + second.G * ratio);

@@ -22,6 +22,7 @@
 using BeebPerf.model;
 using System.Diagnostics;
 using static BeebPerf.FrameAnalysis.Frame;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace BeebPerf.ux
 {
@@ -292,103 +293,168 @@ namespace BeebPerf.ux
                 var frameSettings = gridView._FrameSettings;
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
-                // draw background
-                var backPaintParts = paintParts &
-                    (DataGridViewPaintParts.Border |
-                     DataGridViewPaintParts.Background |
-                     DataGridViewPaintParts.SelectionBackground);
-                base.Paint(
-                    graphics, clipBounds, cellBounds, rowIndex, cellState, 
-                    value, formattedValue, errorText,
-                    cellStyle, advancedBorderStyle, backPaintParts);
-
-                // save state & constrain painting within the cell bounds
-                var graphicsState = graphics.Save();
-                graphics.IntersectClip(cellBounds);
-
                 // calc cycles extents
                 int maxCycleCount = gridView._MaxCycleCount;
                 if (frameSettings != null && frameSettings.ThresholdCycles > 0)
                     maxCycleCount = int.Max(gridView._MaxCycleCount, frameSettings.ThresholdCycles);
 
-                // draw display frames spans
-                foreach (var displayFrameSpan in frame.DisplayFrameSpans)
-                {
-                    int relativeStartCycleCount = displayFrameSpan.StartCycleCount - frame.StartCycleCount;
-                    int relativeEndCycleCount = displayFrameSpan.EndCycleCount - frame.StartCycleCount;
-                    int startX = CyclesToCell(relativeStartCycleCount, maxCycleCount, cellBounds);
-                    int endX = CyclesToCell(relativeEndCycleCount, maxCycleCount, cellBounds);
+                // draw background
+                PaintBackground(graphics, cellBounds, cellStyle, selected);
 
-                    int topY = cellBounds.Top + cellBounds.Height / 8;
-                    int bottomY = cellBounds.Top + cellBounds.Height / 8 + cellBounds.Height / 4;
-                    int midY = (topY + bottomY) / 2;
+                // save state & constrain painting within the cell bounds
+                var graphicsState = graphics.Save();
+                graphics.IntersectClip(cellBounds);
 
-                    var foreColor = gridView.DefaultCellStyle.ForeColor;
-                    if (selected)
-                        foreColor = gridView.DefaultCellStyle.SelectionForeColor;
-                    using var arrowPen = new Pen(foreColor, 3);
-                    var arrowHeadLength = cellBounds.Height / 4;
-
-                    graphics.DrawLine(
-                        arrowPen, 
-                        cellBounds.Left + startX + arrowHeadLength, midY, 
-                        cellBounds.Left + endX - arrowHeadLength, midY);
-
-                    using var arrowHeadPen = new Pen(foreColor, 1);
-                    using var arrowHeadBrush = new SolidBrush(foreColor);
-
-                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
-
-                    Point[] startArrowHeadPoints = [
-                        new() { X = cellBounds.Left + startX, Y = midY },
-                        new() { X = cellBounds.Left + startX + arrowHeadLength, Y = topY },
-                        new() { X = cellBounds.Left + startX + arrowHeadLength, Y = bottomY },
-                    ];
-                    graphics.FillPolygon(arrowHeadBrush, startArrowHeadPoints);
-                    graphics.DrawPolygon(arrowHeadPen, startArrowHeadPoints);
-
-                    Point[] endArrowHeadPoints = [
-                        new() { X = cellBounds.Left + endX, Y = midY },
-                        new() { X = cellBounds.Left + endX - arrowHeadLength, Y = topY },
-                        new() { X = cellBounds.Left + endX - arrowHeadLength, Y = bottomY },
-                    ];
-                    graphics.FillPolygon(arrowHeadBrush, endArrowHeadPoints);
-                    graphics.DrawPolygon(arrowHeadPen, endArrowHeadPoints);
-
-                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
-                }
-
-                // draw frame bar
-                int width = CyclesToCell(frame.EndCycleCount - frame.StartCycleCount, maxCycleCount, cellBounds);
-                var rect = new Rectangle(
-                    cellBounds.Left,
-                    cellBounds.Top + cellBounds.Height / 8 + cellBounds.Height / 4,
-                    width,
-                    cellBounds.Height / 2);
-
-                Color barColor = gridView.DefaultCellStyle.SelectionBackColor;
-                if (selected)
-                    barColor = Blend(barColor, gridView.DefaultCellStyle.SelectionForeColor, 0.75);
-                using var brush = new SolidBrush(barColor);
-
-                graphics.FillRectangle(brush, rect);
-
-                // draw threshold
-                if (frameSettings != null && frameSettings.ThresholdCycles > 0)
-                {
-                    int xPos = CyclesToCell(frameSettings.ThresholdCycles, maxCycleCount, cellBounds);
-                    
-                    var backColor = gridView.DefaultCellStyle.BackColor;
-                    var thresholdColor = backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed;
-                    using var thresholdPen = new Pen(thresholdColor, 2);
-                    graphics.DrawLine(thresholdPen, cellBounds.Left + xPos, cellBounds.Top, cellBounds.Left + xPos, cellBounds.Bottom);
-                }
+                // draw foreground
+                PaintFrame(graphics, cellBounds, cellStyle, gridView, frame, maxCycleCount);
+                PaintDisplayFrames(graphics, cellBounds, cellStyle, gridView, frame, maxCycleCount);
+                PaintThreshold(graphics, cellBounds, cellStyle, gridView, frameSettings, maxCycleCount);
 
                 // restore state
                 graphics.Restore(graphicsState);
             }
 
-            private int CyclesToCell(int value, int range, Rectangle cellBounds)
+            private static void PaintBackground(Graphics graphics, Rectangle cellBounds, DataGridViewCellStyle cellStyle, bool selected)
+            {
+                var color = cellStyle.BackColor;
+                if (selected)
+                    color = cellStyle.SelectionBackColor;
+                var brush = new SolidBrush(color);
+                graphics.FillRectangle(brush, cellBounds);
+            }
+
+            private static void PaintFrame(
+                Graphics graphics,
+                Rectangle cellBounds,
+                DataGridViewCellStyle cellStyle,
+                FramesGridView gridView, 
+                FrameAnalysis.Frame frame, 
+                int maxCycleCount)
+            {
+                // measure
+                int width = CyclesToCell(frame.EndCycleCount - frame.StartCycleCount, maxCycleCount, cellBounds);
+                int margin = cellBounds.Height / 8;
+                var rect = new Rectangle(
+                    cellBounds.Left,
+                    cellBounds.Top + margin,
+                    width,
+                    cellBounds.Height - margin - margin);
+
+                // paint bar
+                var color = Blend(cellStyle.SelectionBackColor, cellStyle.BackColor, 0.5f);
+                using var brush = new SolidBrush(color);
+                graphics.FillRectangle(brush, rect);
+            }
+
+            private static void PaintDisplayFrames(
+                Graphics graphics, 
+                Rectangle cellBounds,
+                DataGridViewCellStyle cellStyle,
+                FramesGridView gridView, 
+                FrameAnalysis.Frame frame, 
+                int maxCycleCount)
+            {
+                // measure
+                int arrowHeadLength = cellBounds.Height / 3;
+                int arrowHeadHalfHeight = cellBounds.Height / 4;
+
+                int arrowCenterY = cellBounds.Top + cellBounds.Height / 2;
+                int arrowTop = arrowCenterY - arrowHeadHalfHeight;
+                int arrowBottom = arrowCenterY + arrowHeadHalfHeight;
+
+                // font
+                int fontHeight = 2 * gridView.Font.Height / 3;
+                using var font = new System.Drawing.Font(gridView.Font.FontFamily, fontHeight, GraphicsUnit.Pixel);
+                StringFormat textFormat = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center,
+                    Trimming = StringTrimming.EllipsisCharacter,
+                    FormatFlags = StringFormatFlags.NoWrap
+                };
+
+                // pens & brushes
+                var color = cellStyle.ForeColor;
+                using var thinPen = new Pen(color, 1);
+                using var thickPen = new Pen(color, 3);
+                using var brush = new SolidBrush(color);
+
+                foreach (var displayFrameSpan in frame.DisplayFrameSpans)
+                {
+                    // measure
+                    int startCycleCount = displayFrameSpan.StartCycleCount - frame.StartCycleCount;
+                    int endCycleCount = displayFrameSpan.EndCycleCount - frame.StartCycleCount;
+
+                    int arrowLeft = cellBounds.Left + CyclesToCell(startCycleCount, maxCycleCount, cellBounds);
+                    int arrowRight = cellBounds.Left + CyclesToCell(endCycleCount, maxCycleCount, cellBounds);
+                    int arrowCenterX = (arrowRight + arrowLeft) / 2;
+
+                    string frameNumberText = displayFrameSpan.FrameNumber.ToString();
+                    int textHalfWidth = TextRenderer.MeasureText(frameNumberText, font).Width / 2;
+                    int arrowCenterLeft = arrowCenterX - textHalfWidth;
+                    int arrowCenterRight = arrowCenterX + textHalfWidth;
+
+                    // paint line
+                    graphics.DrawLine(thickPen,
+                        arrowLeft + arrowHeadLength, arrowCenterY,
+                        arrowCenterLeft , arrowCenterY);
+
+                    graphics.DrawLine(thickPen,
+                        arrowCenterRight, arrowCenterY,
+                        arrowRight - arrowHeadLength, arrowCenterY);
+
+                    // paint left arrow head
+                    Point[] leftArrowHeadPoints = [
+                        new() { X = arrowLeft, Y = arrowCenterY },
+                        new() { X = arrowLeft + arrowHeadLength, Y = arrowTop },
+                        new() { X = arrowLeft + arrowHeadLength, Y = arrowBottom },
+                    ];
+
+                    graphics.FillPolygon(brush, leftArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.DrawPolygon(thinPen, leftArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+
+                    // paint right arrow head
+                    Point[] rightArrowHeadPoints = [
+                        new() { X = arrowRight, Y = arrowCenterY },
+                        new() { X = arrowRight - arrowHeadLength, Y = arrowTop },
+                        new() { X = arrowRight - arrowHeadLength, Y = arrowBottom },
+                    ];
+
+                    graphics.FillPolygon(brush, rightArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.DrawPolygon(thinPen, rightArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+
+                    // paint display frame number
+                    var captionRect = new Rectangle(arrowLeft, cellBounds.Top, arrowRight - arrowLeft, cellBounds.Height);
+                    graphics.DrawString(frameNumberText, font, brush, captionRect, textFormat);
+                }
+            }
+
+            private static void PaintThreshold(
+                Graphics graphics,
+                Rectangle cellBounds,
+                DataGridViewCellStyle cellStyle,
+                FramesGridView gridView,
+                FrameSettings? frameSettings,
+                int maxCycleCount)
+            {
+                if (frameSettings != null && frameSettings.ThresholdCycles > 0)
+                {
+                    // measure
+                    int thresholdX = cellBounds.Left + CyclesToCell(frameSettings.ThresholdCycles, maxCycleCount, cellBounds);
+
+                    // paint
+                    var backColor = cellStyle.BackColor;
+                    var foreColor = backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed;
+                    using var pen = new Pen(foreColor, 2);
+                    graphics.DrawLine(pen, thresholdX, cellBounds.Top, thresholdX, cellBounds.Bottom);
+                }
+            }
+
+            private static int CyclesToCell(int value, int range, Rectangle cellBounds)
             {
                 int padding = cellBounds.Height / 2;
                 return (int)double.Round((double)(cellBounds.Width - padding) * (double)value / (double)range);

@@ -508,7 +508,7 @@ namespace BeebPerf.ux
             {
                 var codeView = (CodeView)DataGridView!;
                 var obj = (object)codeView._DataRows[rowIndex];
-                PaintBackground(codeView, graphics, cellBounds, rowIndex, cellState, obj);
+                PaintBackground(codeView, graphics, cellBounds, cellStyle, rowIndex, cellState, obj);
                 if (obj is InstructionMetrics)
                     if (ColumnIndex == AddressColumnIndex ||
                         ColumnIndex == LabelColumnIndex ||
@@ -528,11 +528,12 @@ namespace BeebPerf.ux
                 CodeView codeView,
                 Graphics graphics,
                 Rectangle cellBounds,
+                DataGridViewCellStyle cellStyle,
                 int rowIndex,
                 DataGridViewElementStates cellState,
                 object value)
             {
-                var backColor = codeView.DefaultCellStyle.BackColor;
+                var backColor = cellStyle.BackColor;
 
                 if (value is InstructionMetrics)
                 {
@@ -546,7 +547,7 @@ namespace BeebPerf.ux
                 graphics.FillRectangle(brush, cellBounds);
 
                 if (value is InstructionMetrics)
-                    DrawBar(rowIndex, graphics, cellBounds, backColor, cellState);
+                    DrawBar(rowIndex, graphics, cellBounds, cellStyle, cellState);
             }
 
             private int PaintCode(
@@ -736,7 +737,7 @@ namespace BeebPerf.ux
                 }
             }
 
-            private Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
+            private static Color ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         }
 
         private string FormatMemoryAccessCount(int count)
