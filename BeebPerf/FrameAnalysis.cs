@@ -288,22 +288,23 @@ namespace BeebPerf
             _WritesAfterDisplayRead = 0;
 
             // find end instruction index based on frame settings
-            _FrameEndInstructionIndex = -1;
             switch (_FrameSettings!.Type)
             {
                 case FrameSettings.FrameType.StartAndEndAddresses:
                     _FrameEndInstructionIndex = FindInstructionIndex(instructionIndex + 1, _FrameSettings.EndAddress);
                     break;
 
-                case FrameSettings.FrameType.JSRAddress:
-                    var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
-                    instructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
-                    goto case FrameSettings.FrameType.RoutineAddress;
-
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
-                    var lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
-                    _FrameEndInstructionIndex = GetNearestInstructionIndex(lastInstructionIndex);
+                    _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                    break;
+
+                case FrameSettings.FrameType.JSRAddress:
+                    var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
+                    var destinationInstructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
+
+                    stackFrame = FindStackFrame(destinationInstructionIndex);
+                    _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
                     break;
             }
         }
@@ -368,21 +369,6 @@ namespace BeebPerf
                 return stackFrame;
 
             return null;
-        }
-
-        private int GetNearestInstructionIndex(int index)
-        {
-            while (index < _Instructions.Length)
-                if (_Instructions[index++].IsInstruction)
-                    return index;
-
-            index = _Instructions.Length - 1;
-
-            while (index > 0)
-                if (_Instructions[index--].IsInstruction)
-                    return index;
-
-            return 0;
         }
 
         private void UpdateVideoState()
