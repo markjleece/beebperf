@@ -20,6 +20,7 @@
 // --------------------------------------------------------------
 
 using BeebPerf.model;
+using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using static BeebPerf.model.DisplaySettings;
 
@@ -435,6 +436,7 @@ namespace BeebPerf.ux
 
         protected string FormatExportPercentage(int value, int range)
         {
+            if (range == 0) return "0";
             value = Math.Clamp(value, 0, range);
             var percentage = 100.0 * (double)value / (double)range;
             return percentage.ToString();

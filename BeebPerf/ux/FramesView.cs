@@ -201,6 +201,7 @@ namespace BeebPerf.ux
             _CopyButton.Name = "copyButton";
             _CopyButton.ImageResourceName = "copyButton.Image";
             _CopyButton.ToolTipText = "Copy";
+            _CopyButton.BackColor = SystemColors.ControlLightLight;
             _CopyButton.Click += CopyButton_Click;
             //
             // _ExportButton
@@ -209,6 +210,7 @@ namespace BeebPerf.ux
             _ExportButton.Name = "exportButton";
             _ExportButton.ImageResourceName = "exportButton.Image";
             _ExportButton.ToolTipText = "Export";
+            _ExportButton.BackColor = SystemColors.ControlLightLight;
             _ExportButton.Click += ExportButton_Click;
             // 
             // _GridView
@@ -241,8 +243,8 @@ namespace BeebPerf.ux
                 _RemoveButton ];
 
             Control[] rightAlignedControls = [
-                _CopyButton,
-                _ExportButton ];
+                _ExportButton,
+                _CopyButton ];
 
             // calc max height of controls to align them vertically centered
             int maxHeight = 0;
@@ -301,13 +303,15 @@ namespace BeebPerf.ux
             }
 
             _SettingsComboBoxPanel.Visible = hasSettings;
-            _EditButton.Visible = hasSettings;
-            _RemoveButton.Visible = hasSettings;
 
+            _EditButton.Visible = hasSettings;
             _EditButton.Enabled = _SelectedFrameSettings != null;
+
+            _RemoveButton.Visible = hasSettings;
             _RemoveButton.Enabled = _SelectedFrameSettings != null;
-            _CopyButton.Enabled = _Frames.Count > 0;
-            _ExportButton.Enabled = _Frames.Count > 0;
+
+            _CopyButton.Visible = _Frames.Count > 0;
+            _ExportButton.Visible = _Frames.Count > 0;
         }
 
         private List<FrameAnalysis.Frame> _Frames = [];

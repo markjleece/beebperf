@@ -219,14 +219,14 @@ namespace BeebPerf.ux
                 "End cycle count",
                 "Duration cycles [#]",
                 "Duration cycles [%]",
+                "Display frame offset",
                 "Writes before display [#]",
                 "Writes before display [%]",
                 "Writes after display [#]",
-                "Writes after display [%]",
-                "Display frame offset"
+                "Writes after display [%]"
             ];
 
-            Debug.Assert(headers.Length == ExportColumnCount);
+        Debug.Assert(headers.Length == ExportColumnCount);
             return headers;
         }
 
