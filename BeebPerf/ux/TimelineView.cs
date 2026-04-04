@@ -464,7 +464,7 @@ namespace BeebPerf.ux
                     frameRect.Left,
                     frameRect.Top,
                     frameRect.Width + 1, 
-                    frameHeight + 1);
+                    frameHeight + Font.Height + 1);
 
                 graphics.ExcludeClip(frameRect);
             }
