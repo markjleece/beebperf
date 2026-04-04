@@ -242,8 +242,10 @@ namespace BeebPerf
                 }
 
                 // process intersecting frames
-                while (displayFrame != null && displayFrame.StartCycleCount < frame.EndCycleCount)
+                bool first = true;
+                while (displayFrame != null && (first || displayFrame.StartCycleCount < frame.EndCycleCount))
                 {
+                    first = false;
                     if (nextFrameStartCycleCount == -1)
                         nextFrameStartCycleCount = displayFrame.StartCycleCount;
 
@@ -263,7 +265,8 @@ namespace BeebPerf
                         nextFrameStartCycleCount = displayFrame.StartCycleCount;
 
                     // back up to deal with cross spans
-                    displayFrame = DisplayFrames[--displayFrameIndex];
+                    if (displayFrameIndex > 0)
+                        displayFrame = DisplayFrames[--displayFrameIndex];
                 }
 
                 frame.DisplayFrameSpans = displayFrameSpans.ToArray();
@@ -292,25 +295,15 @@ namespace BeebPerf
                     _FrameEndInstructionIndex = FindInstructionIndex(instructionIndex + 1, _FrameSettings.EndAddress);
                     break;
 
+                case FrameSettings.FrameType.JSRAddress:
+                    var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
+                    instructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
+                    goto case FrameSettings.FrameType.RoutineAddress;
+
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
                     var lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
                     _FrameEndInstructionIndex = GetNearestInstructionIndex(lastInstructionIndex);
-                    break;
-
-                case FrameSettings.FrameType.JSRAddress:
-                    var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
-                    stackFrame = FindStackFrame(instructionIndex);
-                    foreach (var childStackFrame in stackFrame.Children)
-                    {
-                        if (_Instructions[childStackFrame.FirstInstructionIndex].OpcodeAddress.Equals(destinationAddress))
-                        {
-                            lastInstructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
-                            _FrameEndInstructionIndex = GetNearestInstructionIndex(lastInstructionIndex);
-                            break;
-                        }
-                    }
-                    Debug.Assert(_FrameEndInstructionIndex >= 0);
                     break;
             }
         }
@@ -355,14 +348,15 @@ namespace BeebPerf
 
         private static model.StackFrame? FindStackFrame(model.StackFrame stackFrame, int instructionIndex)
         {
-            // bounds check to avoid unnecessary recursion
-            if (instructionIndex < stackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex &&
-                instructionIndex > stackFrame.GetLastInstructionStackFrame().LastInstructionIndex)
-                return null;
-
             // check children first, as they will be more specific than the parent stack frame
             foreach (var childStackFrame in stackFrame.Children)
             {
+                // bounds check to avoid unnecessary recursion
+                if (instructionIndex < childStackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex ||
+                    instructionIndex > childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex)
+                    continue;
+
+                // Skip children whose ranges cannot contain the index
                 var result = FindStackFrame(childStackFrame, instructionIndex);
                 if (result != null)
                     return result;
