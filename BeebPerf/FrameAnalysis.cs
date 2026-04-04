@@ -277,14 +277,19 @@ namespace BeebPerf
 
         private void StartAnalysisFrame(int cycleCount, int instructionIndex)
         {
+            // remmber cycle count
             _FrameStartCycleCount = cycleCount;
+
+            // reset counts
+            _WritesBeforeDisplayRead = 0;
+            _WritesAfterDisplayRead = 0;
 
             // find end instruction index based on frame settings
             _FrameEndInstructionIndex = -1;
             switch (_FrameSettings!.Type)
             {
                 case FrameSettings.FrameType.StartAndEndAddresses:
-                    _FrameEndInstructionIndex = FindInstructionIndex(instructionIndex, _FrameSettings.EndAddress);
+                    _FrameEndInstructionIndex = FindInstructionIndex(instructionIndex + 1, _FrameSettings.EndAddress);
                     break;
 
                 case FrameSettings.FrameType.RoutineAddress:
@@ -308,10 +313,6 @@ namespace BeebPerf
                     Debug.Assert(_FrameEndInstructionIndex >= 0);
                     break;
             }
-
-            // reset counts
-            _WritesBeforeDisplayRead = 0;
-            _WritesAfterDisplayRead = 0;
         }
 
         private void EndAnalysisFrame(int cycleCount, int instructionIndex)
@@ -326,17 +327,21 @@ namespace BeebPerf
                 WritesAfterDisplayRead = _WritesAfterDisplayRead,
             });
 
-            _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex, _FrameSettings!.StartAddress);
+            // find next start
+            _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex + 1, _FrameSettings!.StartAddress);
             _FrameEndInstructionIndex = -1;
         }
 
         private int FindInstructionIndex(int indexFrom, CanonicalAddress address)
         {
-            for (int instructionIndex = indexFrom; instructionIndex < _Instructions.Length; instructionIndex++)
+            if (indexFrom < _Instructions.Length)
             {
-                ref var instruction = ref _Instructions[instructionIndex];
-                if (instruction.IsInstruction && instruction.OpcodeAddress.Equals(address))
-                    return instructionIndex;
+                for (int instructionIndex = indexFrom; instructionIndex < _Instructions.Length; instructionIndex++)
+                {
+                    ref var instruction = ref _Instructions[instructionIndex];
+                    if (instruction.IsInstruction && instruction.OpcodeAddress.Equals(address))
+                        return instructionIndex;
+                }
             }
             return -1;
         }
