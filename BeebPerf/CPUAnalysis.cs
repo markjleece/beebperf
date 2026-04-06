@@ -312,6 +312,9 @@ namespace BeebPerf
             // review inserted stack-frames, as their associated routine may be incorrect
             ReviewInsertedStackFrames(currentStackFrame);
 
+            // populate effective first & last instruction indices
+            model.StackFrame.ComputeEffectiveInstructionIndices(RootStackFrame, _Instructions.Length);
+
 #if DEBUG && STACKFRAME_INVARIANT
             model.StackFrame.AssertInvariant(RootStackFrame, _Instructions, _InstructionSet!);
 #endif
@@ -697,7 +700,7 @@ namespace BeebPerf
             int instructionIndex = stackFrame.FirstInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
 
-            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+            int lastInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
             while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
@@ -705,7 +708,7 @@ namespace BeebPerf
                 if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
                 {
                     // skip over child stack frames
-                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
@@ -876,7 +879,7 @@ namespace BeebPerf
             int cycleCount = stackFrame.StartCycleCount;
 
             int previousInstructionIndex = instructionIndex;
-            int lastInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+            int lastInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
 
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
@@ -900,7 +903,7 @@ namespace BeebPerf
                         CalculateStackFrameMetrics(childStackFrame, ref instructionOrdinal, instructionMetrics);
 
                     // skip over child stack frames
-                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;

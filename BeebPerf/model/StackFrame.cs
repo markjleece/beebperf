@@ -35,32 +35,6 @@ namespace BeebPerf.model
             routine.StackFrames.Add(this);
         }
 
-        public StackFrame GetFirstInstructionStackFrame()
-        {
-            var current = this;
-            while (current.Children.Count > 0)
-            {
-                var firstChild = current.Children[0];
-                if (firstChild.FirstInstructionIndex >= current.FirstInstructionIndex)
-                    break;
-                current = firstChild;
-            }
-            return current;
-        }
-
-        public StackFrame GetLastInstructionStackFrame()
-        {
-            var current = this;
-            while (current.Children.Count > 0)
-            {
-                var lastChild = current.Children[^1];
-                if (lastChild.LastInstructionIndex <= current.LastInstructionIndex)
-                    break;
-                current = lastChild;
-            }
-            return current;
-        }
-
         public void ClearMetrics()
         {
             CPUMetrics.Clear();
@@ -71,6 +45,23 @@ namespace BeebPerf.model
         public override string ToString()
         {
             return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Type: {CallType}, Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
+        }
+
+        public static void ComputeEffectiveInstructionIndices(StackFrame frame, int instructionCount)
+        {
+            int first = frame.FirstInstructionIndex == -1 ? instructionCount - 1 : frame.FirstInstructionIndex;
+            int last = frame.LastInstructionIndex == -1 ? 0 : frame.LastInstructionIndex;
+
+            foreach (var child in frame.Children)
+            {
+                ComputeEffectiveInstructionIndices(child, instructionCount);
+
+                first = Math.Min(first, child.FirstEffectiveInstructionIndex);
+                last = Math.Max(last, child.LastEffectiveInstructionIndex);
+            }
+
+            frame.FirstEffectiveInstructionIndex = first;
+            frame.LastEffectiveInstructionIndex = last;
         }
 
 #if DEBUG && STACKFRAME_INVARIANT
@@ -111,7 +102,7 @@ namespace BeebPerf.model
             var lastFrame = frame.GetLastInstructionStackFrame();
             if (!lastFrame.InsertedTailCall)
             {
-                var lastInstructionIndex = frame.GetLastInstructionStackFrame().LastInstructionIndex;
+                var lastInstructionIndex = frame.LastEffectiveInstructionIndex;
                 if (lastInstructionIndex != -1 && lastInstructionIndex < instructions.Length - 2)
                 {
                     // included situations where stack pointer is manipulated
@@ -169,7 +160,7 @@ namespace BeebPerf.model
                 Debug.Assert(childFrame.StartCycleCount >= frame.StartCycleCount);
                 Debug.Assert(childFrame.EndCycleCount <= frame.EndCycleCount);
 
-                var childFrameFirstInstructionIndex = childFrame.GetFirstInstructionStackFrame().FirstInstructionIndex;
+                var childFrameFirstInstructionIndex = childFrame.LastEffectiveInstructionIndex;
                 var childFrameLastInstructionIndex = childFrame.GetFirstInstructionStackFrame().LastInstructionIndex;
 
                 if (frame.FirstInstructionIndex != -1)
@@ -197,15 +188,43 @@ namespace BeebPerf.model
 
                 prevChildFrame = childFrame;
             }
-            
+
             // recurse children
             foreach (var childFrame in frame.Children)
                 AssertInvariant(childFrame, instructions, instructionSet, totalCycles);
+        }
+
+        private StackFrame GetFirstInstructionStackFrame()
+        {
+            var current = this;
+            while (current.Children.Count > 0)
+            {
+                var firstChild = current.Children[0];
+                if (firstChild.FirstInstructionIndex >= current.FirstInstructionIndex)
+                    break;
+                current = firstChild;
+            }
+            return current;
+        }
+
+        private StackFrame GetLastInstructionStackFrame()
+        {
+            var current = this;
+            while (current.Children.Count > 0)
+            {
+                var lastChild = current.Children[^1];
+                if (lastChild.LastInstructionIndex <= current.LastInstructionIndex)
+                    break;
+                current = lastChild;
+            }
+            return current;
         }
 #endif
 
         public int FirstInstructionIndex = -1;
         public int LastInstructionIndex = -1;
+        public int FirstEffectiveInstructionIndex;
+        public int LastEffectiveInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
         public ushort LowestAddress = ushort.MinValue;

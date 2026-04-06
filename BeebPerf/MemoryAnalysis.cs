@@ -174,7 +174,7 @@ namespace BeebPerf
                     if (startCycleCount <= stackFrame.EndCycleCount && endCycleCount >= stackFrame.StartCycleCount)
                         CalculateStackFrameMemoryAccessMetrics(address, childStackFrame, startCycleCount, endCycleCount, routineMetrics);
 
-                    instructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;

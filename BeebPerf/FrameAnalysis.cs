@@ -298,7 +298,7 @@ namespace BeebPerf
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
                     if (stackFrame != null) 
-                        _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                        _FrameEndInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
                     break;
 
                 case FrameSettings.FrameType.JSRAddress:
@@ -307,7 +307,7 @@ namespace BeebPerf
 
                     stackFrame = FindStackFrame(destinationInstructionIndex);
                     if (stackFrame != null)
-                        _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                        _FrameEndInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
                     break;
             }
         }
@@ -353,43 +353,24 @@ namespace BeebPerf
         private static model.StackFrame? FindStackFrame(model.StackFrame stackFrame, int instructionIndex)
         {
             // check children first, as they will be more specific than the parent stack frame
-            int firstInstructionIndex, lastInstructionIndex;
-
             foreach (var childStackFrame in stackFrame.Children)
             {
                 // bounds check to avoid unnecessary recursion
-                firstInstructionIndex = childStackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex;
-                if (firstInstructionIndex == -1)
-                    firstInstructionIndex = 0;
-
-                lastInstructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
-                if (lastInstructionIndex == -1)
-                    lastInstructionIndex = int.MaxValue;
-
-                if (instructionIndex < firstInstructionIndex ||
-                    instructionIndex > lastInstructionIndex)
+                if (instructionIndex < childStackFrame.FirstEffectiveInstructionIndex ||
+                    instructionIndex > childStackFrame.LastEffectiveInstructionIndex)
                     continue;
 
-                // Skip children whose ranges cannot contain the index
+                // recurse
                 var result = FindStackFrame(childStackFrame, instructionIndex);
                 if (result != null)
                     return result;
             }
 
-            // check stack frame itself
-            firstInstructionIndex = stackFrame.FirstInstructionIndex;
-            if (firstInstructionIndex == -1)
-                firstInstructionIndex = 0;
+            Debug.Assert(
+                instructionIndex >= stackFrame.FirstEffectiveInstructionIndex &&
+                instructionIndex <= stackFrame.LastEffectiveInstructionIndex);
 
-            lastInstructionIndex = stackFrame.FirstInstructionIndex;
-            if (lastInstructionIndex == -1)
-                lastInstructionIndex = int.MaxValue;
-
-            if (instructionIndex >= firstInstructionIndex &&
-                instructionIndex <= lastInstructionIndex)
-                return stackFrame;
-
-            return null;
+            return stackFrame;
         }
 
         private void UpdateVideoState()
