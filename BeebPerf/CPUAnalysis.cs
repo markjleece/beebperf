@@ -697,7 +697,7 @@ namespace BeebPerf
 
             int excludedCycleCount = 0;
             int childIndex = 0;
-            int instructionIndex = stackFrame.FirstInstructionIndex;
+            int instructionIndex = stackFrame.FirstEffectiveInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
 
             int lastInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
@@ -718,7 +718,7 @@ namespace BeebPerf
                 // update cycle counts
                 ref Instruction instruction = ref _Instructions[instructionIndex];
                 int instructionCycleCount = instruction.CycleCount;
-                if (cycleCount < StartCycleCount || cycleCount > EndCycleCount)
+                if (cycleCount < StartCycleCount || cycleCount >= EndCycleCount)
                     excludedCycleCount += instructionCycleCount;
 
                 cycleCount += instructionCycleCount;
@@ -914,7 +914,7 @@ namespace BeebPerf
                 ref Instruction instruction = ref _Instructions[instructionIndex];
                 int instructionCycleCount = instruction.CycleCount;
                 if (instruction.IsInstruction &&
-                    cycleCount >= StartCycleCount && cycleCount <= EndCycleCount)
+                    cycleCount >= StartCycleCount && cycleCount < EndCycleCount)
                 {
                     var coreInstruction = new CoreInstruction(ref instruction);
                     var metrics = instructionMetrics.TryGetValue(coreInstruction, out var existing)
