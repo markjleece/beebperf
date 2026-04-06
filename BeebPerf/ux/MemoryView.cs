@@ -54,6 +54,7 @@ namespace BeebPerf.ux
             AddColumn("ReadCount", "Reads [#, %]", cellTemplate: null);
             AddColumn("WriteCount", "Writes [#, %]", cellTemplate: null);
 
+            SetColumnAlignment(AddressColumnIndex, DataGridViewContentAlignment.MiddleCenter);
             SetColumnAlignment(ReadWriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(WriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
