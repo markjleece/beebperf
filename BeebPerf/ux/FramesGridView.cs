@@ -78,29 +78,18 @@ namespace BeebPerf.ux
             SetColumnSortMode(VisualizationColumnIndex, DataGridViewColumnSortMode.NotSortable);
         }
 
-        public void Initialize(List<FrameAnalysis.Frame> frames, FrameSettings? frameSettings)
+        public void Initialize(
+            List<FrameAnalysis.Frame> frames, 
+            FrameSettings? frameSettings,
+            bool highlightWritesBeforeDisplay,
+            bool highlightWritesAfterDisplay)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
             _FrameSettings = frameSettings;
-
-            // determine whether to highlight writes before or writes after
-            int totalWritesBeforeDisplay = 0;
-            int totalWritesAfterDisplay = 0;
-            foreach (var frame in frames)
-            {
-                totalWritesBeforeDisplay += frame.WritesBeforeDisplayRead;
-                totalWritesAfterDisplay += frame.WritesAfterDisplayRead;
-            }
-
-            _HighlightWritesBeforeDisplay = false;
-            _HighlightWritesAfterDisplay = false;
-            if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
-            {
-                _HighlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
-                _HighlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
-            }
+            _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
+            _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
 
             // calculate max cycle count
             _MaxCycleCount = 0;

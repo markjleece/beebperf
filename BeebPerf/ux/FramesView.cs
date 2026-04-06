@@ -51,9 +51,75 @@ namespace BeebPerf.ux
 
             _Frames = frames;
 
-            _GridView.Initialize(_Frames, _SelectedFrameSettings);
+            // determine whether to highlight writes before or writes after
+            int totalWritesBeforeDisplay = 0;
+            int totalWritesAfterDisplay = 0;
+            foreach (var frame in frames)
+            {
+                totalWritesBeforeDisplay += frame.WritesBeforeDisplayRead;
+                totalWritesAfterDisplay += frame.WritesAfterDisplayRead;
+            }
 
+            bool highlightWritesBeforeDisplay = false;
+            bool highlightWritesAfterDisplay = false;
+            if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
+            {
+                highlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
+                highlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
+            }
+
+            // initialize grid
+            _GridView.Initialize(_Frames, _SelectedFrameSettings, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
+
+            UpdateSummaryText(highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
             UpdateState();
+        }
+
+        private void UpdateSummaryText(
+            bool highlightWritesBeforeDisplay,
+            bool highlightWritesAfterDisplay)
+        {
+            string text = string.Empty;
+            if (_Frames.Count > 0)
+            {
+                if (_SelectedFrameSettings != null && _SelectedFrameSettings.ThresholdCycles > 0)
+                {
+                    int frameDuractionExceedsThresholdCount = 0;
+                    foreach (var frame in _Frames)
+                        if (frame.EndCycleCount - frame.StartCycleCount > _SelectedFrameSettings.ThresholdCycles)
+                            frameDuractionExceedsThresholdCount++;
+
+                    double frameDurationExceedsThresholdPercentage = 100.0 * (double)frameDuractionExceedsThresholdCount / (double)_Frames.Count;
+                    text = $"Frames exceeding threshold: {frameDurationExceedsThresholdPercentage:F2}%. ";
+                }
+
+                int totalWriteCount = 0;
+                int totalMissTimedWriteCount = 0;
+                int frameWithMissTimesWriteCount = 0;
+                foreach (var frame in _Frames)
+                {
+                    totalWriteCount += frame.WritesBeforeDisplayRead + frame.WritesAfterDisplayRead;
+
+                    if (highlightWritesBeforeDisplay && frame.WritesBeforeDisplayRead > 0)
+                    {
+                        totalMissTimedWriteCount += frame.WritesBeforeDisplayRead;
+                        frameWithMissTimesWriteCount++;
+                    }
+
+                    if (highlightWritesAfterDisplay && frame.WritesAfterDisplayRead > 0)
+                    {
+                        totalMissTimedWriteCount += frame.WritesAfterDisplayRead;
+                        frameWithMissTimesWriteCount++;
+                    }
+                }
+
+                double frameMissTimedWritePercentage = 100.0 * (double)frameWithMissTimesWriteCount / (double)_Frames.Count;
+                double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
+                text += $"Frames with miss-timed writes: {frameMissTimedWritePercentage:F2}%, " +
+                        $"Total miss-timed writes: {overallMissTimedWritePercentage:F2}%";
+            }
+
+            _StatusLabel.Text = text;
         }
 
         public void SelectRange(int analysisFrom, int analysisTo)
@@ -126,7 +192,7 @@ namespace BeebPerf.ux
             Exporter.ExportCSVFile(form, _GridView);
         }
 
-        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
+        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_StatusLabel), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
         private void InitializeComponent()
         {
             // 
@@ -218,6 +284,15 @@ namespace BeebPerf.ux
             _GridView = new FramesGridView();
             _GridView.BackColor = SystemColors.Control;
             // 
+            // _StatusLabel
+            // 
+            _StatusLabel = new();
+            _StatusLabel.AutoSize = true;
+            _StatusLabel.Font = new Font("Segoe UI", 9F);
+            _StatusLabel.Name = "summaryLabel";
+            _StatusLabel.Size = new Size(101, 25);
+            _StatusLabel.TabIndex = 0;
+            // 
             // FramesView - Add controls directly
             // 
             Controls.Add(_SettingsLabel);
@@ -228,6 +303,7 @@ namespace BeebPerf.ux
             Controls.Add(_CopyButton);
             Controls.Add(_ExportButton);
             Controls.Add(_GridView);
+            Controls.Add(_StatusLabel);
         }
 
         protected override void OnLayout(LayoutEventArgs levent)
@@ -271,18 +347,22 @@ namespace BeebPerf.ux
             }
 
             // layout right aligned buttons
-            int right = Width - 6;
+            left = Width - 6;
             foreach (Control child in rightAlignedControls)
             {
-                right -= child.Width;
-                child.Location = new Point(right, padding + (maxHeight - child.Height) / 2);
+                left -= child.Width;
+                child.Location = new Point(left, padding + (maxHeight - child.Height) / 2);
             }
 
             // layout grid view
             int toolbarHeight = maxHeight + padding * 2;
+            int statusHeight = Font.Height + padding * 2;
             _GridView.Location = new Point(0, toolbarHeight);
             _GridView.Width = Width;
-            _GridView.Height = Height - toolbarHeight;
+            _GridView.Height = Height - toolbarHeight - statusHeight;
+
+            // layout status text
+            _StatusLabel.Location = new Point(padding, Height - statusHeight + padding);
         }
 
         private void UpdateState()
@@ -310,6 +390,8 @@ namespace BeebPerf.ux
             _RemoveButton.Visible = hasSettings;
             _RemoveButton.Enabled = _SelectedFrameSettings != null;
 
+            _StatusLabel.Visible = _StatusLabel.Text.Length > 0;
+
             _CopyButton.Visible = _Frames.Count > 0;
             _ExportButton.Visible = _Frames.Count > 0;
         }
@@ -326,6 +408,7 @@ namespace BeebPerf.ux
         private Button _AddButton;
         private Button _EditButton;
         private Button _RemoveButton;
+        private Label _StatusLabel;
         private ButtonEx _CopyButton;
         private ButtonEx _ExportButton;
         private FramesGridView _GridView;
