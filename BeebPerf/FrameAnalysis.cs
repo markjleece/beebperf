@@ -288,6 +288,7 @@ namespace BeebPerf
             _WritesAfterDisplayRead = 0;
 
             // find end instruction index based on frame settings
+            _FrameEndInstructionIndex = -1;
             switch (_FrameSettings!.Type)
             {
                 case FrameSettings.FrameType.StartAndEndAddresses:
@@ -296,7 +297,8 @@ namespace BeebPerf
 
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
-                    _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                    if (stackFrame != null) 
+                        _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
                     break;
 
                 case FrameSettings.FrameType.JSRAddress:
@@ -304,7 +306,8 @@ namespace BeebPerf
                     var destinationInstructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
 
                     stackFrame = FindStackFrame(destinationInstructionIndex);
-                    _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                    if (stackFrame != null)
+                        _FrameEndInstructionIndex = stackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
                     break;
             }
         }
@@ -350,11 +353,21 @@ namespace BeebPerf
         private static model.StackFrame? FindStackFrame(model.StackFrame stackFrame, int instructionIndex)
         {
             // check children first, as they will be more specific than the parent stack frame
+            int firstInstructionIndex, lastInstructionIndex;
+
             foreach (var childStackFrame in stackFrame.Children)
             {
                 // bounds check to avoid unnecessary recursion
-                if (instructionIndex < childStackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex ||
-                    instructionIndex > childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex)
+                firstInstructionIndex = childStackFrame.GetFirstInstructionStackFrame().FirstInstructionIndex;
+                if (firstInstructionIndex == -1)
+                    firstInstructionIndex = 0;
+
+                lastInstructionIndex = childStackFrame.GetLastInstructionStackFrame().LastInstructionIndex;
+                if (lastInstructionIndex == -1)
+                    lastInstructionIndex = int.MaxValue;
+
+                if (instructionIndex < firstInstructionIndex ||
+                    instructionIndex > lastInstructionIndex)
                     continue;
 
                 // Skip children whose ranges cannot contain the index
@@ -364,8 +377,16 @@ namespace BeebPerf
             }
 
             // check stack frame itself
-            if (instructionIndex >= stackFrame.FirstInstructionIndex &&
-                instructionIndex <= stackFrame.LastInstructionIndex)
+            firstInstructionIndex = stackFrame.FirstInstructionIndex;
+            if (firstInstructionIndex == -1)
+                firstInstructionIndex = 0;
+
+            lastInstructionIndex = stackFrame.FirstInstructionIndex;
+            if (lastInstructionIndex == -1)
+                lastInstructionIndex = int.MaxValue;
+
+            if (instructionIndex >= firstInstructionIndex &&
+                instructionIndex <= lastInstructionIndex)
                 return stackFrame;
 
             return null;

@@ -311,6 +311,10 @@ namespace BeebPerf
 
             // review inserted stack-frames, as their associated routine may be incorrect
             ReviewInsertedStackFrames(currentStackFrame);
+
+#if DEBUG && STACKFRAME_INVARIANT
+            model.StackFrame.AssertInvariant(RootStackFrame, _Instructions, _InstructionSet!);
+#endif
         }
 
         private model.StackFrame? CreateInitialStackFrames()
@@ -510,23 +514,20 @@ namespace BeebPerf
                 }
                 else if ((instruction.IsIRQ || instruction.IsNMI) && !isLastInstruction)
                 {
-                    // update instruction indices to include interrupt
-                    if (currentStackFrame!.FirstInstructionIndex < 0)
-                        currentStackFrame.FirstInstructionIndex = instructionIndex;
-
-                    if (currentStackFrame.LastInstructionIndex < instructionIndex)
-                        currentStackFrame.LastInstructionIndex = instructionIndex;
-
                     // create new stack frame for IRQ/NMI
-                    syncStackFrames(postCycleCount);
+                    syncStackFrames(cycleCount);
                     currentStackFrame = CreateStackFrame(
                         instruction.IsIRQ ? CallType.IRQ : CallType.NMI,
                         RoutinesByAddress[instruction.DestinationAddress],
                         instruction.ReturnAddress,
                         stackPointer,
-                        postCycleCount, 
+                        cycleCount,
                         parent: currentStackFrame);
                     stackPointer -= 3;
+
+                    // set instruction indices to include interrupt instruction
+                    currentStackFrame.FirstInstructionIndex = instructionIndex;
+                    currentStackFrame.LastInstructionIndex = instructionIndex;
                 }
 
                 cycleCount = postCycleCount;

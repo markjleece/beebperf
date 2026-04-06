@@ -25,6 +25,11 @@ namespace BeebPerf
 {
     public class MemoryAnalysis
     {
+        public MemoryAnalysis(LabelResolver labelResolver)
+        {
+            _LabelResolver = labelResolver;
+        }
+
         public void Initialize(
             model.StackFrame rootStackFrame,
             Instruction[] instructions,
@@ -127,9 +132,13 @@ namespace BeebPerf
                         int readCount = (int)readWriteCount;
                         int writeCount = (int)(readWriteCount >> 32);
 
+                        var address = new CanonicalAddress((ushort)(baseAddress + j), page);
+                        var label = _LabelResolver.ResolveWithOffset(address.Address);
+
                         MemoryAccesses.Add(new MemoryAccess
                         {
-                            Address = new CanonicalAddress((ushort)(baseAddress + j), page),
+                            Address = address,
+                            Label = label,
                             ReadCount = readCount,
                             WriteCount = writeCount,
                         });
@@ -227,9 +236,10 @@ namespace BeebPerf
 
         public class MemoryAccess
         {
-            public CanonicalAddress Address;
-            public int ReadCount;
-            public int WriteCount;
+            public required CanonicalAddress Address;
+            public required string Label;
+            public required int ReadCount;
+            public required int WriteCount;
         }
 
         public List<MemoryAccess> MemoryAccesses = [];
@@ -239,5 +249,6 @@ namespace BeebPerf
         private InstructionSet? _InstructionSet;
         private model.StackFrame _RootStackFrame = new();
         private byte[][] _SnapshotMemory = [];
+        private LabelResolver _LabelResolver = new();
     }
 }

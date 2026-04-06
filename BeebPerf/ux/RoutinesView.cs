@@ -26,15 +26,16 @@ namespace BeebPerf.ux
 {
     internal class RoutinesView : GridView<Routine>, IGridExporter
     {
-        private const int RoutineColumnIndex = 0;
-        private const int TotalCPUColumnIndex = 1;
-        private const int SelfCPUColumnIndex = 2;
-        private const int ElapsedCPUColumnIndex = 3;
-        private const int InterruptsColumnIndex = 4;
-        private const int ExecutionCountColumnIndex = 5;
+        private const int RoutineAddressColumnIndex = 0;
+        private const int RoutineLabelColumnIndex = 1;
+        private const int TotalCPUColumnIndex = 2;
+        private const int SelfCPUColumnIndex = 3;
+        private const int ElapsedCPUColumnIndex = 4;
+        private const int InterruptsColumnIndex = 5;
+        private const int ExecutionCountColumnIndex = 6;
 
-        private const int ExportRoutineAddressColumnIndex = 0;
-        private const int ExportRoutinePageColumnIndex = 1;
+        private const int ExportRoutinePageColumnIndex = 0;
+        private const int ExportRoutineAddressColumnIndex = 1;
         private const int ExportRoutineLabelColumnIndex = 2;
         private const int ExportTotalCPUColumnIndex = 3;
         private const int ExportTotalCPUPercentageIndex = 4;
@@ -53,20 +54,24 @@ namespace BeebPerf.ux
         public RoutinesView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
             var cellTemplate = new CellTemplate();
-            AddColumn("Routine", "Routine", cellTemplate);
+            AddColumn("Address", "Address", cellTemplate);
+            AddColumn("Label", "Label", cellTemplate);
             AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
             AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
             AddColumn("ElapsedCPU", "Elapsed CPU [#cycles, %]", cellTemplate);
             AddColumn("Interrupts", "Interrupts [#cycles, %]", cellTemplate);
             AddColumn("ExecutionCount", "Execution count [#, %]", cellTemplate);
 
+            SetColumnAlignment(RoutineAddressColumnIndex, DataGridViewContentAlignment.MiddleCenter);
+            SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ElapsedCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(InterruptsColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
-            SetColumnHeaderToolTip(RoutineColumnIndex, "Routine address and label");
+            SetColumnHeaderToolTip(RoutineAddressColumnIndex, "Routine address");
+            SetColumnHeaderToolTip(RoutineLabelColumnIndex, "Routine label");
             SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used by this routine and all routines it calls.");
             SetColumnHeaderToolTip(SelfCPUColumnIndex,"Cycles used just by this routine");
             SetColumnHeaderToolTip(ElapsedCPUColumnIndex, "Total cycles elapsed during execution of routine, including cycles in interrupts");
@@ -142,7 +147,8 @@ namespace BeebPerf.ux
 
             return columnIndex switch
             {
-                RoutineColumnIndex => a.StartAddress.Address.CompareTo(b.StartAddress.Address),
+                RoutineAddressColumnIndex => a.StartAddress.Address.CompareTo(b.StartAddress.Address),
+                RoutineLabelColumnIndex => a.Label.Trim('.').CompareTo(b.Label.Trim('.')),
                 SelfCPUColumnIndex => metrics_a.SelfCycleCount.CompareTo(metrics_b.SelfCycleCount),
                 TotalCPUColumnIndex => metrics_a.InclusiveCycleCount.CompareTo(metrics_b.InclusiveCycleCount),
                 ElapsedCPUColumnIndex => metrics_a.ElapsedCycleCount.CompareTo(metrics_b.ElapsedCycleCount),
@@ -155,10 +161,17 @@ namespace BeebPerf.ux
 
         protected override string OnFormatRowData(Routine routine, int columnIndex, int rowIndex)
         {
-            if (columnIndex == RoutineColumnIndex)
-                return $"{"".PadLeft(routine.HotRoutine ? 4 : 0)}{FormatAddress(routine.StartAddress)} {routine.Label}";
-            else
-                return FormatCountAndRange(routine, columnIndex);
+            return columnIndex switch
+            {
+                RoutineAddressColumnIndex => FormatAddress(routine),
+                RoutineLabelColumnIndex => routine.Label,
+                _ => FormatCountAndRange(routine, columnIndex)
+            };
+        }
+
+        private string FormatAddress(Routine routine)
+        {
+            return $"{"".PadLeft(routine.HotRoutine ? 4 : 0)}{FormatAddress(routine.StartAddress)}";
         }
 
         protected override (int value, int range, bool clamp) OnRowDataCountAndRange(Routine routine, int columnIndex)
@@ -194,8 +207,8 @@ namespace BeebPerf.ux
         string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
-                "Routine address",
                 "Routine page",
+                "Routine address",
                 "Routine label",
                 "Total CPU [#]",
                 "Total CPU [%]",
@@ -235,8 +248,8 @@ namespace BeebPerf.ux
             var metrics = routine.AggregateMetrics;
             return columnIndex switch
             {
-                ExportRoutineAddressColumnIndex => FormatAddress(routine.StartAddress),
                 ExportRoutinePageColumnIndex => routine.StartAddress.Page.ToString(),
+                ExportRoutineAddressColumnIndex => FormatAddress(routine.StartAddress),
                 ExportRoutineLabelColumnIndex => routine.Label,
                 ExportTotalCPUColumnIndex => metrics.InclusiveCycleCount.ToString(),
                 ExportTotalCPUPercentageIndex => FormatExportPercentage(metrics.InclusiveCycleCount, TotalCycleCount),
@@ -276,12 +289,19 @@ namespace BeebPerf.ux
                 // paint flame icon
                 var routinesView = (RoutinesView)DataGridView!;
                 var routine = routinesView._DataRows[rowIndex];
-                if (ColumnIndex == RoutineColumnIndex && routine.HotRoutine)
+                if (ColumnIndex == RoutineAddressColumnIndex && routine.HotRoutine)
                 {
+                    // measure
+                    string text = routinesView.FormatAddress(routine);
+                    var flags = TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+                    Size measure = TextRenderer.MeasureText(text, routinesView.Font, new Size(int.MaxValue, int.MaxValue), flags);
+
+                    int left = cellBounds.Left + (cellBounds.Width - measure.Width) / 2;
                     int size = cellBounds.Height / 2;
                     int inset = cellBounds.Height / 4;
-                    var rect = new Rectangle(cellBounds.Left + inset / 2, cellBounds.Top + inset, size, size);
+                    var rect = new Rectangle(left, cellBounds.Top + inset, size, size);
 
+                    // paint
                     var form = routinesView.FindForm() as BeebPerfForm;
                     if (form is null) return;
                     

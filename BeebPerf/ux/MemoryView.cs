@@ -27,15 +27,15 @@ namespace BeebPerf.ux
 {
     internal class MemoryView : GridView<MemoryAccess>, IGridExporter
     {
-        private const int AddressColumnIndex = 0;
-        private const int PageColumnIndex = 1;
+        private const int PageColumnIndex = 0;
+        private const int AddressColumnIndex = 1;
         private const int LabelColumnIndex = 2;
         private const int ReadWriteCountColumnIndex = 3;
         private const int ReadCountColumnIndex = 4;
         private const int WriteCountColumnIndex = 5;
 
-        private const int ExportAddressColumnIndex = 0;
-        private const int ExportPageColumnIndex = 1;
+        private const int ExportPageColumnIndex = 0;
+        private const int ExportAddressColumnIndex = 1;
         private const int ExportLabelColumnIndex = 2;
         private const int ExportReadWriteCountColumnIndex = 3;
         private const int ExportReadWritePercentageColumnIndex = 4;
@@ -47,8 +47,8 @@ namespace BeebPerf.ux
 
         public MemoryView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)(ButtonType.Copy | ButtonType.Export))
         {
-            AddColumn("Address", "Address", cellTemplate: null);
             AddColumn("Page", "Page", cellTemplate: null);
+            AddColumn("Address", "Address", cellTemplate: null);
             AddColumn("Label", "Label", cellTemplate: null);
             AddColumn("ReadWriteCount", "Reads/Writes [#, %]", cellTemplate: null);
             AddColumn("ReadCount", "Reads [#, %]", cellTemplate: null);
@@ -58,16 +58,16 @@ namespace BeebPerf.ux
             SetColumnAlignment(ReadCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(WriteCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
-            SetColumnHeaderToolTip(AddressColumnIndex, "Address");
             SetColumnHeaderToolTip(PageColumnIndex, "Page");
+            SetColumnHeaderToolTip(AddressColumnIndex, "Address");
             SetColumnHeaderToolTip(LabelColumnIndex, "Label");
             SetColumnHeaderToolTip(ReadWriteCountColumnIndex, "Total number of memory reads or writes");
             SetColumnHeaderToolTip(ReadCountColumnIndex, "Total number of memory reads");
             SetColumnHeaderToolTip(WriteCountColumnIndex, "Total number of memory writes");
 
-            SetColumnSortMode(AddressColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(PageColumnIndex, DataGridViewColumnSortMode.NotSortable);
-            SetColumnSortMode(LabelColumnIndex, DataGridViewColumnSortMode.NotSortable);
+            SetColumnSortMode(AddressColumnIndex, DataGridViewColumnSortMode.Programmatic);
+            SetColumnSortMode(LabelColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(ReadWriteCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(ReadCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(WriteCountColumnIndex, DataGridViewColumnSortMode.Programmatic);
@@ -109,22 +109,28 @@ namespace BeebPerf.ux
 
         protected override int OnSortCompare(MemoryAccess a, MemoryAccess b, int columnIndex)
         {
-            return columnIndex switch
+            var result = columnIndex switch
             {
                 AddressColumnIndex => a.Address.CompareTo(b.Address),
+                LabelColumnIndex => a.Label.Trim('.').CompareTo(b.Label.Trim('.')),
                 ReadWriteCountColumnIndex => (a.ReadCount + a.WriteCount).CompareTo(b.ReadCount + b.WriteCount),
                 ReadCountColumnIndex => a.ReadCount.CompareTo(b.ReadCount),
                 WriteCountColumnIndex => a.WriteCount.CompareTo(b.WriteCount),
                 _ => 0
             };
+
+            if (result == 0 && columnIndex != AddressColumnIndex)
+                result = a.Address.CompareTo(b.Address);
+
+            return result;
         }
 
         protected override string OnFormatRowData(MemoryAccess memoryAccess, int columnIndex, int rowIndex)
         {
             return columnIndex switch
             {
-                AddressColumnIndex => FormatAddress(memoryAccess.Address),
                 PageColumnIndex => memoryAccess.Address.Page.ToString(),
+                AddressColumnIndex => FormatAddress(memoryAccess.Address),
                 LabelColumnIndex => _LabelResolver.ResolveWithOffset(memoryAccess.Address.Address),
                 _ => FormatCountAndRange(memoryAccess, columnIndex),
             };
@@ -160,8 +166,8 @@ namespace BeebPerf.ux
         string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
-                "Memory address",
                 "Memory page",
+                "Memory address",
                 "Label",
                 "Reads/writes [#]",
                 "Reads/writes [%]",
@@ -196,9 +202,9 @@ namespace BeebPerf.ux
         {
             return columnIndex switch
             {
-                ExportAddressColumnIndex => FormatAddress(memoryAccess.Address),
                 ExportPageColumnIndex => memoryAccess.Address.Page.ToString(),
-                ExportLabelColumnIndex => _LabelResolver.ResolveWithOffset(memoryAccess.Address.Address),
+                ExportAddressColumnIndex => FormatAddress(memoryAccess.Address),
+                ExportLabelColumnIndex => memoryAccess.Label,
                 ExportReadWriteCountColumnIndex => (memoryAccess.ReadCount + memoryAccess.WriteCount).ToString(),
                 ExportReadWritePercentageColumnIndex => FormatExportPercentage(memoryAccess.ReadCount + memoryAccess.WriteCount, _TotalReadCount + _TotalWriteCount),
                 ExportReadCountColumnIndex => memoryAccess.ReadCount.ToString(),

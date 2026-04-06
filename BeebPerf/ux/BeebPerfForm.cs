@@ -32,7 +32,7 @@ namespace BeebPerf.ux
         {
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
-            _MemoryAnalysis = new();
+            _MemoryAnalysis = new(_LabelResolver);
             _FrameAnalysis = new();
             _UndoRedoHistory = new();
             _Model = new();
