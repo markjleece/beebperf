@@ -6,16 +6,13 @@
       <Value Profile="(Default)">0, 0</Value>
     </Setting>
     <Setting Name="WindowSize" Type="System.Drawing.Size" Scope="User">
-      <Value Profile="(Default)">800, 600</Value>
+      <Value Profile="(Default)">0, 0</Value>
     </Setting>
     <Setting Name="WindowState" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="RecentPerfFilePathName" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
-    </Setting>
-    <Setting Name="WindowLayout" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="PrimarySplitterDistance" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
@@ -49,6 +46,9 @@
     </Setting>
     <Setting Name="RecentSelectedFrameSettings" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="UnexpectedClose" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
   </Settings>
 </SettingsFile>

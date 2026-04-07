@@ -304,6 +304,7 @@ namespace BeebPerf.ux
             secondarySplitContainer.BorderStyle = BorderStyle.FixedSingle;
             secondarySplitContainer.Location = new Point(0, 0);
             secondarySplitContainer.Name = "secondarySplitContainer";
+            secondarySplitContainer.Orientation = Orientation.Horizontal;
             secondarySplitContainer.Panel1.Controls.Add(tabControl);
             secondarySplitContainer.Panel2.Controls.Add(codeView);
             secondarySplitContainer.TabIndex = 2;

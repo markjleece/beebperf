@@ -37,7 +37,7 @@ namespace BeebPerf.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("800, 600")]
+        [global::System.Configuration.DefaultSettingValueAttribute("0, 0")]
         public global::System.Drawing.Size WindowSize {
             get {
                 return ((global::System.Drawing.Size)(this["WindowSize"]));
@@ -68,18 +68,6 @@ namespace BeebPerf.Properties {
             }
             set {
                 this["RecentPerfFilePathName"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("0")]
-        public int WindowLayout {
-            get {
-                return ((int)(this["WindowLayout"]));
-            }
-            set {
-                this["WindowLayout"] = value;
             }
         }
         
@@ -212,6 +200,18 @@ namespace BeebPerf.Properties {
             }
             set {
                 this["RecentSelectedFrameSettings"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool UnexpectedClose {
+            get {
+                return ((bool)(this["UnexpectedClose"]));
+            }
+            set {
+                this["UnexpectedClose"] = value;
             }
         }
     }

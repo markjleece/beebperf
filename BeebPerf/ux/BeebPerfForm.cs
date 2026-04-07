@@ -59,6 +59,15 @@ namespace BeebPerf.ux
             ResizeSpinner();
         }
 
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            BeginInvoke(new Action(() =>
+            {
+                this.WindowState = _InitialFormWindowState;
+            }));
+        }
+
         private void Spinner_Resize(object? sender, EventArgs e)
         {
             ResizeSpinner();
@@ -79,7 +88,21 @@ namespace BeebPerf.ux
 
             // reopen last .perf file
             if (_RecentPerfFilePathName.Length > 0 && File.Exists(_RecentPerfFilePathName))
-                OpenPerfFile(_RecentPerfFilePathName);
+            {
+                var openRecentFile = DialogResult.Yes;
+                if (_UnexpectedClose)
+                {
+                    openRecentFile = MessageBox.Show(
+                        this,
+                        $"BeebPerf closed unexpectantly last session. Do you want to reopen '{_RecentPerfFilePathName}' ?",
+                        "BeebPerf",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Error);
+                }
+
+                if (openRecentFile == DialogResult.Yes)
+                    OpenPerfFile(_RecentPerfFilePathName);
+            }
         }
 
         private void ReadLabelsFileAsync(string fileName, bool labelsEnabled)
@@ -742,18 +765,19 @@ namespace BeebPerf.ux
             Properties.Settings.Default.RecentEndCycleCount = _RecentEndCycleCount;
             Properties.Settings.Default.RecentExportFolderPath = RecentExportFolderPath;
             Properties.Settings.Default.LabelsFiles = _LabelsFilesEncoding;
-            Properties.Settings.Default.WindowLayout = (int)secondarySplitContainer.Orientation;
             Properties.Settings.Default.PrimarySplitterDistance = primarySplitContainer.SplitterDistance;
             Properties.Settings.Default.SecondarySplitterDistance = secondarySplitContainer.SplitterDistance;
             Properties.Settings.Default.DisplaySettings = displaySettings;
             Properties.Settings.Default.ColorTheme = (int)ColorTheme.Get();
             Properties.Settings.Default.FrameSettingsList = EncodeFrameSettings(_FrameSettingsList);
             Properties.Settings.Default.RecentSelectedFrameSettings = recentFrameSettings;
+            Properties.Settings.Default.UnexpectedClose = false;
             Properties.Settings.Default.Save();
         }
 
         private void RestoreAppState()
         {
+            _UnexpectedClose = Properties.Settings.Default.UnexpectedClose;
             _RecentPerfFilePathName = Properties.Settings.Default.RecentPerfFilePathName;
             _RecentStartCycleCount = Properties.Settings.Default.RecentStartCycleCount;
             _RecentEndCycleCount = Properties.Settings.Default.RecentEndCycleCount;
@@ -761,6 +785,7 @@ namespace BeebPerf.ux
             _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
             RecentExportFolderPath = Properties.Settings.Default.RecentExportFolderPath;
 
+            // frame settings
             _FrameSettingsList = DecodeFrameSettings(Properties.Settings.Default.FrameSettingsList);
             var recentFrameSettings = Properties.Settings.Default.RecentSelectedFrameSettings;
             foreach (var frameSettings in _FrameSettingsList)
@@ -773,29 +798,48 @@ namespace BeebPerf.ux
             }
             framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
 
-            var location = Properties.Settings.Default.WindowLocation;
-            var size = Properties.Settings.Default.WindowSize;
-            var state = Properties.Settings.Default.WindowState;
-            var orientation = Properties.Settings.Default.WindowLayout;
-            var primarySplitterDistance = Properties.Settings.Default.PrimarySplitterDistance;
-            var secondarySplitterDistance = Properties.Settings.Default.SecondarySplitterDistance;
+            // color theme
             var colorTheme = Properties.Settings.Default.ColorTheme;
-
             ColorTheme.Set(this, (ColorThemeType)colorTheme);
 
+            // display settings
             var displaySettings = Properties.Settings.Default.DisplaySettings;
             if (displaySettings.Length > 0)
                 DisplaySettings = DisplaySettings.Deserialize(displaySettings)!;
             else
                 DisplaySettings = new DisplaySettings();
 
-            if (orientation < 0)
-                orientation = (int)Orientation.Horizontal;
+            // windows size and position
+            var windowLocation = Properties.Settings.Default.WindowLocation;
+            var windowSize = Properties.Settings.Default.WindowSize;
+            var windowState = Properties.Settings.Default.WindowState;
+
+            var screenBounds = Screen.FromPoint(windowLocation).WorkingArea;
+            if (windowSize.Width == 0 || windowSize.Height == 0)
+            {
+                windowLocation.X = screenBounds.Size.Width / 12;
+                windowLocation.Y = screenBounds.Size.Height / 12;
+                windowSize.Width = 10 * screenBounds.Size.Width / 12;
+                windowSize.Height = 10 * screenBounds.Size.Height / 12;
+            }
+
+            if (!screenBounds.Contains(new Rectangle(windowLocation, windowSize)))
+                windowLocation = new Point(100, 100);
+
+            Location = windowLocation;
+            Size = windowSize;
+
+            // window state set after form is visible
+            _InitialFormWindowState = (FormWindowState)windowState;
+
+            // splitter positions
+            var primarySplitterDistance = Properties.Settings.Default.PrimarySplitterDistance;
+            var secondarySplitterDistance = Properties.Settings.Default.SecondarySplitterDistance;
 
             if (primarySplitterDistance <= 0 || secondarySplitterDistance <= 0)
             {
                 primarySplitterDistance = Height / 4;
-                secondarySplitterDistance = 4 * Height / 8;
+                secondarySplitterDistance = 3 * Height / 8;
             }
             else
             {
@@ -811,19 +855,14 @@ namespace BeebPerf.ux
                 }
             }
 
-            var screenBounds = Screen.FromPoint(location).WorkingArea;
-            if (!screenBounds.Contains(new Rectangle(location, size)))
-                location = new Point(100, 100);
-
-            StartPosition = FormStartPosition.Manual;
-            Location = location;
-            Size = size;
-            WindowState = (FormWindowState)state;
             primarySplitContainer.SplitterDistance = primarySplitterDistance;
-            secondarySplitContainer.Orientation = (Orientation)orientation;
             secondarySplitContainer.SplitterDistance = secondarySplitterDistance;
 
             ApplyFontScaling(this, DisplaySettings.FontScaling);
+
+            // set unexpected close. This is overwritten when app data is saved during shutdown
+            Properties.Settings.Default.UnexpectedClose = true;
+            Properties.Settings.Default.Save();
         }
 
         public void ApplyFontScaling(Control control, int fontScaling)
@@ -1027,5 +1066,7 @@ namespace BeebPerf.ux
         private MemoryAnalysis _MemoryAnalysis;
         private FrameAnalysis _FrameAnalysis;
         private Font _BaseFont;
+        private bool _UnexpectedClose;
+        private FormWindowState _InitialFormWindowState;
     }
 }
