@@ -112,6 +112,9 @@ namespace BeebPerf.ux
 
         public bool CanSelectAll()
         {
+            if (_RecordingDuration == 0)
+                return false;
+
             return (_AnalysisFrom != 0.0 || _AnalysisTo != _RecordingDuration);
         }
 
@@ -125,6 +128,9 @@ namespace BeebPerf.ux
 
         public bool CanZoomIn()
         {
+            if (_RecordingDuration == 0)
+                return false;
+
             int newDisplayWidth = (_DisplayTo - _DisplayFrom) / 2;
             int minDisplayRange = 4 * Width;
             return (newDisplayWidth > minDisplayRange);
@@ -140,6 +146,9 @@ namespace BeebPerf.ux
 
         public bool CanZoomOut()
         {
+            if (_RecordingDuration == 0)
+                return false;
+
             return _ScrollBar.Enabled;
         }
 
@@ -153,7 +162,7 @@ namespace BeebPerf.ux
 
         public bool CanFitSelection()
         {
-            return true;
+            return (_RecordingDuration > 0);
         }
 
         public void FitSelection()
@@ -166,7 +175,7 @@ namespace BeebPerf.ux
 
         public bool CanFitFrames()
         {
-            return true;
+            return (_RecordingDuration > 0);
         }
             
         public void FitFrames()
