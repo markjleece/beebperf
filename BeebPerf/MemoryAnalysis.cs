@@ -163,18 +163,19 @@ namespace BeebPerf
         {
             int childIndex = 0;
             int instructionIndex = stackFrame.FirstInstructionIndex;
+            int lastInstructionIndex = stackFrame.LastInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
 
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
-            while (cycleCount < stackFrame.EndCycleCount && instructionIndex < stackFrame.EndCycleCount)
+            while (cycleCount < stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
             {
                 if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
                 {
-                    if (startCycleCount <= stackFrame.EndCycleCount && endCycleCount >= stackFrame.StartCycleCount)
+                    if (endCycleCount >= stackFrame.StartCycleCount && startCycleCount <= stackFrame.EndCycleCount)
                         CalculateStackFrameMemoryAccessMetrics(address, childStackFrame, startCycleCount, endCycleCount, routineMetrics);
 
-                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;

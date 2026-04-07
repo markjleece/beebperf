@@ -47,21 +47,21 @@ namespace BeebPerf.model
             return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Type: {CallType}, Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
         }
 
-        public static void ComputeEffectiveInstructionIndices(StackFrame frame, int instructionCount)
+        public static void ComputeInstructionIndices(StackFrame frame, int instructionCount)
         {
-            int first = frame.FirstInstructionIndex == -1 ? instructionCount - 1 : frame.FirstInstructionIndex;
-            int last = frame.LastInstructionIndex == -1 ? 0 : frame.LastInstructionIndex;
+            int first = frame.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : frame.FirstSelfInstructionIndex;
+            int last = frame.LastSelfInstructionIndex == -1 ? 0 : frame.LastSelfInstructionIndex;
 
             foreach (var child in frame.Children)
             {
-                ComputeEffectiveInstructionIndices(child, instructionCount);
+                ComputeInstructionIndices(child, instructionCount);
 
-                first = Math.Min(first, child.FirstEffectiveInstructionIndex);
-                last = Math.Max(last, child.LastEffectiveInstructionIndex);
+                first = Math.Min(first, child.FirstInstructionIndex);
+                last = Math.Max(last, child.LastInstructionIndex);
             }
 
-            frame.FirstEffectiveInstructionIndex = first;
-            frame.LastEffectiveInstructionIndex = last;
+            frame.FirstInstructionIndex = first;
+            frame.LastInstructionIndex = last;
         }
 
 #if DEBUG && STACKFRAME_INVARIANT
@@ -76,10 +76,27 @@ namespace BeebPerf.model
 
         private static void AssertInvariant(StackFrame frame, Instruction[] instructions, InstructionSet instructionSet, int totalCycles)
         {
-            // first instruction
-            if (frame.FirstInstructionIndex != -1)
+            // first and last self instruction indices
+            if (frame.FirstSelfInstructionIndex == -1 || frame.LastSelfInstructionIndex == -1)
             {
-                ref var firstInstruction = ref instructions[frame.FirstInstructionIndex];
+                Debug.Assert(frame.FirstSelfInstructionIndex == -1);
+                Debug.Assert(frame.LastSelfInstructionIndex == -1);
+            }
+            
+            // first and last instruction indices
+            if (frame.FirstSelfInstructionIndex != -1)
+                Debug.Assert(frame.FirstInstructionIndex <= frame.FirstSelfInstructionIndex);
+
+            if (frame.LastSelfInstructionIndex != -1)
+                Debug.Assert(frame.LastInstructionIndex >= frame.LastSelfInstructionIndex);
+
+            Debug.Assert(frame.FirstInstructionIndex >= 0 && frame.FirstInstructionIndex <= instructions.Length - 1);
+            Debug.Assert(frame.LastInstructionIndex >= 0 && frame.LastInstructionIndex <= instructions.Length - 1);
+
+            // first instruction
+            if (frame.FirstSelfInstructionIndex != -1)
+            {
+                ref var firstInstruction = ref instructions[frame.FirstSelfInstructionIndex];
                 switch (frame.CallType)
                 {
                     case CallType.IRQ:
@@ -102,8 +119,8 @@ namespace BeebPerf.model
             var lastFrame = frame.GetLastInstructionStackFrame();
             if (!lastFrame.InsertedTailCall)
             {
-                var lastInstructionIndex = frame.LastEffectiveInstructionIndex;
-                if (lastInstructionIndex != -1 && lastInstructionIndex < instructions.Length - 2)
+                var lastInstructionIndex = frame.LastInstructionIndex;
+                if (lastInstructionIndex < instructions.Length - 1)
                 {
                     // included situations where stack pointer is manipulated
                     ref var lastInstruction = ref instructions[lastInstructionIndex];
@@ -130,26 +147,26 @@ namespace BeebPerf.model
             if (firstFrame != frame)
             {
                 Debug.Assert(firstFrame.StartCycleCount == frame.StartCycleCount);
-                Debug.Assert(firstFrame.FirstInstructionIndex < frame.FirstInstructionIndex);
-                Debug.Assert(firstFrame.LastInstructionIndex < frame.FirstInstructionIndex);
+                Debug.Assert(firstFrame.FirstSelfInstructionIndex < frame.FirstSelfInstructionIndex);
+                Debug.Assert(firstFrame.LastSelfInstructionIndex < frame.FirstSelfInstructionIndex);
             }
 
             if (lastFrame != frame)
             {
                 Debug.Assert(lastFrame.EndCycleCount == frame.EndCycleCount);
-                Debug.Assert(lastFrame.FirstInstructionIndex > frame.LastInstructionIndex);
-                Debug.Assert(lastFrame.LastInstructionIndex > frame.LastInstructionIndex);
+                Debug.Assert(lastFrame.FirstSelfInstructionIndex > frame.LastSelfInstructionIndex);
+                Debug.Assert(lastFrame.LastSelfInstructionIndex > frame.LastSelfInstructionIndex);
             }
 
             // instruction indices
-            if (frame.FirstInstructionIndex != -1)
-                Debug.Assert(frame.FirstInstructionIndex >= 0 && frame.FirstInstructionIndex < instructions.Length);
+            if (frame.FirstSelfInstructionIndex != -1)
+                Debug.Assert(frame.FirstSelfInstructionIndex >= 0 && frame.FirstSelfInstructionIndex < instructions.Length);
 
-            if (frame.LastInstructionIndex != -1)
-                Debug.Assert(frame.LastInstructionIndex >= 0 && frame.LastInstructionIndex < instructions.Length);
+            if (frame.LastSelfInstructionIndex != -1)
+                Debug.Assert(frame.LastSelfInstructionIndex >= 0 && frame.LastSelfInstructionIndex < instructions.Length);
 
-            if (frame.FirstInstructionIndex != -1 && frame.LastInstructionIndex != -1)
-                Debug.Assert(frame.FirstInstructionIndex <= frame.LastInstructionIndex);
+            if (frame.FirstSelfInstructionIndex != -1 && frame.LastSelfInstructionIndex != -1)
+                Debug.Assert(frame.FirstSelfInstructionIndex <= frame.LastSelfInstructionIndex);
 
             // children
             StackFrame? prevChildFrame = null;
@@ -160,22 +177,22 @@ namespace BeebPerf.model
                 Debug.Assert(childFrame.StartCycleCount >= frame.StartCycleCount);
                 Debug.Assert(childFrame.EndCycleCount <= frame.EndCycleCount);
 
-                var childFrameFirstInstructionIndex = childFrame.LastEffectiveInstructionIndex;
-                var childFrameLastInstructionIndex = childFrame.GetFirstInstructionStackFrame().LastInstructionIndex;
+                var childFrameFirstInstructionIndex = childFrame.LastInstructionIndex;
+                var childFrameLastInstructionIndex = childFrame.GetFirstInstructionStackFrame().LastSelfInstructionIndex;
 
-                if (frame.FirstInstructionIndex != -1)
+                if (frame.FirstSelfInstructionIndex != -1)
                     Debug.Assert(
                         childFrameFirstInstructionIndex == -1 ||
                         childFrameLastInstructionIndex == -1 ||
-                        frame.FirstInstructionIndex < childFrameFirstInstructionIndex ||
-                        frame.FirstInstructionIndex > childFrameLastInstructionIndex);                    
+                        frame.FirstSelfInstructionIndex < childFrameFirstInstructionIndex ||
+                        frame.FirstSelfInstructionIndex > childFrameLastInstructionIndex);                    
 
-                if (frame.LastInstructionIndex != -1)
+                if (frame.LastSelfInstructionIndex != -1)
                     Debug.Assert(
                         childFrameFirstInstructionIndex == -1 ||
                         childFrameLastInstructionIndex == -1 ||
-                        frame.LastInstructionIndex < childFrameFirstInstructionIndex ||
-                        frame.LastInstructionIndex > childFrameLastInstructionIndex);
+                        frame.LastSelfInstructionIndex < childFrameFirstInstructionIndex ||
+                        frame.LastSelfInstructionIndex > childFrameLastInstructionIndex);
 
                 if (i == 0 && frame != firstFrame)
                     Debug.Assert(childFrame.StartCycleCount == frame.StartCycleCount);
@@ -200,7 +217,7 @@ namespace BeebPerf.model
             while (current.Children.Count > 0)
             {
                 var firstChild = current.Children[0];
-                if (firstChild.FirstInstructionIndex >= current.FirstInstructionIndex)
+                if (firstChild.FirstSelfInstructionIndex >= current.FirstSelfInstructionIndex)
                     break;
                 current = firstChild;
             }
@@ -213,7 +230,7 @@ namespace BeebPerf.model
             while (current.Children.Count > 0)
             {
                 var lastChild = current.Children[^1];
-                if (lastChild.LastInstructionIndex <= current.LastInstructionIndex)
+                if (lastChild.LastSelfInstructionIndex <= current.LastSelfInstructionIndex)
                     break;
                 current = lastChild;
             }
@@ -221,10 +238,10 @@ namespace BeebPerf.model
         }
 #endif
 
-        public int FirstInstructionIndex = -1;
-        public int LastInstructionIndex = -1;
-        public int FirstEffectiveInstructionIndex;
-        public int LastEffectiveInstructionIndex;
+        public int FirstSelfInstructionIndex = -1;
+        public int LastSelfInstructionIndex = -1;
+        public int FirstInstructionIndex;
+        public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
         public ushort LowestAddress = ushort.MinValue;

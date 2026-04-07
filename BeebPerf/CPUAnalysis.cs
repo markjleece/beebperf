@@ -313,7 +313,7 @@ namespace BeebPerf
             ReviewInsertedStackFrames(currentStackFrame);
 
             // populate effective first & last instruction indices
-            model.StackFrame.ComputeEffectiveInstructionIndices(RootStackFrame, _Instructions.Length);
+            model.StackFrame.ComputeInstructionIndices(RootStackFrame, _Instructions.Length);
 
 #if DEBUG && STACKFRAME_INVARIANT
             model.StackFrame.AssertInvariant(RootStackFrame, _Instructions, _InstructionSet!);
@@ -434,12 +434,12 @@ namespace BeebPerf
                                 cycleCount,
                                 parent: currentStackFrame);
 
-                    // update instruction indices to include instruction
-                    if (currentStackFrame!.FirstInstructionIndex < 0)
-                        currentStackFrame.FirstInstructionIndex = instructionIndex;
+                    // update self instruction indices to include instruction
+                    if (currentStackFrame!.FirstSelfInstructionIndex < 0)
+                        currentStackFrame.FirstSelfInstructionIndex = instructionIndex;
 
-                    if (currentStackFrame.LastInstructionIndex < instructionIndex)
-                        currentStackFrame.LastInstructionIndex = instructionIndex;
+                    if (currentStackFrame.LastSelfInstructionIndex < instructionIndex)
+                        currentStackFrame.LastSelfInstructionIndex = instructionIndex;
 
                     // update start and end addresses
                     ushort instructionAddress = instruction.OpcodeAddress.Address;
@@ -528,9 +528,9 @@ namespace BeebPerf
                         parent: currentStackFrame);
                     stackPointer -= 3;
 
-                    // set instruction indices to include interrupt instruction
-                    currentStackFrame.FirstInstructionIndex = instructionIndex;
-                    currentStackFrame.LastInstructionIndex = instructionIndex;
+                    // set self instruction indices to include interrupt instruction
+                    currentStackFrame.FirstSelfInstructionIndex = instructionIndex;
+                    currentStackFrame.LastSelfInstructionIndex = instructionIndex;
                 }
 
                 cycleCount = postCycleCount;
@@ -617,22 +617,18 @@ namespace BeebPerf
             {
                 if (cycleCount >= startCycleCount)
                     break;
-
                 cycleCount += _Instructions[instructionIndex++].CycleCount;
             }
 
-            FirstInstructionIndex = instructionIndex;
             StartCycleCount = cycleCount;
 
             while (instructionIndex < _Instructions.Length)
             {
-                cycleCount += _Instructions[instructionIndex].CycleCount;
+                cycleCount += _Instructions[instructionIndex++].CycleCount;
                 if (cycleCount >= endCycleCount)
                     break;
-                instructionIndex++;
             }
 
-            LastInstructionIndex = instructionIndex;
             EndCycleCount = cycleCount;
         }
 
@@ -695,20 +691,20 @@ namespace BeebPerf
                 (StartCycleCount > stackFrame.StartCycleCount && StartCycleCount <= stackFrame.EndCycleCount) ||
                 (EndCycleCount >= stackFrame.StartCycleCount && EndCycleCount < stackFrame.EndCycleCount));
 
-            int excludedCycleCount = 0;
             int childIndex = 0;
-            int instructionIndex = stackFrame.FirstEffectiveInstructionIndex;
+            int excludedCycleCount = 0;
             int cycleCount = stackFrame.StartCycleCount;
+            int instructionIndex = stackFrame.FirstInstructionIndex;
+            int lastInstructionIndex = stackFrame.LastInstructionIndex;
 
-            int lastInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
             while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
             {
-                if (childStackFrame is not null && cycleCount == childStackFrame.StartCycleCount)
+                if (childStackFrame is not null && cycleCount >= childStackFrame.StartCycleCount)
                 {
                     // skip over child stack frames
-                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
@@ -875,11 +871,10 @@ namespace BeebPerf
             Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics)
         {
             int childIndex = 0;
-            int instructionIndex = stackFrame.FirstInstructionIndex;
             int cycleCount = stackFrame.StartCycleCount;
-
+            int instructionIndex = stackFrame.FirstInstructionIndex;
+            int lastInstructionIndex = stackFrame.LastInstructionIndex;
             int previousInstructionIndex = instructionIndex;
-            int lastInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
 
             model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
 
@@ -903,7 +898,7 @@ namespace BeebPerf
                         CalculateStackFrameMetrics(childStackFrame, ref instructionOrdinal, instructionMetrics);
 
                     // skip over child stack frames
-                    instructionIndex = childStackFrame.LastEffectiveInstructionIndex + 1;
+                    instructionIndex = childStackFrame.LastInstructionIndex + 1;
                     cycleCount = childStackFrame.EndCycleCount;
 
                     childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
@@ -1050,8 +1045,6 @@ namespace BeebPerf
         public CallTreeNode? ProgramCallTree;
         public CallTreeNode? NMICallTree;
         public CallTreeNode? IRQBRKCallTree;
-        public int FirstInstructionIndex;
-        public int LastInstructionIndex;
         public int StartCycleCount;
         public int EndCycleCount;
         public model.StackFrame RootStackFrame = new();

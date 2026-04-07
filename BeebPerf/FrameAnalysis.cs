@@ -298,7 +298,7 @@ namespace BeebPerf
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
                     if (stackFrame != null) 
-                        _FrameEndInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
+                        _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
 
                 case FrameSettings.FrameType.JSRAddress:
@@ -307,7 +307,7 @@ namespace BeebPerf
 
                     stackFrame = FindStackFrame(destinationInstructionIndex);
                     if (stackFrame != null)
-                        _FrameEndInstructionIndex = stackFrame.LastEffectiveInstructionIndex;
+                        _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
             }
         }
@@ -356,8 +356,8 @@ namespace BeebPerf
             foreach (var childStackFrame in stackFrame.Children)
             {
                 // bounds check to avoid unnecessary recursion
-                if (instructionIndex < childStackFrame.FirstEffectiveInstructionIndex ||
-                    instructionIndex > childStackFrame.LastEffectiveInstructionIndex)
+                if (instructionIndex < childStackFrame.FirstInstructionIndex ||
+                    instructionIndex > childStackFrame.LastInstructionIndex)
                     continue;
 
                 // recurse
@@ -367,8 +367,8 @@ namespace BeebPerf
             }
 
             Debug.Assert(
-                instructionIndex >= stackFrame.FirstEffectiveInstructionIndex &&
-                instructionIndex <= stackFrame.LastEffectiveInstructionIndex);
+                instructionIndex >= stackFrame.FirstInstructionIndex &&
+                instructionIndex <= stackFrame.LastInstructionIndex);
 
             return stackFrame;
         }
