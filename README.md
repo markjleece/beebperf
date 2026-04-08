@@ -2,7 +2,14 @@
 BeebPerf is a Windows-based profiler for the BBC Micro. It works in tandem with a modified version of BeebEm that can record execution information to a .perf file (see below).
 BeebPerf can open.perf files, providing a set of interactive profiler views over the contained data.
 
-# Analysis
+![screenshot6jpg](https://github.com/user-attachments/assets/fb45afc5-585c-4253-bf05-db55a272828c)
+![screenshot5](https://github.com/user-attachments/assets/b049e561-89bb-4dd8-b572-86adb5efa869)
+![screenshot4](https://github.com/user-attachments/assets/94777952-4192-42a3-855e-79b679cd8ad7)
+![screenshot3](https://github.com/user-attachments/assets/a9164ce9-d46e-424e-805f-3c995befe9a9)
+![screenshot2](https://github.com/user-attachments/assets/35a829a5-1603-4ee3-8ad6-4718244e9cfc)
+![screenshot1](https://github.com/user-attachments/assets/167909b8-a154-45e0-a1cc-56dbd7accab0)
+
+# Features
 -Interactive timeline, allowing selective time ranges, with zoom and ‘fit to’ features.
 -Hot routines and hot path analysis.
 -Multiple views including: Routines, Caller/Callee, Call Tree, Flame graph, Memory, Frames, and Code.
@@ -34,7 +41,8 @@ The performance changes add Capture Perf… and End Perf File menu items allowin
 A modified version of BeebEm can be built using Visual Studio 2022 or 2026 using the following instructions:
 1.	Using the Tools  Get Tools and Features… ensure the following components are installed:
 - MSVS v142 – VS 2019 C++ x64/x86 build tools (v14.29 – 16.11)
-- C++ v14.29 (16.11) MFC for v142 build tool (x86 & x64) – needed for afxres.h/rc
+- C++ v14.29 (16.11) MFC for v142 build tool (x86 & x64)
+ – needed for afxres.h/rc
 
 2.	Using the Git  Clone Repository…, clone the BeebEm repository: ‘https://github.com/stardot/beebem-windows.git’
 3.	Using the Git  Open in Command Prompt, execute the following git command to apply the performance changes.  The path to the patch file will likely need changing.
