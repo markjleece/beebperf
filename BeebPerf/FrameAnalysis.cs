@@ -628,6 +628,8 @@ namespace BeebPerf
                     else
                         _WritesAfterDisplayRead++;
                 }
+
+                return;
             }
 
             if (memoryAddress.Page != MemoryPage.WholeRam)
