@@ -97,7 +97,7 @@ namespace BeebPerf
             for (int i = 0; i < 256; i++)
                 _CRTBitmapTbl[i] = new byte[8];
 
-            ConstructMode7Fonts(GetSolutionFolder() + "\\teletext.fnt");
+            ConstructMode7Fonts();
         }
 
         public async Task<bool> AnalysisAsync(
@@ -1230,11 +1230,13 @@ namespace BeebPerf
             }
         }
 
-        private bool ConstructMode7Fonts(string fileName)
+        private bool ConstructMode7Fonts()
         {
             try
             {
-                using var fs = File.OpenRead(fileName);
+                var resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+                var bytes = (byte[])resources.GetObject("teletext.Font")!;
+                using var ms = new MemoryStream(bytes!);
 
                 for (int ch = 0; ch < 96; ch++)
                 {
@@ -1243,11 +1245,11 @@ namespace BeebPerf
 
                     for (int i = 2; i < 20; i++)
                     {
-                        int loByte = fs.ReadByte();
+                        int loByte = ms.ReadByte();
                         if (loByte == -1)
                             throw new EndOfStreamException();
 
-                        int hiByte = fs.ReadByte();
+                        int hiByte = ms.ReadByte();
                         if (hiByte == -1)
                             throw new EndOfStreamException();
 
@@ -1311,16 +1313,6 @@ namespace BeebPerf
             }
 
             return true;
-        }
-
-        static private string GetSolutionFolder()
-        {
-            var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
-            while (directory != null && directory.GetFiles("*.sln").Length == 0)
-            {
-                directory = directory.Parent;
-            }
-            return (directory != null) ? directory.FullName : string.Empty;
         }
 
         public class Frame
