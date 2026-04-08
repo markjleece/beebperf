@@ -42,6 +42,11 @@ namespace BeebPerf.model
                 child.ClearMetrics();
         }
 
+        public bool IsEmpty()
+        {
+            return (FirstSelfInstructionIndex == -1 && LastSelfInstructionIndex == -1 && Children.Count == 0);
+        }
+
         public override string ToString()
         {
             return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Type: {CallType}, Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";

@@ -7061,7 +7061,7 @@ index c087f1f..def40d8 100644
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..fd29b47
+index 0000000..d220db5
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
 @@ -0,0 +1,1061 @@
@@ -7600,7 +7600,7 @@ index 0000000..fd29b47
 +        snapshotData.WriteByte(stackFrame->ReturnStackReg);
 +    }
 +
-+    // screen address (B5 & B4 of System-VIA Port B addressable latch)
++    // screen wrap address (B5 & B4 of System-VIA Port B addressable latch)
 +    snapshotData.WriteByte((IC32State & 0x30) >> 4);
 +
 +    if (bHiddenRAM)
@@ -7876,7 +7876,7 @@ index 0000000..fd29b47
 +    }
 +
 +    // write cycle count and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
-+    assert(cycleCount <= 0x7);
++    if (cycleCount > 7) cycleCount = 7;
 +    m_writeBuffer->WriteByteUnchecked((byte)(cycleCount & 0x7) | modifiedRegisters);
 +
 +    // update / write modified registers

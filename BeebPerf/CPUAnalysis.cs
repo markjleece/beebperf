@@ -405,6 +405,9 @@ namespace BeebPerf
                 bool stackModified = false;
                 while (stackPointer >= currentStackFrame!.ReturnStackPointer && currentStackFrame!.Parent != null)
                 {
+                    if (currentStackFrame.IsEmpty())
+                        currentStackFrame.Parent.Children.Remove(currentStackFrame);
+
                     currentStackFrame.EndCycleCount = postCycleCount;
                     currentStackFrame = currentStackFrame.Parent;
                     stackModified = true;
@@ -536,11 +539,15 @@ namespace BeebPerf
                 cycleCount = postCycleCount;
             }
 
-            // unwind residual stack, setting end cycle counts
+            // unwind residual stack, setting end cycle counts, whilst removing any empty stack frames
             syncStackFrames(cycleCount);
+
             int count = 0;
             while (currentStackFrame!.Parent != null)
             {
+                if (currentStackFrame.IsEmpty())
+                    currentStackFrame.Parent.Children.Remove(currentStackFrame);
+
                 currentStackFrame.EndCycleCount = cycleCount;
                 currentStackFrame = currentStackFrame.Parent;
                 count++;

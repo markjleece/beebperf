@@ -420,14 +420,14 @@ namespace BeebPerf
             {
                 switch ((_ULARegister >> 2) & 0x7)
                 {
-                    case 7: // Mode 0 & 3 (2 pixelColor, high res)
+                    case 7: // Mode 0 & 3 (2 colors, high res)
                         _BitsPerPixel = 1;
                         Build4bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_32bits;
                         horizontalMultiplier = 1;
                         break;
 
-                    case 6: // Mode 1 (4 pixelColor, medium res)
+                    case 6: // Mode 1 (4 colors, medium res)
                         _BitsPerPixel = 2;
                         Build8bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_32bits;
@@ -441,21 +441,21 @@ namespace BeebPerf
                         horizontalMultiplier = 1;
                         break;
 
-                    case 2: // Mode 4 & 6 (2 pixelColor, medium res)
+                    case 2: // Mode 4 & 6 (2 colors, medium res)
                         _BitsPerPixel = 1;
                         Build8bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
                         horizontalMultiplier = 2;
                         break;
 
-                    case 1: // Mode 5 (4 pixelColor, low res)
+                    case 1: // Mode 5 (4 colors, low res)
                         _BitsPerPixel = 2;
                         Build16bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
                         horizontalMultiplier = 2;
                         break;
 
-                    case 0: // Mode 8 (16 pixelColor, very low res)
+                    case 0: // Mode 8 (16 colors, very low res)
                         _BitsPerPixel = 4;
                         Build32bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
@@ -1075,7 +1075,7 @@ namespace BeebPerf
                         ((shiftRegister >> 4) & 0x8) |
                         ((shiftRegister >> 3) & 0x4) |
                         ((shiftRegister >> 2) & 0x2) |
-                        (shiftRegister & 0x1);
+                        ((shiftRegister >> 1) & 0x1);
 
                     int firstEntry = _ULAPalette[firstIndex] & 0xF;
                     firstEntry ^= 0x7;
@@ -1094,7 +1094,7 @@ namespace BeebPerf
                         ((shiftRegister >> 4) & 0x8) |
                         ((shiftRegister >> 3) & 0x4) |
                         ((shiftRegister >> 2) & 0x2) |
-                        (shiftRegister & 0x1);
+                        ((shiftRegister >> 1) & 0x1);
 
                     int secondEntry = _ULAPalette[secondIndex] & 0xF;
                     secondEntry ^= 0x7;
@@ -1130,7 +1130,7 @@ namespace BeebPerf
                         ((shiftRegister >> 4) & 0x8) |
                         ((shiftRegister >> 3) & 0x4) |
                         ((shiftRegister >> 2) & 0x2) |
-                        (shiftRegister & 0x1);
+                        ((shiftRegister >> 1) & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
                     entry ^= 0x7;
@@ -1166,7 +1166,7 @@ namespace BeebPerf
                         ((shiftRegister >> 4) & 0x8) |
                         ((shiftRegister >> 3) & 0x4) |
                         ((shiftRegister >> 2) & 0x2) |
-                        (shiftRegister & 0x1);
+                        ((shiftRegister >> 1) & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
                     entry ^= 0x7;
@@ -1204,7 +1204,7 @@ namespace BeebPerf
                         ((shiftRegister >> 4) & 0x8) |
                         ((shiftRegister >> 3) & 0x4) |
                         ((shiftRegister >> 2) & 0x2) |
-                        (shiftRegister & 0x1);
+                        ((shiftRegister >> 1) & 0x1);
 
                     int entry = _ULAPalette[index] & 0xF;
                     entry ^= 0x7;
