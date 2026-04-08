@@ -45,9 +45,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 1.	Using the **Tools** -> **Get Tools and Features…** ensure the following components are installed:
    - MSVS v142 – VS 2019 C++ x64/x86 build tools (v14.29 – 16.11)
    - C++ v14.29 (16.11) MFC for v142 build tool (x86 & x64) – needed for afxres.h/rc
-2.	Using the **Git** -> **Clone Repository…**, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
-3.	Using the **Git** -> **Open in Command Prompt**, execute the following git command to apply the performance changes.  The path to the patch file will likely need changing.
-   - ***git apply ..\\beebperf\\beebem_changelist.diff***
+2.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
+3.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following git command to apply the performance changes: <code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>  The path to the patch file will likely need changing.
 4.	Reopen and rebuild the solution
 5.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items.
 
