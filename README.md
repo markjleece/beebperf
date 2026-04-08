@@ -29,8 +29,10 @@ After cloning this repository, open the solution file: **BeebPerf.sln**, rebuild
 I suggest you first open one of the sample **.perf** files from the **samples** folder and explore the program before building a version of **BeebEm** that can take performance recordings (see below).
 
 # Limitations
-- Some coding patterns can result in deep call paths.
-- Display frame reconstruction does not currently support the hardware cursor, custom teletext modes, or custom ULA palette hardware.
+1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
+2.	**Overlapping code**.  If code is loaded and executed over previously executed code, the profiler may not function correctly.  Current algorithms for identifying routines and stack frames does not support overlapping code.
+3.	**Code-patterns**.  Some 6502 coding patterns can result in deep tail-call paths being generated, which can impede analysis.  For example, calling into the middle of a loop from  another routine can result in deep call-paths.
+4.	**Display-frame reconstruction**. Does not support the hardware cursor, custom teletext modes, or custom ULA hardware (with larger palettes).
 
 # Documentation
 | File name | Description |
