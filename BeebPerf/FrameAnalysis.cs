@@ -1234,7 +1234,7 @@ namespace BeebPerf
         {
             try
             {
-                var resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+                var resources = new System.ComponentModel.ComponentResourceManager(typeof(ux.BeebPerfForm));
                 var bytes = (byte[])resources.GetObject("teletext.Font")!;
                 using var ms = new MemoryStream(bytes!);
 
