@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..d424aee 100644
+index 52f9049..7fd0be3 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -1113,10 +1113,10 @@ index 52f9049..d424aee 100644
 -	Push(PSR);
 -	PSR |= FlagI; // Set I after pushing - see Birnbaum
 -	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
-+    int returnAddress = ProgramCounter + 1;
 +    unsigned char returnStackReg = StackReg;
++    int returnAddress = ProgramCounter + 1;
 +
-+    PushWord(ProgramCounter + 1);
++    PushWord(returnAddress);
 +    PSR |= FlagB; // Set B before pushing
 +    Push(PSR);
 +    PSR |= FlagI; // Set I after pushing - see Birnbaum
@@ -7061,10 +7061,10 @@ index c087f1f..def40d8 100644
    </PropertyGroup>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..d220db5
+index 0000000..ae800e2
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1061 @@
+@@ -0,0 +1,1065 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2005  Mike Wyatt
@@ -7146,6 +7146,11 @@ index 0000000..d220db5
 +inline static void FileWriteInt32(FILE* pFile, int32_t value)
 +{
 +    FileWrite(pFile, &value, sizeof(value)); // assumes little endian host architecture
++}
++
++inline static int Clamp(int value, int low, int high)
++{
++    return value < low ? low : (value > high ? high : value);
 +}
 +
 +//
@@ -7875,9 +7880,8 @@ index 0000000..d220db5
 +        modifiedRegisters |= ModifiedRegister::StackPointer;
 +    }
 +
-+    // write cycle count and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
-+    if (cycleCount > 7) cycleCount = 7;
-+    m_writeBuffer->WriteByteUnchecked((byte)(cycleCount & 0x7) | modifiedRegisters);
++    // write cycle count (2..9) and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
++    m_writeBuffer->WriteByteUnchecked((byte)Clamp(cycleCount - 2, 0, 7) | modifiedRegisters);
 +
 +    // update / write modified registers
 +    if (modifiedRegisters & ModifiedRegister::Accumulator)

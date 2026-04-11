@@ -342,8 +342,7 @@ namespace BeebPerf
 
                 // cycle count and register changes
                 byte bits = ReadByte(dataStream);
-                int cycleCount = (bits & 0x7);
-                Debug.Assert(cycleCount >= 2 && cycleCount <= 7);
+                int cycleCount = (bits & 0x7) + 2;
                 instruction.CycleCount = cycleCount;
 
                 if ((bits & (byte)ModifiedRegister.Accumulator) != 0) // new value of accumulator
