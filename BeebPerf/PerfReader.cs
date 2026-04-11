@@ -76,7 +76,7 @@ namespace BeebPerf
 
                     case "PFex":
                         if (!headerChunkRead || !snapshotChunkRead)
-                            throw new InvalidDataException("invalid .perf file format - unexpected execution chunks");
+                            throw new InvalidDataException("invalid .perf file format - unexpected execution chunk");
 
                         ReadExecutionData(dataStream, model!);
                         executionChunkRead = true;
@@ -229,7 +229,7 @@ namespace BeebPerf
             for (int i = 0; i < pageCount; i++)
             {
                 byte pageBank = ReadByte(dataStream);
-                if (pageBank > 16)
+                if (pageBank >= 16)
                     throw new InvalidDataException("invalid .perf file format: invalid page bank");
 
                 int pageReadOnly = ReadByte(dataStream);
