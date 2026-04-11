@@ -50,6 +50,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 5. Reopen and rebuild the solution (x64 configuration).
 6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items.
 
+See [docs/BeebPerf.docx](docs/BeebPerf.docx) for more information.
+
 # Acknowlegements
 - Portions of the display reconstruction code were based on **BeebEm's** video class, specifically the Mode 7 font loading and initialization code, and Mode 7 state-machine code. Many thanks to the **BeebEm** contributors for creating and maintaining this wonderful peice of software. 
 - The **.perf** files are compressed and uncompressed using the **ZLib library** - Many thanks to **Jean-loup Gailly** and **Mark Adler** for creating such an excellent and useful library. 
