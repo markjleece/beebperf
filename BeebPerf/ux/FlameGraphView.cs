@@ -69,6 +69,12 @@ namespace BeebPerf.ux
             ClearSelectionInternal();
         }
 
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            base.OnLayout(e);
+            (this as IDataView).UpdateButtons();
+        }
+
         protected override void OnResize(EventArgs eventArgs)
         {
             int vScrollPos = GetVScrollValue();
@@ -372,7 +378,12 @@ namespace BeebPerf.ux
             if (ignoreVScrollValue)
             {
                 if (!_FlipView)
-                    y += (_VScrollBar.Maximum - _VScrollBar.LargeChange);
+                {
+                    if (_VScrollBar.Enabled)
+                        y += (_VScrollBar.Maximum - _VScrollBar.LargeChange);
+                    else
+                        y += _LayoutExtents.Height - Height + _HScrollBar.Height;
+                }
             }
             else
             {
@@ -770,6 +781,9 @@ namespace BeebPerf.ux
 
         void IDataView.UpdateButtons()
         {
+            if (_CopyButton == null || _PercentageButton == null || _CallTypesButton == null || _FlipViewButton == null)
+                return;
+
             int width = Width;
             var vScrollBar = GetVScrollBar();
             if (vScrollBar != null && vScrollBar.Visible)
