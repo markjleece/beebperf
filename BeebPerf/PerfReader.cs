@@ -34,47 +34,56 @@ namespace BeebPerf
 
         public Model? ReadFile(string fileName)
         {
-            Model? model = null;
-
             _LastOpcodeAddress = 0;
 
+            bool headerChunkRead = false;
+            bool labelsChunkRead = false;
+            bool snapshotChunkRead = false;
+            bool executionChunkRead = false;
+
             using var fs = File.OpenRead(fileName);
+
+            Model? model = null;
+
             while (fs.Position < fs.Length)
             {
                 using var dataStream = ReadChunk(fs, out string tag);
                 switch (tag)
                 {
                     case "PFhd":
-                        if (model is not null)
-                            throw new InvalidDataException("invalid .perf file format");
+                        if (headerChunkRead || labelsChunkRead || snapshotChunkRead || executionChunkRead)
+                            throw new InvalidDataException("invalid .perf file format - unexpected header chunk");
 
                         model = ReadHeaderData(dataStream);
+                        headerChunkRead = true;
                         break;
 
                     case "PFlb":
-                        if (model is null)
-                            throw new InvalidDataException("invalid .perf file format");
+                        if (!headerChunkRead || labelsChunkRead || snapshotChunkRead || executionChunkRead)
+                            throw new InvalidDataException("invalid .perf file format - unexpected labels chunk");
 
-                        ReadLabelData(dataStream, model);
+                        ReadLabelData(dataStream, model!);
+                        labelsChunkRead = true;
                         break;
 
                     case "PFss":
-                        if (model is null)
-                            throw new InvalidDataException("invalid .perf file format");
+                        if (!headerChunkRead || snapshotChunkRead || executionChunkRead)
+                            throw new InvalidDataException("invalid .perf file format - unexpected snapshot chunk");
 
-                        ReadSnapshotData(dataStream, model);
+                        ReadSnapshotData(dataStream, model!);
+                        snapshotChunkRead = true;
                         break;
 
                     case "PFex":
-                        if (model is null)
-                            throw new InvalidDataException("invalid .perf file format");
+                        if (!headerChunkRead || !snapshotChunkRead)
+                            throw new InvalidDataException("invalid .perf file format - unexpected execution chunks");
 
-                        ReadExecutionData(dataStream, model);
+                        ReadExecutionData(dataStream, model!);
+                        executionChunkRead = true;
                         break;
 
                     default:
-                        Debug.Assert(false);
-                        break;
+                        throw new InvalidDataException("invalid .perf file format - unknown chunk");
                 }
             }
 
@@ -150,18 +159,32 @@ namespace BeebPerf
             model.Snapshot.StackFrames = new MiniStackFrame[stackFrameCount];
             for (int i = 0; i < stackFrameCount; i++)
             {
-                byte type = ReadByte(dataStream);
-                byte startAddressPage = ReadByte(dataStream);
+                var type = (CallType)ReadByte(dataStream);
+                var startAddressPage = (MemoryPage)ReadByte(dataStream);
                 ushort startAddress = ReadShort(dataStream);
-                byte returnAddressPage = ReadByte(dataStream);
+                var returnAddressPage = (MemoryPage)ReadByte(dataStream);
                 ushort returnAddress = ReadShort(dataStream);
                 byte returnStackPointer = ReadByte(dataStream);
 
-                model.Snapshot.StackFrames[i] = new(
-                    (CallType)type,
-                    new CanonicalAddress(startAddress, (MemoryPage)startAddressPage),
-                    new CanonicalAddress(returnAddress, (MemoryPage)returnAddressPage),
-                    returnStackPointer);
+                if (type != CallType.None && type != CallType.JSR && type != CallType.IRQ && type != CallType.NMI && type != CallType.BRK)
+                    throw new InvalidDataException("invalid .perf file format: invalid stack frame type");
+
+                if (startAddressPage >= MemoryPage.Count)
+                    throw new InvalidDataException("invalid .perf file format: invalid stack frame start address page");
+
+                if (returnAddressPage >= MemoryPage.Count)
+                    throw new InvalidDataException("invalid .perf file format: invalid stack frame return address page");
+
+                var startAddr = new CanonicalAddress(startAddress, startAddressPage);
+                var returnAddr = new CanonicalAddress(returnAddress, returnAddressPage);
+
+                if (!startAddr.IsValid())
+                    throw new InvalidDataException("invalid .perf file format: invalid stack frame start address");
+
+                if (!returnAddr.IsValid())
+                    throw new InvalidDataException("invalid .perf file format: invalid stack frame return address");
+
+                model.Snapshot.StackFrames[i] = new(type, startAddr, returnAddr, returnStackPointer);
             }
 
             byte screenAddress = ReadByte(dataStream);
@@ -171,7 +194,7 @@ namespace BeebPerf
                 1 => 0x6000,
                 2 => 0x3000,
                 3 => 0x5800,
-                _ => throw new ArgumentOutOfRangeException()
+                _ => throw new InvalidDataException("invalid .perf file format: invalid screen wrap address")
             };
 
             if (hasHiddenRam)
@@ -199,16 +222,25 @@ namespace BeebPerf
 
             model.Snapshot.MemoryReadOnly = new bool[16];
 
-            byte bankCount = ReadByte(dataStream);
-            for (int i = 0; i < bankCount; i++)
-            {
-                byte bankId = ReadByte(dataStream);
-                bool readOnly = (ReadByte(dataStream) != 0);
-                byte[] bankMemory = new byte[16384];
-                dataStream.ReadExactly(bankMemory);
+            byte pageCount = ReadByte(dataStream);
+            if (pageCount > 16)
+                throw new InvalidDataException("invalid .perf file format: invalid page count");
 
-                model.Snapshot.Memory[bankId] = bankMemory;
-                model.Snapshot.MemoryReadOnly[bankId] = readOnly;
+            for (int i = 0; i < pageCount; i++)
+            {
+                byte pageBank = ReadByte(dataStream);
+                if (pageBank > 16)
+                    throw new InvalidDataException("invalid .perf file format: invalid page bank");
+
+                int pageReadOnly = ReadByte(dataStream);
+                if (pageReadOnly != 0 && pageReadOnly != 1)
+                    throw new InvalidDataException("invalid .perf file format: invalid page readonly");
+
+                byte[] pageMemory = new byte[16384];
+                dataStream.ReadExactly(pageMemory);
+
+                model.Snapshot.Memory[pageBank] = pageMemory;
+                model.Snapshot.MemoryReadOnly[pageBank] = (pageReadOnly == 1);
             }
 
             if (hasShadowRam)
@@ -305,8 +337,14 @@ namespace BeebPerf
                             instruction.Type = InstructionType.BeginDisplayEvent;
 
                             // display field
-                            instruction.DisplayField = ReadByte(dataStream);
+                            int displayField = ReadByte(dataStream);
+                            if (displayField != 0 && displayField != 1)
+                                throw new InvalidDataException("invalid .perf file format: invalid display field");
+
+                            instruction.DisplayField = displayField;
                         }
+                        else
+                            throw new InvalidDataException("invalid .perf file format: invalid event");
 
                         model.Instructions[_InstructionCount++] = instruction;
                         continue;
@@ -342,6 +380,7 @@ namespace BeebPerf
 
                 // cycle count and register changes
                 byte bits = ReadByte(dataStream);
+
                 int cycleCount = (bits & 0x7) + 2;
                 instruction.CycleCount = cycleCount;
 
