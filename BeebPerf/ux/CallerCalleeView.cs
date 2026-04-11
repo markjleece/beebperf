@@ -96,6 +96,7 @@ namespace BeebPerf.ux
         {
             base.OnResize(e);
             LayoutRoutineCells();
+            Invalidate();
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
