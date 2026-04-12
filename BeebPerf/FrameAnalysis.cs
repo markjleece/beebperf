@@ -149,7 +149,7 @@ namespace BeebPerf
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                     {
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
-                        if (_RegisterModified)
+                        if (_CtrlModified || _ULAModified)
                             UpdateVideoState();
                     }
                 }
@@ -203,6 +203,8 @@ namespace BeebPerf
             _DisplayFrameCount = 1;
             _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
 
+            _CtrlModified = true;
+            _ULAModified = true;
             UpdateVideoState();
         }
 
@@ -375,8 +377,6 @@ namespace BeebPerf
 
         private void UpdateVideoState()
         {
-            _RegisterModified = false;
-
             int characterClockRate = (_ULARegister >> 4) & 0x01;
             _CharacterClockShift = 1 - characterClockRate;
 
@@ -422,42 +422,48 @@ namespace BeebPerf
                 {
                     case 7: // Mode 0 & 3 (2 colors, high res)
                         _BitsPerPixel = 1;
-                        Build4bppLookupTbl();
+                        if (_ULAModified)
+                            Build4bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_32bits;
                         horizontalMultiplier = 1;
                         break;
 
                     case 6: // Mode 1 (4 colors, medium res)
                         _BitsPerPixel = 2;
-                        Build8bppLookupTbl();
+                        if (_ULAModified)
+                            Build8bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_32bits;
                         horizontalMultiplier = 1;
                         break;
 
                     case 5: // Mode 2 (16 colors, low res)
                         _BitsPerPixel = 4;
-                        Build16bppLookupTbl();
+                        if (_ULAModified)
+                            Build16bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_32bits;
                         horizontalMultiplier = 1;
                         break;
 
                     case 2: // Mode 4 & 6 (2 colors, medium res)
                         _BitsPerPixel = 1;
-                        Build8bppLookupTbl();
+                        if (_ULAModified)
+                            Build8bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
                         horizontalMultiplier = 2;
                         break;
 
                     case 1: // Mode 5 (4 colors, low res)
                         _BitsPerPixel = 2;
-                        Build16bppLookupTbl();
+                        if (_ULAModified)
+                            Build16bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
                         horizontalMultiplier = 2;
                         break;
 
                     case 0: // Mode 8 (16 colors, very low res)
                         _BitsPerPixel = 4;
-                        Build32bppLookupTbl();
+                        if (_ULAModified)
+                            Build32bppLookupTbl();
                         _WriteBitmapDataFunc = WriteBitmapData_64bits;
                         horizontalMultiplier = 2;
                         break;
@@ -496,6 +502,9 @@ namespace BeebPerf
 
             if (_CRTBitmapHeight < bitmapHeight)
                 _CRTBitmapHeight = bitmapHeight;
+
+            _CtrlModified = false;
+            _ULAModified = false;
         }
 
         private void StartDisplayFrame(int cycleCount)
@@ -644,42 +653,42 @@ namespace BeebPerf
                 switch (_CtrlWriteRegister)
                 {
                     case 0:
-                        _RegisterModified |= (value != _CtrlR0_HorizontalTotal);
+                        _CtrlModified |= (value != _CtrlR0_HorizontalTotal);
                         _CtrlR0_HorizontalTotal = value;
                         break;
 
                     case 1:
-                        _RegisterModified |= (value != _CtrlR1_HorizontalDisplayed);
+                        _CtrlModified |= (value != _CtrlR1_HorizontalDisplayed);
                         _CtrlR1_HorizontalDisplayed = value;
                         break;
 
                     case 4:
-                        _RegisterModified |= (value != _CtrlR4_VerticalTotal);
+                        _CtrlModified |= (value != _CtrlR4_VerticalTotal);
                         _CtrlR4_VerticalTotal = value;
                         break;
 
                     case 6:
-                        _RegisterModified |= (value != _CtrlR6_VerticalDisplayed);
+                        _CtrlModified |= (value != _CtrlR6_VerticalDisplayed);
                         _CtrlR6_VerticalDisplayed = value;
                         break;
 
                     case 8:
-                        _RegisterModified |= (value != _CtrlR8_InterlaceAndDelay);
+                        _CtrlModified |= (value != _CtrlR8_InterlaceAndDelay);
                         _CtrlR8_InterlaceAndDelay = value;
                         break;
 
                     case 9:
-                        _RegisterModified |= (value != _CtrlR9_ScanLinesPerChar);
+                        _CtrlModified |= (value != _CtrlR9_ScanLinesPerChar);
                         _CtrlR9_ScanLinesPerChar = value;
                         break;
 
                     case 12:
-                        _RegisterModified |= (value != _CtrlR12_ScreenStartHigh);
+                        _CtrlModified |= (value != _CtrlR12_ScreenStartHigh);
                         _CtrlR12_ScreenStartHigh = value;
                         break;
 
                     case 13:
-                        _RegisterModified |= (value != _CtrlR13_ScreenStartLow);
+                        _CtrlModified |= (value != _CtrlR13_ScreenStartLow);
                         _CtrlR13_ScreenStartLow = value;
                         break;
 
@@ -689,12 +698,12 @@ namespace BeebPerf
             }
             else if (address == 0xFE20)
             {
-                _RegisterModified |= (value != _ULARegister);
+                _ULAModified |= (value != _ULARegister);
                 _ULARegister = value;
             }
             else if (address == 0xFE21)
             {
-                _RegisterModified |= (value != _ULAPalette[value >> 4]);
+                _ULAModified |= (value != _ULAPalette[value >> 4]);
                 _ULAPalette[value >> 4] = value;
             }
             else if (address == 0xFE42) // set data direction
@@ -1364,7 +1373,8 @@ namespace BeebPerf
         private byte _ScreenWrapAddressLatch;
         private int _StartCycleCount;
         private int _LastCycleCount;
-        private bool _RegisterModified;
+        private bool _CtrlModified;
+        private bool _ULAModified;
 
         // analysis frames
         private FrameSettings? _FrameSettings;

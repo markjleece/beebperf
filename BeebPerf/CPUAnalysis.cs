@@ -49,9 +49,7 @@ namespace BeebPerf
                 CalculateRange(startCycleCount, endCycleCount);
                 CalculateMetrics();
                 PopulateHotRoutines();
-                PopulateProgramCallTree();
-                PopulateNonMaskableInterruptCallTree();
-                PopulateMaskableInterruptCallTree();
+                PopulateCallTrees();
                 MarkHotPaths();
                 return true; 
             });
@@ -744,78 +742,65 @@ namespace BeebPerf
                 HotRoutines[i].HotRoutine = (i < hotRoutineCount);
         }
 
-        private void PopulateProgramCallTree()
+        private void PopulateCallTrees()
         {
-            Dictionary<CallStack, CallTreeNode> treeNodesByStack = new();
-            ProgramCallTree = new CallTreeNode(RootStackFrame);
-            treeNodesByStack.Add(RootStackFrame, ProgramCallTree);
-
-            foreach (var routine in RoutinesByAddress.Values)
-                foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateCallTree(callStack, ProgramCallTree, treeNodesByStack);
-
-            ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-        }
-        
-        private void PopulateNonMaskableInterruptCallTree()
-        {
-            NMICallTree = null;
-            if (_NMIRoutine is null || _NMIRoutine.MetricsByStack.Keys.Count == 0)
-                return;
-
-            Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
-            CallStack stack = _NMIRoutine.MetricsByStack.Keys.First();
-            NMICallTree = new CallTreeNode(stack);
-            interruptTreeNodesByStack.Add(stack, NMICallTree);
-
-            foreach (var routine in RoutinesByAddress.Values)
-                foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateCallTree(callStack, NMICallTree, interruptTreeNodesByStack);
-
-            NMICallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-        }
-
-        private void PopulateMaskableInterruptCallTree()
-        {
+            ProgramCallTree = null;
             IRQBRKCallTree = null;
-            if (_IRQBRKRoutine is null || _IRQBRKRoutine.MetricsByStack.Keys.Count == 0)
-                return;
+            NMICallTree = null;
 
-            Dictionary<CallStack, CallTreeNode> interruptTreeNodesByStack = new();
-            CallStack stack = _IRQBRKRoutine.MetricsByStack.Keys.First();
-            IRQBRKCallTree = new CallTreeNode(stack);
-            interruptTreeNodesByStack.Add(stack, IRQBRKCallTree);
+            var treeNodesByCallStack = new Dictionary<CallStack, CallTreeNode>();
+            PopulateCallTrees(RootStackFrame, parentCallTreeNode: null, treeNodesByCallStack);
 
-            foreach (var routine in RoutinesByAddress.Values)
-                foreach (var callStack in routine.MetricsByStack.Keys)
-                    PopulateCallTree(callStack, IRQBRKCallTree, interruptTreeNodesByStack);
+            if (ProgramCallTree != null)
+                ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
 
-            IRQBRKCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
+            if (IRQBRKCallTree != null)
+                IRQBRKCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
+
+            if (NMICallTree != null)
+                NMICallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
         }
 
-        private static CallTreeNode? PopulateCallTree(CallStack callStack, CallTreeNode rootTreeNode, Dictionary<CallStack, CallTreeNode> treeNodesByStack)
+        private void PopulateCallTrees(
+            model.StackFrame stackFrame,
+            CallTreeNode? parentCallTreeNode,
+            Dictionary<CallStack, CallTreeNode> treeNodesByCallStack)
         {
-            if (treeNodesByStack.TryGetValue(callStack, out CallTreeNode? treeNode))
-                return treeNode;
+            var callStack = (CallStack)stackFrame;
 
-            if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
-                return null;
+            if (!stackFrame.Routine.MetricsByStack.ContainsKey(callStack))
+                return;
 
-            var newTreeNode = new CallTreeNode(callStack);
-
-            var parentStackFrame = callStack.Parent;
-            if (parentStackFrame is not null)
+            CallTreeNode callTreeNode;
+            if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
             {
-                CallTreeNode? parentTreeNode = PopulateCallTree(parentStackFrame, rootTreeNode, treeNodesByStack);
-                if (parentTreeNode is null)
-                    return null;
+                callTreeNode = new CallTreeNode(callStack);
+                treeNodesByCallStack.Add(callStack, callTreeNode);
 
-                parentTreeNode.AddChild(newTreeNode);
+                switch (stackFrame.CallType)
+                {
+                    case CallType.None:
+                        ProgramCallTree = callTreeNode;
+                        break;
+
+                    case CallType.IRQ:
+                    case CallType.BRK:
+                        IRQBRKCallTree = callTreeNode;
+                        break;
+
+                    case CallType.NMI:
+                        NMICallTree = callTreeNode;
+                        break;
+
+                    default:
+                        if (parentCallTreeNode != null)
+                            parentCallTreeNode.AddChild(callTreeNode);
+                        break;
+                }
             }
 
-            treeNodesByStack[callStack] = newTreeNode;
-
-            return newTreeNode;
+            foreach (var childStackFrame in stackFrame.Children)
+                PopulateCallTrees(childStackFrame, callTreeNode, treeNodesByCallStack);
         }
 
         private void MarkHotPaths()
