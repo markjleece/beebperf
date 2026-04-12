@@ -19,8 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
+
+using System.Text;
 
 namespace BeebPerf.model
 {
@@ -218,15 +218,14 @@ namespace BeebPerf.model
                 };
             }
 
-            [JsonIgnore]
             public Color Color
             {
                 get => Color.FromArgb(_Color);
                 set => _Color = value.ToArgb();
             }
 
-            public bool Bold { get; set; }
-            public bool Italic { get; set; }
+            public required bool Bold { get; set; }
+            public required bool Italic { get; set; }
             public int _Color { get; set; }
         }
 
@@ -243,7 +242,7 @@ namespace BeebPerf.model
                 };
             }
 
-            public AddressFormat Format { get; set; }
+            public required AddressFormat Format { get; set; }
         }
 
         public class MnemonicSettingsType : CommonSettingsType
@@ -259,7 +258,7 @@ namespace BeebPerf.model
                 };
             }
 
-            public MnemonicFormat Format { get; set; }
+            public required MnemonicFormat Format { get; set; }
         }
 
         public class LiteralSettingsType : CommonSettingsType
@@ -275,7 +274,7 @@ namespace BeebPerf.model
                 };
             }
 
-            public LiteralFormat Format { get; set; }
+            public required LiteralFormat Format { get; set; }
         }
 
         public class ColorThemeSettingsType
@@ -317,21 +316,170 @@ namespace BeebPerf.model
             public required CommonSettingsType LabelSettings { get; set; }
         }
 
-        static public string Serialize(DisplaySettings settings)
+        // 
+        // serialization...
+        //
+        static private void Serialize(List<string> stream, string value)
         {
-            return JsonSerializer.Serialize(settings);
+            stream.Add(value);
         }
 
-        static public DisplaySettings? Deserialize(string json)
+        static private void Serialize(List<string> stream, int value)
         {
-            try
+            stream.Add(value.ToString());
+        }
+
+        static private void Serialize(List<string> stream, bool value)
+        {
+            stream.Add(value ? "1" : "0");
+        }
+
+        static private void Serialize(List<string> stream, CommonSettingsType value)
+        {
+            Serialize(stream, value.Bold);
+            Serialize(stream, value.Italic);
+            Serialize(stream, value._Color);
+        }
+
+        static private void Serialize(List<string> stream, AddressSettingsType value)
+        {
+            Serialize(stream, (CommonSettingsType)value);
+            Serialize(stream, (int)value.Format);
+        }
+
+        static private void Serialize(List<string> stream, MnemonicSettingsType value)
+        {
+            Serialize(stream, (CommonSettingsType)value);
+            Serialize(stream, (int)value.Format);
+        }
+
+        static private void Serialize(List<string> stream, LiteralSettingsType value)
+        {
+            Serialize(stream, (CommonSettingsType)value);
+            Serialize(stream, (int)value.Format);
+        }
+
+        static private void Serialize(List<string> stream, ColorThemeSettingsType value)
+        {
+            Serialize(stream, (int)value.ColorTheme);
+            Serialize(stream, value.MnemonicSettings);
+            Serialize(stream, value.AddressSettings);
+            Serialize(stream, value.LiteralSettings);
+            Serialize(stream, value.PunctuationSettings);
+            Serialize(stream, value.LabelSettings);
+        }
+
+        static public string Serialize(DisplaySettings settings)
+        {
+            var stream = new List<string>();
+            Serialize(stream, settings.FontScaling);
+            Serialize(stream, settings.LineSpacing);
+            Serialize(stream, settings.CodeFont);
+            Serialize(stream, settings.LightColorThemeSettings);
+            Serialize(stream, settings.DarkColorThemeSettings);
+
+            var sb = new StringBuilder();
+            foreach (var element in stream)
             {
-                return JsonSerializer.Deserialize<DisplaySettings>(json);
+                sb.Append(element);
+                sb.Append(',');
             }
-            catch
+            return sb.ToString(); 
+        }
+
+        // 
+        // deserialization...
+        //
+        static private string DeserializeString(Queue<string> stream)
+        {
+            return stream.Dequeue();
+        }
+
+        static private int DeserializeInt(Queue<string> stream)
+        {
+            if (int.TryParse(stream.Dequeue(), out var value))
+                return value;
+            throw new Exception("display setting deserialization error");
+        }
+
+        static private bool DeserializeBool(Queue<string> stream)
+        {
+            var value = stream.Dequeue();
+            if (value == "1")
+                return true;
+            else if (value == "0")
+                return false;
+            else
+                throw new Exception("display setting deserialization error");
+        }
+
+        static private CommonSettingsType DeserializeCommonSettings(Queue<string> stream)
+        {
+            return new CommonSettingsType()
             {
-                return new DisplaySettings();
-            }
+                Bold = DeserializeBool(stream),
+                Italic = DeserializeBool(stream),
+                _Color = DeserializeInt(stream)
+            };
+        }
+
+        static private MnemonicSettingsType DeserializeMnemonicSettings(Queue<string> stream)
+        {
+            return new MnemonicSettingsType()
+            {
+                Bold = DeserializeBool(stream),
+                Italic = DeserializeBool(stream),
+                _Color = DeserializeInt(stream),
+                Format = (MnemonicFormat)DeserializeInt(stream)
+            };
+        }
+
+        static private AddressSettingsType DeserializeAddressSettings(Queue<string> stream)
+        {
+            return new AddressSettingsType()
+            {
+                Bold = DeserializeBool(stream),
+                Italic = DeserializeBool(stream),
+                _Color = DeserializeInt(stream),
+                Format = (AddressFormat)DeserializeInt(stream)
+            };
+        }
+
+        static private LiteralSettingsType DeserializeLiteralSettings(Queue<string> stream)
+        {
+            return new LiteralSettingsType()
+            {
+                Bold = DeserializeBool(stream),
+                Italic = DeserializeBool(stream),
+                _Color = DeserializeInt(stream),
+                Format = (LiteralFormat)DeserializeInt(stream)
+            };
+        }
+
+        static private ColorThemeSettingsType DeserializeColorThemeSettings(Queue<string> stream)
+        {
+            return new ColorThemeSettingsType()
+            {
+                ColorTheme = (ColorThemeType)DeserializeInt(stream),
+                MnemonicSettings = DeserializeMnemonicSettings(stream),
+                AddressSettings = DeserializeAddressSettings(stream),
+                LiteralSettings = DeserializeLiteralSettings(stream),
+                PunctuationSettings = DeserializeCommonSettings(stream),
+                LabelSettings = DeserializeCommonSettings(stream),
+            };
+        }
+
+        static public DisplaySettings Deserialize(string encoding)
+        {
+            var stream = new Queue<string>(encoding.Split(','));
+            return new DisplaySettings()
+            {
+                FontScaling = DeserializeInt(stream),
+                LineSpacing = DeserializeInt(stream),
+                CodeFont = DeserializeString(stream),
+                LightColorThemeSettings = DeserializeColorThemeSettings(stream),
+                DarkColorThemeSettings = DeserializeColorThemeSettings(stream)
+            };
         }
 
         public int FontScaling { get; set; }

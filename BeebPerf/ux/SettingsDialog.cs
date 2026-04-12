@@ -40,7 +40,7 @@ namespace BeebPerf.ux
             InitializeComponent();
             Owner = form;
 
-            // show wait cursor
+            // show wait cursor until the dialog is shown
             Capture = true;
             Cursor = Cursors.WaitCursor;
             Shown += SettingDialog_Shown;
@@ -48,9 +48,20 @@ namespace BeebPerf.ux
             // workaround: Theme changes can sometime break mouse-click to form-click event routing
             okButton.MouseClick += OkButton_MouseClick;
             cancelButton.MouseClick += CancelButton_MouseClick;
+            resetButton.MouseClick += ResetButton_MouseClick;
 
-            // initialize controls
-            sampleCodePanel.DisplaySettings = _Settings;
+            _SuppressChangeEvents--;
+
+            // poulate controls
+            PopulateControls(settings.Clone(), ColorTheme.Get());
+        }
+
+        private void PopulateControls(DisplaySettings settings, ColorThemeType colorTheme)
+        {
+            _SuppressChangeEvents++;
+
+            _Settings = settings;
+            sampleCodePanel.DisplaySettings = settings;
 
             List<string> codeFontNames = GetCodeFontNames();
             codeFontNames.Insert(0, "Default");
@@ -71,9 +82,10 @@ namespace BeebPerf.ux
             SetComboBoxOptions(literalFormatComboBox, ["Hexadecimal", "Decimal", "Binary"]);
 
             SetComboBoxOptions(colorThemeComboBox, ["System", "Dark", "Light"]);
+
             _SuppressChangeEvents--;
 
-            colorThemeComboBox.SelectedIndex = (int)ColorTheme.Get();
+            colorThemeComboBox.SelectedIndex = (int)colorTheme;
             colorThemeComboBox.Enabled = ColorTheme.CanSet();
 
             sampleCodePanel.Invalidate();
@@ -125,6 +137,20 @@ namespace BeebPerf.ux
             Settings = _Settings;
         }
 
+        private void ResetButton_MouseClick(object? sender, EventArgs e)
+        {
+            // workaround: Theme changes can sometime break mouse-click to form-click event routing
+            PopulateControls(new DisplaySettings(), ColorThemeType.System);
+            Invalidate(invalidateChildren: true);
+        }
+
+        private void ResetButton_Click(object sender, EventArgs e)
+        {
+            _Settings = new DisplaySettings();
+            PopulateControls(new DisplaySettings(), ColorThemeType.System);
+            Invalidate(invalidateChildren: true);
+        }
+
         private void TextScalingComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (_SuppressChangeEvents > 0)
@@ -151,7 +177,6 @@ namespace BeebPerf.ux
             sampleCodePanel.Invalidate();
         }
         
-
         private void CodeFontComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (_SuppressChangeEvents > 0)
@@ -381,5 +406,82 @@ namespace BeebPerf.ux
         private DisplaySettings _Settings;
         private int _SuppressChangeEvents;
         private Font _BaseFont;
+    }
+
+    public class ColorButton : Button
+    {
+        public ColorButton()
+        {
+            FlatStyle = FlatStyle.Flat;
+        }
+
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            _Hover = true;
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            _Hover = false;
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+                _Pressed = true;
+
+            Invalidate();
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            _Pressed = false;
+            Invalidate();
+            base.OnMouseUp(e);
+        }
+
+        protected override void OnGotFocus(EventArgs e)
+        {
+            _Focused = true;
+            Invalidate();
+            base.OnGotFocus(e);
+        }
+
+        protected override void OnLostFocus(EventArgs e)
+        {
+            _Focused = false;
+            Invalidate();
+            base.OnLostFocus(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Color color;
+            if (_Pressed)
+                color = SystemColors.ControlDarkDark;
+            else if (_Hover)
+                color = SystemColors.HotTrack;
+            else if (_Focused)
+                color = SystemColors.Highlight;
+            else
+                color = SystemColors.ControlDark;
+
+            using var pen = new Pen(color, 2);
+            var rect = new Rectangle(1, 1, this.Width - 2, this.Height - 2);
+            e.Graphics.DrawRectangle(pen, rect);
+
+            using var brush = new SolidBrush(BackColor);
+            rect.Inflate(-1, -1);
+            e.Graphics.FillRectangle(brush, rect);
+        }
+
+        private bool _Hover;
+        private bool _Pressed;
+        private bool _Focused;
     }
 }

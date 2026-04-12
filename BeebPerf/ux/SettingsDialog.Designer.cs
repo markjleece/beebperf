@@ -51,46 +51,47 @@ namespace BeebPerf.ux
         private void InitializeComponent()
         {
             generalGroupBox = new GroupBox();
+            lineSpacingComboBox = new ComboBox();
+            lineSpacingLabel = new Label();
             colorThemeComboBox = new ComboBox();
             textScalingComboBox = new ComboBox();
             textScalingLabel = new Label();
-            lineSpacingLabel = new Label();
-            lineSpacingComboBox = new ComboBox();
             colorThemeLabel = new Label();
             codeFontComboBox = new ComboBox();
             codeFontLabel = new Label();
             addressGroupBox = new GroupBox();
-            addressColorButton = new Button();
+            addressColorButton = new ColorButton();
             addressColorLabel = new Label();
             addressItalicCheckBox = new CheckBox();
             addressBoldCheckBox = new CheckBox();
             addressFormatLabel = new Label();
             addressFormatComboBox = new ComboBox();
             mnemonicGroupBox = new GroupBox();
-            mnemonicColorButton = new Button();
+            mnemonicColorButton = new ColorButton();
             mnemonicFormatComboBox = new ComboBox();
             mnemonicColorLabel = new Label();
             mnemonicItalicCheckBox = new CheckBox();
             mnemonicFormatLabel = new Label();
             mnemonicBoldCheckBox = new CheckBox();
             labelGroupBox = new GroupBox();
-            labelColorButton = new Button();
+            labelColorButton = new ColorButton();
             labelItalicCheckBox = new CheckBox();
             labelColorLabel = new Label();
             labelBoldCheckBox = new CheckBox();
             literalColorLabel = new Label();
             literalGroupBox = new GroupBox();
-            literalColorButton = new Button();
+            literalColorButton = new ColorButton();
             literalFormatComboBox = new ComboBox();
             literalItalicCheckBox = new CheckBox();
             literalFormatLabel = new Label();
             literalBoldCheckBox = new CheckBox();
             punctuationGroupBox = new GroupBox();
-            punctuationColorButton = new Button();
+            punctuationColorButton = new ColorButton();
             punctuationItalicCheckBox = new CheckBox();
             punctuationColorLabel = new Label();
             punctuationBoldCheckBox = new CheckBox();
             sampleCodePanel = new SampleCodePanel();
+            resetButton = new Button();
             okButton = new Button();
             cancelButton = new Button();
             generalGroupBox.SuspendLayout();
@@ -103,14 +104,14 @@ namespace BeebPerf.ux
             // 
             // generalGroupBox
             // 
-            generalGroupBox.Controls.Add(lineSpacingComboBox);
-            generalGroupBox.Controls.Add(lineSpacingLabel);
-            generalGroupBox.Controls.Add(colorThemeComboBox);
-            generalGroupBox.Controls.Add(textScalingComboBox);
-            generalGroupBox.Controls.Add(textScalingLabel);
-            generalGroupBox.Controls.Add(colorThemeLabel);
-            generalGroupBox.Controls.Add(codeFontComboBox);
             generalGroupBox.Controls.Add(codeFontLabel);
+            generalGroupBox.Controls.Add(codeFontComboBox);
+            generalGroupBox.Controls.Add(colorThemeLabel);
+            generalGroupBox.Controls.Add(colorThemeComboBox);
+            generalGroupBox.Controls.Add(textScalingLabel);
+            generalGroupBox.Controls.Add(textScalingComboBox);
+            generalGroupBox.Controls.Add(lineSpacingLabel);
+            generalGroupBox.Controls.Add(lineSpacingComboBox);
             generalGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             generalGroupBox.Location = new Point(12, 12);
             generalGroupBox.Name = "generalGroupBox";
@@ -118,6 +119,27 @@ namespace BeebPerf.ux
             generalGroupBox.TabIndex = 0;
             generalGroupBox.TabStop = false;
             generalGroupBox.Text = "General";
+            // 
+            // lineSpacingComboBox
+            // 
+            lineSpacingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            lineSpacingComboBox.Font = new Font("Segoe UI", 9F);
+            lineSpacingComboBox.FormattingEnabled = true;
+            lineSpacingComboBox.Location = new Point(152, 141);
+            lineSpacingComboBox.Name = "lineSpacingComboBox";
+            lineSpacingComboBox.Size = new Size(182, 33);
+            lineSpacingComboBox.TabIndex = 0;
+            lineSpacingComboBox.SelectedIndexChanged += LineSpacingComboBox_SelectedIndexChanged;
+            // 
+            // lineSpacingLabel
+            // 
+            lineSpacingLabel.AutoSize = true;
+            lineSpacingLabel.Font = new Font("Segoe UI", 9F);
+            lineSpacingLabel.Location = new Point(6, 144);
+            lineSpacingLabel.Name = "lineSpacingLabel";
+            lineSpacingLabel.Size = new Size(109, 25);
+            lineSpacingLabel.TabIndex = 0;
+            lineSpacingLabel.Text = "Line spacing";
             // 
             // colorThemeComboBox
             // 
@@ -130,16 +152,6 @@ namespace BeebPerf.ux
             colorThemeComboBox.TabIndex = 0;
             colorThemeComboBox.SelectedIndexChanged += ColorThemeComboBox_SelectedIndexChanged;
             // 
-            // textScalingLabel
-            // 
-            textScalingLabel.AutoSize = true;
-            textScalingLabel.Font = new Font("Segoe UI", 9F);
-            textScalingLabel.Location = new Point(6, 104);
-            textScalingLabel.Name = "textScalingLabel";
-            textScalingLabel.Size = new Size(101, 25);
-            textScalingLabel.TabIndex = 0;
-            textScalingLabel.Text = "Text scaling";
-            // 
             // textScalingComboBox
             // 
             textScalingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -151,26 +163,15 @@ namespace BeebPerf.ux
             textScalingComboBox.TabIndex = 0;
             textScalingComboBox.SelectedIndexChanged += TextScalingComboBox_SelectedIndexChanged;
             // 
-            // lineSpacingLabel
+            // textScalingLabel
             // 
-            lineSpacingLabel.AutoSize = true;
-            lineSpacingLabel.Font = new Font("Segoe UI", 9F);
-            lineSpacingLabel.Location = new Point(6, 144);
-            lineSpacingLabel.Name = "lineSpacingLabel";
-            lineSpacingLabel.Size = new Size(109, 25);
-            lineSpacingLabel.TabIndex = 0;
-            lineSpacingLabel.Text = "Line spacing";
-            // 
-            // lineSpacingComboBox
-            // 
-            lineSpacingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            lineSpacingComboBox.Font = new Font("Segoe UI", 9F);
-            lineSpacingComboBox.FormattingEnabled = true;
-            lineSpacingComboBox.Location = new Point(152, 141);
-            lineSpacingComboBox.Name = "lineSpacingComboBox";
-            lineSpacingComboBox.Size = new Size(182, 33);
-            lineSpacingComboBox.TabIndex = 0;
-            lineSpacingComboBox.SelectedIndexChanged += LineSpacingComboBox_SelectedIndexChanged;
+            textScalingLabel.AutoSize = true;
+            textScalingLabel.Font = new Font("Segoe UI", 9F);
+            textScalingLabel.Location = new Point(6, 104);
+            textScalingLabel.Name = "textScalingLabel";
+            textScalingLabel.Size = new Size(101, 25);
+            textScalingLabel.TabIndex = 0;
+            textScalingLabel.Text = "Text scaling";
             // 
             // colorThemeLabel
             // 
@@ -207,12 +208,12 @@ namespace BeebPerf.ux
             // 
             // addressGroupBox
             // 
-            addressGroupBox.Controls.Add(addressColorButton);
-            addressGroupBox.Controls.Add(addressColorLabel);
-            addressGroupBox.Controls.Add(addressItalicCheckBox);
-            addressGroupBox.Controls.Add(addressBoldCheckBox);
             addressGroupBox.Controls.Add(addressFormatLabel);
             addressGroupBox.Controls.Add(addressFormatComboBox);
+            addressGroupBox.Controls.Add(addressColorLabel);
+            addressGroupBox.Controls.Add(addressColorButton);
+            addressGroupBox.Controls.Add(addressBoldCheckBox);
+            addressGroupBox.Controls.Add(addressItalicCheckBox);
             addressGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             addressGroupBox.Location = new Point(12, 205);
             addressGroupBox.Name = "addressGroupBox";
@@ -227,7 +228,7 @@ namespace BeebPerf.ux
             addressColorButton.Name = "addressColorButton";
             addressColorButton.Size = new Size(34, 34);
             addressColorButton.TabIndex = 0;
-            addressColorButton.UseVisualStyleBackColor = true;
+            addressColorButton.UseVisualStyleBackColor = false;
             addressColorButton.Click += ColorButton_Click;
             // 
             // addressColorLabel
@@ -287,12 +288,12 @@ namespace BeebPerf.ux
             // 
             // mnemonicGroupBox
             // 
-            mnemonicGroupBox.Controls.Add(mnemonicColorButton);
+            mnemonicGroupBox.Controls.Add(mnemonicFormatLabel);
             mnemonicGroupBox.Controls.Add(mnemonicFormatComboBox);
             mnemonicGroupBox.Controls.Add(mnemonicColorLabel);
-            mnemonicGroupBox.Controls.Add(mnemonicItalicCheckBox);
-            mnemonicGroupBox.Controls.Add(mnemonicFormatLabel);
+            mnemonicGroupBox.Controls.Add(mnemonicColorButton);
             mnemonicGroupBox.Controls.Add(mnemonicBoldCheckBox);
+            mnemonicGroupBox.Controls.Add(mnemonicItalicCheckBox);
             mnemonicGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             mnemonicGroupBox.Location = new Point(12, 326);
             mnemonicGroupBox.Name = "mnemonicGroupBox";
@@ -307,7 +308,7 @@ namespace BeebPerf.ux
             mnemonicColorButton.Name = "mnemonicColorButton";
             mnemonicColorButton.Size = new Size(34, 34);
             mnemonicColorButton.TabIndex = 0;
-            mnemonicColorButton.UseVisualStyleBackColor = true;
+            mnemonicColorButton.UseVisualStyleBackColor = false;
             mnemonicColorButton.Click += ColorButton_Click;
             // 
             // mnemonicFormatComboBox
@@ -367,10 +368,10 @@ namespace BeebPerf.ux
             // 
             // labelGroupBox
             // 
-            labelGroupBox.Controls.Add(labelColorButton);
-            labelGroupBox.Controls.Add(labelItalicCheckBox);
             labelGroupBox.Controls.Add(labelColorLabel);
+            labelGroupBox.Controls.Add(labelColorButton);
             labelGroupBox.Controls.Add(labelBoldCheckBox);
+            labelGroupBox.Controls.Add(labelItalicCheckBox);
             labelGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             labelGroupBox.Location = new Point(12, 444);
             labelGroupBox.Name = "labelGroupBox";
@@ -385,7 +386,7 @@ namespace BeebPerf.ux
             labelColorButton.Name = "labelColorButton";
             labelColorButton.Size = new Size(34, 34);
             labelColorButton.TabIndex = 0;
-            labelColorButton.UseVisualStyleBackColor = true;
+            labelColorButton.UseVisualStyleBackColor = false;
             labelColorButton.Click += ColorButton_Click;
             // 
             // labelItalicCheckBox
@@ -434,12 +435,12 @@ namespace BeebPerf.ux
             // 
             // literalGroupBox
             // 
-            literalGroupBox.Controls.Add(literalColorButton);
+            literalGroupBox.Controls.Add(literalFormatLabel);
             literalGroupBox.Controls.Add(literalFormatComboBox);
             literalGroupBox.Controls.Add(literalColorLabel);
-            literalGroupBox.Controls.Add(literalItalicCheckBox);
-            literalGroupBox.Controls.Add(literalFormatLabel);
+            literalGroupBox.Controls.Add(literalColorButton);
             literalGroupBox.Controls.Add(literalBoldCheckBox);
+            literalGroupBox.Controls.Add(literalItalicCheckBox);
             literalGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             literalGroupBox.Location = new Point(12, 553);
             literalGroupBox.Name = "literalGroupBox";
@@ -454,7 +455,7 @@ namespace BeebPerf.ux
             literalColorButton.Name = "literalColorButton";
             literalColorButton.Size = new Size(34, 34);
             literalColorButton.TabIndex = 0;
-            literalColorButton.UseVisualStyleBackColor = true;
+            literalColorButton.UseVisualStyleBackColor = false;
             literalColorButton.Click += ColorButton_Click;
             // 
             // literalFormatComboBox
@@ -504,10 +505,10 @@ namespace BeebPerf.ux
             // 
             // punctuationGroupBox
             // 
-            punctuationGroupBox.Controls.Add(punctuationColorButton);
-            punctuationGroupBox.Controls.Add(punctuationItalicCheckBox);
             punctuationGroupBox.Controls.Add(punctuationColorLabel);
+            punctuationGroupBox.Controls.Add(punctuationColorButton);
             punctuationGroupBox.Controls.Add(punctuationBoldCheckBox);
+            punctuationGroupBox.Controls.Add(punctuationItalicCheckBox);
             punctuationGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             punctuationGroupBox.Location = new Point(12, 671);
             punctuationGroupBox.Name = "punctuationGroupBox";
@@ -522,7 +523,7 @@ namespace BeebPerf.ux
             punctuationColorButton.Name = "punctuationColorButton";
             punctuationColorButton.Size = new Size(34, 34);
             punctuationColorButton.TabIndex = 0;
-            punctuationColorButton.UseVisualStyleBackColor = true;
+            punctuationColorButton.UseVisualStyleBackColor = false;
             punctuationColorButton.Click += ColorButton_Click;
             // 
             // punctuationItalicCheckBox
@@ -567,6 +568,16 @@ namespace BeebPerf.ux
             sampleCodePanel.Size = new Size(592, 123);
             sampleCodePanel.TabIndex = 0;
             // 
+            // resetButton
+            // 
+            resetButton.Location = new Point(256, 909);
+            resetButton.Name = "resetButton";
+            resetButton.Size = new Size(112, 34);
+            resetButton.TabIndex = 0;
+            resetButton.Text = "Reset";
+            resetButton.UseVisualStyleBackColor = true;
+            resetButton.Click += ResetButton_Click;
+            // 
             // okButton
             // 
             okButton.DialogResult = DialogResult.OK;
@@ -588,26 +599,27 @@ namespace BeebPerf.ux
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             // 
-            // EditSettingsDialog
-            //
+            // SettingsDialog
+            // 
             AcceptButton = okButton;
-            CancelButton = cancelButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
+            CancelButton = cancelButton;
             ClientSize = new Size(616, 955);
-            Controls.Add(sampleCodePanel);
-            Controls.Add(punctuationGroupBox);
-            Controls.Add(literalGroupBox);
-            Controls.Add(labelGroupBox);
-            Controls.Add(mnemonicGroupBox);
-            Controls.Add(addressGroupBox);
             Controls.Add(generalGroupBox);
+            Controls.Add(addressGroupBox);
+            Controls.Add(mnemonicGroupBox);
+            Controls.Add(labelGroupBox);
+            Controls.Add(literalGroupBox);
+            Controls.Add(punctuationGroupBox);
+            Controls.Add(sampleCodePanel);
+            Controls.Add(resetButton);
             Controls.Add(okButton);
             Controls.Add(cancelButton);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "EditSettingsDialog";
+            Name = "SettingsDialog";
             Text = "Settings";
             generalGroupBox.ResumeLayout(false);
             generalGroupBox.PerformLayout();
@@ -644,7 +656,7 @@ namespace BeebPerf.ux
         private Label addressFormatLabel;
         private ComboBox addressFormatComboBox;
         private Label addressColorLabel;
-        private Button addressColorButton;
+        private ColorButton addressColorButton;
         private CheckBox addressBoldCheckBox;
         private CheckBox addressItalicCheckBox;
 
@@ -652,13 +664,13 @@ namespace BeebPerf.ux
         private Label mnemonicFormatLabel;
         private ComboBox mnemonicFormatComboBox;
         private Label mnemonicColorLabel;
-        private Button mnemonicColorButton;
+        private ColorButton mnemonicColorButton;
         private CheckBox mnemonicBoldCheckBox;
         private CheckBox mnemonicItalicCheckBox;
 
         private GroupBox labelGroupBox;
         private Label labelColorLabel;
-        private Button labelColorButton;
+        private ColorButton labelColorButton;
         private CheckBox labelBoldCheckBox;
         private CheckBox labelItalicCheckBox;
 
@@ -666,18 +678,19 @@ namespace BeebPerf.ux
         private Label literalFormatLabel;
         private ComboBox literalFormatComboBox;
         private Label literalColorLabel;
-        private Button literalColorButton;
+        private ColorButton literalColorButton;
         private CheckBox literalBoldCheckBox;
         private CheckBox literalItalicCheckBox;
 
         private GroupBox punctuationGroupBox;
         private Label punctuationColorLabel;
-        private Button punctuationColorButton;
+        private ColorButton punctuationColorButton;
         private CheckBox punctuationBoldCheckBox;
         private CheckBox punctuationItalicCheckBox;
         
         private SampleCodePanel sampleCodePanel;
 
+        private Button resetButton;
         private Button okButton;
         private Button cancelButton;
     }

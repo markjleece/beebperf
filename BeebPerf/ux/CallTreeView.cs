@@ -394,7 +394,7 @@ namespace BeebPerf.ux
                 bool hotChild = false;
                 foreach (var childNode in treeNode.Children)
                     hotChild |= childNode.HotPath;
-                if (hotChild)
+                if (hotChild && treeNode.Depth < MaxHotPathExpansion)
                     OpenTreeNode(index, treeNode);
             }
             UpdateColumns();
@@ -752,5 +752,6 @@ namespace BeebPerf.ux
         private ReentrancyGuard _ReentrancyGuard = new();
         private List<CallTreeNode> _ExportTreeNodes = [];
         private bool _SiblingPercentages = false;
+        private const int MaxHotPathExpansion = 12;
     }
 }

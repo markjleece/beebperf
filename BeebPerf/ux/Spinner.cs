@@ -28,7 +28,7 @@ namespace BeebPerf.ux
         public Spinner() : base()
         {
             _Timer = new();
-            _Timer.Interval = 20;
+            _Timer.Interval = 80;
             _Timer.Tick += Timer_Tick;
             VisibleChanged += OnVisibleChanged;
         }
@@ -43,7 +43,7 @@ namespace BeebPerf.ux
 
         private void Timer_Tick(object? sender, EventArgs e)
         {
-            _Angle += (Math.PI / 16.0);
+            _Angle += (Math.PI / 4.0);
             if (_Angle > (2.0 * Math.PI))
                 _Angle = 0.0;
 

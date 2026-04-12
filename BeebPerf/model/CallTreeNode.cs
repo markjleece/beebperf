@@ -19,8 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Windows.Forms;
-
 namespace BeebPerf.model
 {
     public class CallTreeNode : TreeNode<CallTreeNode>
