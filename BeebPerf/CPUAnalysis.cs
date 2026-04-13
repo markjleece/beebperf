@@ -288,7 +288,7 @@ namespace BeebPerf
 
         private Routine CreatePageBaseRoutine(MemoryPage page)
         {
-            var baseAddress = MemoryPageTraits.PageStartAddress(page);
+            var baseAddress = MemoryPageTraits.BaseAddress(page);
             return CreateRoutine(new CanonicalAddress(baseAddress, page));
         }
 

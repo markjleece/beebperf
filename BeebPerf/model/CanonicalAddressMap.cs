@@ -53,13 +53,13 @@ namespace BeebPerf.model
             var entries = _PageEntries[(int)page];
             if (entries == null)
             {
-                entries = new object[MemoryPageTraits.PageSize(page)];
+                entries = new object[MemoryPageTraits.Size(page)];
                 _PageEntries[(int)page] = entries;
             }
 
-            int address = key.Address - MemoryPageTraits.PageStartAddress(page);
+            int address = key.Address - MemoryPageTraits.BaseAddress(page);
 
-            if (address < 0 || address >= MemoryPageTraits.PageSize(page))
+            if (address < 0 || address >= MemoryPageTraits.Size(page))
                 throw new ArgumentException("invalid key");
 
             if (entries[address] != null)
@@ -85,9 +85,9 @@ namespace BeebPerf.model
             if (entries == null)
                 return default(TValue);
 
-            int address = key.Address - MemoryPageTraits.PageStartAddress(page);
+            int address = key.Address - MemoryPageTraits.BaseAddress(page);
 
-            if (address < 0 || address >= MemoryPageTraits.PageSize(page))
+            if (address < 0 || address >= MemoryPageTraits.Size(page))
                 throw new ArgumentException("invalid key");
             
             return (TValue?)entries[address];

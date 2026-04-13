@@ -23,14 +23,14 @@ namespace BeebPerf.model
 {
     public class MemoryPageTraits
     {
-        public static int PageSize(MemoryPage memoryPage)
+        public static int Size(MemoryPage memoryPage)
         {
             return _PageSizes[(int)memoryPage];
         }
 
-        public static ushort PageStartAddress(MemoryPage memoryPage)
+        public static ushort BaseAddress(MemoryPage memoryPage)
         {
-            return _PageStartAddress[(int)memoryPage];
+            return _PageBaseAddresses[(int)memoryPage];
         }
 
         private static int[] _PageSizes = [
@@ -57,7 +57,7 @@ namespace BeebPerf.model
             256,   // HiddenRam
         ];
 
-        private static ushort[] _PageStartAddress = [
+        private static ushort[] _PageBaseAddresses = [
             0x8000, // PageRom0
             0x8000, // PageRom1
             0x8000, // PageRom2

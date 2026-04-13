@@ -69,7 +69,7 @@ namespace BeebPerf.model
 
         public ushort PageOffset
         {
-            get => (ushort)(Address - MemoryPageTraits.PageStartAddress(Page));
+            get => (ushort)(Address - MemoryPageTraits.BaseAddress(Page));
         }
 
         public bool IsValid()
@@ -77,10 +77,10 @@ namespace BeebPerf.model
             var page = Page;
             ushort address = Address;
 
-            var pageStartAddress = MemoryPageTraits.PageStartAddress(page);
-            var pageSize = MemoryPageTraits.PageSize(page);
+            var pageBaseAddress = MemoryPageTraits.BaseAddress(page);
+            var pageSize = MemoryPageTraits.Size(page);
 
-            return (address >= pageStartAddress && address < pageStartAddress + pageSize);
+            return (address >= pageBaseAddress && address < pageBaseAddress + pageSize);
         }
 
         private int _PageAddress;
