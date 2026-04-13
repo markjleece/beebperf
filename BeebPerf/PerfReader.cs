@@ -451,10 +451,6 @@ namespace BeebPerf
                 {
                     instruction.ReturnAddress = instruction.OpcodeAddress.Offset(3);
                 }
-                else if (opcode == 0x60/*RTS*/ || opcode == 0x40/*RTI*/)
-                {
-                    instruction.ReturnAddress = instruction.DestinationAddress;
-                }
 
                 // memory access address and read/write values
                 var memoryAccess = instructionSet.MemoryAccess(opcode);
