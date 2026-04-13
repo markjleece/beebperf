@@ -139,6 +139,7 @@ namespace BeebPerf
 
                 if (instructionIndex == _FrameEndInstructionIndex)
                     EndAnalysisFrame(postCycleCount, instructionIndex);
+                
                 if (instructionIndex == _FrameStartInstructionIndex)
                     StartAnalysisFrame(cycleCount, instructionIndex);
 
