@@ -19,19 +19,17 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Collections;
-
 namespace BeebPerf.model
 {
-    public class SortedCanonicalAddresses : IEnumerable<CanonicalAddress>
+    public class CanonicalAddressSequence
     {
         private readonly List<CanonicalAddress> _List = new();
 
-        public SortedCanonicalAddresses()
-        { 
+        public CanonicalAddressSequence() 
+        {
         }
 
-        public SortedCanonicalAddresses(List<CanonicalAddress> items)
+        public CanonicalAddressSequence(List<CanonicalAddress> items)
         {
             _List = items.ToList();
             _List.Sort();
@@ -83,16 +81,6 @@ namespace BeebPerf.model
             }
 
             return new CanonicalAddress(0, value.Page); // no match
-        }
-
-        public IEnumerator<CanonicalAddress> GetEnumerator()
-        {
-            return ((IEnumerable<CanonicalAddress>)_List).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return ((IEnumerable)_List).GetEnumerator();
         }
     }
 }

@@ -68,9 +68,8 @@ namespace BeebPerf
 
         private void CreateRoutines()
         {
-            _Routines = new();
-            _SortedRoutineAddresses = new();
             RoutinesByAddress = new();
+            _RoutineAddressSequence = new();
 
             // create routines invoked by JSR, BRK, IRQ, NMI, RTS, and RTI, whilst collecting branches and jumps
             var branchesAndJumps = CreatePrimaryRoutines();
@@ -192,7 +191,7 @@ namespace BeebPerf
 
             foreach (CanonicalAddressPair branchOrJump in branchesAndJumps)
             {
-                CanonicalAddress routineAddress = _SortedRoutineAddresses.Find(branchOrJump.FirstCanonicalAddress);
+                CanonicalAddress routineAddress = _RoutineAddressSequence.Find(branchOrJump.FirstCanonicalAddress);
 
                 HashSet<CanonicalAddressPair> routineBranchesAndJumps;
                 if (branchesAndJumpsByRoutine.ContainsKey(routineAddress))
@@ -215,7 +214,7 @@ namespace BeebPerf
         {
             // now we have an initial set of routines and a set of branches and jumps, so we create additional
             // routines that are required to ensure all branch and jump destinations are routine entry points
-            var allRoutines = _SortedRoutineAddresses.ToList<CanonicalAddress>();
+            var allRoutines = RoutinesByAddress.Keys.ToList<CanonicalAddress>();
             Stack<CanonicalAddress> pendingRoutines = new(allRoutines);
 
             while (pendingRoutines.Count > 0)
@@ -232,7 +231,7 @@ namespace BeebPerf
                     if (RoutinesByAddress.ContainsKey(destinationAddress))
                         continue; // branch/jump destination matches and existing routine, so nothing to do
 
-                    CanonicalAddress destinationRoutine = _SortedRoutineAddresses.Find(destinationAddress);
+                    CanonicalAddress destinationRoutine = _RoutineAddressSequence.Find(destinationAddress);
                     if (destinationRoutine.Equals(routineAddress))
                         continue; // branch/jump source and destination lie inside the same routine, so nothing to do
 
@@ -280,8 +279,7 @@ namespace BeebPerf
             routine = new Routine(address, label);
 
             RoutinesByAddress.Add(address, routine);
-            _Routines.Add(routine);
-            _SortedRoutineAddresses.Add(address);
+            _RoutineAddressSequence.Add(address);
 
             return routine;
         }
@@ -323,7 +321,7 @@ namespace BeebPerf
                 if (currentStackFrame != null)
                 {
                     // is the return address within the parent routine?
-                    var returnRoutineAddress = _SortedRoutineAddresses.Find(stackFrame.ReturnAddress);
+                    var returnRoutineAddress = _RoutineAddressSequence.Find(stackFrame.ReturnAddress);
                     if (!returnRoutineAddress.Equals(currentStackFrame!.StartAddress))
                     {
                         // create stack frame for tail call, creating a base routine if needed
@@ -361,7 +359,7 @@ namespace BeebPerf
             }
 
             // if first instruction within in a tail-call?
-            var firstRoutineAddress = _SortedRoutineAddresses.Find(_Instructions[0].OpcodeAddress);
+            var firstRoutineAddress = _RoutineAddressSequence.Find(_Instructions[0].OpcodeAddress);
             if (!currentStackFrame!.StartAddress.Equals(firstRoutineAddress))
             {
                 // create stack frame for tail call, creating a base routine if needed
@@ -595,7 +593,7 @@ namespace BeebPerf
 
         public void ResolveRoutineLabels()
         {
-            foreach (var routine in _Routines)
+            foreach (var routine in RoutinesByAddress.Values)
             {
                 if (routine == _IRQBRKRoutine || routine == _NMIRoutine)
                     continue;
@@ -634,7 +632,7 @@ namespace BeebPerf
         {
             RootStackFrame.ClearMetrics();
 
-            foreach (var routine in _Routines)
+            foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
             CalculateMetrics(RootStackFrame);
@@ -725,7 +723,7 @@ namespace BeebPerf
         private void PopulateHotRoutines()
         {
             HotRoutines.Clear();
-            foreach (var routine in _Routines)
+            foreach (var routine in RoutinesByAddress.Values)
                 if (routine.AggregateMetrics.ExecutionCount > 0)
                     HotRoutines.Add(routine);
             HotRoutines.Sort((a, b) => b.AggregateMetrics.SelfCycleCount.CompareTo(a.AggregateMetrics.SelfCycleCount));
@@ -1036,8 +1034,7 @@ namespace BeebPerf
 
         private Routine? _IRQBRKRoutine = null;
         private Routine? _NMIRoutine = null;
-        private List<Routine> _Routines = [];
-        private SortedCanonicalAddresses _SortedRoutineAddresses = new();
+        private CanonicalAddressSequence _RoutineAddressSequence = new();
         private Instruction[] _Instructions = [];
         private LabelResolver _LabelResolver = new();
         private InstructionSet? _InstructionSet;

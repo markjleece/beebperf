@@ -23,11 +23,6 @@ namespace BeebPerf.model
 {
     public class CanonicalAddressMap<TValue>
     {
-        public TValue this[CanonicalAddress key]
-        {
-            get => GetValue(key);
-        }
-
         public bool ContainsKey(CanonicalAddress key)
         {
             return Find(key) != null;
@@ -65,7 +60,14 @@ namespace BeebPerf.model
             if (entries[address] != null)
                 throw new ArgumentException("entry already exist");
 
+            _Keys.Add(key);
+
             entries[address] = value;
+        }
+
+        public TValue this[CanonicalAddress key]
+        {
+            get => GetValue(key);
         }
 
         public TValue GetValue(CanonicalAddress key)
@@ -75,6 +77,20 @@ namespace BeebPerf.model
                 throw new ArgumentException("invalid key");
 
             return found;
+        }
+
+        public IEnumerable<CanonicalAddress> Keys
+        {
+            get => _Keys;
+        }
+
+        public IEnumerable<TValue> Values
+        {
+            get
+            {
+                foreach (var key in _Keys)
+                    yield return GetValue(key);
+            }
         }
 
         private TValue? Find(CanonicalAddress key)
@@ -89,10 +105,11 @@ namespace BeebPerf.model
 
             if (address < 0 || address >= MemoryPageTraits.Size(page))
                 throw new ArgumentException("invalid key");
-            
+
             return (TValue?)entries[address];
         }
 
+        private List<CanonicalAddress> _Keys = [];
         private object?[][] _PageEntries = new object[(int)MemoryPage.Count][];
     }
 }
