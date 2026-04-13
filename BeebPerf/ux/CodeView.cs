@@ -102,7 +102,7 @@ namespace BeebPerf.ux
 
         public void Initialize(
             Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
-            Dictionary<CanonicalAddress, Routine> routinesByAddress,
+            CanonicalAddressMap<Routine> routinesByAddress,
             LabelResolver labelResolver,
             InstructionSet instructionSet)
         {
@@ -777,7 +777,7 @@ namespace BeebPerf.ux
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
         private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
-        private Dictionary<CanonicalAddress, Routine> _RoutinesByAddress = new();
+        private CanonicalAddressMap<Routine> _RoutinesByAddress = new();
         private RoutineMemoryAccess? _MemoryAccess;
         private LabelResolver _LabelResolver = new();
     }

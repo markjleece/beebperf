@@ -19,8 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using System.Diagnostics;
-
 namespace BeebPerf.model
 {
     public struct CanonicalAddress : IComparable<CanonicalAddress>, IEquatable<CanonicalAddress>
@@ -71,47 +69,18 @@ namespace BeebPerf.model
 
         public ushort PageOffset
         {
-            get
-            {
-                int address = (_PageAddress & 0xFFFF);
-                int page = (_PageAddress >> 16);
-                return (MemoryPage)page switch
-                {
-                    MemoryPage.WholeRam => (ushort)address,
-                    MemoryPage.HiddenRam => (ushort)address,
-                    MemoryPage.ShadowRam => (ushort)(address - 0x3000),
-                    MemoryPage.PrivateRam => (ushort)(address - 0x8000),
-                    MemoryPage.FilingSystemRam => (ushort)(address - 0xC000),
-                    _ => (ushort)(address - 0x8000)
-                };
-            }
+            get => (ushort)(Address - MemoryPageTraits.PageStartAddress(Page));
         }
 
         public bool IsValid()
         {
             var page = Page;
-            ushort addr = Address;
+            ushort address = Address;
 
-            switch (page)
-            {
-                case MemoryPage.WholeRam:
-                    return true;
+            var pageStartAddress = MemoryPageTraits.PageStartAddress(page);
+            var pageSize = MemoryPageTraits.PageSize(page);
 
-                case MemoryPage.HiddenRam:
-                    return addr < 0x100;
-
-                case MemoryPage.ShadowRam:
-                    return addr >= 0x3000 && addr < 0x8000;
-
-                case MemoryPage.PrivateRam:
-                    return addr >= 0x8000 && addr < 0xB000;
-
-                case MemoryPage.FilingSystemRam:
-                    return addr >= 0xC000 && addr < 0xE000;
-
-                default:
-                    return addr >= 0x8000 && addr < 0xC000;
-            }
+            return (address >= pageStartAddress && address < pageStartAddress + pageSize);
         }
 
         private int _PageAddress;

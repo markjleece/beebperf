@@ -112,16 +112,7 @@ namespace BeebPerf
                 if (memory[i] != null)
                 {
                     var page = (MemoryPage)i;
-
-                    int baseAddress = page switch
-                    {
-                        MemoryPage.WholeRam => 0,
-                        MemoryPage.HiddenRam => 0,
-                        MemoryPage.ShadowRam => 0x3000,
-                        MemoryPage.PrivateRam => 0x8000,
-                        MemoryPage.FilingSystemRam => 0xC000,
-                        _ => 0x8000
-                    };
+                    int baseAddress = MemoryPageTraits.PageStartAddress(page);
 
                     for (int j = 0; j < memory[i].Length; j++)
                     {
