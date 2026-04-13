@@ -137,10 +137,10 @@ namespace BeebPerf
                 ref var instruction = ref instructions[instructionIndex];
                 int postCycleCount = cycleCount + instruction.CycleCount;
 
-                if (instructionIndex == _FrameStartInstructionIndex)
-                    StartAnalysisFrame(cycleCount, instructionIndex);
                 if (instructionIndex == _FrameEndInstructionIndex)
                     EndAnalysisFrame(postCycleCount, instructionIndex);
+                if (instructionIndex == _FrameStartInstructionIndex)
+                    StartAnalysisFrame(cycleCount, instructionIndex);
 
                 if (instruction.IsInstruction)
                 {
@@ -326,8 +326,13 @@ namespace BeebPerf
                 WritesAfterDisplayRead = _WritesAfterDisplayRead,
             });
 
-            // find next start
-            _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex + 1, _FrameSettings!.StartAddress);
+            // find next start instruction
+            if (_FrameSettings!.Type == FrameSettings.FrameType.StartAndEndAddresses &&
+                _FrameSettings.StartAddress.Equals(_FrameSettings.EndAddress))
+                _FrameStartInstructionIndex = instructionIndex;
+            else
+                _FrameStartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex + 1, _FrameSettings!.StartAddress);
+
             _FrameEndInstructionIndex = -1;
         }
 
