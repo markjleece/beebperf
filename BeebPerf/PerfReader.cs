@@ -34,6 +34,7 @@ namespace BeebPerf
 
         public Model? ReadFile(string fileName)
         {
+            _InstructionCount = 0;
             _LastOpcodeAddress = 0;
 
             bool headerChunkRead = false;
@@ -775,16 +776,15 @@ namespace BeebPerf
         private byte _StackPointer;
 
         private int _RomPageSelected;
-        private bool _ShadowRamSelected;
-        private bool _ShadowRamXBit;
-        private bool _ShadowRamEBit;
-        private bool _PrivateRamSelected;
-        private bool _FilingSystemRamSelected;
-
-        private bool _ShadowRamEnabled; // IntegraB
-        private bool _PrivateRam1kArea; // IntegraB
-        private bool _PrivateRam4kArea; // IntegraB
-        private bool _PrivateRam8kArea; // IntegraB
+        private bool _ShadowRamSelected;        // BPlus, IntegraB, Master
+        private bool _ShadowRamEnabled;         // IntegraB
+        private bool _ShadowRamXBit;            // Master
+        private bool _ShadowRamEBit;            // Master
+        private bool _PrivateRamSelected;       // BPlus, IntegraB, Master 
+        private bool _PrivateRam1kArea;         // IntegraB
+        private bool _PrivateRam4kArea;         // IntegraB
+        private bool _PrivateRam8kArea;         // IntegraB
+        private bool _FilingSystemRamSelected;  // Master
 
         private static readonly int MaxChunkSize = 0x100000; // 1MB 
     }
