@@ -734,9 +734,11 @@ namespace BeebPerf
 
         private static ushort ReadShort(Stream ms)
         {
-            Span<byte> buf = stackalloc byte[2];
-            if (ms.Read(buf) != 2) throw new EndOfStreamException();
-            return (ushort)(buf[0] | (buf[1] << 8));
+            int lowByte = ms.ReadByte();
+            int highByte = ms.ReadByte();
+            if (lowByte == -1 || highByte == -1) 
+                throw new EndOfStreamException();
+            return (ushort)(lowByte | (highByte << 8));
         }
 
         private static int ReadInt(Stream ms)
