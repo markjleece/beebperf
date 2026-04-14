@@ -727,25 +727,30 @@ namespace BeebPerf
 
         private static byte ReadByte(Stream ms)
         {
-            int v = ms.ReadByte();
-            if (v == -1) throw new EndOfStreamException();
-            return (byte)v;
+            int value = ms.ReadByte();
+            if (value == -1) 
+                throw new EndOfStreamException();
+            return (byte)value;
         }
 
         private static ushort ReadShort(Stream ms)
         {
-            int lowByte = ms.ReadByte();
-            int highByte = ms.ReadByte();
-            if (lowByte == -1 || highByte == -1) 
+            int byte0 = ms.ReadByte();
+            int byte1 = ms.ReadByte();
+            if (byte1 == -1) 
                 throw new EndOfStreamException();
-            return (ushort)(lowByte | (highByte << 8));
+            return (ushort)(byte0 | (byte1 << 8));
         }
 
         private static int ReadInt(Stream ms)
         {
-            Span<byte> buf = stackalloc byte[4];
-            if (ms.Read(buf) != 4) throw new EndOfStreamException();
-            return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+            int byte0 = ms.ReadByte();
+            int byte1 = ms.ReadByte();
+            int byte2 = ms.ReadByte();
+            int byte3 = ms.ReadByte();
+            if (byte3 == -1)
+                throw new EndOfStreamException();
+            return byte0 | (byte1 << 8) | (byte2 << 16) | (byte3 << 24);
         }
 
         private enum EventType
