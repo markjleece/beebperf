@@ -144,7 +144,7 @@ namespace BeebPerf
             model.Snapshot.Accumulator = _Accumulator = ReadByte(dataStream);
             model.Snapshot.XRegister = _XRegister = ReadByte(dataStream);
             model.Snapshot.YRegister = _YRegister = ReadByte(dataStream);
-            model.Snapshot.StatusRegister = _StatusRegister = ReadByte(dataStream);
+            ReadByte(dataStream); // skip status register, not used
             model.Snapshot.StackPointer = _StackPointer = ReadByte(dataStream);
 
             byte romPagingRegister = ReadByte(dataStream);
@@ -201,7 +201,6 @@ namespace BeebPerf
             {
                 byte hiddenRamAddress = ReadByte(dataStream);
                 model.Snapshot.HiddenRamAddress = hiddenRamAddress;
-                _HiddenRamAddress = hiddenRamAddress;
             }
 
             model.Snapshot.VideoULARegister = ReadByte(dataStream);
@@ -394,7 +393,7 @@ namespace BeebPerf
                     _YRegister = ReadByte(dataStream);
 
                 if ((bits & (byte)ModifiedRegister.StatusRegister) != 0) // new value of status register
-                    _StatusRegister = ReadByte(dataStream);
+                    ReadByte(dataStream); // skip, not used
 
                 if ((bits & (byte)ModifiedRegister.StackPointer) != 0) // new value of stack pointer
                     _StackPointer = ReadByte(dataStream);
@@ -523,8 +522,6 @@ namespace BeebPerf
                             RomPagingRegisterChange(model, memoryWriteValue);
                         else if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38)
                             AccessControlRegisterChange(model, memoryWriteValue);
-                        else if (memoryAddress == 0xFE38 && model.BBCModel == BBCModelType.IntegraB)
-                            _HiddenRamAddress = memoryWriteValue;
                     }
                 }
 
@@ -534,7 +531,6 @@ namespace BeebPerf
 
         private void RomPagingRegisterChange(Model model, byte value)
         {
-            _RomPagingRegister = value;
             _RomPageSelected = (byte)(value & 0x0F);
 
             switch (model.BBCModel)
@@ -561,8 +557,6 @@ namespace BeebPerf
 
         private void AccessControlRegisterChange(Model model, byte value)
         {
-            _AccessControlRegister = value;
-
             switch (model.BBCModel)
             {
                 case BBCModelType.B:
@@ -598,7 +592,7 @@ namespace BeebPerf
             {
                 case BBCModelType.B:
                     if (address >= 0x8000 && address < 0xC000)
-                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)_RomPageSelected;
                     else
                         page = MemoryPage.WholeRam;
                     break;
@@ -618,7 +612,7 @@ namespace BeebPerf
                     else if (address < 0xB000 && _PrivateRamSelected)
                         page = MemoryPage.PrivateRam;
                     else if (address < 0xC000)
-                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)_RomPageSelected;
                     else
                         page = MemoryPage.WholeRam;
                     break;
@@ -637,7 +631,7 @@ namespace BeebPerf
                         (_PrivateRam1kArea && address >= 0x9000 && address < 0xB000)))
                         page = MemoryPage.PrivateRam;
                     else if (address < 0xC000)
-                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
+                        page = (MemoryPage)_RomPageSelected;
                     else
                         page = MemoryPage.WholeRam;
                     break;
@@ -656,8 +650,8 @@ namespace BeebPerf
                     else if (address < 0x9000 && _PrivateRamSelected)
                         page = MemoryPage.PrivateRam;
                     else if (address < 0xC000)
-                        page = (MemoryPage)(_RomPagingRegister & 0x0F);
-                    else if (address < 0xE000)
+                        page = (MemoryPage)_RomPageSelected;
+                    else if (address < 0xE000 && _FilingSystemRamSelected)
                         page = MemoryPage.FilingSystemRam;
                     else
                         page = MemoryPage.WholeRam;
@@ -778,7 +772,6 @@ namespace BeebPerf
         private byte _Accumulator;
         private byte _XRegister;
         private byte _YRegister;
-        private byte _StatusRegister;
         private byte _StackPointer;
 
         private int _RomPageSelected;
@@ -788,14 +781,10 @@ namespace BeebPerf
         private bool _PrivateRamSelected;
         private bool _FilingSystemRamSelected;
 
-        private byte _HiddenRamAddress; // IntegraB
         private bool _ShadowRamEnabled; // IntegraB
         private bool _PrivateRam1kArea; // IntegraB
         private bool _PrivateRam4kArea; // IntegraB
         private bool _PrivateRam8kArea; // IntegraB
-
-        private byte _RomPagingRegister;
-        private byte _AccessControlRegister;
 
         private static readonly int MaxChunkSize = 0x100000; // 1MB 
     }

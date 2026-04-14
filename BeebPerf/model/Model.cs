@@ -75,7 +75,6 @@ namespace BeebPerf.model
                     Accumulator = Accumulator,
                     XRegister = XRegister,
                     YRegister = YRegister,
-                    StatusRegister = StatusRegister,
                     StackPointer = StackPointer,
                     StackFrames = (MiniStackFrame[])StackFrames.Clone(),
                     RomPagingRegister = RomPagingRegister,
@@ -94,7 +93,6 @@ namespace BeebPerf.model
             public byte Accumulator;
             public byte XRegister;
             public byte YRegister;
-            public byte StatusRegister;
             public byte StackPointer;
             public MiniStackFrame[] StackFrames = [];
             public byte RomPagingRegister;
