@@ -21,6 +21,11 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents a labels file loaded from disk. It includes the
+    // file name, the list of contained labels, the file’s load
+    // status, and whether the labels are currently enabled.
+    //
     public enum LabelsFileStatus
     {
         None = 0,

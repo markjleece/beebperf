@@ -25,6 +25,9 @@ using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.operation
 {
+    //
+    // Show hot-paths UX operation
+    //
     class ShowHotPathsOperation : Operation
     {
         public ShowHotPathsOperation(

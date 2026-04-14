@@ -24,6 +24,9 @@ using System.Text;
 
 namespace BeebPerf.model
 {
+    // 
+    // Display settings
+    //
     public class DisplaySettings
     {
         public const int ThemeCount = 3;

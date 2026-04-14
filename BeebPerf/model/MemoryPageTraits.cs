@@ -21,6 +21,10 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents memory‑page traits, providing query methods to
+    // obtain a page’s base address and size.
+    //
     public class MemoryPageTraits
     {
         public static int Size(MemoryPage memoryPage)

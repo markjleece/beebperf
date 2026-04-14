@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Select tab UX operation
+    //
     class SelectTabOperation : Operation
     {
         public SelectTabOperation(BeebPerfForm form, Panel? newTab, Panel? prevTab)

@@ -21,6 +21,9 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // BBC models
+    //
     public enum BBCModelType
     {
         B = 0,

@@ -21,9 +21,16 @@
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace BeebPerf.model
 {
+    // 
+    // Represents an individual instruction, IRQ, NMI, or display
+    // event read from the .perf file. Each instruction is stored
+    // as a 12‑byte packed structure within a single large array
+    // containing all recorded events.
+    //
     public enum InstructionType
     {
         Instruction = 0x00,

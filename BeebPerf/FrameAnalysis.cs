@@ -21,38 +21,7 @@
 
 //
 // Acknowlegment: Video related code is derived from the BeebEm project,
-// specifically portions of the Video class. Uses the same SAA5050 font
-// loading and font file, and SAA5050 state machine logic.
-//
-// The code generates a list of analysis frames, which captures
-// how long each game-loop iteration takes, and a list of display
-// frames, which captures the displayed CRT frames.
-//
-// Analysis frames also capture the number of screen writes
-// that occur before and after the screen memory is read for display,
-// and their offset (cycles) from the next display frame.
-// 
-// The video code emulates the 6845, ULA, and SAA5050 at a
-// character/address level.
-//
-// The code renders frame bitmaps in 4bpp indexed format, where
-// the palette is set to match the BBC Micro's 16-color palette.
-//
-// Supports:
-// - Standard modes 0-6, and teletext mode 7
-// - Non-standard video modes (e.g. Mode 8)
-// - Mixed non-teletext modes (mid-frame ULA changes)
-// - Interlaced support
-// - Over-scan resolutions up to 1024x640
-// - Hardware scrolling
-// 
-// Limitations:
-// - No support for shadow RAM reads
-// - No support for hardware cursor
-// - No support for non-interlaced teletext modes
-// - No support for mixed teletext and non-teletext modes
-// - No support for graphics tablets
-// - No support for custom ULA palettes
+// specifically portions of the Video class.
 //
 
 using BeebPerf.model;
@@ -61,6 +30,35 @@ using System.Drawing.Imaging;
 
 namespace BeebPerf
 {
+    //
+    // Frame analysus generates a list of analysis frames, which captures
+    // how long each game-loop iteration takes, and a list of display
+    // frames, which captures the displayed CRT frames.
+    //
+    // Analysis frames also capture the number of screen writes
+    // that occur before and after the screen memory is scanned for
+    // display, and their offset (cycles) from the next display frame.
+    // 
+    // The video code emulates the 6845, ULA, and SAA5050 at a
+    // character/address level.
+    //
+    // The code renders frame bitmaps in 4bpp indexed format, where
+    // the palette is set to match the BBC Micro's 16-color palette.
+    //
+    // Supports:
+    // - Standard modes 0-6, and teletext mode 7
+    // - Non-standard video modes (e.g. Mode 8)
+    // - Mixed non-teletext modes (mid-frame ULA changes)
+    // - Interlaced support
+    // - Over-scan resolutions up to 1024x640
+    // - Hardware scrolling
+    // 
+    // Limitations:
+    // - No support for the hardware cursor
+    // - No support for custom teletext modes
+    // - No support for graphics tablets
+    // - No support for custom ULA hardware
+    //
     public class FrameAnalysis
     {
         private delegate byte ReadScreenData();

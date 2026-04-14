@@ -25,6 +25,15 @@ namespace BeebPerf
 {
     public class MemoryAnalysis
     {
+        //
+        // Performs memory analysis on the data loaded from a .perf
+        // file for the selected time range, calculating memory‑read
+        // and memory‑write counts for every accessed memory address.
+        //
+        // Analysis is also performed to determine the read and write
+        // counts for a specific memory address at both the routine
+        // level and the instruction level.
+        //
         public MemoryAnalysis(LabelResolver labelResolver)
         {
             _LabelResolver = labelResolver;

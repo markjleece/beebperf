@@ -21,6 +21,11 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents a tree node within a UX displayed tree. A tree
+    // node has a parent, a set of children, a depth value, and
+    // an expansion state indicating whether it is open or closed.
+    //
     public class TreeNode<T> where T : TreeNode<T>
     {
         public TreeNode() 
@@ -77,18 +82,18 @@ namespace BeebPerf.model
             }
         }
 
-        public enum ExpansionType
-        {
-            Closed,
-            Open
-        };
-
         private void UpdateDepth()
         {
             _Depth = Parent!._Depth + 1;
             foreach (var child in Children)
                 child.UpdateDepth();
         }
+
+        public enum ExpansionType
+        {
+            Closed,
+            Open
+        };
 
         public T? Parent;
         public ExpansionType Expansion;

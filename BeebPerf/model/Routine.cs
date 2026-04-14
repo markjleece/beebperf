@@ -21,6 +21,11 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents a routine, including its start and end addresses,
+    // optional label, hot‑routine flag, CPU metrics for each
+    // associated call stack, and the list of associated stack-frames.
+    //
     public class Routine
     {
         public Routine()

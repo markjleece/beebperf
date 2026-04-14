@@ -21,6 +21,10 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents the undo/redo history, maintaining lists of
+    // undo and redo operations.
+    //
     public class UndoRedoHistory
     {
         public bool Execute(Operation op)

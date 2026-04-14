@@ -25,6 +25,9 @@ using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.operation
 {
+    //
+    // Select routine UX operation
+    //
     class SelectRoutineOperation : Operation
     {
         public SelectRoutineOperation(

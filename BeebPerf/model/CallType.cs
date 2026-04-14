@@ -21,29 +21,17 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Call types
     //
-    // Represents a compact stack frame, containing the
-    // stack-frames's call-type, start & return addresses,
-    // and return stack pointer value.
-    //
-    public class MiniStackFrame
+    public enum CallType
     {
-        public CanonicalAddress StartAddress { get; }
-        public CanonicalAddress ReturnAddress { get; }
-        public byte ReturnStackPointer { get; }
-        public CallType CallType { get; }
-
-        public MiniStackFrame(CallType callType, CanonicalAddress startAddress, CanonicalAddress returnAddress, byte returnStackPointer)
-        {
-            CallType = callType;
-            StartAddress = startAddress;
-            ReturnAddress = returnAddress;
-            ReturnStackPointer = returnStackPointer;
-        }
-
-        public override string ToString()
-        {
-            return $"CallType: {CallType}, Start: {StartAddress}, Return: {ReturnAddress}, Return SP: {ReturnStackPointer}";
-        }
+        None = 0,
+        JSR = 1,
+        IRQ = 2,
+        NMI = 3,
+        BRK = 4,
+        TailCall = 5,
+        FallThrough = 6
     }
 }

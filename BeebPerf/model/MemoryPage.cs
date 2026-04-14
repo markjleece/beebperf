@@ -21,6 +21,9 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Memory page
+    //
     public enum MemoryPage
     {
         PageRom0 = 0,

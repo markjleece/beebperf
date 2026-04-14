@@ -24,6 +24,26 @@ using System.Diagnostics;
 
 namespace BeebPerf
 {
+    //
+    // Performs CPU analysis on the data loaded from a .perf file.
+    // Static analysis is performed first to identify all routines
+    // and their associated stack frames. Dynamic analysis is then
+    // applied to compute CPU metrics — restricted to the currently
+    // selected time range — for all the identified routines and
+    // their associated stack frames.
+    //
+    // Afterwards, program, IRQ/BRK, and NMI call-trees are
+    // constructed, hot paths are marked, and hot routines are
+    // identified and flagged.
+    //
+    // Dynamic analysis is re‑executed whenever the selected time
+    // range changes, ensuring that all CPU metrics remain accurate
+    // for the current view.
+    //
+    // When a routine is selected, CPU metrics are also computed at
+    // the instruction level to provide fine‑grained insight into
+    // per‑instruction behavior.
+    //
     public class CPUAnalysis
     {
         public CPUAnalysis(LabelResolver labelResolver)

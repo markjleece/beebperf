@@ -25,6 +25,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Edit program settings UX operation
+    //
     class EditSettingsOperation : Operation
     {
         public EditSettingsOperation(BeebPerfForm form, Font baseFont)

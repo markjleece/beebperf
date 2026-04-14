@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Show zero-page memory addresses UX operation
+    //
     class ShowZeroPageAddressesOperation : Operation
     {
         public ShowZeroPageAddressesOperation(BeebPerfForm form, bool showZeroPageAddresses)

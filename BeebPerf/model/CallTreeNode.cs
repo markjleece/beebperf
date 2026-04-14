@@ -21,6 +21,17 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Represent a call tree node within the program, IRQ/BRK, or 
+    // NMI call trees, which are displayed in the UX Call Tree tab.
+    //
+    // Each instance has an associated routine, call-stack,
+    // CPU metrics, and hot-path flag.
+    // 
+    // The class also provides sorting functionality, and extends
+    // from TreeNode, which provides the tree topology and node
+    // explansion behaviors.
+    //
     public class CallTreeNode : TreeNode<CallTreeNode>
     {
         public CallTreeNode(CallStack callStack)

@@ -23,6 +23,15 @@ using System.Diagnostics;
 
 namespace BeebPerf.model
 {
+    //
+    // Represents a stack-frame, including its start and end cycle
+    // counts, first and last instruction indices, lowest and highest
+    // instruction addresses, associated CPU metrics, and the
+    // collection of child stack frames.
+    //
+    // A stack-frame also has an associated call-stack, which is 
+    // inherited for implementation efficiency.
+    //
     public class StackFrame : CallStack
     {
         public StackFrame() : base() 

@@ -21,6 +21,10 @@
 
 namespace BeebPerf
 {
+    //
+    // Responsible for resolving labels from addresses, given a
+    // list of label files.
+    //
     public class LabelResolver
     {
         public void Initialize(List<model.LabelsFile> labelsFiles)

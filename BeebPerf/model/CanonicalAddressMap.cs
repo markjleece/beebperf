@@ -21,6 +21,13 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Container providing Dictionary<CanonicalAddress, TValue>
+    // semantics, with better performance.
+    //
+    // The container is used during static analysis, during the
+    // creation of stack frames.
+    //
     public class CanonicalAddressMap<TValue>
     {
         public bool ContainsKey(CanonicalAddress key)

@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Add analysis frame settings UX operation
+    //
     class AddFrameSettingsOperation : Operation
     {
         public AddFrameSettingsOperation(

@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Edit labels files UX operation
+    //
     class EditLabelsOperation : Operation
     {
         public EditLabelsOperation(

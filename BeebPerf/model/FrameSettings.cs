@@ -21,6 +21,13 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Frame settings - used to define what a 'frame' is,
+    // defining the span and threshold settings.
+    //
+    // The span can be defined by setting its type to 
+    // start & end address, routine address, of JSR address.
+    //
     public class FrameSettings
     {
         public enum FrameType : int

@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Remove analysis frame settings UX operation
+    //
     class RemoveFrameSettingsOperation : Operation
     {
         public RemoveFrameSettingsOperation(BeebPerfForm form, FrameSettings frameSettings, List<FrameSettings> frameSettingsList)

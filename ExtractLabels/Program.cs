@@ -25,6 +25,14 @@ using System.Text.RegularExpressions;
 
 namespace ExtractLabels
 {
+    //
+    // Usage: ExtractLabels <input-filename>
+    // The output can be piped to an output file.
+    //
+    // Extracts labels from assembler output files or from label
+    // files that have the form:
+    //  [{'label1':address1L,'label2':address2L,...}]
+    //
     internal class Program
     {
         static void Main(string[] args)

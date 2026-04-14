@@ -21,6 +21,9 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // CPU type
+    //
     public enum CPUType
     {
         _6502 = 0,

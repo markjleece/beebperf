@@ -21,6 +21,9 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents an undoable/redoable UX operation
+    // 
     public abstract class Operation
     {
         public abstract bool Execute();

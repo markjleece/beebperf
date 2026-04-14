@@ -21,17 +21,16 @@
 
 namespace BeebPerf.model
 {
-    public enum CallType
-    {
-        None = 0,
-        JSR = 1,
-        IRQ = 2,
-        NMI = 3,
-        BRK = 4,
-        TailCall = 5,
-        FallThrough = 6
-    }
-
+    // 
+    // Represents a call-stack where an instance chains to its 
+    // parent call-stack.  Each call-stack instance has an
+    // associated call-type (how it was invoked), routine,
+    // start and return addresses.
+    //
+    // The identity of a call-stack is defined by the chain of
+    // start addresses, up until an IRQ, NMI, BRK, or the root
+    // is encountered.
+    //
     public class CallStack : IEquatable<CallStack>
     {
         public CallStack()

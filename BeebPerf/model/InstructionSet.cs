@@ -1,9 +1,36 @@
-﻿using System.Diagnostics;
+﻿// --------------------------------------------------------------
+// BeebPerf - A BBC Micro Profiler
+//
+// Copyright (C) 2026  Mark John Leece
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public
+// License along with this program; if not, write to the Free
+// Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+// Boston, MA  02110-1301, USA.
+// --------------------------------------------------------------
+
+using System.Diagnostics;
 
 namespace BeebPerf.model
 {
     public class InstructionSet
     {
+        //
+        // Represents the 6502 and 65C02 instruction sets, providing
+        // opcode‑based query methods such as instruction size,
+        // branch classification, memory‑access characteristics,
+        // addressing mode, and other related properties.
+        //
         public InstructionSet(CPUType cpu)
         {
             CPU = cpu;

@@ -21,6 +21,10 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Represents a canonical address, which is comprised of an
+    // absolute 16-bit address and memory page (see MemoryPage).
+    //
     public struct CanonicalAddress : IComparable<CanonicalAddress>, IEquatable<CanonicalAddress>
     {
         public CanonicalAddress(ushort address, MemoryPage page)

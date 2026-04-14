@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Select memory address UX operation
+    //
     class SelectMemoryAddressOperation : Operation
     {
         public SelectMemoryAddressOperation(BeebPerfForm form, CanonicalAddress? newAddress, CanonicalAddress? prevAddress)

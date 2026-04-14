@@ -27,6 +27,9 @@ using System.Text;
 
 namespace BeebPerf
 {
+    //
+    // Reads a .perf file populating a Model instance with its contents.
+    //
     public class PerfReader
     {
         [DllImport("zlib.dll")]

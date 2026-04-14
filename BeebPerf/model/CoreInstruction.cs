@@ -23,6 +23,9 @@ using System.Diagnostics;
 
 namespace BeebPerf.model
 {
+    // 
+    // Represents a core instruction. An opcode address, opcode, and operand
+    //
     public struct CoreInstruction : IEquatable<CoreInstruction>, IComparable<CoreInstruction>
     {
         public CoreInstruction(ref Instruction instruction)

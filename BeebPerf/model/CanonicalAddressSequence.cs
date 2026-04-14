@@ -21,6 +21,14 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // Container holding an ordered list of CanonicalAddress. The
+    // Find(...) method finds the nearest lower address using a
+    // binary search.
+    // 
+    // The container is used to find which routine an instruction
+    // resides in during the stack-frame creation process.
+    //
     public class CanonicalAddressSequence
     {
         private readonly List<CanonicalAddress> _List = new();

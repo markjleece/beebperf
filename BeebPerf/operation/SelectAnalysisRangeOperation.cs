@@ -24,6 +24,9 @@ using BeebPerf.ux;
 
 namespace BeebPerf.operation
 {
+    //
+    // Select analysis range UX operation
+    //
     class SelectAnalysisRangeOperation : Operation
     {
         public SelectAnalysisRangeOperation(

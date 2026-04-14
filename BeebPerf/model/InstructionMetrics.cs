@@ -21,6 +21,12 @@
 
 namespace BeebPerf.model
 {
+    //
+    // Represents the CPU‑metrics for an individual instruction
+    // as shown in the code panel. In addition to the metrics, each
+    // instance records whether the instruction is a tail call,
+    // whether it modifies code, its branch count, and its ordinal.
+    //
     public class InstructionMetrics : IComparable<InstructionMetrics>, IEquatable<InstructionMetrics>
     {
         public InstructionMetrics(CoreInstruction instruction, int ordinal)

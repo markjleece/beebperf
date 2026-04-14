@@ -19,8 +19,15 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using static BeebPerf.model.Model;
+
 namespace BeebPerf.model
 {
+    //
+    // Represents the data loaded from a .perf file. The BBC
+    // model, associated instruction-set, snapshot data,
+    // instructions, and optional labels.
+    // 
     public class Model
     {
         public Model()

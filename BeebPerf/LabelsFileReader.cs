@@ -24,6 +24,10 @@ using System.Text.RegularExpressions;
 
 namespace BeebPerf
 {
+    // 
+    // Label files reader. Extracts labels from assembler output
+    // or from label files in the form: [{'label':addressL,...}]
+    //
     public class LabelsFileReader
     {
         public async Task<LabelsFile> ReadFileAsync(string fileName)

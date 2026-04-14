@@ -21,6 +21,10 @@
 
 namespace BeebPerf.model
 {
+    // 
+    // CPU metrics.  Holds the number of self cycles, 
+    // inclusive cycles, elapsed cycles, and execution count.
+    //
     public class CPUMetrics
     {
         public CPUMetrics()

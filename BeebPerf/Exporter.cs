@@ -26,6 +26,13 @@ using System.Text;
 
 namespace BeebPerf
 {
+    //
+    // Exporter class used to export grid data to a CSV file or copy
+    // grid data to the clipboard.
+    //
+    // Also used to copy display‑frame snapshot bitmaps to the clipboard,
+    // and copy the flame graph (as an EMF) to the clipboard.
+    //
     public interface IGridExporter
     {
         string[] GetHeaders();
