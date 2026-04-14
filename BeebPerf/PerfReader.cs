@@ -399,7 +399,7 @@ namespace BeebPerf
                 if ((bits & (byte)ModifiedRegister.StackPointer) != 0) // new value of stack pointer
                     _StackPointer = ReadByte(dataStream);
 
-                // stack pointer (excluding BRK, JMP, RTI, RTS)
+                // stack pointer (excluding BRK, JSR, RTI, RTS)
                 if (model.InstructionSet!.ModifiesStackPointer(opcode) && (opcode & 0x0F) != 0)
                     instruction.StackPointer = _StackPointer;
 

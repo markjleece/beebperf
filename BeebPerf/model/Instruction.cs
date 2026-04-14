@@ -85,14 +85,12 @@ namespace BeebPerf.model
         {
             get
             {
-                Debug.Assert(IsNMI || IsIRQ || (IsInstruction && 
-                    (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/)));
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction && (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/)));
                 return new CanonicalAddress(_ReturnAddress, (MemoryPage)_ReturnAddressPage);
             }
             set
             {
-                Debug.Assert(IsNMI || IsIRQ || (IsInstruction &&
-                    (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/)));
+                Debug.Assert(IsNMI || IsIRQ || (IsInstruction && (Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/)));
                 _ReturnAddress = value.Address;
                 _ReturnAddressPage = (byte)value.Page;
             }
