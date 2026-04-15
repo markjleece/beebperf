@@ -150,10 +150,109 @@ namespace BeebPerf
         private void DynamicAddressAnalysis(CanonicalAddress address, int startCycleCount, int endCycleCount)
         {
             Dictionary<CanonicalAddress, RoutineMemoryAccess> routineMetrics = new();
-            CalculateStackFrameMemoryAccessMetrics(address, _RootStackFrame, startCycleCount, endCycleCount, routineMetrics);
+
+            var stack = new Stack<model.StackFrame>();
+            stack.Push(_RootStackFrame);
+
+            while (stack.Count > 0)
+            {
+                var stackFrame = stack.Pop();
+
+                int childIndex = 0;
+                int instructionIndex = stackFrame.FirstInstructionIndex;
+                int lastInstructionIndex = stackFrame.LastInstructionIndex;
+                int cycleCount = stackFrame.StartCycleCount;
+
+                model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+
+                while (cycleCount < stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
+                {
+                    if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
+                    {
+                        if (childStackFrame.StartCycleCount <= endCycleCount && childStackFrame.EndCycleCount >= startCycleCount)
+                            stack.Push(childStackFrame);
+
+                        instructionIndex = childStackFrame.LastInstructionIndex + 1;
+                        cycleCount = childStackFrame.EndCycleCount;
+
+                        childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
+                        continue;
+                    }
+
+                    ref Instruction instruction = ref _Instructions[instructionIndex];
+                    int instructionCycleCount = instruction.CycleCount;
+                    if (instruction.IsInstruction &&
+                        cycleCount >= startCycleCount && cycleCount < endCycleCount)
+                    {
+                        byte opcode = instruction.Opcode;
+                        var memoryAccess = _InstructionSet!.MemoryAccess(opcode);
+                        if (memoryAccess != 0 && instruction.MemoryAddress.Equals(address))
+                        {
+                            var routineAddress = stackFrame.Routine.StartAddress;
+                            var metrics = routineMetrics.TryGetValue(routineAddress, out var existing)
+                                ? existing
+                                : routineMetrics[routineAddress] = new RoutineMemoryAccess(stackFrame.Routine, address);
+
+                            var coreInstruction = new CoreInstruction(ref instruction);
+
+                            if ((memoryAccess & InstructionSet.MemoryAccessType.Read) != 0)
+                            {
+                                metrics.ReadCount++;
+                                metrics.InstructionReadCounts[coreInstruction] = metrics.InstructionReadCounts.GetValueOrDefault(coreInstruction) + 1;
+                            }
+
+                            if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
+                            {
+                                metrics.WriteCount++;
+                                metrics.InstructionWriteCounts[coreInstruction] = metrics.InstructionWriteCounts.GetValueOrDefault(coreInstruction) + 1;
+                            }
+                        }
+                    }
+
+                    cycleCount += instructionCycleCount;
+                    instructionIndex++;
+                }
+            }
+
             RoutineAccesses = routineMetrics.Values.ToList();
         }
 
+        public class RoutineMemoryAccess
+        {
+            public RoutineMemoryAccess(Routine routine, CanonicalAddress address)
+            {
+                Routine = routine;
+                Address = address;
+                InstructionReadCounts = new();
+                InstructionWriteCounts = new();
+            }
+
+            public Routine Routine;
+            public CanonicalAddress Address;
+            public int ReadCount;
+            public int WriteCount;
+            public Dictionary<CoreInstruction, int> InstructionReadCounts;
+            public Dictionary<CoreInstruction, int> InstructionWriteCounts;
+        }
+
+        public class MemoryAccess
+        {
+            public required CanonicalAddress Address;
+            public required string Label;
+            public required int ReadCount;
+            public required int WriteCount;
+        }
+
+        public List<MemoryAccess> MemoryAccesses = [];
+        public List<RoutineMemoryAccess> RoutineAccesses = [];
+
+        private Instruction[] _Instructions = [];
+        private InstructionSet? _InstructionSet;
+        private model.StackFrame _RootStackFrame = new();
+        private byte[][] _SnapshotMemory = [];
+        private LabelResolver _LabelResolver = new();
+
+        /*
         private void CalculateStackFrameMemoryAccessMetrics(
             CanonicalAddress address,
             model.StackFrame stackFrame,
@@ -216,40 +315,6 @@ namespace BeebPerf
                 instructionIndex++;
             }
         }
-
-        public class RoutineMemoryAccess
-        {
-            public RoutineMemoryAccess(Routine routine, CanonicalAddress address)
-            {
-                Routine = routine;
-                Address = address;
-                InstructionReadCounts = new();
-                InstructionWriteCounts = new();
-            }
-
-            public Routine Routine;
-            public CanonicalAddress Address;
-            public int ReadCount;
-            public int WriteCount;
-            public Dictionary<CoreInstruction, int> InstructionReadCounts;
-            public Dictionary<CoreInstruction, int> InstructionWriteCounts;
-        }
-
-        public class MemoryAccess
-        {
-            public required CanonicalAddress Address;
-            public required string Label;
-            public required int ReadCount;
-            public required int WriteCount;
-        }
-
-        public List<MemoryAccess> MemoryAccesses = [];
-        public List<RoutineMemoryAccess> RoutineAccesses = [];
-
-        private Instruction[] _Instructions = [];
-        private InstructionSet? _InstructionSet;
-        private model.StackFrame _RootStackFrame = new();
-        private byte[][] _SnapshotMemory = [];
-        private LabelResolver _LabelResolver = new();
+        */
     }
 }
