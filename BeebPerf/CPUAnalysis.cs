@@ -755,13 +755,59 @@ namespace BeebPerf
 
         private void PopulateCallTrees()
         {
+            var treeNodesByCallStack = new Dictionary<CallStack, CallTreeNode>();
+
+            // clear trees
             ProgramCallTree = null;
             IRQBRKCallTree = null;
             NMICallTree = null;
 
-            var treeNodesByCallStack = new Dictionary<CallStack, CallTreeNode>();
-            PopulateCallTrees(RootStackFrame, parentCallTreeNode: null, treeNodesByCallStack);
+            // populate trees
+            var stack = new Stack<(model.StackFrame stackFrame, CallTreeNode? parentCallTreeNode)>();
+            stack.Push((stackFrame: RootStackFrame, parentCallTreeNode: null));
 
+            while (stack.Count > 0)
+            {
+                var (stackFrame, parentCallTreeNode) = stack.Pop();
+
+                var callStack = (CallStack)stackFrame;
+
+                if (!stackFrame.Routine.MetricsByStack.ContainsKey(callStack))
+                    return;
+
+                CallTreeNode callTreeNode;
+                if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
+                {
+                    callTreeNode = new CallTreeNode(callStack);
+                    treeNodesByCallStack.Add(callStack, callTreeNode);
+
+                    switch (stackFrame.CallType)
+                    {
+                        case CallType.None:
+                            ProgramCallTree = callTreeNode;
+                            break;
+
+                        case CallType.IRQ:
+                        case CallType.BRK:
+                            IRQBRKCallTree = callTreeNode;
+                            break;
+
+                        case CallType.NMI:
+                            NMICallTree = callTreeNode;
+                            break;
+
+                        default:
+                            if (parentCallTreeNode != null)
+                                parentCallTreeNode.AddChild(callTreeNode);
+                            break;
+                    }
+                }
+
+                foreach (var childStackFrame in stackFrame.Children)
+                    stack.Push((stackFrame: childStackFrame, parentCallTreeNode: callTreeNode));
+            }
+
+            // sort populated trees
             if (ProgramCallTree != null)
                 ProgramCallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
 
@@ -770,48 +816,6 @@ namespace BeebPerf
 
             if (NMICallTree != null)
                 NMICallTree.Sort(CallTreeNode.SortField.InclusiveCPU, SortOrder.Descending);
-        }
-
-        private void PopulateCallTrees(
-            model.StackFrame stackFrame,
-            CallTreeNode? parentCallTreeNode,
-            Dictionary<CallStack, CallTreeNode> treeNodesByCallStack)
-        {
-            var callStack = (CallStack)stackFrame;
-
-            if (!stackFrame.Routine.MetricsByStack.ContainsKey(callStack))
-                return;
-
-            CallTreeNode callTreeNode;
-            if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
-            {
-                callTreeNode = new CallTreeNode(callStack);
-                treeNodesByCallStack.Add(callStack, callTreeNode);
-
-                switch (stackFrame.CallType)
-                {
-                    case CallType.None:
-                        ProgramCallTree = callTreeNode;
-                        break;
-
-                    case CallType.IRQ:
-                    case CallType.BRK:
-                        IRQBRKCallTree = callTreeNode;
-                        break;
-
-                    case CallType.NMI:
-                        NMICallTree = callTreeNode;
-                        break;
-
-                    default:
-                        if (parentCallTreeNode != null)
-                            parentCallTreeNode.AddChild(callTreeNode);
-                        break;
-                }
-            }
-
-            foreach (var childStackFrame in stackFrame.Children)
-                PopulateCallTrees(childStackFrame, callTreeNode, treeNodesByCallStack);
         }
 
         private void MarkHotPaths()
@@ -839,11 +843,20 @@ namespace BeebPerf
                 treeNodes[i].HotPath = (i < hotPathCount);
         }
 
-        private void PopulateCallTreeNodeList(CallTreeNode treeNode, List<CallTreeNode> treeNodeList)
+        private void PopulateCallTreeNodeList(CallTreeNode callTree, List<CallTreeNode> treeNodeList)
         {
-            treeNodeList.Add(treeNode);
-            foreach (var child in treeNode.Children)
-                PopulateCallTreeNodeList(child, treeNodeList);
+            var stack = new Stack<CallTreeNode>();
+            stack.Push(callTree);
+
+            while (stack.Count > 0)
+            {
+                var callTreeNode = stack.Pop();
+
+                treeNodeList.Add(callTreeNode);
+
+                foreach (var childCallTreeNode in callTreeNode.Children)
+                    stack.Push(childCallTreeNode); 
+            }
         }
 
         //
