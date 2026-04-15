@@ -36,7 +36,7 @@ namespace BeebPerf.model
         {
             _Children.Add(treeNode);
             treeNode.Parent = (T)this;
-            treeNode.UpdateDepth();
+            UpdateDepths(treeNode);
         }
 
         public int Depth
@@ -67,26 +67,40 @@ namespace BeebPerf.model
 
         public void Sort(Comparison<T> comparison)
         {
+            Sort(this, comparison);
+        }
+
+        private static void Sort(TreeNode<T> treeNode, Comparison<T> comparison)
+        {
             var stack = new Stack<TreeNode<T>>();
-            stack.Push(this);
+            stack.Push(treeNode);
 
             while (stack.Count > 0)
             {
-                var node = stack.Pop();
+                treeNode = stack.Pop();
 
-                if (node._Children.Count > 1)
-                    node._Children.Sort(comparison);
+                if (treeNode._Children.Count > 1)
+                    treeNode._Children.Sort(comparison);
 
-                for (int i = node._Children.Count - 1; i >= 0; i--)
-                    stack.Push(node._Children[i]);
+                for (int i = treeNode._Children.Count - 1; i >= 0; i--)
+                    stack.Push(treeNode._Children[i]);
             }
         }
 
-        private void UpdateDepth()
-        {
-            _Depth = Parent!._Depth + 1;
-            foreach (var child in Children)
-                child.UpdateDepth();
+        private static void UpdateDepths(TreeNode<T> treeNode)
+        { 
+            var stack = new Stack<TreeNode<T>>();
+            stack.Push(treeNode);
+
+            while (stack.Count > 0)
+            {
+                treeNode = stack.Pop();
+
+                treeNode._Depth = treeNode.Parent!._Depth + 1;
+
+                foreach (var child in treeNode.Children)
+                    stack.Push(child);
+            }
         }
 
         public enum ExpansionType

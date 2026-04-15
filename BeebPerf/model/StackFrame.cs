@@ -46,9 +46,23 @@ namespace BeebPerf.model
 
         public void ClearMetrics()
         {
-            CPUMetrics.Clear();
-            foreach (var child in Children)
-                child.ClearMetrics();
+            ClearMetrics(this);
+        }
+
+        private static void ClearMetrics(StackFrame stackFrame)
+        { 
+            var stack = new Stack<StackFrame>();
+            stack.Push(stackFrame);
+
+            while (stack.Count > 0)
+            {
+                stackFrame = stack.Pop();
+
+                stackFrame.CPUMetrics.Clear();
+
+                foreach (var childStackFrame in stackFrame.Children)
+                    stack.Push(childStackFrame);
+            }
         }
 
         public bool IsEmpty()
@@ -61,21 +75,63 @@ namespace BeebPerf.model
             return "".PadLeft((FullDepth - 1) * 2, ' ') + $"Type: {CallType}, Start: {StartAddress}{Routine.Label}, Return: {ReturnAddress}, ReturnSP: {ReturnStackPointer}";
         }
 
-        public static void ComputeInstructionIndices(StackFrame frame, int instructionCount)
+        public static void ComputeInstructionIndices(StackFrame stackFrame, int instructionCount)
         {
-            int first = frame.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : frame.FirstSelfInstructionIndex;
-            int last = frame.LastSelfInstructionIndex == -1 ? 0 : frame.LastSelfInstructionIndex;
-
-            foreach (var child in frame.Children)
+            /*
+            int first = stackFrame.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : stackFrame.FirstSelfInstructionIndex;
+            int last = stackFrame.LastSelfInstructionIndex == -1 ? 0 : stackFrame.LastSelfInstructionIndex;
+            
+            foreach (var childStackFrame in stackFrame.Children)
             {
-                ComputeInstructionIndices(child, instructionCount);
-
-                first = Math.Min(first, child.FirstInstructionIndex);
-                last = Math.Max(last, child.LastInstructionIndex);
+                ComputeInstructionIndices(childStackFrame, instructionCount);
+            
+                first = Math.Min(first, childStackFrame.FirstInstructionIndex);
+                last = Math.Max(last, childStackFrame.LastInstructionIndex);
             }
+            
+            stackFrame.FirstInstructionIndex = first;
+            stackFrame.LastInstructionIndex = last;
+            */
 
-            frame.FirstInstructionIndex = first;
-            frame.LastInstructionIndex = last;
+            var stack = new Stack<(StackFrame frame, int childIndex, int first, int last)>();
+
+            // Push the root frame with initial state
+            stack.Push((
+                frame: stackFrame,
+                childIndex: 0,
+                first: stackFrame.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : stackFrame.FirstSelfInstructionIndex,
+                last: stackFrame.LastSelfInstructionIndex == -1 ? 0 : stackFrame.LastSelfInstructionIndex
+            ));
+
+            while (stack.Count > 0)
+            {
+                var (frame, childIndex, first, last) = stack.Pop();
+
+                if (childIndex < frame.Children.Count)
+                {
+                    // we still have children to process so push the current frame back with childIndex incremented
+                    stack.Push((frame, childIndex + 1, first, last));
+
+                    // now push the child frame as a new work item
+                    var child = frame.Children[childIndex];
+                    int childFirst = child.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : child.FirstSelfInstructionIndex;
+                    int childLast = child.LastSelfInstructionIndex == -1 ? 0 : child.LastSelfInstructionIndex;
+
+                    stack.Push((child, 0, childFirst, childLast));
+                }
+                else
+                {
+                    // all children processed — so we can now determine the instruction indices
+                    foreach (var child in frame.Children)
+                    {
+                        first = Math.Min(first, child.FirstInstructionIndex);
+                        last = Math.Max(last, child.LastInstructionIndex);
+                    }
+
+                    frame.FirstInstructionIndex = first;
+                    frame.LastInstructionIndex = last;
+                }
+            }
         }
 
 #if DEBUG && STACKFRAME_INVARIANT
@@ -85,144 +141,147 @@ namespace BeebPerf.model
             for (int i = 0; i < instructions.Length; i++)
                 totalCycles += instructions[i].CycleCount;
 
-            AssertInvariant(rootStackFrame, instructions, instructionSet, totalCycles);
-        }
+            var stack = new Stack<StackFrame>();
+            stack.Push(rootStackFrame);
 
-        private static void AssertInvariant(StackFrame frame, Instruction[] instructions, InstructionSet instructionSet, int totalCycles)
-        {
-            // first and last self instruction indices
-            if (frame.FirstSelfInstructionIndex == -1 || frame.LastSelfInstructionIndex == -1)
+            while (stack.Count > 0)
             {
-                Debug.Assert(frame.FirstSelfInstructionIndex == -1);
-                Debug.Assert(frame.LastSelfInstructionIndex == -1);
-            }
-            
-            // first and last instruction indices
-            if (frame.FirstSelfInstructionIndex != -1)
-                Debug.Assert(frame.FirstInstructionIndex <= frame.FirstSelfInstructionIndex);
+                var stackFrame = stack.Pop();
 
-            if (frame.LastSelfInstructionIndex != -1)
-                Debug.Assert(frame.LastInstructionIndex >= frame.LastSelfInstructionIndex);
-
-            Debug.Assert(frame.FirstInstructionIndex >= 0 && frame.FirstInstructionIndex <= instructions.Length - 1);
-            Debug.Assert(frame.LastInstructionIndex >= 0 && frame.LastInstructionIndex <= instructions.Length - 1);
-
-            // first instruction
-            if (frame.FirstSelfInstructionIndex != -1)
-            {
-                ref var firstInstruction = ref instructions[frame.FirstSelfInstructionIndex];
-                switch (frame.CallType)
+                // first and last self instruction indices
+                if (stackFrame.FirstSelfInstructionIndex == -1 || stackFrame.LastSelfInstructionIndex == -1)
                 {
-                    case CallType.IRQ:
-                        Debug.Assert(firstInstruction.IsIRQ);
-                        break;
-
-                    case CallType.NMI:
-                        Debug.Assert(firstInstruction.IsNMI);
-                        break;
-
-                    case CallType.JSR:
-                    case CallType.TailCall:
-                    case CallType.FallThrough:
-                        Debug.Assert(firstInstruction.IsInstruction);
-                        break;
+                    Debug.Assert(stackFrame.FirstSelfInstructionIndex == -1);
+                    Debug.Assert(stackFrame.LastSelfInstructionIndex == -1);
                 }
-            }
 
-            // last instruction
-            var lastFrame = frame.GetLastInstructionStackFrame();
-            if (!lastFrame.InsertedTailCall)
-            {
-                var lastInstructionIndex = frame.LastInstructionIndex;
-                if (lastInstructionIndex < instructions.Length - 1)
+                // first and last instruction indices
+                if (stackFrame.FirstSelfInstructionIndex != -1)
+                    Debug.Assert(stackFrame.FirstInstructionIndex <= stackFrame.FirstSelfInstructionIndex);
+
+                if (stackFrame.LastSelfInstructionIndex != -1)
+                    Debug.Assert(stackFrame.LastInstructionIndex >= stackFrame.LastSelfInstructionIndex);
+
+                Debug.Assert(stackFrame.FirstInstructionIndex >= 0 && stackFrame.FirstInstructionIndex <= instructions.Length - 1);
+                Debug.Assert(stackFrame.LastInstructionIndex >= 0 && stackFrame.LastInstructionIndex <= instructions.Length - 1);
+
+                // first instruction
+                if (stackFrame.FirstSelfInstructionIndex != -1)
                 {
-                    // included situations where stack pointer is manipulated
-                    ref var lastInstruction = ref instructions[lastInstructionIndex];
-                    ref var afterLastInstruction = ref instructions[lastInstructionIndex + 1];
+                    ref var firstInstruction = ref instructions[stackFrame.FirstSelfInstructionIndex];
+                    switch (stackFrame.CallType)
+                    {
+                        case CallType.IRQ:
+                            Debug.Assert(firstInstruction.IsIRQ);
+                            break;
 
-                    Debug.Assert(lastInstruction.IsInstruction);
-                    Debug.Assert(
-                        lastInstruction.Opcode == 0x60/*RTS*/ ||
-                        lastInstruction.Opcode == 0x40/*RTI*/ ||
-                        lastInstruction.Opcode == 0x00/*BRK*/ ||
-                        lastInstruction.Opcode == 0x20/*JSR*/ ||
-                        instructionSet.IsBranchOrJump(lastInstruction.Opcode) ||
-                        afterLastInstruction.IsIRQ ||
-                        afterLastInstruction.IsNMI);
+                        case CallType.NMI:
+                            Debug.Assert(firstInstruction.IsNMI);
+                            break;
+
+                        case CallType.JSR:
+                        case CallType.TailCall:
+                        case CallType.FallThrough:
+                            Debug.Assert(firstInstruction.IsInstruction);
+                            break;
+                    }
                 }
+
+                // last instruction
+                var lastFrame = stackFrame.GetLastInstructionStackFrame();
+                if (!lastFrame.InsertedTailCall)
+                {
+                    var lastInstructionIndex = stackFrame.LastInstructionIndex;
+                    if (lastInstructionIndex < instructions.Length - 1)
+                    {
+                        // included situations where stack pointer is manipulated
+                        ref var lastInstruction = ref instructions[lastInstructionIndex];
+                        ref var afterLastInstruction = ref instructions[lastInstructionIndex + 1];
+
+                        Debug.Assert(lastInstruction.IsInstruction);
+                        Debug.Assert(
+                            lastInstruction.Opcode == 0x60/*RTS*/ ||
+                            lastInstruction.Opcode == 0x40/*RTI*/ ||
+                            lastInstruction.Opcode == 0x00/*BRK*/ ||
+                            lastInstruction.Opcode == 0x20/*JSR*/ ||
+                            instructionSet.IsBranchOrJump(lastInstruction.Opcode) ||
+                            afterLastInstruction.IsIRQ ||
+                            afterLastInstruction.IsNMI);
+                    }
+                }
+
+                // cycles
+                Debug.Assert(stackFrame.StartCycleCount < stackFrame.EndCycleCount);
+                Debug.Assert(stackFrame.StartCycleCount >= 0 && stackFrame.EndCycleCount <= totalCycles);
+
+                // first and last stack frames
+                var firstFrame = stackFrame.GetFirstInstructionStackFrame();
+                if (firstFrame != stackFrame)
+                {
+                    Debug.Assert(firstFrame.StartCycleCount == stackFrame.StartCycleCount);
+                    Debug.Assert(firstFrame.FirstSelfInstructionIndex < stackFrame.FirstSelfInstructionIndex);
+                    Debug.Assert(firstFrame.LastSelfInstructionIndex < stackFrame.FirstSelfInstructionIndex);
+                }
+
+                if (lastFrame != stackFrame)
+                {
+                    Debug.Assert(lastFrame.EndCycleCount == stackFrame.EndCycleCount);
+                    Debug.Assert(lastFrame.FirstSelfInstructionIndex > stackFrame.LastSelfInstructionIndex);
+                    Debug.Assert(lastFrame.LastSelfInstructionIndex > stackFrame.LastSelfInstructionIndex);
+                }
+
+                // instruction indices
+                if (stackFrame.FirstSelfInstructionIndex != -1)
+                    Debug.Assert(stackFrame.FirstSelfInstructionIndex >= 0 && stackFrame.FirstSelfInstructionIndex < instructions.Length);
+
+                if (stackFrame.LastSelfInstructionIndex != -1)
+                    Debug.Assert(stackFrame.LastSelfInstructionIndex >= 0 && stackFrame.LastSelfInstructionIndex < instructions.Length);
+
+                if (stackFrame.FirstSelfInstructionIndex != -1 && stackFrame.LastSelfInstructionIndex != -1)
+                    Debug.Assert(stackFrame.FirstSelfInstructionIndex <= stackFrame.LastSelfInstructionIndex);
+
+                // children
+                StackFrame? prevChildFrame = null;
+                for (int i = 0; i < stackFrame.Children.Count; i++)
+                {
+                    var childFrame = stackFrame.Children[i];
+
+                    Debug.Assert(childFrame.StartCycleCount >= stackFrame.StartCycleCount);
+                    Debug.Assert(childFrame.EndCycleCount <= stackFrame.EndCycleCount);
+
+                    var childFrameFirstInstructionIndex = childFrame.LastInstructionIndex;
+                    var childFrameLastInstructionIndex = childFrame.GetFirstInstructionStackFrame().LastSelfInstructionIndex;
+
+                    if (stackFrame.FirstSelfInstructionIndex != -1)
+                        Debug.Assert(
+                            childFrameFirstInstructionIndex == -1 ||
+                            childFrameLastInstructionIndex == -1 ||
+                            stackFrame.FirstSelfInstructionIndex < childFrameFirstInstructionIndex ||
+                            stackFrame.FirstSelfInstructionIndex > childFrameLastInstructionIndex);
+
+                    if (stackFrame.LastSelfInstructionIndex != -1)
+                        Debug.Assert(
+                            childFrameFirstInstructionIndex == -1 ||
+                            childFrameLastInstructionIndex == -1 ||
+                            stackFrame.LastSelfInstructionIndex < childFrameFirstInstructionIndex ||
+                            stackFrame.LastSelfInstructionIndex > childFrameLastInstructionIndex);
+
+                    if (i == 0 && stackFrame != firstFrame)
+                        Debug.Assert(childFrame.StartCycleCount == stackFrame.StartCycleCount);
+
+                    if (i == stackFrame.Children.Count - 1 && stackFrame != lastFrame)
+                        Debug.Assert(childFrame.EndCycleCount == stackFrame.EndCycleCount);
+
+                    if (prevChildFrame != null)
+                        Debug.Assert(childFrame.StartCycleCount >= prevChildFrame.EndCycleCount);
+
+                    prevChildFrame = childFrame;
+                }
+
+                // apply invariant to children
+                foreach (var childStackFrame in stackFrame.Children)
+                    stack.Push(childStackFrame);
             }
-
-            // cycles
-            Debug.Assert(frame.StartCycleCount < frame.EndCycleCount);
-            Debug.Assert(frame.StartCycleCount >= 0 && frame.EndCycleCount <= totalCycles);
-
-            // first and last stack frames
-            var firstFrame = frame.GetFirstInstructionStackFrame();
-            if (firstFrame != frame)
-            {
-                Debug.Assert(firstFrame.StartCycleCount == frame.StartCycleCount);
-                Debug.Assert(firstFrame.FirstSelfInstructionIndex < frame.FirstSelfInstructionIndex);
-                Debug.Assert(firstFrame.LastSelfInstructionIndex < frame.FirstSelfInstructionIndex);
-            }
-
-            if (lastFrame != frame)
-            {
-                Debug.Assert(lastFrame.EndCycleCount == frame.EndCycleCount);
-                Debug.Assert(lastFrame.FirstSelfInstructionIndex > frame.LastSelfInstructionIndex);
-                Debug.Assert(lastFrame.LastSelfInstructionIndex > frame.LastSelfInstructionIndex);
-            }
-
-            // instruction indices
-            if (frame.FirstSelfInstructionIndex != -1)
-                Debug.Assert(frame.FirstSelfInstructionIndex >= 0 && frame.FirstSelfInstructionIndex < instructions.Length);
-
-            if (frame.LastSelfInstructionIndex != -1)
-                Debug.Assert(frame.LastSelfInstructionIndex >= 0 && frame.LastSelfInstructionIndex < instructions.Length);
-
-            if (frame.FirstSelfInstructionIndex != -1 && frame.LastSelfInstructionIndex != -1)
-                Debug.Assert(frame.FirstSelfInstructionIndex <= frame.LastSelfInstructionIndex);
-
-            // children
-            StackFrame? prevChildFrame = null;
-            for (int i = 0; i < frame.Children.Count; i++)
-            {
-                var childFrame = frame.Children[i];
-
-                Debug.Assert(childFrame.StartCycleCount >= frame.StartCycleCount);
-                Debug.Assert(childFrame.EndCycleCount <= frame.EndCycleCount);
-
-                var childFrameFirstInstructionIndex = childFrame.LastInstructionIndex;
-                var childFrameLastInstructionIndex = childFrame.GetFirstInstructionStackFrame().LastSelfInstructionIndex;
-
-                if (frame.FirstSelfInstructionIndex != -1)
-                    Debug.Assert(
-                        childFrameFirstInstructionIndex == -1 ||
-                        childFrameLastInstructionIndex == -1 ||
-                        frame.FirstSelfInstructionIndex < childFrameFirstInstructionIndex ||
-                        frame.FirstSelfInstructionIndex > childFrameLastInstructionIndex);                    
-
-                if (frame.LastSelfInstructionIndex != -1)
-                    Debug.Assert(
-                        childFrameFirstInstructionIndex == -1 ||
-                        childFrameLastInstructionIndex == -1 ||
-                        frame.LastSelfInstructionIndex < childFrameFirstInstructionIndex ||
-                        frame.LastSelfInstructionIndex > childFrameLastInstructionIndex);
-
-                if (i == 0 && frame != firstFrame)
-                    Debug.Assert(childFrame.StartCycleCount == frame.StartCycleCount);
-
-                if (i == frame.Children.Count - 1 && frame != lastFrame)
-                    Debug.Assert(childFrame.EndCycleCount == frame.EndCycleCount);
-
-                if (prevChildFrame != null)
-                    Debug.Assert(childFrame.StartCycleCount >= prevChildFrame.EndCycleCount);
-
-                prevChildFrame = childFrame;
-            }
-
-            // recurse children
-            foreach (var childFrame in frame.Children)
-                AssertInvariant(childFrame, instructions, instructionSet, totalCycles);
         }
 
         private StackFrame GetFirstInstructionStackFrame()
