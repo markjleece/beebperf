@@ -655,52 +655,66 @@ namespace BeebPerf
             foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
-            CalculateMetrics(RootStackFrame);
-        }
+            var stack = new Stack<(model.StackFrame stackFrame, int childIndex)>();
+            stack.Push((RootStackFrame, 0));
 
-        private int CalculateMetrics(model.StackFrame stackFrame)
-        {
-            stackFrame.CPUMetrics.Clear();
-
-            if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
+            while (stack.Count > 0)
             {
-                return (stackFrame.EndCycleCount - stackFrame.StartCycleCount); // excluded cycle instructionCount
+                var (stackFrame, childIndex) = stack.Pop();
+
+                if (childIndex < stackFrame.Children.Count)
+                {
+                    // we still have children to process so push the current frame back with childIndex incremented
+                    stack.Push((stackFrame, childIndex + 1));
+
+                    // now push the child stack frame as a new work item, if there is work to do
+                    var childStackFrame = stackFrame.Children[childIndex];
+
+                    if (StartCycleCount > childStackFrame.EndCycleCount || EndCycleCount < childStackFrame.StartCycleCount)
+                        childStackFrame.ExcludedCycles = childStackFrame.EndCycleCount - childStackFrame.StartCycleCount;
+                    else
+                        stack.Push((childStackFrame, 0));
+                }
+                else
+                {
+                    // all children processed — so we can now calculate the metrics
+                    int excludedCycleCount = 0;
+                    if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
+                        excludedCycleCount = CalculatedExcludedCycles(stackFrame);
+
+                    int childInclusiveCycleCount = 0;
+                    int childElapsedCycleCount = 0;
+
+                    foreach (var childStackFrame in stackFrame.Children)
+                    {
+                        excludedCycleCount += childStackFrame.ExcludedCycles;
+
+                        childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
+                        if (childStackFrame.CallType != CallType.IRQ && childStackFrame.CallType != CallType.NMI && childStackFrame.CallType != CallType.BRK)
+                            childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                    }
+
+                    stackFrame.ExcludedCycles = excludedCycleCount;
+
+                    var cpuMetrics = stackFrame.CPUMetrics;
+                    cpuMetrics.ExecutionCount = 1;
+                    cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
+                    cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
+                    cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
+
+                    Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
+                    Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
+
+                    if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
+                        metrics.Add(cpuMetrics);
+                    else
+                        stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
+
+                    stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
+                }
             }
-
-            int excludedCycleCount = 0;
-            if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
-                excludedCycleCount = CalculatedExcludedCycles(stackFrame);
-
-            int childInclusiveCycleCount = 0;
-            int childElapsedCycleCount = 0;
-
-            foreach (var childStackFrame in stackFrame.Children)
-            {
-                excludedCycleCount += CalculateMetrics(childStackFrame);
-                childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
-                if (childStackFrame.CallType != CallType.IRQ && childStackFrame.CallType != CallType.NMI && childStackFrame.CallType != CallType.BRK)
-                    childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
-            }
-
-            var cpuMetrics = stackFrame.CPUMetrics;
-            cpuMetrics.ExecutionCount = 1;
-            cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
-            cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
-            cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
-
-            Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
-            Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
-
-            if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
-                metrics.Add(cpuMetrics);
-            else
-                stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
-
-            stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
-
-            return excludedCycleCount;
         }
-
+ 
         private int CalculatedExcludedCycles(model.StackFrame stackFrame)
         {
             Debug.Assert(
@@ -773,7 +787,7 @@ namespace BeebPerf
                 var callStack = (CallStack)stackFrame;
 
                 if (!stackFrame.Routine.MetricsByStack.ContainsKey(callStack))
-                    return;
+                    continue;
 
                 CallTreeNode callTreeNode;
                 if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
