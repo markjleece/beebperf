@@ -650,71 +650,74 @@ namespace BeebPerf
 
         private void CalculateMetrics()
         {
+            // clear metrics
             RootStackFrame.ClearMetrics();
 
             foreach (var routine in RoutinesByAddress.Values)
                 routine.ClearMetrics();
 
-            var stack = new Stack<(model.StackFrame stackFrame, int childIndex)>();
-            stack.Push((RootStackFrame, 0));
+            // calculate metrics bottom up, iteratively
+            var stack = new Stack<(model.StackFrame stackFrame, bool resume)>();
+            stack.Push((RootStackFrame, resume: false));
 
             while (stack.Count > 0)
             {
-                var (stackFrame, childIndex) = stack.Pop();
+                var (stackFrame, resume) = stack.Pop();
 
-                if (childIndex < stackFrame.Children.Count)
+                // process children first
+                if (stackFrame.Children.Count > 0 && !resume)
                 {
-                    // we still have children to process so push the current frame back with childIndex incremented
-                    stack.Push((stackFrame, childIndex + 1));
+                    stack.Push((stackFrame, resume: true));
 
-                    // now push the child stack frame as a new work item, if there is work to do
-                    var childStackFrame = stackFrame.Children[childIndex];
-
-                    if (StartCycleCount > childStackFrame.EndCycleCount || EndCycleCount < childStackFrame.StartCycleCount)
-                        childStackFrame.ExcludedCycles = childStackFrame.EndCycleCount - childStackFrame.StartCycleCount;
-                    else
-                        stack.Push((childStackFrame, 0));
-                }
-                else
-                {
-                    // all children processed — so we can now calculate the metrics
-                    int excludedCycleCount = 0;
-                    if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
-                        excludedCycleCount = CalculatedExcludedCycles(stackFrame);
-
-                    int childInclusiveCycleCount = 0;
-                    int childElapsedCycleCount = 0;
-
-                    foreach (var childStackFrame in stackFrame.Children)
+                    foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
                     {
-                        excludedCycleCount += childStackFrame.ExcludedCycles;
-
-                        childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
-                        if (childStackFrame.CallType != CallType.IRQ && childStackFrame.CallType != CallType.NMI && childStackFrame.CallType != CallType.BRK)
-                            childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                        // optimization: Just set ExcludedCycles if stack frame does not overlap the selected time range
+                        if (childStackFrame.EndCycleCount < StartCycleCount || childStackFrame.StartCycleCount > EndCycleCount)
+                            childStackFrame.ExcludedCycles = childStackFrame.EndCycleCount - childStackFrame.StartCycleCount;
+                        else
+                            stack.Push((childStackFrame, resume: false));
                     }
 
-                    stackFrame.ExcludedCycles = excludedCycleCount;
-
-                    var cpuMetrics = stackFrame.CPUMetrics;
-                    cpuMetrics.ExecutionCount = 1;
-                    cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
-                    cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
-                    cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
-
-                    Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
-                    Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
-
-                    if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
-                        metrics.Add(cpuMetrics);
-                    else
-                        stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
-
-                    stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
+                    continue;
                 }
+
+                // children processed - so calculate metrics
+                int excludedCycleCount = 0;
+                if (StartCycleCount > stackFrame.StartCycleCount || EndCycleCount < stackFrame.EndCycleCount)
+                    excludedCycleCount = CalculatedExcludedCycles(stackFrame);
+
+                int childInclusiveCycleCount = 0;
+                int childElapsedCycleCount = 0;
+
+                foreach (var childStackFrame in stackFrame.Children)
+                {
+                    excludedCycleCount += childStackFrame.ExcludedCycles;
+
+                    childElapsedCycleCount += childStackFrame.CPUMetrics.ElapsedCycleCount;
+                    if (childStackFrame.CallType != CallType.IRQ && childStackFrame.CallType != CallType.NMI && childStackFrame.CallType != CallType.BRK)
+                        childInclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                }
+
+                stackFrame.ExcludedCycles = excludedCycleCount;
+
+                var cpuMetrics = stackFrame.CPUMetrics;
+                cpuMetrics.ExecutionCount = 1;
+                cpuMetrics.ElapsedCycleCount = (stackFrame.EndCycleCount - stackFrame.StartCycleCount) - excludedCycleCount;
+                cpuMetrics.SelfCycleCount = cpuMetrics.ElapsedCycleCount - childElapsedCycleCount;
+                cpuMetrics.InclusiveCycleCount = cpuMetrics.SelfCycleCount + childInclusiveCycleCount;
+
+                Debug.Assert(cpuMetrics.ElapsedCycleCount >= 0 && cpuMetrics.SelfCycleCount >= 0 && cpuMetrics.InclusiveCycleCount >= 0);
+                Debug.Assert(cpuMetrics.InclusiveCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.ElapsedCycleCount && cpuMetrics.SelfCycleCount <= cpuMetrics.InclusiveCycleCount);
+
+                if (stackFrame.Routine.MetricsByStack.TryGetValue(stackFrame, out var metrics))
+                    metrics.Add(cpuMetrics);
+                else
+                    stackFrame.Routine.MetricsByStack.Add(stackFrame, cpuMetrics.Clone());
+
+                stackFrame.Routine.AggregateMetrics.Add(cpuMetrics);
             }
         }
- 
+
         private int CalculatedExcludedCycles(model.StackFrame stackFrame)
         {
             Debug.Assert(
@@ -817,7 +820,7 @@ namespace BeebPerf
                     }
                 }
 
-                foreach (var childStackFrame in stackFrame.Children)
+                foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
                     stack.Push((stackFrame: childStackFrame, parentCallTreeNode: callTreeNode));
             }
 
@@ -868,7 +871,7 @@ namespace BeebPerf
 
                 treeNodeList.Add(callTreeNode);
 
-                foreach (var childCallTreeNode in callTreeNode.Children)
+                foreach (var childCallTreeNode in callTreeNode.Children) // child order doesn't matter
                     stack.Push(childCallTreeNode); 
             }
         }
@@ -900,64 +903,73 @@ namespace BeebPerf
             ref int instructionOrdinal,
             Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics)
         {
-            int childIndex = 0;
-            int cycleCount = stackFrame.StartCycleCount;
-            int instructionIndex = stackFrame.FirstInstructionIndex;
-            int lastInstructionIndex = stackFrame.LastInstructionIndex;
-            int previousInstructionIndex = instructionIndex;
+            var stack = new Stack<model.StackFrame>();
+            stack.Push(stackFrame);
 
-            model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
-
-            while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
+            while (stack.Count > 0)
             {
-                if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
+                stackFrame = stack.Pop();
+
+                int childIndex = 0;
+                int cycleCount = stackFrame.StartCycleCount;
+                int instructionIndex = stackFrame.FirstInstructionIndex;
+                int lastInstructionIndex = stackFrame.LastInstructionIndex;
+                int previousInstructionIndex = instructionIndex;
+
+                model.StackFrame? childStackFrame = (stackFrame.Children.Count > 0) ? stackFrame.Children[0] : null;
+
+                while (cycleCount <= stackFrame.EndCycleCount && instructionIndex <= lastInstructionIndex)
                 {
-                    if (previousInstructionIndex > -1 &&
-                        (childStackFrame.CallType == CallType.JSR || childStackFrame.CallType == CallType.TailCall))
+                    if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
                     {
-                        var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
-                        if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
+                        if (previousInstructionIndex > -1 &&
+                            (childStackFrame.CallType == CallType.JSR || childStackFrame.CallType == CallType.TailCall))
                         {
-                            metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
-                            if (childStackFrame.CallType == CallType.TailCall)
-                                metrics.TailCall = true;
+                            var previousInstruction = new CoreInstruction(ref _Instructions[previousInstructionIndex]);
+                            if (instructionMetrics.TryGetValue(previousInstruction, out var metrics))
+                            {
+                                metrics.InclusiveCycleCount += childStackFrame.CPUMetrics.InclusiveCycleCount;
+                                if (childStackFrame.CallType == CallType.TailCall)
+                                    metrics.TailCall = true;
+                            }
                         }
+
+                        // process fall-through
+                        if (childStackFrame.CallType == CallType.FallThrough)
+                            stack.Push(childStackFrame);
+
+                        // skip over child stack frames
+                        instructionIndex = childStackFrame.LastInstructionIndex + 1;
+                        cycleCount = childStackFrame.EndCycleCount;
+
+                        childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
+                        continue;
                     }
 
-                    if (childStackFrame.CallType == CallType.FallThrough)
-                        CalculateStackFrameMetrics(childStackFrame, ref instructionOrdinal, instructionMetrics);
+                    // update cycle counts
+                    ref Instruction instruction = ref _Instructions[instructionIndex];
+                    int instructionCycleCount = instruction.CycleCount;
+                    if (instruction.IsInstruction &&
+                        cycleCount >= StartCycleCount && cycleCount < EndCycleCount)
+                    {
+                        var coreInstruction = new CoreInstruction(ref instruction);
+                        var metrics = instructionMetrics.TryGetValue(coreInstruction, out var existing)
+                            ? existing
+                            : instructionMetrics[coreInstruction] = new InstructionMetrics(coreInstruction, instructionOrdinal++);
 
-                    // skip over child stack frames
-                    instructionIndex = childStackFrame.LastInstructionIndex + 1;
-                    cycleCount = childStackFrame.EndCycleCount;
+                        metrics.InclusiveCycleCount += instructionCycleCount;
+                        metrics.SelfCycleCount += instructionCycleCount;
+                        metrics.ExecutionCount += 1;
 
-                    childStackFrame = (++childIndex < stackFrame.Children.Count) ? stackFrame.Children[childIndex] : null;
-                    continue;
+                        if (_InstructionSet!.IsBranch(instruction.Opcode) && instructionCycleCount > 2)
+                            metrics.BranchCount += 1;
+
+                        previousInstructionIndex = instructionIndex;
+                    }
+
+                    cycleCount += instructionCycleCount;
+                    instructionIndex++;
                 }
-
-                // update cycle counts
-                ref Instruction instruction = ref _Instructions[instructionIndex];
-                int instructionCycleCount = instruction.CycleCount;
-                if (instruction.IsInstruction &&
-                    cycleCount >= StartCycleCount && cycleCount < EndCycleCount)
-                {
-                    var coreInstruction = new CoreInstruction(ref instruction);
-                    var metrics = instructionMetrics.TryGetValue(coreInstruction, out var existing)
-                        ? existing
-                        : instructionMetrics[coreInstruction] = new InstructionMetrics(coreInstruction, instructionOrdinal++);
-
-                    metrics.InclusiveCycleCount += instructionCycleCount;
-                    metrics.SelfCycleCount += instructionCycleCount;
-                    metrics.ExecutionCount += 1;
-
-                    if (_InstructionSet!.IsBranch(instruction.Opcode) && instructionCycleCount > 2)
-                        metrics.BranchCount += 1;
-
-                    previousInstructionIndex = instructionIndex;
-                }
-
-                cycleCount += instructionCycleCount;
-                instructionIndex++;
             }
         }
 

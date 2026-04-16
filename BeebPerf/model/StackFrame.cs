@@ -61,8 +61,8 @@ namespace BeebPerf.model
                 stackFrame.CPUMetrics.Clear();
                 stackFrame.ExcludedCycles = 0;
 
-                foreach (var childStackFrame in stackFrame.Children)
-                    stack.Push(childStackFrame);
+                foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
+                    stack.Push(childStackFrame); 
             }
         }
         
@@ -78,37 +78,41 @@ namespace BeebPerf.model
 
         public static void ComputeInstructionIndices(StackFrame rootStackFrame, int instructionCount)
         {
-            var stack = new Stack<(StackFrame stackFrame, int childIndex)>();
-            stack.Push((rootStackFrame, 0));
+            var stack = new Stack<(StackFrame stackFrame, bool resume)>();
+            stack.Push((rootStackFrame, false));
 
             while (stack.Count > 0)
             {
-                var (stackFrame, childIndex) = stack.Pop();
+                var (stackFrame, resume) = stack.Pop();
 
-                if (childIndex < stackFrame.Children.Count)
+                // process children first
+                if (stackFrame.Children.Count > 0 && !resume)
                 {
-                    // we still have children to process so push the current frame back with childIndex incremented
-                    stack.Push((stackFrame, childIndex + 1));
+                    stack.Push((stackFrame, resume: true));
 
-                    // now push the child stack frame as a new work item
-                    var child = stackFrame.Children[childIndex];
-                    stack.Push((child, 0));
+                    foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
+                        stack.Push((childStackFrame, resume: false)); 
+
+                    continue;
                 }
-                else
+
+                // all children processed — so we can now determine the instruction indices
+                int first = stackFrame.FirstSelfInstructionIndex == -1
+                    ? instructionCount - 1
+                    : stackFrame.FirstSelfInstructionIndex;
+
+                int last = stackFrame.LastSelfInstructionIndex == -1
+                    ? 0
+                    : stackFrame.LastSelfInstructionIndex;
+
+                foreach (var child in stackFrame.Children)
                 {
-                    // all children processed — so we can now determine the instruction indices
-                    int first = stackFrame.FirstSelfInstructionIndex == -1 ? instructionCount - 1 : stackFrame.FirstSelfInstructionIndex;
-                    int last = stackFrame.LastSelfInstructionIndex == -1 ? 0 : stackFrame.LastSelfInstructionIndex;
-
-                    foreach (var childStackFrame in stackFrame.Children)
-                    {
-                        first = Math.Min(first, childStackFrame.FirstInstructionIndex);
-                        last = Math.Max(last, childStackFrame.LastInstructionIndex);
-                    }
-
-                    stackFrame.FirstInstructionIndex = first;
-                    stackFrame.LastInstructionIndex = last;
+                    first = Math.Min(first, child.FirstInstructionIndex);
+                    last = Math.Max(last, child.LastInstructionIndex);
                 }
+
+                stackFrame.FirstInstructionIndex = first;
+                stackFrame.LastInstructionIndex = last;
             }
         }
 
@@ -257,7 +261,7 @@ namespace BeebPerf.model
                 }
 
                 // apply invariant to children
-                foreach (var childStackFrame in stackFrame.Children)
+                foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
                     stack.Push(childStackFrame);
             }
         }

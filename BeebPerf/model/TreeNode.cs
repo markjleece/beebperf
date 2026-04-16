@@ -46,13 +46,7 @@ namespace BeebPerf.model
 
         public int Count
         {
-            get
-            {
-                int count = 1;
-                foreach (var childNode in _Children)
-                    count += childNode.Count;
-                return count;
-            }
+            get => CountTreeNodes(this);
         }
 
         public bool HasChildren
@@ -70,6 +64,26 @@ namespace BeebPerf.model
             Sort(this, comparison);
         }
 
+        private static int CountTreeNodes(TreeNode<T> treeNode)
+        {
+            int count = 0;
+
+            var stack = new Stack<TreeNode<T>>();
+            stack.Push(treeNode);
+
+            while (stack.Count > 0)
+            {
+                treeNode = stack.Pop();
+
+                count++;
+
+                foreach (var childTreeNode in treeNode._Children) // child order doesn't matter
+                    stack.Push(childTreeNode);
+            }
+
+            return count;
+        }
+
         private static void Sort(TreeNode<T> treeNode, Comparison<T> comparison)
         {
             var stack = new Stack<TreeNode<T>>();
@@ -82,8 +96,8 @@ namespace BeebPerf.model
                 if (treeNode._Children.Count > 1)
                     treeNode._Children.Sort(comparison);
 
-                for (int i = treeNode._Children.Count - 1; i >= 0; i--)
-                    stack.Push(treeNode._Children[i]);
+                foreach (var childTreeNode in treeNode._Children) // child order doesn't matter
+                    stack.Push(childTreeNode);
             }
         }
 
@@ -98,7 +112,7 @@ namespace BeebPerf.model
 
                 treeNode._Depth = treeNode.Parent!._Depth + 1;
 
-                foreach (var child in treeNode.Children)
+                foreach (var child in treeNode.Children) // child order doesn't matter
                     stack.Push(child);
             }
         }

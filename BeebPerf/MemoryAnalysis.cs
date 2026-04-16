@@ -170,7 +170,7 @@ namespace BeebPerf
                     if (childStackFrame != null && cycleCount >= childStackFrame.StartCycleCount)
                     {
                         if (childStackFrame.StartCycleCount <= endCycleCount && childStackFrame.EndCycleCount >= startCycleCount)
-                            stack.Push(childStackFrame);
+                            stack.Push(childStackFrame); // child order doesn't matter
 
                         instructionIndex = childStackFrame.LastInstructionIndex + 1;
                         cycleCount = childStackFrame.EndCycleCount;
