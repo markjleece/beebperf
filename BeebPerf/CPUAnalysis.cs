@@ -587,6 +587,7 @@ namespace BeebPerf
                         stackFrame.Routine = CreateRoutine(routineAddress);
                         stackFrame.Routine.StackFrames.Add(stackFrame);
                         stackFrame.Routine.EndAddress = stackFrame.HighestAddress;
+                        stackFrame.ReHash(); // as StartAddress changed
                     }
                     else if (stackFrame.Routine.EndAddress < stackFrame.HighestAddress)
                         stackFrame.Routine.EndAddress = stackFrame.HighestAddress;

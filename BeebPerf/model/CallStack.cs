@@ -38,14 +38,17 @@ namespace BeebPerf.model
             Routine = new Routine();
         }
 
-        public CallStack(Routine routine, CanonicalAddress returnAddress, byte returnStackPointer, CallType type, StackFrame? parent)
+        public CallStack(Routine routine, CanonicalAddress returnAddress, byte returnStackPointer, CallType callType, StackFrame? parent)
         {
-            CallType = type;
+            CallType = callType;
             Parent = parent;
             Routine = routine;
             StartAddress = routine.StartAddress;
             ReturnAddress = returnAddress;
             ReturnStackPointer = returnStackPointer;
+            Depth = (parent == null || callType == CallType.IRQ || callType == CallType.NMI || callType == CallType.BRK) ? 0 : parent.Depth + 1;
+            FullDepth = (parent == null) ? 0 : parent.FullDepth + 1;
+            CalcHash();
         }
 
         public bool Equals(CallStack? other)
@@ -72,47 +75,26 @@ namespace BeebPerf.model
 
         public override int GetHashCode()
         {
-            int hashCode = 0;
-            for (var callStack = this; callStack != null; callStack = callStack.Parent)
-            {
-                hashCode = unchecked(hashCode * 31 + callStack.StartAddress.GetHashCode());
-                if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
-                    break;
-            }
-            return hashCode;
+            return _HashCode;
         }
 
-        public int Depth
+        protected void CalcHash()
         {
-            get
-            {
-                int depth = 0;
-                for (var callStack = this; callStack != null; callStack = callStack.Parent)
-                {
-                    depth++;
-                    if (callStack.CallType == CallType.IRQ || callStack.CallType == CallType.NMI || callStack.CallType == CallType.BRK)
-                        break;
-                }
-                return depth;
-            }
+            int hashCode = StartAddress.GetHashCode();
+            if (Parent != null && CallType != CallType.IRQ && CallType != CallType.NMI && CallType != CallType.BRK)
+                hashCode = unchecked(Parent._HashCode * 31 + hashCode);
+            _HashCode = hashCode;
         }
 
-        public int FullDepth
-        {
-            get
-            {
-                int depth = 0;
-                for (var callStack = this; callStack != null; callStack = callStack.Parent)
-                    depth++;
-                return depth;
-            }
-        }
-
-        public CallType CallType;
+        public CallType CallType { get; private set; }
+        public StackFrame? Parent { get; private set; }
+        public int Depth { get; private set; }
+        public int FullDepth { get; private set; }
         public Routine Routine;
         public CanonicalAddress StartAddress;
         public CanonicalAddress ReturnAddress;
         public byte ReturnStackPointer;
-        public StackFrame? Parent;
+
+        private int _HashCode;
     }
 }

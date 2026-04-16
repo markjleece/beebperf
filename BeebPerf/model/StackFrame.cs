@@ -65,7 +65,28 @@ namespace BeebPerf.model
                     stack.Push(childStackFrame); 
             }
         }
-        
+
+        public void ReHash()
+        {
+            ReHash(this);
+        }
+
+        private static void ReHash(StackFrame stackFrame)
+        {
+            var stack = new Stack<StackFrame>();
+            stack.Push(stackFrame);
+
+            while (stack.Count > 0)
+            {
+                stackFrame = stack.Pop();
+
+                stackFrame.CalcHash();
+
+                foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
+                    stack.Push(childStackFrame);
+            }
+        }
+
         public bool IsEmpty()
         {
             return (FirstSelfInstructionIndex == -1 && LastSelfInstructionIndex == -1 && Children.Count == 0);

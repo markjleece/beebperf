@@ -36,12 +36,7 @@ namespace BeebPerf.model
         {
             _Children.Add(treeNode);
             treeNode.Parent = (T)this;
-            UpdateDepths(treeNode);
-        }
-
-        public int Depth
-        {
-            get => _Depth;
+            treeNode.Depth = Depth + 1;
         }
 
         public int Count
@@ -101,31 +96,15 @@ namespace BeebPerf.model
             }
         }
 
-        private static void UpdateDepths(TreeNode<T> treeNode)
-        { 
-            var stack = new Stack<TreeNode<T>>();
-            stack.Push(treeNode);
-
-            while (stack.Count > 0)
-            {
-                treeNode = stack.Pop();
-
-                treeNode._Depth = treeNode.Parent!._Depth + 1;
-
-                foreach (var child in treeNode.Children) // child order doesn't matter
-                    stack.Push(child);
-            }
-        }
-
         public enum ExpansionType
         {
             Closed,
             Open
         };
 
-        public T? Parent;
+        public T? Parent { get; private set; }
+        public int Depth { get; private set; }
         public ExpansionType Expansion;
-        private int _Depth;
         private List<T> _Children = new();
     }
 }
