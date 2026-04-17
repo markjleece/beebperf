@@ -506,11 +506,6 @@ namespace BeebPerf.ux
         {
             Graphics graphics = e.Graphics;
 
-            // draw header text
-            using var textBrush = new SolidBrush(ForeColor);
-            graphics.DrawString("Duration:", Font, textBrush, new PointF(0, 0));
-
-            // draw default ruler
             using var pen = new Pen(Blend(ForeColor, BackColor, 0.5));
             using var brush = new SolidBrush(ForeColor);
 

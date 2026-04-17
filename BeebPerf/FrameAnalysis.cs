@@ -196,6 +196,15 @@ namespace BeebPerf
             _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
             _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
 
+            _PortBAddressableLatch = _ScreenWrapAddress switch
+            {
+                0x4000 => 0x00,
+                0x6000 => 0x10,
+                0x3000 => 0x20,
+                0x5800 => 0x30,
+                _ => 0x00
+            };
+
             SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
 
             _DisplayFrame = false;

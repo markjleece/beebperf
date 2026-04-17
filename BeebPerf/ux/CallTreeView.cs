@@ -330,46 +330,43 @@ namespace BeebPerf.ux
 
         private void SelectRoutineInternal(Routine routine, CallStack callStack)
         {
-            // find tree node
-            var treeNode = FindTreeNode(routine, callStack);
-            if (treeNode == null)
+            // create routine stack
+            var routineStack = new Stack<Routine>(callStack.Depth);
+            for (int depth = callStack.Depth; depth >= 0; depth--)
             {
-                ClearSelection();
-                return;
-            }
-
-            // create tip-to-root stack of tree nodes 
-            Stack<CallTreeNode> treeNodeStack = new();
-            while (treeNode != null)
-            {
-                treeNodeStack.Push(treeNode);
-                treeNode = treeNode.Parent;
+                routineStack.Push(callStack.Routine);
+                callStack = callStack.Parent!;
             }
 
             // expand tree nodes root-to-tip, selecting the tip
             CollapseTreeInternal();
 
-            int rowIndex = 0;
-            treeNode = treeNodeStack.Pop();
-            while (treeNode != null && rowIndex < _DataRows.Count)
+            bool root = true;
+            for (int rowIndex = 0; rowIndex < _DataRows.Count; rowIndex++)
             {
-                if (treeNode == _DataRows[rowIndex])
+                var treeNode = _DataRows[rowIndex];
+
+                if (root && treeNode.Parent != null)
+                    continue;
+
+                if (treeNode.Routine != routineStack.Peek())
+                    continue;
+
+                routineStack.Pop();
+
+                if (routineStack.Count == 0)
                 {
-                    if (treeNodeStack.Count == 0)
-                    {
-                        SelectRow(treeNode, scrollIntoView: true);
-                        return;
-                    }
-
-                    if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
-                    {
-                        OpenTreeNode(rowIndex, treeNode);
-                        UpdateColumns();
-                    }
-
-                    treeNode = treeNodeStack.Pop();
+                    SelectRow(treeNode, scrollIntoView: true);
+                    return;
                 }
-                rowIndex++;
+
+                if (treeNode.Expansion == TreeNode<CallTreeNode>.ExpansionType.Closed)
+                {
+                    OpenTreeNode(rowIndex, treeNode);
+                    UpdateColumns();
+                }
+
+                root = false;
             }
         }
 
@@ -540,33 +537,6 @@ namespace BeebPerf.ux
                     RemoveChildRows(index, childNode);
                 }
             }
-        }
-
-        private CallTreeNode? FindTreeNode(Routine routine, CallStack callStack)
-        {
-            foreach (var treeNode in _DataRows)
-            {
-                if (treeNode.Parent == null)
-                {
-                    var found = FindTreeNode(treeNode, routine, callStack);
-                    if (found != null)
-                        return found;
-                }
-            }
-            return null;
-        }
-
-        private CallTreeNode? FindTreeNode(CallTreeNode treeNode, Routine routine, CallStack callStack)
-        {
-            if (treeNode.Routine == routine && callStack == treeNode.CallStack)
-                return treeNode;
-            foreach (var child in treeNode.Children)
-            {
-                var found = FindTreeNode(child, routine, callStack);
-                if (found != null)
-                    return found;
-            }
-            return null;
         }
 
         private void RefreshExecutionCounts()
