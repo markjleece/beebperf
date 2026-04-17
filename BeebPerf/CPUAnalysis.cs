@@ -788,12 +788,8 @@ namespace BeebPerf
             {
                 var (stackFrame, parentCallTreeNode) = stack.Pop();
 
-                var callStack = (CallStack)stackFrame;
-
-                if (!stackFrame.Routine.MetricsByStack.ContainsKey(callStack))
-                    continue;
-
                 CallTreeNode callTreeNode;
+                var callStack = (CallStack)stackFrame;
                 if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
                 {
                     callTreeNode = new CallTreeNode(callStack);
@@ -822,7 +818,8 @@ namespace BeebPerf
                 }
 
                 foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
-                    stack.Push((stackFrame: childStackFrame, parentCallTreeNode: callTreeNode));
+                    if (childStackFrame.CPUMetrics.InclusiveCycleCount > 0)
+                        stack.Push((stackFrame: childStackFrame, parentCallTreeNode: callTreeNode));
             }
 
             // sort populated trees
