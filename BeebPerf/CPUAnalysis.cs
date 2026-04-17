@@ -51,9 +51,13 @@ namespace BeebPerf
             _LabelResolver = labelResolver;
         }
 
+        //
+        // static analysis...
+        //
+
         public async Task<bool> StaticAnalysisAsync(Model model)
         {
-            return await Task.Run(() => 
+            return await Task.Run(() =>
             {
                 Initialize(model);
                 CreateRoutines();
@@ -62,40 +66,6 @@ namespace BeebPerf
             });
         }
 
-        public async Task<bool> DynamicAnalysisAsync(int startCycleCount, int endCycleCount)
-        {
-            return await Task.Run(() => 
-            {
-                CalculateRange(startCycleCount, endCycleCount);
-                CalculateMetrics();
-                PopulateHotRoutines();
-                PopulateCallTrees();
-                MarkHotPaths();
-                return true; 
-            });
-        }
-
-        public async Task<(List<RoutineMetrics>, List<RoutineMetrics>)> GetCallerCalleeMetricsAsync(Routine routine)
-        {
-            return await Task.Run(() =>
-            {
-                var callerMetrics = GetCallerMetrics(routine);
-                var calleeMetrics = GetCalleeMetrics(routine);
-                return (callerMetrics, calleeMetrics);
-            });
-        }
-
-        public async Task<List<InstructionMetrics>> CalculateInstructionMetricsAsync(Routine routine, CallStack? callStack)
-        {
-            return await Task.Run(() =>
-            {
-                return CalculateInstructionMetrics(routine, callStack);
-            });
-        }
-
-        //
-        // static analysis...
-        //
         private void Initialize(Model model)
         {
             _Instructions = model.Instructions;
@@ -642,6 +612,20 @@ namespace BeebPerf
         //
         // dynamic analysis...
         //
+
+        public async Task<bool> DynamicAnalysisAsync(int startCycleCount, int endCycleCount)
+        {
+            return await Task.Run(() =>
+            {
+                CalculateRange(startCycleCount, endCycleCount);
+                CalculateMetrics();
+                PopulateHotRoutines();
+                PopulateCallTrees();
+                MarkHotPaths();
+                return true;
+            });
+        }
+
         private void CalculateRange(int startCycleCount, int endCycleCount)
         {
             int cycleCount = 0;
@@ -925,7 +909,16 @@ namespace BeebPerf
         //
         // instruction metrics...
         //
-        public List<InstructionMetrics> CalculateInstructionMetrics(Routine routine, CallStack? callStack)
+
+        public async Task<List<InstructionMetrics>> CalculateInstructionMetricsAsync(Routine routine, CallStack? callStack)
+        {
+            return await Task.Run(() =>
+            {
+                return CalculateInstructionMetrics(routine, callStack);
+            });
+        }
+
+        private List<InstructionMetrics> CalculateInstructionMetrics(Routine routine, CallStack? callStack)
         {
             Dictionary<CoreInstruction, InstructionMetrics> instructionMetrics = new();
 
@@ -1060,7 +1053,18 @@ namespace BeebPerf
         //
         // caller / callee metrics...
         //
-        public List<RoutineMetrics> GetCallerMetrics(Routine routine)
+
+        public async Task<(List<RoutineMetrics>, List<RoutineMetrics>)> CalculateCallerCalleeMetricsAsync(Routine routine)
+        {
+            return await Task.Run(() =>
+            {
+                var callerMetrics = CalculateCallerMetrics(routine);
+                var calleeMetrics = CalculateCalleeMetrics(routine);
+                return (callerMetrics, calleeMetrics);
+            });
+        }
+
+        private List<RoutineMetrics> CalculateCallerMetrics(Routine routine)
         {
             Dictionary<CallStack, CPUMetrics> callerMetrics = new();
 
@@ -1078,23 +1082,34 @@ namespace BeebPerf
             return ToList(callerMetrics);
         }
 
-        public List<RoutineMetrics> GetCalleeMetrics(Routine routine)
+        private List<RoutineMetrics> CalculateCalleeMetrics(Routine routine)
         {
             Dictionary<CallStack, CPUMetrics> calleeMetrics = new();
 
+            // first collect all the callee routines during the selected time range
+            var calledRoutines = new HashSet<Routine>();
             foreach (var stackFrame in routine!.StackFrames)
             {
                 if (StartCycleCount > stackFrame.EndCycleCount || EndCycleCount < stackFrame.StartCycleCount)
                     continue;
 
                 foreach (var child in stackFrame.Children)
-                {
-                    if (child.CallType == CallType.IRQ || child.CallType == CallType.NMI || child.CallType == CallType.BRK)
-                        continue;
+                    if (child.CallType != CallType.IRQ && child.CallType != CallType.NMI && child.CallType != CallType.BRK)
+                        calledRoutines.Add(child.Routine);
+            }
 
-                    if (!calleeMetrics.ContainsKey(child))
-                        if (child.Routine.MetricsByStack.TryGetValue(child, out var metrics))
-                            calleeMetrics[child] = metrics.Clone();
+            // now collect all the callee routine metrics
+            foreach (var childRoutine in calledRoutines)
+            {
+                foreach (var kvp in childRoutine.MetricsByStack)
+                {
+                    var callStack = kvp.Key;
+
+                    if (!calleeMetrics.ContainsKey(callStack))
+                    {
+                        var metrics = kvp.Value;
+                        calleeMetrics[callStack] = metrics.Clone();
+                    }
                 }
             }
 

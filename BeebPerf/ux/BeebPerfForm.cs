@@ -505,7 +505,7 @@ namespace BeebPerf.ux
         {
             callerCalleeView.Clear();
 
-            _CPUAnalysis.GetCallerCalleeMetricsAsync(routine).ContinueWith((task) =>
+            _CPUAnalysis.CalculateCallerCalleeMetricsAsync(routine).ContinueWith((task) =>
             {
                 this.Invoke((Action)(() =>
                 {
