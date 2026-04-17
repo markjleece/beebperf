@@ -1099,12 +1099,11 @@ namespace BeebPerf
             }
 
             // now collect all the callee routine metrics
-            foreach (var childRoutine in calledRoutines)
+            foreach (var calleeRoutine in calledRoutines)
             {
-                foreach (var kvp in childRoutine.MetricsByStack)
+                foreach (var kvp in calleeRoutine.MetricsByStack)
                 {
                     var callStack = kvp.Key;
-
                     if (!calleeMetrics.ContainsKey(callStack))
                     {
                         var metrics = kvp.Value;
