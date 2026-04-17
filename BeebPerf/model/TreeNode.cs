@@ -26,12 +26,8 @@ namespace BeebPerf.model
     // node has a parent, a set of children, a depth value, and
     // an expansion state indicating whether it is open or closed.
     //
-    public class TreeNode<T> where T : TreeNode<T>
+    public class TreeNode<T> : IEquatable<TreeNode<T>> where T : TreeNode<T>
     {
-        public TreeNode() 
-        {
-        }
-
         public void AddChild(T treeNode)
         {
             _Children.Add(treeNode);
@@ -96,6 +92,16 @@ namespace BeebPerf.model
             }
         }
 
+        public override int GetHashCode()
+        {
+            return _Id;
+        }
+
+        public bool Equals(TreeNode<T>? other)
+        {
+            return other != null && _Id == other._Id;
+        }
+
         public enum ExpansionType
         {
             Closed,
@@ -106,5 +112,8 @@ namespace BeebPerf.model
         public int Depth { get; private set; }
         public ExpansionType Expansion;
         private List<T> _Children = new();
+
+        private int _Id = _NextId++;
+        private static int _NextId = 1;
     }
 }

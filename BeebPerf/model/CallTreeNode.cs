@@ -30,7 +30,7 @@ namespace BeebPerf.model
     // 
     // The class also provides sorting functionality, and extends
     // from TreeNode, which provides the tree topology and node
-    // explansion behaviors.
+    // expansion behaviors.
     //
     public class CallTreeNode : TreeNode<CallTreeNode>
     {
@@ -38,7 +38,7 @@ namespace BeebPerf.model
         {
             CallStack = callStack;
             Routine = callStack.Routine;
-            CPUMetrics = callStack.Routine.MetricsByStack.TryGetValue(callStack, out var metrics) ? metrics : new CPUMetrics();
+            CPUMetrics = new CPUMetrics();
         }
 
         public enum SortField
@@ -96,7 +96,7 @@ namespace BeebPerf.model
 
         public readonly Routine Routine;
         public readonly CallStack CallStack;
-        public readonly CPUMetrics CPUMetrics;
+        public CPUMetrics CPUMetrics;
         public bool HotPath;
     }
 }

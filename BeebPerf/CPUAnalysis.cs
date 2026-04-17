@@ -771,16 +771,32 @@ namespace BeebPerf
                 HotRoutines[i].HotRoutine = (i < hotRoutineCount);
         }
 
+        private struct CallTreeLocation : IEquatable<CallTreeLocation>
+        {
+            public required CallTreeNode ParentCallTreeNode;
+            public required CanonicalAddress StartAddress;
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(ParentCallTreeNode, StartAddress);
+            }
+
+            bool IEquatable<CallTreeLocation>.Equals(CallTreeLocation other)
+            {
+                return ParentCallTreeNode.Equals(other.ParentCallTreeNode) &&
+                       StartAddress.Equals(other.StartAddress);
+            }
+        }
+
         private void PopulateCallTrees()
         {
-            var treeNodesByCallStack = new Dictionary<CallStack, CallTreeNode>();
+            var treeNodesByLocation = new Dictionary<CallTreeLocation, CallTreeNode>();
 
             // clear trees
             ProgramCallTree = null;
             IRQBRKCallTree = null;
             NMICallTree = null;
 
-            // populate trees
             var stack = new Stack<(model.StackFrame stackFrame, CallTreeNode? parentCallTreeNode)>();
             stack.Push((stackFrame: RootStackFrame, parentCallTreeNode: null));
 
@@ -790,32 +806,49 @@ namespace BeebPerf
 
                 CallTreeNode callTreeNode;
                 var callStack = (CallStack)stackFrame;
-                if (!treeNodesByCallStack.TryGetValue(callStack, out callTreeNode!))
+
+                switch (stackFrame.CallType)
                 {
-                    callTreeNode = new CallTreeNode(callStack);
-                    treeNodesByCallStack.Add(callStack, callTreeNode);
+                    case CallType.None:
+                        if (ProgramCallTree == null)
+                            ProgramCallTree = new CallTreeNode(stackFrame);
+                        callTreeNode = ProgramCallTree;
+                        break;
 
-                    switch (stackFrame.CallType)
-                    {
-                        case CallType.None:
-                            ProgramCallTree = callTreeNode;
-                            break;
+                    case CallType.IRQ:
+                    case CallType.BRK:
+                        if (IRQBRKCallTree == null)
+                            IRQBRKCallTree = new CallTreeNode(stackFrame);
+                        callTreeNode = IRQBRKCallTree;
+                        break;
 
-                        case CallType.IRQ:
-                        case CallType.BRK:
-                            IRQBRKCallTree = callTreeNode;
-                            break;
+                    case CallType.NMI:
+                        if (NMICallTree == null)
+                            NMICallTree = new CallTreeNode(stackFrame);
+                        callTreeNode = NMICallTree;
+                        break;
 
-                        case CallType.NMI:
-                            NMICallTree = callTreeNode;
-                            break;
+                    default:
+                        Debug.Assert(parentCallTreeNode != null);
 
-                        default:
-                            if (parentCallTreeNode != null)
-                                parentCallTreeNode.AddChild(callTreeNode);
-                            break;
-                    }
+                        // populate trees
+                        var key = new CallTreeLocation()
+                        {
+                            ParentCallTreeNode = parentCallTreeNode,
+                            StartAddress = stackFrame.StartAddress
+                        };
+                            
+                        if (!treeNodesByLocation.TryGetValue(key, out callTreeNode!))
+                        {
+                            callTreeNode = new CallTreeNode(callStack);
+                            treeNodesByLocation.Add(key, callTreeNode);
+                            parentCallTreeNode!.AddChild(callTreeNode);
+                        }
+                        break;
                 }
+
+                // aggregate metrics
+                callTreeNode.CPUMetrics.Add(stackFrame.CPUMetrics);
 
                 foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
                     if (childStackFrame.CPUMetrics.InclusiveCycleCount > 0)
