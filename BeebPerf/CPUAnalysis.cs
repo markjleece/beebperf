@@ -829,9 +829,6 @@ namespace BeebPerf
                         break;
 
                     default:
-                        Debug.Assert(parentCallTreeNode != null);
-
-                        // populate trees
                         var key = new CallTreeLocation()
                         {
                             ParentCallTreeNode = parentCallTreeNode,
@@ -850,6 +847,7 @@ namespace BeebPerf
                 // aggregate metrics (much faster than performing a lookup in the CallTreeNode constructor)
                 callTreeNode.CPUMetrics.Add(stackFrame.CPUMetrics);
 
+                // create work items for children that have metrics
                 foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
                     if (childStackFrame.CPUMetrics.InclusiveCycleCount > 0)
                         stack.Push((stackFrame: childStackFrame, parentCallTreeNode: callTreeNode));

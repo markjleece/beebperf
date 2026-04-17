@@ -484,7 +484,7 @@ namespace BeebPerf.ux
                 _LayoutExtents.Height = (maxTreeDepth * cellHeight) + (2 * marginSize);
 
                 // layout siblings, and their descendants
-                LayoutSiblings(_CallTrees, left: marginSize, top: marginSize, scaler, cellHeight, new HashSet<Rectangle>());
+                LayoutSiblings(_CallTrees, left: marginSize, top: marginSize, scaler, cellHeight, new HashSet<Rectangle>(), depth: 0);
             }
             else
             {
@@ -495,7 +495,14 @@ namespace BeebPerf.ux
             UpdateScrollBars();
         }
 
-        private void LayoutSiblings(IReadOnlyList<CallTreeNode> siblings, int left, int top, double scaler, int cellHeight, HashSet<Rectangle> rectSet)
+        private void LayoutSiblings(
+            IReadOnlyList<CallTreeNode> siblings, 
+            int left, 
+            int top, 
+            double scaler, 
+            int cellHeight, 
+            HashSet<Rectangle> rectSet,
+            int depth)
         {
             // sort siblings by their inclusive cycle count
             var sortedSiblings = siblings.ToList();
@@ -533,10 +540,8 @@ namespace BeebPerf.ux
                 }
 
                 // recursively layout children
-                if (sibling.HasChildren)
-                {
-                    LayoutSiblings(sibling.Children, siblingLeft, top + cellHeight, scaler, cellHeight, rectSet);
-                }
+                if (sibling.HasChildren && depth < MaxDisplayedDepth)
+                    LayoutSiblings(sibling.Children, siblingLeft, top + cellHeight, scaler, cellHeight, rectSet, depth + 1);
             }
         }
 
@@ -674,7 +679,7 @@ namespace BeebPerf.ux
         {
             int maxDepth = depth;
             foreach (var sibling in siblings)
-                if (sibling.HasChildren)
+                if (sibling.HasChildren && depth < MaxDisplayedDepth)
                     maxDepth = Math.Max(MaxDepth(sibling.Children, depth + 1), maxDepth);
             return maxDepth;
         }
@@ -890,5 +895,7 @@ namespace BeebPerf.ux
         private bool _SiblingPercentages = false;
         private bool _ShowCallTypes = false;
         private bool _FlipView = false;
+
+        private const int MaxDisplayedDepth = 1000;
     }
 }
