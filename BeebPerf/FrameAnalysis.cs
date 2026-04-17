@@ -20,7 +20,7 @@
 // --------------------------------------------------------------
 
 //
-// Acknowlegment: Video related code is derived from the BeebEm project,
+// acknowledgement: Video related code is derived from the BeebEm project,
 // specifically portions of the Video class.
 //
 
@@ -31,7 +31,7 @@ using System.Drawing.Imaging;
 namespace BeebPerf
 {
     //
-    // Frame analysus generates a list of analysis frames, which captures
+    // Frame analysis generates a list of analysis frames, which captures
     // how long each game-loop iteration takes, and a list of display
     // frames, which captures the displayed CRT frames.
     //
@@ -281,7 +281,7 @@ namespace BeebPerf
 
         private void StartAnalysisFrame(int cycleCount, int instructionIndex)
         {
-            // remmber cycle count
+            // remember cycle count
             _FrameStartCycleCount = cycleCount;
 
             // reset counts
@@ -298,8 +298,7 @@ namespace BeebPerf
 
                 case FrameSettings.FrameType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
-                    if (stackFrame != null) 
-                        _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
+                    _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
 
                 case FrameSettings.FrameType.JSRAddress:
@@ -307,8 +306,7 @@ namespace BeebPerf
                     var destinationInstructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
 
                     stackFrame = FindStackFrame(destinationInstructionIndex);
-                    if (stackFrame != null)
-                        _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
+                    _FrameEndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
             }
         }
@@ -352,31 +350,41 @@ namespace BeebPerf
         private model.StackFrame FindStackFrame(int instructionIndex)
         {
             Debug.Assert(_RootStackFrame != null);
-            var result = FindStackFrame(_RootStackFrame!, instructionIndex);
-            return result!;
-        }
 
-        private static model.StackFrame? FindStackFrame(model.StackFrame stackFrame, int instructionIndex)
-        {
-            // check children first, as they will be more specific than the parent stack frame
-            foreach (var childStackFrame in stackFrame.Children)
+            var stack = new Stack<(model.StackFrame stackFrame, bool resume)>();
+            stack.Push((_RootStackFrame, resume: false));
+
+            while (stack.Count > 0)
             {
-                // bounds check to avoid unnecessary recursion
-                if (instructionIndex < childStackFrame.FirstInstructionIndex ||
-                    instructionIndex > childStackFrame.LastInstructionIndex)
-                    continue;
+                var (stackFrame, resume) = stack.Pop();
 
-                // recurse
-                var result = FindStackFrame(childStackFrame, instructionIndex);
-                if (result != null)
-                    return result;
+                // first check the child stack frames
+                if (stackFrame.Children.Count > 0 && !resume)
+                {
+                    stack.Push((stackFrame, resume: true));
+
+                    foreach (var childStackFrame in stackFrame.Children) // order doesn't matter
+                    {
+                        // bounds check to avoid unnecessary processing
+                        if (instructionIndex < childStackFrame.FirstInstructionIndex ||
+                            instructionIndex > childStackFrame.LastInstructionIndex)
+                            continue;
+
+                        stack.Push((childStackFrame, resume: false));
+                    }
+
+                    continue;
+                }
+
+                // must be this stack frame!
+                Debug.Assert(
+                    instructionIndex >= stackFrame.FirstInstructionIndex &&
+                    instructionIndex <= stackFrame.LastInstructionIndex);
+
+                return stackFrame;
             }
 
-            Debug.Assert(
-                instructionIndex >= stackFrame.FirstInstructionIndex &&
-                instructionIndex <= stackFrame.LastInstructionIndex);
-
-            return stackFrame;
+            return _RootStackFrame!;
         }
 
         private void UpdateVideoState()
@@ -710,31 +718,23 @@ namespace BeebPerf
                 _ULAModified |= (value != _ULAPalette[value >> 4]);
                 _ULAPalette[value >> 4] = value;
             }
-            else if (address == 0xFE42) // set data direction
+            else if (address == 0xFE40 || address == 0xFE50)
             {
-                _SystemVIA_DataDirection = value;
-            }
-            else if (address == 0xFE40) // set screen wrap address
-            {
-                if ((_SystemVIA_DataDirection & 0xF) == 0xF)
-                {
-                    int latchIndex = (value & 0x07);
-                    int latchValue = (value >> 3) & 0x01;
-                    if (latchIndex == 4)
-                        _ScreenWrapAddressLatch = (byte)((_ScreenWrapAddressLatch & 0xFE) | latchValue);
-                    else if (latchIndex == 5)
-                        _ScreenWrapAddressLatch = (byte)((_ScreenWrapAddressLatch & 0xFD) | latchValue);
+                int bit = 1 << (value & 0x07);
+                if ((value & 0x8) == 0x8)
+                    _PortBAddressableLatch |= (byte)bit;
+                else
+                    _PortBAddressableLatch &= (byte)~bit;
 
-                    _ScreenWrapAddress = _ScreenWrapAddressLatch switch
-                    {
-                        0 => 0x4000,
-                        1 => 0x6000,
-                        2 => 0x3000,
-                        3 => 0x5800,
-                        _ => throw new ArgumentOutOfRangeException()
-                    };
-                    _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
-                }
+                _ScreenWrapAddress = (_PortBAddressableLatch & 0x30) switch
+                {
+                    0x00 => 0x4000,
+                    0x10 => 0x6000,
+                    0x20 => 0x3000,
+                    0x30 => 0x5800,
+                    _ => throw new ArgumentOutOfRangeException()
+                };
+                _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
             }
 
             if (address >= 0xFE34 && address < 0xFE38)
@@ -1373,8 +1373,7 @@ namespace BeebPerf
         private int[] _ShadowRamDisplayFrame = [];
         private int[] _FilingSystemRamDisplayFrame = [];
 
-        private byte _SystemVIA_DataDirection;
-        private byte _ScreenWrapAddressLatch;
+        private byte _PortBAddressableLatch;
         private int _StartCycleCount;
         private int _LastCycleCount;
         private bool _CtrlModified;

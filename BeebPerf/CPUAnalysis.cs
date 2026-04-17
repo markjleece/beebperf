@@ -562,7 +562,6 @@ namespace BeebPerf
                 count++;
             }
             currentStackFrame!.EndCycleCount = cycleCount;
-            Debug.Assert(count < 50);
 
             // set members
             RootStackFrame = currentStackFrame;
