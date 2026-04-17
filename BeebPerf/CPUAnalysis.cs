@@ -847,7 +847,7 @@ namespace BeebPerf
                         break;
                 }
 
-                // aggregate metrics
+                // aggregate metrics (much faster than performing a lookup in the CallTreeNode constructor)
                 callTreeNode.CPUMetrics.Add(stackFrame.CPUMetrics);
 
                 foreach (var childStackFrame in stackFrame.Children) // child order doesn't matter
