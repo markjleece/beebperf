@@ -75,6 +75,24 @@ namespace BeebPerf
             });
         }
 
+        public async Task<(List<RoutineMetrics>, List<RoutineMetrics>)> GetCallerCalleeMetricsAsync(Routine routine)
+        {
+            return await Task.Run(() =>
+            {
+                var callerMetrics = GetCallerMetrics(routine);
+                var calleeMetrics = GetCalleeMetrics(routine);
+                return (callerMetrics, calleeMetrics);
+            });
+        }
+
+        public async Task<List<InstructionMetrics>> CalculateInstructionMetricsAsync(Routine routine, CallStack? callStack)
+        {
+            return await Task.Run(() =>
+            {
+                return CalculateInstructionMetrics(routine, callStack);
+            });
+        }
+
         //
         // static analysis...
         //
@@ -830,7 +848,7 @@ namespace BeebPerf
                     default:
                         var key = new CallTreeLocation()
                         {
-                            ParentCallTreeNode = parentCallTreeNode,
+                            ParentCallTreeNode = parentCallTreeNode!,
                             StartAddress = stackFrame.StartAddress
                         };
                             

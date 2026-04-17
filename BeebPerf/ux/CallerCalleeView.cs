@@ -39,33 +39,32 @@ namespace BeebPerf.ux
             InitializeButtons();
         }
 
-        public void Initialize(
-            Func<Routine, List<RoutineMetrics>> getCallerMetrics,
-            Func<Routine, List<RoutineMetrics>> getCalleeMetrics,
-            int totalCycleCount)
+        public void Initialize(int totalCycleCount)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            _GetCallerMetrics = getCallerMetrics;
-            _GetCalleeMetrics = getCalleeMetrics;
             _TotalCycleCount = totalCycleCount;
         }
 
-        public void SelectRoutine(Routine routine)
+        public void SelectRoutine(Routine routine, List<RoutineMetrics> callerMetrics, List<RoutineMetrics> calleeMetrics)
         {
-            using var token = _ReentrancyGuard.TryEnter();
-            if (token == null) return;
-
-            SelectRoutineInternal(routine);
+            _Routine = routine;
+            _Callers = callerMetrics;
+            _Callees = calleeMetrics;
+            LayoutRoutineCells();
+            (this as IDataView).UpdateButtons();
+            Invalidate();
         }
 
         public void Clear()
         {
-            using var token = _ReentrancyGuard.TryEnter();
-            if (token == null) return;
-
-            ClearInternal();
+            _Routine = null;
+            _Callers = new();
+            _Callees = new();
+            _RoutineCells.Clear();
+            (this as IDataView).UpdateButtons();
+            Invalidate();
         }
 
         protected override void OnMouseClick(MouseEventArgs e)
@@ -81,8 +80,6 @@ namespace BeebPerf.ux
                      routineCell.CellType != RoutineCellType.Callee) ||
                     !routineCell.Rectangle.Contains(e.X, e.Y))
                     continue;
-
-                SelectRoutineInternal(routineCell.Routine);
 
                 var form = FindForm() as BeebPerfForm;
                 if (form is null) continue;
@@ -126,26 +123,6 @@ namespace BeebPerf.ux
 
             HideToolTip();
             RemoveFocus();
-        }
-
-        private void SelectRoutineInternal(Routine routine)
-        {
-            _Routine = routine;
-            _Callers = _GetCallerMetrics!.Invoke(routine);
-            _Callees = _GetCalleeMetrics!.Invoke(routine);
-            LayoutRoutineCells();
-            (this as IDataView).UpdateButtons();
-            Invalidate();
-        }
-
-        private void ClearInternal()
-        {
-            _Routine = null;
-            _Callers = new();
-            _Callees = new();
-            _RoutineCells.Clear();
-            (this as IDataView).UpdateButtons();
-            Invalidate();
         }
 
         private void OnVisibleChanged(object? sender, EventArgs e)
@@ -550,8 +527,6 @@ namespace BeebPerf.ux
             public bool ShowHotness;
         }
 
-        private Func<Routine, List<RoutineMetrics>>? _GetCallerMetrics;
-        private Func<Routine, List<RoutineMetrics>>? _GetCalleeMetrics;
         private RoutineCell? _FocusRoutineCell;
         private List<RoutineCell> _RoutineCells = new();
         private List<RoutineMetrics> _Callers = new();

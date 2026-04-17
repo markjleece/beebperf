@@ -22,6 +22,7 @@
 using BeebPerf.model;
 using BeebPerf.operation;
 using System.Text;
+using static BeebPerf.CPUAnalysis;
 using static BeebPerf.MemoryAnalysis;
 
 namespace BeebPerf.ux
@@ -94,7 +95,7 @@ namespace BeebPerf.ux
                 {
                     openRecentFile = MessageBox.Show(
                         this,
-                        $"BeebPerf closed unexpectantly last session. Do you want to reopen '{_RecentPerfFilePathName}' ?",
+                        $"BeebPerf closed unexpectedly last session. Do you want to reopen '{_RecentPerfFilePathName}' ?",
                         "BeebPerf",
                         MessageBoxButtons.YesNo,
                         MessageBoxIcon.Error);
@@ -254,13 +255,10 @@ namespace BeebPerf.ux
 
                     // caller/callee
                     callerCalleeView.Initialize(
-                        _CPUAnalysis.GetCallerMetrics,
-                        _CPUAnalysis.GetCalleeMetrics,
                         _CPUAnalysis.EndCycleCount - _CPUAnalysis.StartCycleCount);
 
                     // code view
                     codeView.Initialize(
-                        _CPUAnalysis.CalculateInstructionMetrics,
                         _CPUAnalysis.RoutinesByAddress,
                         _LabelResolver,
                         _Model.InstructionSet!);
@@ -480,13 +478,42 @@ namespace BeebPerf.ux
             _SelectedMemoryAccess = memoryAccess;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-            codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess);
+            SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
+            SetCallerCalleeAsync(_SelectedRoutine);
 
             routinesView.SelectRoutine(routine);
-            callerCalleeView.SelectRoutine(routine);
             callTreeView.SelectRoutine(routine, callStack!);
             flameGraphView.SelectRoutine(routine, callStack!);
             memoryRoutinesView.SelectRoutine(routine);
+        }
+
+        private void SetCodeAsync(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
+        {
+            codeView.Clear();
+
+            _CPUAnalysis.CalculateInstructionMetricsAsync(routine, callStack).ContinueWith((task) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    var instructionMetrics = task.Result as List<InstructionMetrics>;
+                    codeView.SetCode(routine!, callStack, instructionMetrics, memoryAccess);
+                }));
+            });
+        }
+
+        private void SetCallerCalleeAsync(Routine routine)
+        {
+            callerCalleeView.Clear();
+
+            _CPUAnalysis.GetCallerCalleeMetricsAsync(routine).ContinueWith((task) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    var callerMetrics = task.Result.Item1 as List<RoutineMetrics>;
+                    var calleeMetrics = task.Result.Item2 as List<RoutineMetrics>;
+                    callerCalleeView.SelectRoutine(routine, callerMetrics, calleeMetrics);
+                }));
+            });
         }
 
         public void ClearSelectedRoutine()
@@ -562,7 +589,7 @@ namespace BeebPerf.ux
                         if (memoryAccesses != null)
                         {
                             memoryRoutinesView.SelectRoutine(_SelectedRoutine);
-                            codeView.SetCode(_SelectedRoutine, callStack: null, memoryAccesses);
+                            SetCodeAsync(_SelectedRoutine, callStack: null, memoryAccesses);
                         }
                     }
                 }));
@@ -659,7 +686,7 @@ namespace BeebPerf.ux
             if (_SelectedRoutine != null)
             {
                 bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-                codeView.SetCode(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
+                SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
             }
         }
 

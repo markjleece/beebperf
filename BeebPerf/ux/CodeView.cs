@@ -101,18 +101,16 @@ namespace BeebPerf.ux
         }
 
         public void Initialize(
-            Func<Routine, CallStack?, List<InstructionMetrics>>? calculateInstructionMetrics,
             CanonicalAddressMap<Routine> routinesByAddress,
             LabelResolver labelResolver,
             InstructionSet instructionSet)
         {
-            _CalculateInstructionMetrics = calculateInstructionMetrics;
             _RoutinesByAddress = routinesByAddress;
             _InstructionSet = instructionSet;
             _LabelResolver = labelResolver;
         }
 
-        public void SetCode(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
+        public void SetCode(Routine routine, CallStack? callStack, List<InstructionMetrics> instructionMetrics, RoutineMemoryAccess? memoryAccess)
         {
             // memory access
             _MemoryAccess = memoryAccess;
@@ -124,9 +122,6 @@ namespace BeebPerf.ux
 
             SetColumnVisibility(MemoryReadCountColumnIndex, memoryAccess != null);
             SetColumnVisibility(MemoryWriteCountColumnIndex, memoryAccess != null);
-
-            // get instruction metrics
-            var instructionMetrics = _CalculateInstructionMetrics!.Invoke(routine, callStack);
 
             // populate view data
             var dataRows = new List<Object>(instructionMetrics.Count);
@@ -776,7 +771,6 @@ namespace BeebPerf.ux
         private InstructionSet? _InstructionSet;
         private int _MaxExecutionCount;
         private int _TotalCycleCount;
-        private Func<Routine, CallStack?, List<InstructionMetrics>>? _CalculateInstructionMetrics;
         private CanonicalAddressMap<Routine> _RoutinesByAddress = new();
         private RoutineMemoryAccess? _MemoryAccess;
         private LabelResolver _LabelResolver = new();
