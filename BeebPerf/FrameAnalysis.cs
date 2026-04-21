@@ -1376,7 +1376,22 @@ namespace BeebPerf
         private byte _PortBAddressableLatch;
         private bool _DisplayFrame;
 
-        // screen memory...
+        // analysis frame state
+        private struct AnalysisFrameState
+        {
+            public AnalysisFrameState() { }
+
+            public FrameSettings? FrameSettings;
+            public int WritesBeforeDisplayRead;
+            public int WritesAfterDisplayRead;
+            public int StartInstructionIndex;
+            public int EndInstructionIndex;
+            public int StartCycleCount;
+            public int FrameNumber = 0;
+        }
+        private AnalysisFrameState _AnalysisFrameState = new();
+
+        // screen memory state
         private struct ScreenMemory
         {
             public ScreenMemory() {}
@@ -1397,22 +1412,7 @@ namespace BeebPerf
         }
         private ScreenMemory _ScreenMemory = new();
 
-        // analysis frames
-        private struct AnalysisFrameState
-        {
-            public AnalysisFrameState() {}
-
-            public FrameSettings? FrameSettings;
-            public int WritesBeforeDisplayRead;
-            public int WritesAfterDisplayRead;
-            public int StartInstructionIndex;
-            public int EndInstructionIndex;
-            public int StartCycleCount;
-            public int FrameNumber = 0;
-        }
-        private AnalysisFrameState _AnalysisFrameState = new();
-
-        // ULA...
+        // ULA state
         private struct ULAState
         {
             public ULAState() {}
