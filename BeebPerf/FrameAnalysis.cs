@@ -1391,7 +1391,7 @@ namespace BeebPerf
         }
         private AnalysisFrameState _AnalysisFrameState = new();
 
-        // screen memory state
+        // screen memory 
         private struct ScreenMemory
         {
             public ScreenMemory() {}
@@ -1424,7 +1424,7 @@ namespace BeebPerf
         }
         private ULAState _ULAState = new();
 
-        // CRT 6845...
+        // CRT 6845 state
         private struct CRTState
         {
             public CRTState(FrameAnalysis frameAnalysis)
@@ -1465,6 +1465,7 @@ namespace BeebPerf
         }
         private CRTState _CRTState = new();
 
+        // display state
         private struct DisplayState
         {
             public DisplayState()
@@ -1519,7 +1520,7 @@ namespace BeebPerf
         }
         private DisplayState _DisplayState = new();
 
-        // mode 7...
+        // mode 7 state
         private enum Mode7DoubleHeightRow
         {
             Top = 0,
