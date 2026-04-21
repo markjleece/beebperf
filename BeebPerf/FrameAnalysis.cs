@@ -51,7 +51,7 @@ namespace BeebPerf
     // - Mixed non-teletext modes (mid-frame ULA changes)
     // - Interlaced support
     // - Over-scan resolutions up to 1024x640
-    // - Hardware scrolling
+    // - Hardware scrolling and split screen support
     // 
     // Limitations:
     // - No support for the hardware cursor
@@ -93,7 +93,7 @@ namespace BeebPerf
             _ReadScreenDataFunc = ReadScreenData_Void;
 
             for (int i = 0; i < 256; i++)
-                _CRTBitmapTbl[i] = new byte[8];
+                _DisplayLookupTbl[i] = new byte[8];
 
             ConstructMode7Fonts();
         }
@@ -137,24 +137,20 @@ namespace BeebPerf
 
                 if (instructionIndex == _FrameEndInstructionIndex)
                     EndAnalysisFrame(postCycleCount, instructionIndex);
-                
+
                 if (instructionIndex == _FrameStartInstructionIndex)
                     StartAnalysisFrame(cycleCount, instructionIndex);
 
-                if (instruction.IsInstruction)
+                if (instruction.IsBeginDisplayEvent)
+                {
+                    StartDisplayFrame(cycleCount);
+                }
+                else if (instruction.IsInstruction)
                 {
                     byte opcode = instruction.Opcode;
                     var memoryAccess = instructionSet.MemoryAccess(opcode);
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
-                    {
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
-                        if (_CtrlModified || _ULAModified)
-                            UpdateVideoState();
-                    }
-                }
-                else if (instruction.IsBeginDisplayEvent)
-                {
-                    StartDisplayFrame(cycleCount);
                 }
 
                 cycleCount = postCycleCount;
@@ -166,54 +162,6 @@ namespace BeebPerf
             UpdateFrames();
 
             return true;
-        }
-
-        private void InitializeVideo(Model model)
-        {
-            _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
-            _ULARegister = model.Snapshot.VideoULARegister;
-
-            _CtrlR0_HorizontalTotal = model.Snapshot.VideoCtrlRegisters[0];
-            _CtrlR1_HorizontalDisplayed = model.Snapshot.VideoCtrlRegisters[1];
-            _CtrlR4_VerticalTotal = model.Snapshot.VideoCtrlRegisters[4];
-            _CtrlR6_VerticalDisplayed = model.Snapshot.VideoCtrlRegisters[6];
-            _CtrlR8_InterlaceAndDelay = model.Snapshot.VideoCtrlRegisters[8];
-            _CtrlR9_ScanLinesPerChar = model.Snapshot.VideoCtrlRegisters[9];
-            _CtrlR12_ScreenStartHigh = model.Snapshot.VideoCtrlRegisters[12];
-            _CtrlR13_ScreenStartLow = model.Snapshot.VideoCtrlRegisters[13];
-
-            _Memory = new byte[32768];
-            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 32768);
-
-            _ShadowRam = new byte[20480];
-            if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
-
-            _FilingSystemRam = new byte[8192];
-            if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
-                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
-
-            _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
-            _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
-
-            _PortBAddressableLatch = _ScreenWrapAddress switch
-            {
-                0x4000 => 0x00,
-                0x6000 => 0x10,
-                0x3000 => 0x20,
-                0x5800 => 0x30,
-                _ => 0x00
-            };
-
-            SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
-
-            _DisplayFrame = false;
-            _DisplayFrameCount = 1;
-            _CRTBitmap = new byte[_CRTMaxBufferHeight * _CRTBitmapStride];
-
-            _CtrlModified = true;
-            _ULAModified = true;
-            UpdateVideoState();
         }
 
         private void InitializeFrames(FrameSettings? frameSettings)
@@ -396,154 +344,71 @@ namespace BeebPerf
             return _RootStackFrame!;
         }
 
-        private void UpdateVideoState()
+        private void InitializeVideo(Model model)
         {
-            int characterClockRate = (_ULARegister >> 4) & 0x01;
-            _CharacterClockShift = 1 - characterClockRate;
+            _ULAPalette = model.Snapshot.VideoULAPalette.ToArray();
+            _ULARegister = model.Snapshot.VideoULARegister;
+            _ULARegisterModified = true;
 
-            bool interlacedSync = (_CtrlR8_InterlaceAndDelay & 0x1) != 0;
-            _CRTBitmapScanlineOffsetIncrement = (interlacedSync ? 2 : 1) * _CRTBitmapStride;
-            _CRTBitmapScanlineOffsetReset = (interlacedSync ? _DisplayFrameCount % 2 : 0) * _CRTBitmapStride;
+            _CRTRegister0_HorizontalTotal = model.Snapshot.VideoCtrlRegisters[0];
+            _CRTRegister1_HorizontalDisplayed = model.Snapshot.VideoCtrlRegisters[1];
+            _CRTRegister2_HorizontalSyncPos = model.Snapshot.VideoCtrlRegisters[2];
+            _CRTRegister3_SyncWidth = model.Snapshot.VideoCtrlRegisters[3];
+            _CRTRegister4_VerticalTotal = model.Snapshot.VideoCtrlRegisters[4];
+            _CRTRegister5_VerticalTotalAdjust = model.Snapshot.VideoCtrlRegisters[5];
+            _CRTRegister6_VerticalDisplayed = model.Snapshot.VideoCtrlRegisters[6];
+            _CRTRegister7_VerticalSyncPos = model.Snapshot.VideoCtrlRegisters[7];
+            _CRTRegister8_InterlaceAndDelay = model.Snapshot.VideoCtrlRegisters[8];
+            _CRTRegister9_ScanLinesPerChar = model.Snapshot.VideoCtrlRegisters[9];
 
-            bool interlacedVideo = (_CtrlR8_InterlaceAndDelay & 0x2) != 0;
-            _ScanlineCounterIncrement = interlacedVideo ? 2 : 1;
-            _ScanlineCounterReset = interlacedVideo ? _DisplayFrameCount % 2 : 0;
+            _CRTRegister12_Latch_ScreenStartHigh = model.Snapshot.VideoCtrlRegisters[12];
+            _CRTRegister13_Latch_ScreenStartLow = model.Snapshot.VideoCtrlRegisters[13];
 
-            _ScanlinesPerCharAdjust = (interlacedSync && interlacedVideo) ? 2 : 1;
+            _Memory = new byte[32768];
+            Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0, _Memory, 0, 32768);
 
-            _TeletextMode = ((_ULARegister >> 1) & 0x01) != 0;
+            _ShadowRam = new byte[20480];
+            if (model.Snapshot.Memory[(int)MemoryPage.ShadowRam] != null)
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.ShadowRam], 0, _ShadowRam, 0, 20480);
 
-            if ((_TeletextMode && (!interlacedSync || !interlacedVideo)) ||
-                (!_TeletextMode && interlacedVideo))
+            _FilingSystemRam = new byte[8192];
+            if (model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam] != null)
+                Buffer.BlockCopy(model.Snapshot.Memory[(int)MemoryPage.FilingSystemRam], 0, _FilingSystemRam, 0, 8192);
+
+            _ScreenWrapAddress = model.Snapshot.ScreenWrapAddress;
+            _ScreenWrapOffset = 0x8000 - _ScreenWrapAddress;
+
+            _PortBAddressableLatch = _ScreenWrapAddress switch
             {
-                _DisplayFrame = false; // unsupported interlaced mode!
-            }
+                0x4000 => 0x00,
+                0x6000 => 0x10,
+                0x3000 => 0x20,
+                0x5800 => 0x30,
+                _ => 0x00
+            };
 
-            if (_TeletextMode)
-            {
-                _ScreenStartAddressDiv8 = 0; // not used in teletext mode
-                _ScreenStartAddress = (((_CtrlR12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CtrlR13_ScreenStartLow;
-                _ScreenSize = _CtrlR6_VerticalDisplayed * _CtrlR1_HorizontalDisplayed;
-            }
-            else
-            {
-                _ScreenStartAddressDiv8 = (_CtrlR12_ScreenStartHigh << 8) + _CtrlR13_ScreenStartLow;
-                _ScreenStartAddress = _ScreenStartAddressDiv8 * 8;
-                _ScreenSize = _CtrlR6_VerticalDisplayed * _CtrlR1_HorizontalDisplayed * 8;
-            }
+            SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
 
-            _ReadScreenDataFunc = _TeletextMode ? ReadScreenData_Teletext : ReadScreenData_NonTeletext;
-
-            int horizontalMultiplier;
-            int bitmapWidth, bitmapHeight;
-
-            if (!_TeletextMode)
-            {
-                switch ((_ULARegister >> 2) & 0x7)
-                {
-                    case 7: // Mode 0 & 3 (2 colors, high res)
-                        _BitsPerPixel = 1;
-                        if (_ULAModified)
-                            Build4bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                        horizontalMultiplier = 1;
-                        break;
-
-                    case 6: // Mode 1 (4 colors, medium res)
-                        _BitsPerPixel = 2;
-                        if (_ULAModified)
-                            Build8bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                        horizontalMultiplier = 1;
-                        break;
-
-                    case 5: // Mode 2 (16 colors, low res)
-                        _BitsPerPixel = 4;
-                        if (_ULAModified)
-                            Build16bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_32bits;
-                        horizontalMultiplier = 1;
-                        break;
-
-                    case 2: // Mode 4 & 6 (2 colors, medium res)
-                        _BitsPerPixel = 1;
-                        if (_ULAModified)
-                            Build8bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                        horizontalMultiplier = 2;
-                        break;
-
-                    case 1: // Mode 5 (4 colors, low res)
-                        _BitsPerPixel = 2;
-                        if (_ULAModified)
-                            Build16bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                        horizontalMultiplier = 2;
-                        break;
-
-                    case 0: // Mode 8 (16 colors, very low res)
-                        _BitsPerPixel = 4;
-                        if (_ULAModified)
-                            Build32bppLookupTbl();
-                        _WriteBitmapDataFunc = WriteBitmapData_64bits;
-                        horizontalMultiplier = 2;
-                        break;
-
-                    default:
-                        throw new NotImplementedException();
-                }
-
-                bitmapWidth = horizontalMultiplier * (_CtrlR1_HorizontalDisplayed * 8);
-                bitmapHeight = _CtrlR6_VerticalDisplayed * (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust);
-
-                _CRTAspectRatio = _CRTAspectRatio_NonTeletext;
-
-                if (interlacedSync)
-                {
-                    bitmapHeight *= 2;
-                    _CRTAspectRatio *= 2.0f;
-                }
-
-                if (bitmapWidth > _CRTMaxBitmapWidth || bitmapHeight > _CRTMaxBufferHeight)
-                    _DisplayFrame = false; // unsupported over-scan!
-            }
-            else
-            {
-                // Mode 7 (teletext)
-                _WriteBitmapDataFunc = WriteBitmapData_Mode7;
-                
-                bitmapWidth = 480;
-                bitmapHeight = 500;
-
-                _CRTAspectRatio = _CRTAspectRatio_Teletext;
-            }
-
-            if (_CRTBitmapWidth < bitmapWidth)
-                _CRTBitmapWidth = bitmapWidth;
-
-            if (_CRTBitmapHeight < bitmapHeight)
-                _CRTBitmapHeight = bitmapHeight;
-
-            _CtrlModified = false;
-            _ULAModified = false;
+            _DisplayFrame = false;
+            _DisplayFrameCount = 1;
+            _DisplayBuffer = new byte[_MaxDisplayBitmapHeight * _DisplayBitmapStride];
         }
 
         private void StartDisplayFrame(int cycleCount)
         {
             if (_DisplayFrame)
-                EndDisplayFrame(cycleCount); // shouldn't happen
+                EndDisplayFrame();
 
             _DisplayFrame = true;
 
-            _CRTBitmapWidth = 0;
-            _CRTBitmapHeight = 0;
+            _DisplayFrameWidth = 0;
 
-            _StartCycleCount = cycleCount;
-            _LastCycleCount = cycleCount;
+            _DisplayFrameStartCycleCount = cycleCount;
+            _DisplayFrameLastCycleCount = cycleCount;
 
-            _BlankSpace = false;
-            _RowCounter = 0;
-            _ColumnCounter = 0;
+            _CRTBlankSpace = false;
+            _CRTRowCounter = 0;
+            _CRTColumnCounter = 0;
 
             _Mode7State.DoubleHeightRow = Mode7DoubleHeightRow.Top;
             _Mode7State.LastRowCounter = -1;
@@ -554,17 +419,21 @@ namespace BeebPerf
                 _Mode7State.FlashOn = !_Mode7State.FlashOn; // toggle flash state
             }
 
-            UpdateVideoState();
+            UpdateVideoState(newFrame: true);
 
-            _ScanlineCounter = _ScanlineCounterReset;
-            _CRTBitmapScanlineOffset = _CRTBitmapScanlineOffsetReset;
+            int verticalAdjustSize = _CRTRegister5_VerticalTotalAdjust * _DisplayScanlineOffsetIncrement;
+            if (verticalAdjustSize > 0)
+                Array.Clear(_DisplayBuffer, 0, verticalAdjustSize);
+
+            _DisplayScanlineOffset = _DisplayScanlineOffsetReset + verticalAdjustSize;
+            _DisplayScanlineIndex = _CRTRegister5_VerticalTotalAdjust;
         }
 
-        private void EndDisplayFrame(int cycleCount)
+        private void EndDisplayFrame()
         {
-            Debug.Assert(cycleCount - _StartCycleCount < 480000);
+            Debug.Assert(_DisplayFrameEndCycleCount - _DisplayFrameStartCycleCount < 480000);
 
-            Bitmap bitmap = new Bitmap(_CRTBitmapWidth, _CRTBitmapHeight, PixelFormat.Format4bppIndexed);
+            Bitmap bitmap = new Bitmap(_DisplayFrameWidth, _DisplayFrameHeight, PixelFormat.Format4bppIndexed);
             bitmap.Palette = _ColorPalette;
 
             if (_DisplayFrame)
@@ -576,13 +445,13 @@ namespace BeebPerf
                     data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
                     unsafe
                     {
-                        fixed (byte* src = _CRTBitmap)
+                        fixed (byte* src = _DisplayBuffer)
                         {
                             byte* dst = (byte*)data.Scan0;
-                            for (int i = 0; i < _CRTBitmapHeight; i++)
+                            for (int i = 0; i < _DisplayFrameHeight; i++)
                             {
                                 Buffer.MemoryCopy(
-                                    src + (i * _CRTBitmapStride),
+                                    src + (i * _DisplayBitmapStride),
                                     dst + (i * data.Stride),
                                     data.Stride,
                                     data.Stride);
@@ -599,26 +468,199 @@ namespace BeebPerf
 
             DisplayFrames.Add(new()
             {
-                AspectRatio = _CRTAspectRatio,
+                AspectRatio = _DisplayBitmapAspectRatio,
                 FrameNumber = _DisplayFrameCount++,
-                StartCycleCount = _StartCycleCount,
-                EndCycleCount = cycleCount,
+                StartCycleCount = _DisplayFrameStartCycleCount,
+                EndCycleCount = _DisplayFrameEndCycleCount,
                 Bitmap = bitmap
             });
 
             _DisplayFrame = false;
         }
 
-        private bool IsScreenAddress(ushort address)
+        private void UpdateVideoState(bool newFrame)
         {
-            int screenEndAddress = _ScreenStartAddress + _ScreenSize;
-            int screenWrapSize = screenEndAddress - 0x8000;
+            bool interlacedSync = (_CRTRegister8_InterlaceAndDelay & 0x1) != 0;
+            bool interlacedVideo = (_CRTRegister8_InterlaceAndDelay & 0x2) != 0;
 
-            if (screenWrapSize <= 0)
-                return (address >= _ScreenStartAddress && address < screenEndAddress);
+            if (newFrame || _ULARegisterModified)
+            {
+                _DisplayScanlineIndexIncrement = interlacedSync ? 2 : 1;
+                _DisplayScanlineOffsetIncrement = (interlacedSync ? 2 : 1) * _DisplayBitmapStride;
+                _DisplayScanlineOffsetReset = (interlacedSync ? _DisplayFrameCount % 2 : 0) * _DisplayBitmapStride;
+
+                _CRTScanlineCounterIncrement = interlacedVideo ? 2 : 1;
+                _CRTScanlineCounterReset = interlacedVideo ? _DisplayFrameCount % 2 : 0;
+
+                _ScanlinesPerCharAdjust = (interlacedSync && interlacedVideo) ? 2 : 1;
+
+                _TeletextMode = (_ULARegister & 0x2) != 0;
+
+                if ((_TeletextMode && (!interlacedSync || !interlacedVideo)) ||
+                    (!_TeletextMode && interlacedVideo))
+                    _DisplayFrame = false; // unsupported interlaced mode!
+
+                int characterClockRate = (_ULARegister >> 4) & 0x01;
+                _CharacterClockShift = 1 - characterClockRate;
+            }
+
+            if (newFrame)
+            {
+                _CRTRowCounter = 0;
+                _CRTScanlineCounter = _CRTScanlineCounterReset;
+                _CRTVerticalAdjustCounter = 0;
+                _CRTBlankSpace = false;
+
+                _CRTRegister12_ScreenStartHigh = _CRTRegister12_Latch_ScreenStartHigh;
+                _CRTRegister13_ScreenStartLow = _CRTRegister13_Latch_ScreenStartLow;
+
+                if (_TeletextMode)
+                {
+                    _ScreenStartAddressDiv8 = 0; // not used in teletext mode
+                    _ScreenStartAddress = (((_CRTRegister12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CRTRegister13_ScreenStartLow;
+                    _ScreenSize = _CRTRegister6_VerticalDisplayed * _CRTRegister1_HorizontalDisplayed;
+                }
+                else
+                {
+                    _ScreenStartAddressDiv8 = (_CRTRegister12_ScreenStartHigh << 8) + _CRTRegister13_ScreenStartLow;
+                    _ScreenStartAddress = _ScreenStartAddressDiv8 * 8;
+                    _ScreenSize = _CRTRegister6_VerticalDisplayed * _CRTRegister1_HorizontalDisplayed * 8;
+                }
+            }
+
+            if (_ULARegisterModified)
+            {
+                if (!_TeletextMode)
+                {
+                    _ReadScreenDataFunc = ReadScreenData_NonTeletext;
+
+                    switch ((_ULARegister >> 2) & 0x7)
+                    {
+                        case 7: // Mode 0 & 3 (2 colors, high res)
+                            Build4bppLookupTbl(bitsPerPixel: 1);
+                            _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                            break;
+
+                        case 6: // Mode 1 (4 colors, medium res)
+                            Build8bppLookupTbl(bitsPerPixel: 2);
+                            _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                            break;
+
+                        case 5: // Mode 2 (16 colors, low res)
+                            Build16bppLookupTbl(bitsPerPixel: 4);
+                            _WriteBitmapDataFunc = WriteBitmapData_32bits;
+                            break;
+
+                        case 2: // Mode 4 & 6 (2 colors, medium res)
+                            Build8bppLookupTbl(bitsPerPixel: 1);
+                            _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                            break;
+
+                        case 1: // Mode 5 (4 colors, low res)
+                            Build16bppLookupTbl(bitsPerPixel: 2);
+                            _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                            break;
+
+                        case 0: // Mode 8 (16 colors, very low res)
+                            Build32bppLookupTbl(bitsPerPixel: 4);
+                            _WriteBitmapDataFunc = WriteBitmapData_64bits;
+                            break;
+
+                        default:
+                            throw new NotImplementedException();
+                    }
+
+                    float aspectRatio = _DisplayBitmapAspectRatio_NonTeletext;
+                    if (interlacedSync) aspectRatio *= 2.0f;
+                    _DisplayBitmapAspectRatio = aspectRatio;
+                }
+                else
+                {
+                    // teletext (Mode 7)
+                    _ReadScreenDataFunc = ReadScreenData_Teletext;
+                    _WriteBitmapDataFunc = WriteBitmapData_Teletext;
+                    _DisplayBitmapAspectRatio = _DisplayBitmapAspectRatio_Teletext;
+                }
+            }
+
+            // calc display frame width
+            int horizontalMultiplier;
+            if (_TeletextMode)
+                horizontalMultiplier = 12;
+            else if ((_ULARegister & 0x10) != 0)
+                horizontalMultiplier = 8;
             else
-                return ((address >= _ScreenStartAddress && address < 0x8000) ||
-                        (address >= _ScreenWrapAddress && address < _ScreenWrapAddress + screenWrapSize));
+                horizontalMultiplier = 16;
+
+            int bitmapWidth = _CRTRegister1_HorizontalDisplayed * horizontalMultiplier;
+            if (bitmapWidth > _MaxDisplayBitmapWidth)
+                _DisplayFrame = false; // unsupported over-scan!
+
+            if (_DisplayFrameWidth < bitmapWidth)
+                _DisplayFrameWidth = bitmapWidth;
+
+            _ULARegisterModified = false;
+        }
+
+        private void DisplayMemory(int cycleCount)
+        {
+            int characterCount = (cycleCount >> _CharacterClockShift) - (_DisplayFrameLastCycleCount >> _CharacterClockShift);
+
+            _DisplayFrameLastCycleCount = cycleCount;
+
+            if (_ULARegisterModified)
+                UpdateVideoState(newFrame: false);
+
+            for (int i = 0; i < characterCount; i++)
+            {
+                // read screen memory and rasterize it to CRT bitmap, if not in blanking period
+                if (!_CRTBlankSpace)
+                    _WriteBitmapDataFunc(_ReadScreenDataFunc());
+
+                // advance CRT counters
+                _CRTColumnCounter++;
+                _CRTBlankSpace |= (_CRTColumnCounter == _CRTRegister1_HorizontalDisplayed);
+
+                if (_CRTColumnCounter == _CRTRegister0_HorizontalTotal + 1)
+                {
+                    // new scanline
+                    _CRTColumnCounter = 0;
+                    _CRTScanlineCounter += _CRTScanlineCounterIncrement;
+
+                    if (_DisplayScanlineOffset > _MaxDisplayScanlineOffset)
+                        return; // over-scan!
+
+                    _DisplayScanlineOffset += _DisplayScanlineOffsetIncrement;
+                    _DisplayScanlineIndex += _DisplayScanlineIndexIncrement;
+
+                    if (_CRTRowCounter <= _CRTRegister4_VerticalTotal)
+                    {
+                        if (_CRTScanlineCounter >= (_CRTRegister9_ScanLinesPerChar + _ScanlinesPerCharAdjust))
+                        {
+                            // new character row
+                            _CRTScanlineCounter = _CRTScanlineCounterReset;
+                            _CRTRowCounter++;
+
+                            if (_CRTRowCounter == _CRTRegister6_VerticalDisplayed)
+                            {
+                                // end of vertical display phase
+                                _DisplayFrameEndCycleCount = cycleCount;
+                                _DisplayFrameHeight = (_DisplayScanlineIndex + 1) & ~1; // round to even
+                            }
+                        }
+                    }
+
+                    if (_CRTRowCounter > _CRTRegister4_VerticalTotal)
+                    {
+                        // vertical adjust phase
+                        _CRTVerticalAdjustCounter += _CRTScanlineCounterIncrement;
+                        if (_CRTVerticalAdjustCounter >= _CRTRegister5_VerticalTotalAdjust)
+                            UpdateVideoState(newFrame: true);
+                    }
+
+                    _CRTBlankSpace = (_CRTRowCounter >= _CRTRegister6_VerticalDisplayed);
+                }
+            }
         }
 
         private void MemoryWrite(CanonicalAddress memoryAddress, byte value)
@@ -667,50 +709,58 @@ namespace BeebPerf
 
             if (address == 0xFE00)
             {
-                _CtrlWriteRegister = value;
+                _CRTWriteRegister = value;
             }
             else if (address == 0xFE01)
             {
-                switch (_CtrlWriteRegister)
+                switch (_CRTWriteRegister)
                 {
                     case 0:
-                        _CtrlModified |= (value != _CtrlR0_HorizontalTotal);
-                        _CtrlR0_HorizontalTotal = value;
+                        _CRTRegister0_HorizontalTotal = value;
                         break;
 
                     case 1:
-                        _CtrlModified |= (value != _CtrlR1_HorizontalDisplayed);
-                        _CtrlR1_HorizontalDisplayed = value;
+                        _CRTRegister1_HorizontalDisplayed = value;
+                        break;
+
+                    case 2:
+                        _CRTRegister2_HorizontalSyncPos = value;
+                        break;
+
+                    case 3:
+                        _CRTRegister3_SyncWidth = value;
                         break;
 
                     case 4:
-                        _CtrlModified |= (value != _CtrlR4_VerticalTotal);
-                        _CtrlR4_VerticalTotal = value;
+                        _CRTRegister4_VerticalTotal = (byte)(value & 0x7F); // 7 bit register
+                        break;
+
+                    case 5:
+                        _CRTRegister5_VerticalTotalAdjust = (byte)(value & 0x1F); // 5 bit register
                         break;
 
                     case 6:
-                        _CtrlModified |= (value != _CtrlR6_VerticalDisplayed);
-                        _CtrlR6_VerticalDisplayed = value;
+                        _CRTRegister6_VerticalDisplayed = (byte)(value & 0x7F); // 7 bit register
+                        break;
+
+                    case 7:
+                        _CRTRegister7_VerticalSyncPos = (byte)(value & 0x7F); // 7 bit register
                         break;
 
                     case 8:
-                        _CtrlModified |= (value != _CtrlR8_InterlaceAndDelay);
-                        _CtrlR8_InterlaceAndDelay = value;
+                        _CRTRegister8_InterlaceAndDelay = (byte)(value & 0x3F); // 6 bit register;
                         break;
 
                     case 9:
-                        _CtrlModified |= (value != _CtrlR9_ScanLinesPerChar);
-                        _CtrlR9_ScanLinesPerChar = value;
+                        _CRTRegister9_ScanLinesPerChar = (byte)(value & 0x1F); // 5 bit register
                         break;
 
                     case 12:
-                        _CtrlModified |= (value != _CtrlR12_ScreenStartHigh);
-                        _CtrlR12_ScreenStartHigh = value;
+                        _CRTRegister12_Latch_ScreenStartHigh = value; // latched
                         break;
 
                     case 13:
-                        _CtrlModified |= (value != _CtrlR13_ScreenStartLow);
-                        _CtrlR13_ScreenStartLow = value;
+                        _CRTRegister13_Latch_ScreenStartLow = value; // latched
                         break;
 
                     default:
@@ -719,12 +769,12 @@ namespace BeebPerf
             }
             else if (address == 0xFE20)
             {
-                _ULAModified |= (value != _ULARegister);
+                _ULARegisterModified |= (value != _ULARegister);
                 _ULARegister = value;
             }
             else if (address == 0xFE21)
             {
-                _ULAModified |= (value != _ULAPalette[value >> 4]);
+                _ULARegisterModified |= (value != _ULAPalette[value >> 4]);
                 _ULAPalette[value >> 4] = value;
             }
             else if (address == 0xFE40 || address == 0xFE50)
@@ -752,6 +802,18 @@ namespace BeebPerf
             }
         }
 
+        private bool IsScreenAddress(ushort address)
+        {
+            int screenEndAddress = _ScreenStartAddress + _ScreenSize;
+            int screenWrapSize = screenEndAddress - 0x8000;
+
+            if (screenWrapSize <= 0)
+                return (address >= _ScreenStartAddress && address < screenEndAddress);
+            else
+                return ((address >= _ScreenStartAddress && address < 0x8000) ||
+                        (address >= _ScreenWrapAddress && address < _ScreenWrapAddress + screenWrapSize));
+        }
+
         private void SetDisplayShadowRam(byte accessControlRegister)
         {
             switch (_BBCModel)
@@ -772,41 +834,6 @@ namespace BeebPerf
             }
         }
 
-        private void DisplayMemory(int cycleCount)
-        {
-            int characterCount = (cycleCount >> _CharacterClockShift) - (_LastCycleCount >> _CharacterClockShift);
-
-            _LastCycleCount = cycleCount;
-
-            for (int i = 0; i < characterCount; i++)
-            {
-                // read screen memory and rasterize it to CRT bitmap, if not in blanking period
-                if (!_BlankSpace)
-                    _WriteBitmapDataFunc(_ReadScreenDataFunc());
-
-                // advance counters
-                _ColumnCounter++;
-                _BlankSpace |= (_ColumnCounter == _CtrlR1_HorizontalDisplayed);
-                if (_ColumnCounter == _CtrlR0_HorizontalTotal + 1)
-                {
-                    _ColumnCounter = 0;
-                    _CRTBitmapScanlineOffset += _CRTBitmapScanlineOffsetIncrement;
-
-                    _ScanlineCounter += _ScanlineCounterIncrement;
-                    if (_ScanlineCounter >= (_CtrlR9_ScanLinesPerChar + _ScanlinesPerCharAdjust))
-                    {
-                        _ScanlineCounter = _ScanlineCounterReset;
-                        _RowCounter++;
-
-                        if (_RowCounter == _CtrlR6_VerticalDisplayed)
-                            EndDisplayFrame(cycleCount);
-                    }
-
-                    _BlankSpace = (_RowCounter >= _CtrlR6_VerticalDisplayed);
-                }
-            }
-        }
-
         private byte ReadScreenData_Void()
         {
             return 0;
@@ -814,24 +841,24 @@ namespace BeebPerf
 
         private byte ReadScreenData_Teletext()
         {
-            int characterAddress = _ScreenStartAddress + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
+            int characterAddress = _ScreenStartAddress + (_CRTRowCounter * _CRTRegister1_HorizontalDisplayed) + _CRTColumnCounter;
 
             if (characterAddress >= 0x8000)
-                characterAddress -= _ScreenWrapOffset;
+                characterAddress = (characterAddress - _ScreenWrapOffset) & 0x7FFF;
 
             return ReadDisplayMemory(characterAddress);
         }
 
         private byte ReadScreenData_NonTeletext()
         {
-            if (_ScanlineCounter >= 8)
+            if (_CRTScanlineCounter >= 8)
                 return 0;
 
-            int characterAddress = _ScreenStartAddressDiv8 + (_RowCounter * _CtrlR1_HorizontalDisplayed) + _ColumnCounter;
-            int memoryAddress = (characterAddress << 3) + _ScanlineCounter;
+            int characterAddress = _ScreenStartAddressDiv8 + (_CRTRowCounter * _CRTRegister1_HorizontalDisplayed) + _CRTColumnCounter;
+            int memoryAddress = (characterAddress << 3) + _CRTScanlineCounter;
 
             if (memoryAddress >= 0x8000)
-                memoryAddress -= _ScreenWrapOffset;
+                memoryAddress = (memoryAddress - _ScreenWrapOffset) & 0x7FFF;
 
             return ReadDisplayMemory(memoryAddress);
         }
@@ -874,25 +901,25 @@ namespace BeebPerf
 
         private void WriteBitmapData_32bits(byte value)
         {
-            int index = _CRTBitmapScanlineOffset + (_ColumnCounter << 2);
-            Buffer.BlockCopy(_CRTBitmapTbl[value], 0, _CRTBitmap, index, 4);
+            int index = _DisplayScanlineOffset + (_CRTColumnCounter << 2);
+            Buffer.BlockCopy(_DisplayLookupTbl[value], 0, _DisplayBuffer, index, 4);
         }
 
         private void WriteBitmapData_64bits(byte value)
         {
-            int index = _CRTBitmapScanlineOffset + (_ColumnCounter << 3);
-            Buffer.BlockCopy(_CRTBitmapTbl[value], 0, _CRTBitmap, index, 8);
+            int index = _DisplayScanlineOffset + (_CRTColumnCounter << 3);
+            Buffer.BlockCopy(_DisplayLookupTbl[value], 0, _DisplayBuffer, index, 8);
         }
 
-        private void WriteBitmapData_Mode7(byte value)
+        private void WriteBitmapData_Teletext(byte value)
         {
-            if (_ColumnCounter >= 40)
+            if (_CRTColumnCounter >= 40)
                 return;
 
             // update double-height row state
-            if (_RowCounter != _Mode7State.LastRowCounter)
+            if (_CRTRowCounter != _Mode7State.LastRowCounter)
             {
-                if (_RowCounter == 0)
+                if (_CRTRowCounter == 0)
                 {
                     _Mode7State.DoubleHeightRow = Mode7DoubleHeightRow.Top;
                 }
@@ -904,11 +931,11 @@ namespace BeebPerf
                         : Mode7DoubleHeightRow.Top;
                 }
 
-                _Mode7State.LastRowCounter = _RowCounter;
+                _Mode7State.LastRowCounter = _CRTRowCounter;
             }
 
             // reset state at start of scanline
-            if (_ColumnCounter == 0)
+            if (_CRTColumnCounter == 0)
             {
                 _Mode7State.ForeColor = 7;
                 _Mode7State.BackColor = 0;
@@ -1057,16 +1084,16 @@ namespace BeebPerf
             // determine scanline index
             int scanlineIndex;
             if (_Mode7State.DoubleHeight)
-                scanlineIndex = (_ScanlineCounter >> 1) + (_Mode7State.DoubleHeightRow == Mode7DoubleHeightRow.Top ? 0 : 10);
+                scanlineIndex = (_CRTScanlineCounter >> 1) + (_Mode7State.DoubleHeightRow == Mode7DoubleHeightRow.Top ? 0 : 10);
             else
-                scanlineIndex = _ScanlineCounter;
+                scanlineIndex = _CRTScanlineCounter;
 
             // fetch font scanline
             int valueAsIndex = Math.Max(value - 32, 0);
             uint fontScanline = fontBitmap[valueAsIndex, scanlineIndex];
 
             // render 12 pixels (6 bytes)
-            int index = _CRTBitmapScanlineOffset + (_ColumnCounter * 6);
+            int index = _DisplayScanlineOffset + (_CRTColumnCounter * 6);
             uint pixelMask = 0x800;
             while (pixelMask != 0)
             {
@@ -1076,20 +1103,20 @@ namespace BeebPerf
                 uint loColor = ((fontScanline & pixelMask) != 0) ? foreColor : _Mode7State.BackColor;
                 pixelMask >>= 1;
 
-                _CRTBitmap[index++] = (byte)((hiColor << 4) | loColor);
+                _DisplayBuffer[index++] = (byte)((hiColor << 4) | loColor);
             }
 
             // commit pending foreground color
             _Mode7State.ForeColor = _Mode7State.ForeColorPending;
         }
 
-        private void Build4bppLookupTbl()
+        private void Build4bppLookupTbl(int bitsPerPixel)
         {
-            Debug.Assert(_BitsPerPixel == 1);
-            int shiftCount = 8 / _BitsPerPixel;
+            Debug.Assert(bitsPerPixel == 1);
+            int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var bitmapTbl = _CRTBitmapTbl[value];
+                var bitmapTbl = _DisplayLookupTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i += 2)
@@ -1138,13 +1165,13 @@ namespace BeebPerf
             }
         }
 
-        private void Build8bppLookupTbl()
+        private void Build8bppLookupTbl(int bitsPerPixel)
         {
-            Debug.Assert(_BitsPerPixel == 1 || _BitsPerPixel == 2);
-            int shiftCount = 8 / _BitsPerPixel;
+            Debug.Assert(bitsPerPixel == 1 || bitsPerPixel == 2);
+            int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var bitmapTbl = _CRTBitmapTbl[value];
+                var bitmapTbl = _DisplayLookupTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1174,13 +1201,13 @@ namespace BeebPerf
             }
         }
 
-        private void Build16bppLookupTbl()
+        private void Build16bppLookupTbl(int bitsPerPixel)
         {
-            Debug.Assert(_BitsPerPixel == 2 || _BitsPerPixel == 4);
-            int shiftCount = 8 / _BitsPerPixel;
+            Debug.Assert(bitsPerPixel == 2 || bitsPerPixel == 4);
+            int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var bitmapTbl = _CRTBitmapTbl[value];
+                var bitmapTbl = _DisplayLookupTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1212,13 +1239,13 @@ namespace BeebPerf
             }
         }
 
-        private void Build32bppLookupTbl()
+        private void Build32bppLookupTbl(int bitsPerPixel)
         {
-            Debug.Assert(_BitsPerPixel == 4);
-            int shiftCount = 8 / _BitsPerPixel;
+            Debug.Assert(bitsPerPixel == 4);
+            int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var bitmapTbl = _CRTBitmapTbl[value];
+                var bitmapTbl = _DisplayLookupTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1382,11 +1409,15 @@ namespace BeebPerf
         private int[] _ShadowRamDisplayFrame = [];
         private int[] _FilingSystemRamDisplayFrame = [];
 
+        // screen memory...
+        private int _ScreenWrapAddress;
+        private int _ScreenWrapOffset;
+        private int _ScreenSize;
+        private int _ScreenStartAddressDiv8;
+        private int _ScreenStartAddress;
+
         private byte _PortBAddressableLatch;
-        private int _StartCycleCount;
-        private int _LastCycleCount;
-        private bool _CtrlModified;
-        private bool _ULAModified;
+        private bool _ULARegisterModified;
 
         // analysis frames
         private FrameSettings? _FrameSettings;
@@ -1399,53 +1430,62 @@ namespace BeebPerf
 
         // 6845...
         private bool _DisplayFrame;
-        private byte _CtrlR0_HorizontalTotal;
-        private byte _CtrlR1_HorizontalDisplayed;
-        private byte _CtrlR4_VerticalTotal;
-        private byte _CtrlR6_VerticalDisplayed;
-        private byte _CtrlR8_InterlaceAndDelay;
-        private byte _CtrlR9_ScanLinesPerChar;
-        private byte _CtrlR12_ScreenStartHigh;
-        private byte _CtrlR13_ScreenStartLow;
-        private byte _CtrlWriteRegister;
-        private int _ColumnCounter;
-        private int _RowCounter;
-        private int _ScanlineCounter;
-        private int _ScanlineCounterIncrement;
-        private int _ScanlineCounterReset;
-        private int _ScreenWrapAddress;
-        private int _ScreenWrapOffset;
-        private int _ScreenSize;
-        private int _ScreenStartAddressDiv8;
-        private int _ScreenStartAddress;
+        private byte _CRTWriteRegister;
+
+        private byte _CRTRegister0_HorizontalTotal;
+        private byte _CRTRegister1_HorizontalDisplayed;
+        private byte _CRTRegister2_HorizontalSyncPos;
+        private byte _CRTRegister3_SyncWidth;
+        private byte _CRTRegister4_VerticalTotal;
+        private byte _CRTRegister5_VerticalTotalAdjust;
+        private byte _CRTRegister6_VerticalDisplayed;
+        private byte _CRTRegister7_VerticalSyncPos;
+        private byte _CRTRegister8_InterlaceAndDelay;
+        private byte _CRTRegister9_ScanLinesPerChar;
+        private byte _CRTRegister12_ScreenStartHigh;
+        private byte _CRTRegister13_ScreenStartLow;
+
+        private byte _CRTRegister12_Latch_ScreenStartHigh;
+        private byte _CRTRegister13_Latch_ScreenStartLow;
+
+        private bool _CRTBlankSpace;
+        private int _CRTColumnCounter;
+        private int _CRTRowCounter;
+        private int _CRTScanlineCounter;
+        private int _CRTScanlineCounterIncrement;
+        private int _CRTScanlineCounterReset;
+        private int _CRTVerticalAdjustCounter;
+
         private int _DisplayFrameCount;
+        private int _DisplayFrameStartCycleCount;
+        private int _DisplayFrameEndCycleCount;
+        private int _DisplayFrameLastCycleCount;
+        private int _DisplayFrameHeight;
+        private int _DisplayFrameWidth;
+        private int _DisplayScanlineIndex;
+        private int _DisplayScanlineIndexIncrement;
+        private int _DisplayScanlineOffset;
+        private int _DisplayScanlineOffsetIncrement;
+        private int _DisplayScanlineOffsetReset;
+        private byte[] _DisplayBuffer = [];
+        private byte[][] _DisplayLookupTbl = new byte[256][];
+        private float _DisplayBitmapAspectRatio;
+
+        private const int _MaxDisplayBitmapWidth = 1024;
+        private const int _MaxDisplayBitmapHeight = 640;
+        private const int _DisplayBitmapStride = _MaxDisplayBitmapWidth / 2;
+        private const int _MaxDisplayScanlineOffset = (_MaxDisplayBitmapHeight - 1) * _DisplayBitmapStride;
+        private const float _DisplayBitmapAspectRatio_Teletext = 0.813f;
+        private const float _DisplayBitmapAspectRatio_NonTeletext = 0.46f;
 
         // ULA...
         private byte _ULARegister;
         private byte[] _ULAPalette = [];
-        private int _BitsPerPixel;
         private int _CharacterClockShift; // 0 for modes 0..3, 1 for modes 4..7
         private int _ScanlinesPerCharAdjust;
         private bool _TeletextMode;
-        private bool _BlankSpace;
         private bool _DisplayShadowRam;
         private static ColorPalette _ColorPalette;
-
-        // CRT...
-        private const int _CRTMaxBitmapWidth = 1024;
-        private const int _CRTMaxBufferHeight = 640;
-        private const int _CRTBitmapStride = _CRTMaxBitmapWidth / 2;
-        private const float _CRTAspectRatio_Teletext = 0.813f;
-        private const float _CRTAspectRatio_NonTeletext = 0.46f;
-
-        private int _CRTBitmapWidth;
-        private int _CRTBitmapHeight;
-        private int _CRTBitmapScanlineOffset;
-        private int _CRTBitmapScanlineOffsetIncrement;
-        private int _CRTBitmapScanlineOffsetReset;
-        private byte[] _CRTBitmap = [];
-        private byte[][] _CRTBitmapTbl = new byte[256][];
-        private float _CRTAspectRatio;
 
         // mode 7...
         private uint[,] _Mode7TextFont = new uint[96, 20];
