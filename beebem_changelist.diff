@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 826e41f..65e1480 100644
+index 52f9049..65e1480 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -2097,7 +2097,7 @@ index 826e41f..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1305,65 +1415,87 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
+@@ -1305,63 +1415,87 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
  
  void Init6502Core()
  {
@@ -2190,7 +2190,6 @@ index 826e41f..65e1480 100644
 -  ProgramCounter=BeebReadMem(0xfffe) | (BeebReadMem(0xffff)<<8);
 -  SetPSR(FlagI,0,0,1,0,0,0,0);
 -  IRQCycles=7;
--    PerfWriter_WriteInterruptEvent(PerfWriter::EventType::IRQ, ProgramCounter, IRQCycles, returnAddress);
 +void DoInterrupt(void)
 +{
 +    int returnAddress = ProgramCounter;
@@ -2217,7 +2216,6 @@ index 826e41f..65e1480 100644
 -  ProgramCounter=BeebReadMem(0xfffa) | (BeebReadMem(0xfffb)<<8);
 -  SetPSR(FlagI,0,0,1,0,0,0,0); /* Normal interrupts should be disabled during NMI ? */
 -  IRQCycles=7;
--        PerfWriter::InterruptType::NMI, returnAddress, ProgramCounter, IRQCycles, stackPSR);
 +void DoNMI(void)
 +{
 +    int returnAddress = ProgramCounter;
@@ -2238,7 +2236,7 @@ index 826e41f..65e1480 100644
  } /* DoNMI */
  
  /*-------------------------------------------------------------------------*/
-@@ -1390,58 +1522,58 @@ void DoNMI(void) {
+@@ -1388,58 +1522,58 @@ void DoNMI(void) {
  
  static void ClipboardREMVHandler()
  {
@@ -2349,7 +2347,7 @@ index 826e41f..65e1480 100644
  }
  
  // The routine indirected through the CNPV vector is used by the operating
-@@ -1466,25 +1598,25 @@ static void ClipboardREMVHandler()
+@@ -1464,25 +1598,25 @@ static void ClipboardREMVHandler()
  
  static void ClipboardCNPVHandler()
  {
@@ -2394,7 +2392,7 @@ index 826e41f..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1493,1858 +1625,1870 @@ static void ClipboardCNPVHandler()
+@@ -1491,1858 +1625,1870 @@ static void ClipboardCNPVHandler()
  
  void Exec6502Instruction()
  {
@@ -6107,7 +6105,7 @@ index 826e41f..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3353,7 +3497,7 @@ static void PollHardware(unsigned int nCycles)
+@@ -3351,7 +3497,7 @@ static void PollHardware(unsigned int nCycles)
  
  int MillisecondsToCycles(int Time)
  {
@@ -6116,7 +6114,7 @@ index 826e41f..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3362,49 +3506,73 @@ int MillisecondsToCycles(int Time)
+@@ -3360,49 +3506,73 @@ int MillisecondsToCycles(int Time)
  
  int MicrosecondsToCycles(int Time)
  {
@@ -8657,19 +8655,18 @@ index e271e44..7b476bf 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c75bf66..dba49d8 100644
+index c17d038..dba49d8 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
-@@ -117,7 +117,7 @@ struct VideoStateT {
+@@ -117,6 +117,7 @@ struct VideoStateT {
    bool IsNewTVFrame; // Specifies the start of a new TV frame, following VSync (used so we only calibrate speed once per frame)
    bool InterlaceFrame;
    bool DoCA1Int;
--  int DisplayScanline; /* MJSL - number of horizontal syncs since the last vertical sync. Used in performance capture */
 +  int DisplayScanline; // Number of horizontal syncs since the last vertical sync - used in performance capture - MJSL
  };
  
  static VideoStateT VideoState;
-@@ -1274,6 +1274,14 @@ void VideoDoScanLine(void) {
+@@ -1273,6 +1274,14 @@ void VideoDoScanLine(void) {
        IncTrigger((CRTC_HorizontalTotal + 1) * ((VideoULA_ControlReg & 16) ? 1 : 2), VideoTriggerCount);
      }
    } /* Teletext if */
@@ -8684,7 +8681,7 @@ index c75bf66..dba49d8 100644
  }
  
  /*-------------------------------------------------------------------------------------------------------------*/
-@@ -1311,6 +1319,7 @@ void VideoInit(void) {
+@@ -1310,6 +1319,7 @@ void VideoInit(void) {
    VideoState.LastPixmapLine=0;
    VideoState.PreviousLastPixmapLine=256;
    VideoState.IsNewTVFrame = false;
@@ -8692,7 +8689,7 @@ index c75bf66..dba49d8 100644
    CurY=-1;
    //AdjustVideo();
  }
-@@ -1674,6 +1683,7 @@ void SaveVideoUEF(FILE *SUEF)
+@@ -1673,6 +1683,7 @@ void SaveVideoUEF(FILE *SUEF)
  	UEFWrite32(Mode7FlashTrigger, SUEF);
  	UEFWrite8(Mode7FlashOn, SUEF);
  	UEFWrite32(VideoTriggerCount - TotalCycles, SUEF);
@@ -8700,7 +8697,7 @@ index c75bf66..dba49d8 100644
  }
  
  void LoadVideoUEF(FILE *SUEF, int Version)
-@@ -1738,6 +1748,10 @@ void LoadVideoUEF(FILE *SUEF, int Version)
+@@ -1737,6 +1748,10 @@ void LoadVideoUEF(FILE *SUEF, int Version)
  		Mode7FlashOn = UEFReadBool(SUEF);
  		VideoTriggerCount = TotalCycles + UEFRead32(SUEF);
  	}
@@ -8711,7 +8708,7 @@ index c75bf66..dba49d8 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1806,3 +1820,27 @@ void VideoGetText(char *text, int line)
+@@ -1805,3 +1820,27 @@ void VideoGetText(char *text, int line)
  
  	text[x] = '\0';
  }
