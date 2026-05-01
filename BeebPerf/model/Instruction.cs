@@ -35,8 +35,7 @@ namespace BeebPerf.model
     {
         Instruction = 0x00,
         IRQ = 0x10,
-        NMI = 0x20,
-        BeginDisplayEvent = 0x30
+        NMI = 0x20
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -50,7 +49,6 @@ namespace BeebPerf.model
         public bool IsInstruction => (Type == InstructionType.Instruction);
         public bool IsIRQ => (Type == InstructionType.IRQ);
         public bool IsNMI => (Type == InstructionType.NMI);
-        public bool IsBeginDisplayEvent => (Type == InstructionType.BeginDisplayEvent);
 
         public InstructionType Type
         {
@@ -147,20 +145,6 @@ namespace BeebPerf.model
             }
         }
 
-        public int DisplayField
-        {
-            get
-            {
-                Debug.Assert(IsBeginDisplayEvent);
-                return _DisplayField;
-            }
-            set
-            {
-                Debug.Assert(IsBeginDisplayEvent && (value == 0 || value == 1));
-                _DisplayField = (byte)value;
-            }
-        }
-
         public byte Opcode
         {
             get
@@ -250,9 +234,6 @@ namespace BeebPerf.model
         // common fields
         [FieldOffset(0)] private byte _TypeAndCycleCount;
 
-        // display event fields
-        [FieldOffset(1)] private byte _DisplayField;
-
         // instruction fields
         [FieldOffset(1)] private byte _OpcodeAddressPage;
         [FieldOffset(2)] private ushort _OpcodeAddress;
@@ -309,10 +290,6 @@ namespace BeebPerf.model
             else if (IsIRQ)
             {
                 return $"NON-MASKABLE INTERRUPT to {DestinationAddress}";
-            }
-            else if (IsBeginDisplayEvent)
-            {
-                return $"BEGIN DISPLAY EVENT";
             }
             else
             {

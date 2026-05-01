@@ -65,6 +65,8 @@ namespace BeebPerf.ux
 
         private void PopulateControls()
         {
+            _IgnoreChanges = true;
+
             // name
             nameTextBox.Text = _FrameSettings.Name;
 
@@ -97,6 +99,8 @@ namespace BeebPerf.ux
                 _ => 2
             };
             cyclesTextBox.Text = _FrameSettings.ThresholdCycles.ToString();
+
+            _IgnoreChanges = false;
 
             CancelAddressValidation();
             UpdateState();
@@ -288,26 +292,31 @@ namespace BeebPerf.ux
 
         private void nameTextBox_TextChanged(object sender, EventArgs e)
         {
+            if (_IgnoreChanges) return;
             UpdateState();
         }
 
         private void typeComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (_IgnoreChanges) return;
             UpdateState();
         }
 
         private void pageComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (_IgnoreChanges) return;
             UpdateState();
         }
 
         private void startTextBox_TextChanged(object sender, EventArgs e)
         {
+            if (_IgnoreChanges) return;
             UpdateState();
         }
 
         private void endTextBox_TextChanged(object sender, EventArgs e)
         {
+            if (_IgnoreChanges) return;
             UpdateState();
         }
 

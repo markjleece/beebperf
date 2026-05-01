@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..7fd0be3 100644
+index 826e41f..65e1480 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -388,11 +388,11 @@ index 52f9049..7fd0be3 100644
  
  static void PollVIAs(unsigned int nCycles);
  static void PollHardware(unsigned int nCycles);
-@@ -249,62 +247,157 @@ static unsigned int InstructionCount[256];
+@@ -249,62 +247,159 @@ static unsigned int InstructionCount[256];
  
  /*----------------------------------------------------------------------------*/
  
-+// Read and write memory helpers
++// Read and write memory helpers - used for performance capture - MJSL
 +
 +static int LastReadWriteAddress;
 +static unsigned char LastReadValue;
@@ -428,7 +428,7 @@ index 52f9049..7fd0be3 100644
 +
 +/*----------------------------------------------------------------------------*/
 +
-+// Call stack
++// Call stack - used for performance capture - MJSL
 +
 +static StackFrame StackFrames[128];
 +static int StackFrameCount;
@@ -474,6 +474,8 @@ index 52f9049..7fd0be3 100644
 +}
 +
 +/*----------------------------------------------------------------------------*/
++
++// Get registers - used for performance capture - MJSL
 +
 +void GetRegisters(int* pProgramCounter, unsigned char* pAccumulator, unsigned char* pXReg, unsigned char* pYReg, unsigned char* pPSR, unsigned char* pStackReg)
 +{
@@ -591,7 +593,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*----------------------------------------------------------------------------*/
-@@ -314,57 +407,57 @@ void DoIntCheck()
+@@ -314,57 +409,57 @@ void DoIntCheck()
  
  void SyncIO(void)
  {
@@ -680,7 +682,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*----------------------------------------------------------------------------*/
-@@ -374,8 +467,8 @@ static void AdvanceCyclesForMemWrite()
+@@ -374,8 +469,8 @@ static void AdvanceCyclesForMemWrite()
  
  INLINE static void SetPSRZN(const unsigned char Value)
  {
@@ -691,7 +693,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*----------------------------------------------------------------------------*/
-@@ -384,8 +477,8 @@ INLINE static void SetPSRZN(const unsigned char Value)
+@@ -384,8 +479,8 @@ INLINE static void SetPSRZN(const unsigned char Value)
  
  INLINE static void SetPSR(int Mask, int c, int z, int i, int d, int b, int v, int n)
  {
@@ -702,7 +704,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*----------------------------------------------------------------------------*/
-@@ -394,41 +487,41 @@ INLINE static void SetPSR(int Mask, int c, int z, int i, int d, int b, int v, in
+@@ -394,41 +489,41 @@ INLINE static void SetPSR(int Mask, int c, int z, int i, int d, int b, int v, in
  
  INLINE static void SetPSRCZN(int c, int z, int n)
  {
@@ -755,7 +757,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -437,528 +530,538 @@ INLINE static int PopWord()
+@@ -437,528 +532,543 @@ INLINE static int PopWord()
  
  INLINE static int RelAddrModeHandler_Data()
  {
@@ -1113,16 +1115,20 @@ index 52f9049..7fd0be3 100644
 -	Push(PSR);
 -	PSR |= FlagI; // Set I after pushing - see Birnbaum
 -	ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
-+    unsigned char returnStackReg = StackReg;
 +    int returnAddress = ProgramCounter + 1;
++    unsigned char returnStackReg = StackReg;
 +
-+    PushWord(returnAddress);
++    PushWord(ProgramCounter + 1);
 +    PSR |= FlagB; // Set B before pushing
++    byte pushedPSR = PSR;
 +    Push(PSR);
 +    PSR |= FlagI; // Set I after pushing - see Birnbaum
 +    ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
 +
++    // Push stack frame and log interrupt - used for performance capture - MJSL
 +    PushStackFrame(StackFrameType_BRK, returnAddress, returnStackReg);
++    PerfWriter_WriteInterruptEvent(
++        PerfWriter::InterruptType::IRQ, returnAddress, ProgramCounter, IRQCycles, pushedPSR);
  }
  
  INLINE static void BVCInstrHandler()
@@ -1313,6 +1319,7 @@ index 52f9049..7fd0be3 100644
 +    PushWord(ProgramCounter - 1);
 +    ProgramCounter = Address;
 +
++    // Push stack frame - used for performance capture - MJSL
 +    PushStackFrame(StackFrameType_JSR, returnAddress, returnStackReg);
  }
  
@@ -1633,7 +1640,7 @@ index 52f9049..7fd0be3 100644
  }
  
  // ARR instruction hander.
-@@ -966,52 +1069,52 @@ INLINE static void STYInstrHandler(int Address)
+@@ -966,52 +1076,52 @@ INLINE static void STYInstrHandler(int Address)
  
  INLINE static void ARRInstrHandler(unsigned char Operand)
  {
@@ -1718,7 +1725,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1020,12 +1123,12 @@ INLINE static void KILInstrHandler()
+@@ -1020,12 +1130,12 @@ INLINE static void KILInstrHandler()
  
  INLINE static unsigned char AbsAddrModeHandler_Data()
  {
@@ -1736,7 +1743,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1034,12 +1137,12 @@ INLINE static unsigned char AbsAddrModeHandler_Data()
+@@ -1034,12 +1144,12 @@ INLINE static unsigned char AbsAddrModeHandler_Data()
  
  INLINE static int AbsAddrModeHandler_Address()
  {
@@ -1754,7 +1761,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1048,7 +1151,7 @@ INLINE static int AbsAddrModeHandler_Address()
+@@ -1048,7 +1158,7 @@ INLINE static int AbsAddrModeHandler_Address()
  
  INLINE static int ZeroPgAddrModeHandler_Address()
  {
@@ -1763,7 +1770,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1057,9 +1160,9 @@ INLINE static int ZeroPgAddrModeHandler_Address()
+@@ -1057,9 +1167,9 @@ INLINE static int ZeroPgAddrModeHandler_Address()
  
  INLINE static unsigned char IndXAddrModeHandler_Data()
  {
@@ -1776,7 +1783,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1068,9 +1171,9 @@ INLINE static unsigned char IndXAddrModeHandler_Data()
+@@ -1068,9 +1178,9 @@ INLINE static unsigned char IndXAddrModeHandler_Data()
  
  INLINE static int IndXAddrModeHandler_Address()
  {
@@ -1789,7 +1796,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1079,18 +1182,18 @@ INLINE static int IndXAddrModeHandler_Address()
+@@ -1079,18 +1189,18 @@ INLINE static int IndXAddrModeHandler_Address()
  
  INLINE static unsigned char IndYAddrModeHandler_Data()
  {
@@ -1817,7 +1824,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1099,17 +1202,17 @@ INLINE static unsigned char IndYAddrModeHandler_Data()
+@@ -1099,17 +1209,17 @@ INLINE static unsigned char IndYAddrModeHandler_Data()
  
  INLINE static int IndYAddrModeHandler_Address()
  {
@@ -1843,7 +1850,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1118,8 +1221,8 @@ INLINE static int IndYAddrModeHandler_Address()
+@@ -1118,8 +1228,8 @@ INLINE static int IndYAddrModeHandler_Address()
  
  INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  {
@@ -1854,7 +1861,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1128,7 +1231,7 @@ INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
+@@ -1128,7 +1238,7 @@ INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  
  INLINE static int ZeroPgXAddrModeHandler_Address()
  {
@@ -1863,7 +1870,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1137,18 +1240,18 @@ INLINE static int ZeroPgXAddrModeHandler_Address()
+@@ -1137,18 +1247,18 @@ INLINE static int ZeroPgXAddrModeHandler_Address()
  
  INLINE static unsigned char AbsXAddrModeHandler_Data()
  {
@@ -1891,7 +1898,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1157,18 +1260,18 @@ INLINE static unsigned char AbsXAddrModeHandler_Data()
+@@ -1157,18 +1267,18 @@ INLINE static unsigned char AbsXAddrModeHandler_Data()
  
  INLINE static int AbsXAddrModeHandler_Address()
  {
@@ -1919,7 +1926,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1177,18 +1280,18 @@ INLINE static int AbsXAddrModeHandler_Address()
+@@ -1177,18 +1287,18 @@ INLINE static int AbsXAddrModeHandler_Address()
  
  INLINE static unsigned char AbsYAddrModeHandler_Data()
  {
@@ -1947,7 +1954,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1197,18 +1300,18 @@ INLINE static unsigned char AbsYAddrModeHandler_Data()
+@@ -1197,18 +1307,18 @@ INLINE static unsigned char AbsYAddrModeHandler_Data()
  
  INLINE static int AbsYAddrModeHandler_Address()
  {
@@ -1975,7 +1982,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1217,27 +1320,27 @@ INLINE static int AbsYAddrModeHandler_Address()
+@@ -1217,27 +1327,27 @@ INLINE static int AbsYAddrModeHandler_Address()
  
  INLINE static int IndAddrModeHandler_Address()
  {
@@ -2021,7 +2028,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1246,10 +1349,10 @@ INLINE static int IndAddrModeHandler_Address()
+@@ -1246,10 +1356,10 @@ INLINE static int IndAddrModeHandler_Address()
  
  INLINE static int ZPIndAddrModeHandler_Address()
  {
@@ -2036,7 +2043,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1258,10 +1361,10 @@ INLINE static int ZPIndAddrModeHandler_Address()
+@@ -1258,10 +1368,10 @@ INLINE static int ZPIndAddrModeHandler_Address()
  
  INLINE static unsigned char ZPIndAddrModeHandler_Data()
  {
@@ -2051,7 +2058,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1271,13 +1374,13 @@ INLINE static unsigned char ZPIndAddrModeHandler_Data()
+@@ -1271,13 +1381,13 @@ INLINE static unsigned char ZPIndAddrModeHandler_Data()
  
  INLINE static int IndAddrXModeHandler_Address()
  {
@@ -2070,7 +2077,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1286,8 +1389,8 @@ INLINE static int IndAddrXModeHandler_Address()
+@@ -1286,8 +1396,8 @@ INLINE static int IndAddrXModeHandler_Address()
  
  INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  {
@@ -2081,7 +2088,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1296,7 +1399,7 @@ INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
+@@ -1296,7 +1406,7 @@ INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  
  INLINE static int ZeroPgYAddrModeHandler_Address()
  {
@@ -2090,7 +2097,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1305,63 +1408,80 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
+@@ -1305,65 +1415,87 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
  
  void Init6502Core()
  {
@@ -2171,6 +2178,7 @@ index 52f9049..7fd0be3 100644
 +    NMIStatus = 0;
 +    NMILock = false;
 +
++    // Set root stack frame - used for performance capture - MJSL
 +    StackFrameCount = 1;
 +    SetStackFrame(0/*index*/, StackFrameType_Root, ProgramCounter, 0/*returnAddress*/, 0xff/*returnStackReg*/);
  }
@@ -2182,19 +2190,23 @@ index 52f9049..7fd0be3 100644
 -  ProgramCounter=BeebReadMem(0xfffe) | (BeebReadMem(0xffff)<<8);
 -  SetPSR(FlagI,0,0,1,0,0,0,0);
 -  IRQCycles=7;
+-    PerfWriter_WriteInterruptEvent(PerfWriter::EventType::IRQ, ProgramCounter, IRQCycles, returnAddress);
 +void DoInterrupt(void)
 +{
 +    int returnAddress = ProgramCounter;
 +    unsigned char returnStackReg = StackReg;
++    byte pushedPSR = PSR & ~FlagB;
 +
 +    PushWord(ProgramCounter);
-+    Push(PSR & ~FlagB);
++    Push(pushedPSR);
 +    ProgramCounter=BeebReadMem(0xfffe) | (BeebReadMem(0xffff)<<8);
 +    SetPSR(FlagI,0,0,1,0,0,0,0);
 +    IRQCycles=7;
 +
++    // Push stack frame and log interrupt - used for performance capture - MJSL
 +    PushStackFrame(StackFrameType_IRQ, returnAddress, returnStackReg);
-+    PerfWriter_WriteInterruptEvent(false/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
++    PerfWriter_WriteInterruptEvent(
++        PerfWriter::InterruptType::IRQ, returnAddress, ProgramCounter, IRQCycles, pushedPSR);
  } /* DoInterrupt */
  
  /*-------------------------------------------------------------------------*/
@@ -2205,10 +2217,12 @@ index 52f9049..7fd0be3 100644
 -  ProgramCounter=BeebReadMem(0xfffa) | (BeebReadMem(0xfffb)<<8);
 -  SetPSR(FlagI,0,0,1,0,0,0,0); /* Normal interrupts should be disabled during NMI ? */
 -  IRQCycles=7;
+-        PerfWriter::InterruptType::NMI, returnAddress, ProgramCounter, IRQCycles, stackPSR);
 +void DoNMI(void)
 +{
 +    int returnAddress = ProgramCounter;
 +    unsigned char returnStackReg = StackReg;
++    byte pushedPSR = PSR;
 +
 +    NMILock = true;
 +    PushWord(ProgramCounter);
@@ -2217,12 +2231,14 @@ index 52f9049..7fd0be3 100644
 +    SetPSR(FlagI,0,0,1,0,0,0,0); /* Normal interrupts should be disabled during NMI ? */
 +    IRQCycles=7;
 +
++    // Push stack frame and log interrupt - used for performance capture - MJSL
 +    PushStackFrame(StackFrameType_NMI, returnAddress, returnStackReg);
-+    PerfWriter_WriteInterruptEvent(true/*non-maskable*/, ProgramCounter, IRQCycles, StackReg);
++    PerfWriter_WriteInterruptEvent(
++        PerfWriter::InterruptType::NMI, returnAddress, ProgramCounter, IRQCycles, pushedPSR);
  } /* DoNMI */
  
  /*-------------------------------------------------------------------------*/
-@@ -1388,58 +1508,58 @@ void DoNMI(void) {
+@@ -1390,58 +1522,58 @@ void DoNMI(void) {
  
  static void ClipboardREMVHandler()
  {
@@ -2333,7 +2349,7 @@ index 52f9049..7fd0be3 100644
  }
  
  // The routine indirected through the CNPV vector is used by the operating
-@@ -1464,25 +1584,25 @@ static void ClipboardREMVHandler()
+@@ -1466,25 +1598,25 @@ static void ClipboardREMVHandler()
  
  static void ClipboardCNPVHandler()
  {
@@ -2378,7 +2394,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1491,1858 +1611,1865 @@ static void ClipboardCNPVHandler()
+@@ -1493,1858 +1625,1870 @@ static void ClipboardCNPVHandler()
  
  void Exec6502Instruction()
  {
@@ -4719,6 +4735,8 @@ index 52f9049..7fd0be3 100644
 +            case 0x4c:
 +                // JMP abs
 +                ProgramCounter = AbsAddrModeHandler_Address();
++
++                // Update root stack frame's start address - used for performance capture - MJSL
 +                UpdateRootStackFrame();
 +                break;
 +            case 0x4d:
@@ -4927,6 +4945,8 @@ index 52f9049..7fd0be3 100644
 +            case 0x6c:
 +                // JMP (abs)
 +                ProgramCounter = IndAddrModeHandler_Address();
++
++                // Update root stack frame's start address - used for performance capture - MJSL
 +                UpdateRootStackFrame();
 +                break;
 +            case 0x6d:
@@ -5887,6 +5907,7 @@ index 52f9049..7fd0be3 100644
 +        Cycles += CyclesTable[CurrentInstruction] -
 +                  CyclesToMemRead[CurrentInstruction] - CyclesToMemWrite[CurrentInstruction];
 +
++        // Log instruction - used for performance capture - MJSL
 +        PerfWriter_WriteInstruction(
 +            PrePC, ProgramCounter, (byte)CurrentInstruction, (byte)Cycles, 
 +            Accumulator, XReg, YReg, PSR, StackReg,
@@ -6086,7 +6107,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3351,7 +3478,7 @@ static void PollHardware(unsigned int nCycles)
+@@ -3353,7 +3497,7 @@ static void PollHardware(unsigned int nCycles)
  
  int MillisecondsToCycles(int Time)
  {
@@ -6095,7 +6116,7 @@ index 52f9049..7fd0be3 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3360,49 +3487,68 @@ int MillisecondsToCycles(int Time)
+@@ -3362,49 +3506,73 @@ int MillisecondsToCycles(int Time)
  
  int MicrosecondsToCycles(int Time)
  {
@@ -6128,6 +6149,8 @@ index 52f9049..7fd0be3 100644
 +    UEFWrite8(intStatus, SUEF);
 +    UEFWrite8(NMIStatus, SUEF);
 +    UEFWrite8(NMILock, SUEF);
++
++    // Write stack frames - used for performance capture - MJSL
 +    SyncStackFrames(StackReg);
 +    UEFWrite8(StackFrameCount, SUEF);
 +    for (int i = 0; i < StackFrameCount; i++) {
@@ -6138,6 +6161,7 @@ index 52f9049..7fd0be3 100644
 +        UEFWrite16(StackFrames[i].ReturnAddress, SUEF);
 +        UEFWrite8(StackFrames[i].ReturnStackReg, SUEF);
 +    }
++
 +    UEFWrite16(0, SUEF);
  }
  
@@ -6167,6 +6191,8 @@ index 52f9049..7fd0be3 100644
 +    NMIStatus = UEFRead8(SUEF);
 +    NMILock = UEFReadBool(SUEF);
 +    // AtoDTrigger=Disc8271Trigger=AMXTrigger=PrinterTrigger=VideoTriggerCount=TotalCycles+100;
++
++    // Read stack frames - used for performance capture - MJSL
 +    StackFrameCount = UEFRead8(SUEF);
 +    for (int i = 0; i < StackFrameCount; i++) {
 +        StackFrames[i].Type = (StackFrameType)UEFRead8(SUEF);
@@ -6196,13 +6222,14 @@ index 52f9049..7fd0be3 100644
 +    }
  }
 diff --git a/Src/6502core.h b/Src/6502core.h
-index 935ff6b..630a357 100644
+index 935ff6b..6a505d2 100644
 --- a/Src/6502core.h
 +++ b/Src/6502core.h
-@@ -99,4 +99,28 @@ void WriteInstructionCounts(const char *FileName);
+@@ -99,4 +99,29 @@ void WriteInstructionCounts(const char *FileName);
  int MillisecondsToCycles(int Time);
  int MicrosecondsToCycles(int Time);
  
++// Stack frames - used for performance capture - MJSL
 +enum StackFrameType
 +{
 +	StackFrameType_Root = 0,
@@ -6243,7 +6270,7 @@ index e921f98..df7d840 100644
      END
      POPUP "&Edit"
 diff --git a/Src/BeebEm.vcxproj b/Src/BeebEm.vcxproj
-index 81b032a..c2e1b43 100644
+index 81b032a..a967acf 100644
 --- a/Src/BeebEm.vcxproj
 +++ b/Src/BeebEm.vcxproj
 @@ -22,32 +22,32 @@
@@ -6284,29 +6311,52 @@ index 81b032a..c2e1b43 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
-@@ -98,6 +98,7 @@
+@@ -56,22 +56,6 @@
+   </ImportGroup>
+   <ImportGroup Label="Shared">
+   </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+   <PropertyGroup Label="UserMacros" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <LinkIncremental>true</LinkIncremental>
+@@ -98,6 +82,7 @@
        <PreprocessorDefinitions>MODET;MODE32;BEEBEM;ENABLE_SPEECH=0;WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
        <SDLCheck>true</SDLCheck>
        <AdditionalOptions>/source-charset:windows-1252 /execution-charset:windows-1252 %(AdditionalOptions)</AdditionalOptions>
-+      <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(DXSDK_DIR)Include</AdditionalIncludeDirectories>
      </ClCompile>
      <Link>
        <SubSystem>Windows</SubSystem>
-@@ -107,6 +108,9 @@
+@@ -107,6 +92,9 @@
        <AdditionalDependencies>Comctl32.lib;d3d9.lib;dsound.lib;Gdiplus.lib;Shlwapi.lib;Vfw32.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
        <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
      </Link>
 +    <ResourceCompile>
-+      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\atlmfc\include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(VCToolsInstallDir)atlmfc\include</AdditionalIncludeDirectories>
 +    </ResourceCompile>
    </ItemDefinitionGroup>
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
      <ClCompile>
-@@ -116,12 +120,16 @@
+@@ -116,12 +104,16 @@
        <Optimization>Disabled</Optimization>
        <PreprocessorDefinitions>MODET;MODE32;BEEBEM;ENABLE_SPEECH=0;WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
        <SDLCheck>true</SDLCheck>
-+      <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(DXSDK_DIR)Include</AdditionalIncludeDirectories>
      </ClCompile>
      <Link>
        <SubSystem>Windows</SubSystem>
@@ -6314,48 +6364,48 @@ index 81b032a..c2e1b43 100644
        <AdditionalDependencies>Comctl32.lib;d3d9.lib;dsound.lib;Gdiplus.lib;Shlwapi.lib;Vfw32.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
      </Link>
 +    <ResourceCompile>
-+      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\atlmfc\include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(VCToolsInstallDir)atlmfc\include</AdditionalIncludeDirectories>
 +    </ResourceCompile>
    </ItemDefinitionGroup>
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
      <ClCompile>
-@@ -134,6 +142,7 @@
+@@ -134,6 +126,7 @@
        <PreprocessorDefinitions>MODET;MODE32;BEEBEM;ENABLE_SPEECH=0;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
        <SDLCheck>true</SDLCheck>
        <AdditionalOptions>/source-charset:windows-1252 /execution-charset:windows-1252 %(AdditionalOptions)</AdditionalOptions>
-+      <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(DXSDK_DIR)Include</AdditionalIncludeDirectories>
      </ClCompile>
      <Link>
        <SubSystem>Windows</SubSystem>
-@@ -145,6 +154,9 @@
+@@ -145,6 +138,9 @@
        <AdditionalDependencies>Comctl32.lib;d3d9.lib;dsound.lib;Gdiplus.lib;Shlwapi.lib;Vfw32.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
        <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
      </Link>
 +    <ResourceCompile>
-+      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\atlmfc\include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(VCToolsInstallDir)atlmfc\include</AdditionalIncludeDirectories>
 +    </ResourceCompile>
    </ItemDefinitionGroup>
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
      <ClCompile>
-@@ -156,6 +168,7 @@
+@@ -156,6 +152,7 @@
        <IntrinsicFunctions>true</IntrinsicFunctions>
        <PreprocessorDefinitions>MODET;MODE32;BEEBEM;ENABLE_SPEECH=0;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
        <SDLCheck>true</SDLCheck>
-+      <AdditionalIncludeDirectories>C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(DXSDK_DIR)Include</AdditionalIncludeDirectories>
      </ClCompile>
      <Link>
        <SubSystem>Windows</SubSystem>
-@@ -164,6 +177,9 @@
+@@ -164,6 +161,9 @@
        <GenerateDebugInformation>true</GenerateDebugInformation>
        <AdditionalDependencies>Comctl32.lib;d3d9.lib;dsound.lib;Gdiplus.lib;Shlwapi.lib;Vfw32.lib;winmm.lib;Ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
      </Link>
 +    <ResourceCompile>
-+      <AdditionalIncludeDirectories>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\atlmfc\include</AdditionalIncludeDirectories>
++      <AdditionalIncludeDirectories>$(VCToolsInstallDir)atlmfc\include</AdditionalIncludeDirectories>
 +    </ResourceCompile>
    </ItemDefinitionGroup>
    <ItemGroup>
      <ClCompile Include="6502core.cpp" />
-@@ -212,6 +228,7 @@
+@@ -212,6 +212,7 @@
      <ClCompile Include="Model.cpp" />
      <ClCompile Include="Music5000.cpp" />
      <ClCompile Include="PALRom.cpp" />
@@ -6363,7 +6413,7 @@ index 81b032a..c2e1b43 100644
      <ClCompile Include="Preferences.cpp" />
      <ClCompile Include="Registry.cpp" />
      <ClCompile Include="RenameFileDialog.cpp" />
-@@ -383,6 +400,7 @@
+@@ -383,6 +384,7 @@
      <ClInclude Include="MonitorType.h" />
      <ClInclude Include="Music5000.h" />
      <ClInclude Include="PALRom.h" />
@@ -6396,7 +6446,7 @@ index 49a1c2e..bf7a73a 100644
    <ItemGroup>
      <Image Include="..\Help\bbcmicro.png">
 diff --git a/Src/BeebMem.cpp b/Src/BeebMem.cpp
-index a27e15f..279470f 100644
+index a27e15f..a63bad1 100644
 --- a/Src/BeebMem.cpp
 +++ b/Src/BeebMem.cpp
 @@ -92,7 +92,7 @@ bool ShEn = false;   // Shadow RAM Enable
@@ -6408,11 +6458,13 @@ index a27e15f..279470f 100644
  
  unsigned char Hidden[256];
  unsigned char Private[12288];
-@@ -290,6 +290,159 @@ const unsigned char *BeebMemPtrWithWrapMode7(int Address, int Length) {
+@@ -290,6 +290,161 @@ const unsigned char *BeebMemPtrWithWrapMode7(int Address, int Length) {
  	return tmpBuf;
  }
  
 +/*----------------------------------------------------------------------------*/
++
++// Get memory page - used for performance capture - MJSL
 +
 +MemPageType BeebMemPage(int Address) {
 +	if (MachineType == Model::B) {
@@ -6569,7 +6621,7 @@ index a27e15f..279470f 100644
  unsigned char BeebReadMem(int Address) {
  	unsigned char Value = 0xff;
 diff --git a/Src/BeebMem.h b/Src/BeebMem.h
-index 6333326..43e2cba 100644
+index 6333326..a65e401 100644
 --- a/Src/BeebMem.h
 +++ b/Src/BeebMem.h
 @@ -47,6 +47,8 @@ extern unsigned char WholeRam[65536];
@@ -6589,10 +6641,11 @@ index 6333326..43e2cba 100644
  
  enum RomFlags
  {
-@@ -92,9 +95,19 @@ extern char RomFile[MAX_PATH];
+@@ -92,9 +95,20 @@ extern char RomFile[MAX_PATH];
  
  extern char HardDrivePath[MAX_PATH]; // JGH
  
++// Memory page type - used for performance capture - MJSL
 +enum MemPageType {
 +	MemPage_Rom = 0, // 0..15 depending on ROMSEL
 +	MemPage_WholeRam = 16,
@@ -6651,14 +6704,14 @@ index df545ce..ab2ed0f 100644
  	case IDM_SPEECH:
  		EnableSpeech(!SpeechEnabled);
 diff --git a/Src/BeebWin.h b/Src/BeebWin.h
-index 9bd9764..f7a6f29 100644
+index 9bd9764..5bc3c04 100644
 --- a/Src/BeebWin.h
 +++ b/Src/BeebWin.h
 @@ -527,6 +527,12 @@ public:
  	void EndVideo();
  	bool IsCapturing() const;
  
-+	// Performance capture
++	// Performance capture - MJSL
 +	void UpdatePerfCaptureMenu();
 +	void CapturePerf();
 +	void EndPerfCapture();
@@ -6668,7 +6721,7 @@ index 9bd9764..f7a6f29 100644
  	void CaptureBitmap(int SourceX,
  	                   int SourceY,
 diff --git a/Src/BeebWinIo.cpp b/Src/BeebWinIo.cpp
-index ee59192..841f95f 100644
+index ee59192..ad23381 100644
 --- a/Src/BeebWinIo.cpp
 +++ b/Src/BeebWinIo.cpp
 @@ -55,6 +55,7 @@ using std::max;
@@ -6679,10 +6732,12 @@ index ee59192..841f95f 100644
  #include "Resource.h"
  #include "Serial.h"
  #include "Sound.h"
-@@ -1083,6 +1084,96 @@ bool BeebWin::IsCapturing() const
+@@ -1083,6 +1084,98 @@ bool BeebWin::IsCapturing() const
  
  /****************************************************************************/
  
++// Performance capture - MJSL
++
 +static std::string FormatString(const char* format, ...)
 +{
 +	va_list args;
@@ -6777,14 +6832,15 @@ index ee59192..841f95f 100644
  {
  	char FileName[MAX_PATH];
 diff --git a/Src/BeebWinPrefs.cpp b/Src/BeebWinPrefs.cpp
-index d86738b..f22b2cc 100644
+index d86738b..1233723 100644
 --- a/Src/BeebWinPrefs.cpp
 +++ b/Src/BeebWinPrefs.cpp
-@@ -1634,6 +1634,10 @@ void BeebWin::LoadFilePathPreferences()
+@@ -1634,6 +1634,11 @@ void BeebWin::LoadFilePathPreferences()
  	if (!m_Preferences.HasValue(CFG_AVI_PATH)) {
  		m_Preferences.SetStringValue(CFG_AVI_PATH, "");
  	}
 +	
++	// Performance capture - MJSL
 +	if (!m_Preferences.HasValue(CFG_PERF_PATH)) {
 +		m_Preferences.SetStringValue(CFG_PERF_PATH, "");
 +	}
@@ -6838,7 +6894,7 @@ index 9dae885..4d02094 100644
  {
  	int start;
 diff --git a/Src/Hardware/Acorn1770/Acorn1770.vcxproj b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
-index 72c4469..52adc3b 100644
+index 72c4469..a621eec 100644
 --- a/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 +++ b/Src/Hardware/Acorn1770/Acorn1770.vcxproj
 @@ -22,32 +22,32 @@
@@ -6879,7 +6935,30 @@ index 72c4469..52adc3b 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
-@@ -80,6 +80,8 @@
+@@ -56,22 +56,6 @@
+   </ImportGroup>
+   <ImportGroup Label="Shared">
+   </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+   <PropertyGroup Label="UserMacros" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <LinkIncremental>true</LinkIncremental>
+@@ -80,6 +64,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
      <LinkIncremental>true</LinkIncremental>
@@ -6888,7 +6967,7 @@ index 72c4469..52adc3b 100644
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
      <LinkIncremental>false</LinkIncremental>
-@@ -88,6 +90,8 @@
+@@ -88,6 +74,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
      <LinkIncremental>false</LinkIncremental>
@@ -6898,7 +6977,7 @@ index 72c4469..52adc3b 100644
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
      <ClCompile>
 diff --git a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
-index a880b0e..32a2a20 100644
+index a880b0e..9068b16 100644
 --- a/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 +++ b/Src/Hardware/OpusDDOS/OpusDDOS.vcxproj
 @@ -22,32 +22,32 @@
@@ -6939,7 +7018,30 @@ index a880b0e..32a2a20 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
-@@ -80,6 +80,8 @@
+@@ -56,22 +56,6 @@
+   </ImportGroup>
+   <ImportGroup Label="Shared">
+   </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+   <PropertyGroup Label="UserMacros" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <LinkIncremental>true</LinkIncremental>
+@@ -80,6 +64,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
      <LinkIncremental>true</LinkIncremental>
@@ -6948,7 +7050,7 @@ index a880b0e..32a2a20 100644
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
      <LinkIncremental>false</LinkIncremental>
-@@ -88,6 +90,8 @@
+@@ -88,6 +74,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
      <LinkIncremental>false</LinkIncremental>
@@ -6958,7 +7060,7 @@ index a880b0e..32a2a20 100644
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
      <ClCompile>
 diff --git a/Src/Hardware/Watford/Watford.vcxproj b/Src/Hardware/Watford/Watford.vcxproj
-index c0de679..168e033 100644
+index c0de679..aa31f13 100644
 --- a/Src/Hardware/Watford/Watford.vcxproj
 +++ b/Src/Hardware/Watford/Watford.vcxproj
 @@ -22,32 +22,32 @@
@@ -6999,7 +7101,30 @@ index c0de679..168e033 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>Unicode</CharacterSet>
    </PropertyGroup>
-@@ -80,6 +80,8 @@
+@@ -56,22 +56,6 @@
+   </ImportGroup>
+   <ImportGroup Label="Shared">
+   </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+   <PropertyGroup Label="UserMacros" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <LinkIncremental>true</LinkIncremental>
+@@ -80,6 +64,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
      <LinkIncremental>true</LinkIncremental>
@@ -7008,7 +7133,7 @@ index c0de679..168e033 100644
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
      <LinkIncremental>false</LinkIncremental>
-@@ -88,6 +90,8 @@
+@@ -88,6 +74,8 @@
    </PropertyGroup>
    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
      <LinkIncremental>false</LinkIncremental>
@@ -7018,7 +7143,7 @@ index c0de679..168e033 100644
    <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
      <ClCompile>
 diff --git a/Src/InnoSetup/Installer.vcxproj b/Src/InnoSetup/Installer.vcxproj
-index c087f1f..def40d8 100644
+index c087f1f..8ff2b1f 100644
 --- a/Src/InnoSetup/Installer.vcxproj
 +++ b/Src/InnoSetup/Installer.vcxproj
 @@ -21,32 +21,32 @@
@@ -7059,15 +7184,38 @@ index c087f1f..def40d8 100644
      <WholeProgramOptimization>true</WholeProgramOptimization>
      <CharacterSet>MultiByte</CharacterSet>
    </PropertyGroup>
+@@ -55,22 +55,6 @@
+   </ImportGroup>
+   <ImportGroup Label="Shared">
+   </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-    <Import Project="$(SolutionDir)BeebEm.user.props" />
+-  </ImportGroup>
+   <PropertyGroup Label="UserMacros" />
+   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+     <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..ae800e2
+index 0000000..d00f2ec
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1065 @@
+@@ -0,0 +1,1048 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
-+Copyright (C) 2005  Mike Wyatt
++Copyright (C) 2026  Mark J Leece
 +
 +This program is free software; you can redistribute it and/or
 +modify it under the terms of the GNU General Public License
@@ -7086,9 +7234,7 @@ index 0000000..ae800e2
 +****************************************************************/
 +
 +//
-+// BeebEm .Perf Writer
-+//
-+// Mark J Leece - Aug 2025
++// Performance capture writer
 +//
 +
 +#include <windows.h>
@@ -7554,24 +7700,16 @@ index 0000000..ae800e2
 +    }
 +
 +    int snapshotSize =
-+        2 +                         // program counter
-+        1 +                         // accumulator
-+        1 +                         // X register
-+        1 +                         // Y register
-+        1 +                         // status register
-+        1 +                         // stack register/pointer
-+        1 +                         // rom paging register
-+        1 +                         // access control register (ACCCON)
-+        1 +                         // stack frame count
-+        m_stackFrameCount * 8 +     // stack frames
-+        1 +                         // screen address
++        7 +                         // CPU registers
++        2 +                         // paging registers
 +        (bHiddenRAM ? 1 : 0) +      // hidden ram address (IntegraB)
-+        1 +                         // video ULA control register
-+        16 +                        // video ULA palette
-+        18 +                        // video CRTC registers
++        1 + m_stackFrameCount * 8 + // call stack
++        17 +                        // video ULA state
++        25 +                        // video CRTC state
++        1 +                         // screen wrap address
 +        65536 +                     // base memory (64K)
-+        1 +                         // page count
-+        bankCount * (2 + 16384) +   // page data (bank-id, read-only flag, memory (16K))
++        1 +                         // memory page count
++        bankCount * (2 + 16384) +   // memory page data (bank-id, read-only flag, memory (16K))
 +        (bShadowRAM ? 20480 : 0) +  // shadow ram (20K)
 +        (bPrivateRAM ? 12288 : 0) + // private ram (12K)
 +        (bPrivateMosRAM ? 4096 : 0) + // private ram (4K)
@@ -7580,7 +7718,7 @@ index 0000000..ae800e2
 +
 +    Buffer snapshotData(snapshotSize);
 +
-+    // registers
++    // CPU registers
 +    snapshotData.WriteInt16((int16_t)m_programCounter);
 +    snapshotData.WriteByte(m_accumulator);
 +    snapshotData.WriteByte(m_XRegister);
@@ -7591,6 +7729,12 @@ index 0000000..ae800e2
 +    // paging registers
 +    snapshotData.WriteByte(PagedRomReg);
 +    snapshotData.WriteByte(ACCCON);
++
++    // hidden RAM address
++    if (bHiddenRAM)
++    {
++        snapshotData.WriteByte((byte)HidAdd);
++    }
 +
 +    // call stack
 +    snapshotData.WriteByte((byte)m_stackFrameCount);
@@ -7605,14 +7749,6 @@ index 0000000..ae800e2
 +        snapshotData.WriteByte(stackFrame->ReturnStackReg);
 +    }
 +
-+    // screen wrap address (B5 & B4 of System-VIA Port B addressable latch)
-+    snapshotData.WriteByte((IC32State & 0x30) >> 4);
-+
-+    if (bHiddenRAM)
-+    {
-+        snapshotData.WriteByte((byte)HidAdd);
-+    }
-+
 +    // video ULA
 +    snapshotData.WriteByte(VideoULA_ControlReg);
 +    for (int i = 0; i < 16; i++)
@@ -7620,7 +7756,8 @@ index 0000000..ae800e2
 +        snapshotData.WriteByte(VideoULA_Palette[i] ^ 0x07); // save physical color bits 0..2 inverted
 +    }
 +
-+    // video 6845 registers
++    // video CRTC
++    snapshotData.WriteByte(CRTCControlReg);
 +    byte CRTCRegs[] = {
 +        CRTC_HorizontalTotal,     // R0
 +        CRTC_HorizontalDisplayed, // R1
@@ -7641,6 +7778,17 @@ index 0000000..ae800e2
 +        CRTC_LightPenHigh,        // R16
 +        CRTC_LightPenLow };       // R17
 +    snapshotData.Write(CRTCRegs, sizeof(CRTCRegs));
++
++    int videoCharRow, videoCharColumn, videoCharScanline, videoDisplayScanline, videoDisplayField;
++    VideoGetState(&videoCharRow, &videoCharColumn, &videoCharScanline, &videoDisplayScanline, &videoDisplayField);
++    snapshotData.WriteByte((byte)videoCharRow);
++    snapshotData.WriteByte((byte)videoCharColumn);
++    snapshotData.WriteByte((byte)videoCharScanline);
++    snapshotData.WriteInt16((int16_t)videoDisplayScanline);
++    snapshotData.WriteByte((byte)videoDisplayField);
++
++    // screen wrap address (B5 & B4 of System-VIA Port B addressable latch)
++    snapshotData.WriteByte((IC32State & 0x30) >> 4);
 +
 +    // memory
 +    snapshotData.Write(WholeRam, 65536);
@@ -7750,7 +7898,7 @@ index 0000000..ae800e2
 +}
 +
 +void PerfWriter::WriteInterruptEvent(
-+    bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg)
++    PerfWriter::InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister)
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
@@ -7762,7 +7910,7 @@ index 0000000..ae800e2
 +
 +    // write maskable or non-maskable interrupt marker (0x80, 0|1)
 +    m_writeBuffer->WriteByteUnchecked(0x80);
-+    m_writeBuffer->WriteByteUnchecked(bNonMaskable ? 1 : 0);
++    m_writeBuffer->WriteByteUnchecked((byte)interruptType);
 +
 +    // write cycle count
 +    m_writeBuffer->WriteByteUnchecked((byte)cycleCount);
@@ -7772,28 +7920,11 @@ index 0000000..ae800e2
 +    m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +
 +    // write pushed return address
-+    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + postStackReg + 2]);
-+    m_writeBuffer->WriteByteUnchecked(WholeRam[0x100 + postStackReg + 3]);
++    m_writeBuffer->WriteByteUnchecked((byte)(prePC & 0xFF));
++    m_writeBuffer->WriteByteUnchecked((byte)(prePC >> 8));
 +
-+    m_executionCount++;
-+}
-+
-+void PerfWriter::WriteBeginDisplayEvent(byte displayField)
-+{
-+    if (m_pFile == nullptr || m_error) return;
-+
-+    if (m_writeBuffer->Size() >= (BufferSize - MaxInstructionSize)) // buffer almost full?
-+    {
-+        // swap read / write buffers
-+        if (!SwapReadWriteBuffers()) return;
-+    }
-+
-+    // write (0x80, 0x02)
-+    m_writeBuffer->WriteByteUnchecked(0x80);
-+    m_writeBuffer->WriteByteUnchecked(0x02);
-+
-+    // write field
-+    m_writeBuffer->WriteByteUnchecked(displayField);
++    // stack status register
++    m_writeBuffer->WriteByteUnchecked(stackStatusRegister);
 +
 +    m_executionCount++;
 +}
@@ -8132,13 +8263,13 @@ index 0000000..ae800e2
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..8796028
+index 0000000..4709137
 --- /dev/null
 +++ b/Src/PerfWriter.h
-@@ -0,0 +1,358 @@
+@@ -0,0 +1,354 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
-+Copyright (C) 2005  Mike Wyatt
++Copyright (C) 2026  Mark J Leece
 +
 +This program is free software; you can redistribute it and/or
 +modify it under the terms of the GNU General Public License
@@ -8157,9 +8288,7 @@ index 0000000..8796028
 +****************************************************************/
 +
 +//
-+// BeebEm .Perf Writer
-+//
-+// Mark J Leece - Aug 2025
++// Performance capture writer
 +//
 +
 +#ifndef PERF_WRITER_HEADER
@@ -8175,11 +8304,16 @@ index 0000000..8796028
 +	virtual ~PerfWriter();
 +
 +public:
++	enum InterruptType
++	{
++		IRQ = 0,
++		NMI = 1
++	};
++
 +	bool Initialise(const CHAR* psFileName);
 +	bool Close();
-+	void WriteBeginDisplayEvent(byte displayField);
 +	void WriteInterruptEvent(
-+		bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg);
++		InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister);
 +	void WriteInstruction(
 +		int prePC, int postPC, byte opcode, byte cycleCount, 
 +		byte postAccumulator, byte postXReg, byte postYReg, byte postPSR, byte postStackReg,
@@ -8335,19 +8469,12 @@ index 0000000..8796028
 +//
 +// inlines...
 +//
-+inline void PerfWriter_WriteBeginDisplayEvent(byte displayField)
++inline void PerfWriter_WriteInterruptEvent(
++	PerfWriter::InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister)
 +{
 +	if (perfWriter != nullptr)
 +	{
-+		perfWriter->WriteBeginDisplayEvent(displayField);
-+	}
-+}
-+
-+inline void PerfWriter_WriteInterruptEvent(bool bNonMaskable, int postPC, byte cycleCount, byte postStackReg)
-+{
-+	if (perfWriter != nullptr)
-+	{
-+		perfWriter->WriteInterruptEvent(bNonMaskable, postPC, cycleCount, postStackReg);
++		perfWriter->WriteInterruptEvent(interruptType, prePC, postPC, cycleCount, stackStatusRegister);
 +	}
 +}
 +
@@ -8517,7 +8644,7 @@ index b893fa5..d6d046d 100644
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
 diff --git a/Src/UefState.cpp b/Src/UefState.cpp
-index e271e44..4c3201b 100644
+index e271e44..7b476bf 100644
 --- a/Src/UefState.cpp
 +++ b/Src/UefState.cpp
 @@ -47,7 +47,7 @@ Boston, MA  02110-1301, USA.
@@ -8525,27 +8652,102 @@ index e271e44..4c3201b 100644
  /*-------------------------------------------------------------------------*/
  
 -const unsigned char UEFSTATE_VERSION = 15;
-+const unsigned char UEFSTATE_VERSION = 16;
++const unsigned char UEFSTATE_VERSION = 16; // Performance capture - MJSL
  
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c17d038..8bf7b2b 100644
+index c75bf66..dba49d8 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
-@@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
- #include "DebugTrace.h"
- #include "Log.h"
- #include "Main.h"
-+#include "PerfWriter.h"
- #include "Sound.h"
- #include "SysVia.h"
- #include "UefState.h"
-@@ -656,6 +657,7 @@ static void VideoStartOfFrame()
-     CursorFieldCount--;
-     Mode7FlashTrigger--;
-     VideoState.InterlaceFrame = !VideoState.InterlaceFrame;
-+    PerfWriter_WriteBeginDisplayEvent((CRTC_InterlaceAndDelay & 1) ? (byte)VideoState.InterlaceFrame : 0);
-   }
+@@ -117,7 +117,7 @@ struct VideoStateT {
+   bool IsNewTVFrame; // Specifies the start of a new TV frame, following VSync (used so we only calibrate speed once per frame)
+   bool InterlaceFrame;
+   bool DoCA1Int;
+-  int DisplayScanline; /* MJSL - number of horizontal syncs since the last vertical sync. Used in performance capture */
++  int DisplayScanline; // Number of horizontal syncs since the last vertical sync - used in performance capture - MJSL
+ };
  
-   // Cursor update for blink. I thought I'd put it here, as this is where the mode 7 flash field thingy is too
+ static VideoStateT VideoState;
+@@ -1274,6 +1274,14 @@ void VideoDoScanLine(void) {
+       IncTrigger((CRTC_HorizontalTotal + 1) * ((VideoULA_ControlReg & 16) ? 1 : 2), VideoTriggerCount);
+     }
+   } /* Teletext if */
++ 
++  // Reset/increment DisplayScanline - used for performance capture - MJSL
++  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0) {
++    VideoState.DisplayScanline = 0;
++  } 
++  else {
++    VideoState.DisplayScanline++;
++  }
+ }
+ 
+ /*-------------------------------------------------------------------------------------------------------------*/
+@@ -1311,6 +1319,7 @@ void VideoInit(void) {
+   VideoState.LastPixmapLine=0;
+   VideoState.PreviousLastPixmapLine=256;
+   VideoState.IsNewTVFrame = false;
++  VideoState.DisplayScanline = 0; // Used for performance capture - MJSL
+   CurY=-1;
+   //AdjustVideo();
+ }
+@@ -1674,6 +1683,7 @@ void SaveVideoUEF(FILE *SUEF)
+ 	UEFWrite32(Mode7FlashTrigger, SUEF);
+ 	UEFWrite8(Mode7FlashOn, SUEF);
+ 	UEFWrite32(VideoTriggerCount - TotalCycles, SUEF);
++    UEFWrite32(VideoState.DisplayScanline, SUEF); // Used for performance capture - MJSL
+ }
+ 
+ void LoadVideoUEF(FILE *SUEF, int Version)
+@@ -1738,6 +1748,10 @@ void LoadVideoUEF(FILE *SUEF, int Version)
+ 		Mode7FlashOn = UEFReadBool(SUEF);
+ 		VideoTriggerCount = TotalCycles + UEFRead32(SUEF);
+ 	}
++
++    if (Version >= 16) {
++        VideoState.DisplayScanline = UEFRead32(SUEF); // Used for performance capture - MJSL
++    }
+ }
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -1806,3 +1820,27 @@ void VideoGetText(char *text, int line)
+ 
+ 	text[x] = '\0';
+ }
++
++/*-------------------------------------------------------------------------------------------------------------*/
++
++// Get video state - used for performance capture - MJSL
++
++void VideoGetState(int* pCharLine, int* pCharColumn, int* pInCharLineUp, int* pDisplayScanline, int *pDisplayField)
++{
++    int HorizontalTotal = CRTC_HorizontalTotal + 1;
++    int CyclesToNextScanline = VideoTriggerCount - TotalCycles;
++    int CharacterClockCycles = ((VideoULA_ControlReg & 0x10) ? 1 : 2);
++
++    int CharColumn = HorizontalTotal - (CyclesToNextScanline / CharacterClockCycles);
++
++    if (CharColumn < 0)
++        CharColumn = 0;
++    else if (CharColumn > HorizontalTotal)
++        CharColumn = HorizontalTotal;
++
++    *pCharLine = VideoState.CharLine;
++    *pCharColumn = CharColumn;
++    *pInCharLineUp = VideoState.InCharLineUp;
++    *pDisplayScanline = VideoState.DisplayScanline;
++    *pDisplayField = (int)VideoState.InterlaceFrame;
++}
+diff --git a/Src/Video.h b/Src/Video.h
+index 4fd7b6c..5b36f93 100644
+--- a/Src/Video.h
++++ b/Src/Video.h
+@@ -64,6 +64,7 @@ void VideoInit(void);
+ void VideoDoScanLine(void);
+ void VideoGetText(char *text, int line);
+ void VideoLightPenStrobe();
++void VideoGetState(int* pCharLine, int* pCharColumn, int* pInCharLineUp, int* pHSyncCount, int* pField);
+ 
+ extern bool TeletextEnabled;
+ 

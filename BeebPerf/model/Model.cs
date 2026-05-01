@@ -88,9 +88,15 @@ namespace BeebPerf.model
                     AccessControlRegister = AccessControlRegister,
                     ScreenWrapAddress = ScreenWrapAddress,
                     HiddenRamAddress = HiddenRamAddress,
-                    VideoULARegister = VideoULARegister,
-                    VideoULAPalette = (byte[])VideoULAPalette.Clone(),
-                    VideoCtrlRegisters = (byte[])VideoCtrlRegisters.Clone(),
+                    ULAControlRegister = ULAControlRegister,
+                    ULAPalette = (byte[])ULAPalette.Clone(),
+                    CRTCRegisterSelect = CRTCRegisterSelect,
+                    CRTCRegisters = (byte[])CRTCRegisters.Clone(),
+                    CRTCCharacterRow = CRTCCharacterRow,
+                    CRTCCharacterColumn = CRTCCharacterColumn,
+                    CRTCCharacterScanline = CRTCCharacterScanline,
+                    CRTCDisplayScanline = CRTCDisplayScanline,
+                    CRTCDisplayField = CRTCDisplayField
                 };
             }
 
@@ -106,9 +112,15 @@ namespace BeebPerf.model
             public byte AccessControlRegister;
             public ushort ScreenWrapAddress;
             public byte HiddenRamAddress;
-            public byte VideoULARegister;
-            public byte[] VideoULAPalette = [];
-            public byte[] VideoCtrlRegisters = [];
+            public byte ULAControlRegister;
+            public byte[] ULAPalette = [];
+            public byte CRTCRegisterSelect;
+            public byte[] CRTCRegisters = [];
+            public byte CRTCCharacterRow;
+            public byte CRTCCharacterColumn;
+            public byte CRTCCharacterScanline;
+            public ushort CRTCDisplayScanline;
+            public byte CRTCDisplayField;
         }
 
         public BBCModelType BBCModel;

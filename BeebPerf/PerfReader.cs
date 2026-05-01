@@ -144,6 +144,7 @@ namespace BeebPerf
             bool hasFilingSystemRam = (model.BBCModel == BBCModelType.Master128 || model.BBCModel == BBCModelType.MasterET);
             bool hasHiddenRam = (model.BBCModel == BBCModelType.IntegraB);
 
+            // CPU registers
             model.Snapshot.ProgramCounter = ReadShort(dataStream);
             model.Snapshot.Accumulator = _Accumulator = ReadByte(dataStream);
             model.Snapshot.XRegister = _XRegister = ReadByte(dataStream);
@@ -151,6 +152,7 @@ namespace BeebPerf
             ReadByte(dataStream); // skip status register, not used
             model.Snapshot.StackPointer = _StackPointer = ReadByte(dataStream);
 
+            // paging registers
             byte romPagingRegister = ReadByte(dataStream);
             model.Snapshot.RomPagingRegister = romPagingRegister;
             RomPagingRegisterChange(model, romPagingRegister);
@@ -158,6 +160,13 @@ namespace BeebPerf
             byte accessControlRegister = ReadByte(dataStream);
             model.Snapshot.AccessControlRegister = accessControlRegister;
             AccessControlRegisterChange(model, accessControlRegister);
+
+            // hidden RAM address
+            if (hasHiddenRam)
+            {
+                byte hiddenRamAddress = ReadByte(dataStream);
+                model.Snapshot.HiddenRamAddress = hiddenRamAddress;
+            }
 
             int stackFrameCount = ReadByte(dataStream);
             model.Snapshot.StackFrames = new MiniStackFrame[stackFrameCount];
@@ -191,8 +200,35 @@ namespace BeebPerf
                 model.Snapshot.StackFrames[i] = new(type, startAddr, returnAddr, returnStackPointer);
             }
 
-            byte screenAddress = ReadByte(dataStream);
-            model.Snapshot.ScreenWrapAddress = screenAddress switch
+            // video ULA
+            model.Snapshot.ULAControlRegister = ReadByte(dataStream);
+
+            byte[] palette = new byte[16];
+            dataStream.ReadExactly(palette);
+            model.Snapshot.ULAPalette = palette;
+
+            // video CRTC
+            byte controlRegister = ReadByte(dataStream);
+            if (controlRegister >= 18)
+                throw new InvalidDataException("invalid .perf file format: invalid CTRL control register");
+            model.Snapshot.CRTCRegisterSelect = controlRegister;
+
+            byte[] registers = new byte[18];
+            dataStream.ReadExactly(registers);
+            model.Snapshot.CRTCRegisters = registers;
+            model.Snapshot.CRTCCharacterRow = ReadByte(dataStream);
+            model.Snapshot.CRTCCharacterColumn = ReadByte(dataStream);
+            model.Snapshot.CRTCCharacterScanline = ReadByte(dataStream);
+            model.Snapshot.CRTCDisplayScanline = ReadShort(dataStream);
+
+            byte displayField = ReadByte(dataStream);
+            if (displayField != 0 && displayField != 1)
+                throw new InvalidDataException("invalid .perf file format: invalid display field");
+            model.Snapshot.CRTCDisplayField = displayField;
+
+            // screen wrap address
+            byte screenWrapAddress = ReadByte(dataStream);
+            model.Snapshot.ScreenWrapAddress = screenWrapAddress switch
             {
                 0 => 0x4000,
                 1 => 0x6000,
@@ -201,22 +237,7 @@ namespace BeebPerf
                 _ => throw new InvalidDataException("invalid .perf file format: invalid screen wrap address")
             };
 
-            if (hasHiddenRam)
-            {
-                byte hiddenRamAddress = ReadByte(dataStream);
-                model.Snapshot.HiddenRamAddress = hiddenRamAddress;
-            }
-
-            model.Snapshot.VideoULARegister = ReadByte(dataStream);
-
-            byte[] palette = new byte[16];
-            dataStream.ReadExactly(palette);
-            model.Snapshot.VideoULAPalette = palette;
-
-            byte[] controlRegisters = new byte[18];
-            dataStream.ReadExactly(controlRegisters);
-            model.Snapshot.VideoCtrlRegisters = controlRegisters;
-
+            // memory
             model.Snapshot.Memory = new byte[(int)MemoryPage.Count][];
 
             byte[] wholeRam = new byte[65536];
@@ -309,12 +330,11 @@ namespace BeebPerf
                     marker = ReadByte(dataStream);
                     if (marker < 0x80)
                     {
-                        // event:
+                        // event
                         var eventType = (EventType)marker;
-                        if (eventType == EventType.IRQ ||
-                            eventType == EventType.NMI)
+                        if (eventType == EventType.IRQ || eventType == EventType.NMI)
                         {
-                            // mark as interrupt
+                            // IRQ/NMI event
                             instruction.Type = eventType switch
                             {
                                 EventType.IRQ => InstructionType.IRQ,
@@ -334,23 +354,15 @@ namespace BeebPerf
                             // return address
                             ushort returnAddress = ReadShort(dataStream);
                             instruction.ReturnAddress = ToCanonicalAddress(model, returnAddress);
+
+                            // skip pushed status register, not used
+                            ReadByte(dataStream); 
+
+                            model.Instructions[_InstructionCount++] = instruction;
+                            continue;
                         }
-                        else if (eventType == EventType.BeginDisplayEvent)
-                        {
-                            instruction.Type = InstructionType.BeginDisplayEvent;
 
-                            // display field
-                            int displayField = ReadByte(dataStream);
-                            if (displayField != 0 && displayField != 1)
-                                throw new InvalidDataException("invalid .perf file format: invalid display field");
-
-                            instruction.DisplayField = displayField;
-                        }
-                        else
-                            throw new InvalidDataException("invalid .perf file format: invalid event");
-
-                        model.Instructions[_InstructionCount++] = instruction;
-                        continue;
+                        throw new InvalidDataException("invalid .perf file format: invalid event");
                     }
 
                     // Instruction: Three-byte address encoding
@@ -755,7 +767,6 @@ namespace BeebPerf
         {
             IRQ = 0,
             NMI = 1,
-            BeginDisplayEvent = 2
         }
 
         private enum ModifiedRegister : byte
