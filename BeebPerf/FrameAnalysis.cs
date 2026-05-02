@@ -456,25 +456,25 @@ namespace BeebPerf
                 {
                     // teletext (Mode 7)
                     _DisplayState.ReadScreenDataFunc = ReadScreenData_Teletext;
-                    _DisplayState.WriteBitmapDataFunc = WriteBitmapData_Teletext;
+                    _DisplayState.WriteDisplayDataFunc = WriteDisplayData_Teletext;
                     _DisplayState.AspectRatio = DisplayState.AspectRatio_Teletext;
                 }
                 else
                 {
                     // non-teletext modes (Modes 0-6, and 8)
                     _DisplayState.ReadScreenDataFunc = ReadScreenData_NonTeletext;
-                    _DisplayState.WriteBitmapDataFunc = ((_ULAState.ControlRegister & 0x10) == 0x10)
-                        ? WriteBitmapData_32bits  // modes 0,1,2,3
-                        : WriteBitmapData_64bits; // modes 4,5,6,8,
+                    _DisplayState.WriteDisplayDataFunc = ((_ULAState.ControlRegister & 0x10) == 0x10)
+                        ? WriteDisplayData_32bits  // modes 0,1,2,3
+                        : WriteDisplayData_64bits; // modes 4,5,6,8,
                     _DisplayState.AspectRatio = DisplayState.AspectRatio_NonTeletext;
                 }
 
                 // clear CRTC modified flag
-                _ULAState.ControlRegisterModified = false;
+                _CRTCState.RegisterModified = false;
             }
         }
 
-        private void BuildWriteBitmapDataTbl()
+        private void BuildWriteDisplayDataTbl()
         {
             if (_ULAState.TeletextMode)
                 return;
@@ -482,27 +482,27 @@ namespace BeebPerf
             switch ((_ULAState.ControlRegister >> 2) & 0x7)
             {
                 case 7: // Mode 0 & 3 (2 colors, high res)
-                    BuildWriteBitmapDataTbl_4bpp(bitsPerPixel: 1);
+                    BuildWriteDisplayDataTbl_4bpp(bitsPerPixel: 1);
                     break;
 
                 case 6: // Mode 1 (4 colors, medium res)
-                    BuildWriteBitmapDataTbl_8bpp(bitsPerPixel: 2);
+                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 2);
                     break;
 
                 case 5: // Mode 2 (16 colors, low res)
-                    BuildWriteBitmapDataTbl_16bpp(bitsPerPixel: 4);
+                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 4);
                     break;
 
                 case 2: // Mode 4 & 6 (2 colors, medium res)
-                    BuildWriteBitmapDataTbl_8bpp(bitsPerPixel: 1);
+                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 1);
                     break;
 
                 case 1: // Mode 5 (4 colors, low res)
-                    BuildWriteBitmapDataTbl_16bpp(bitsPerPixel: 2);
+                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 2);
                     break;
 
                 case 0: // Mode 8 (16 colors, very low res)
-                    BuildWriteBitmapDataTbl_32bpp(bitsPerPixel: 4);
+                    BuildWriteDisplayDataTbl_32bpp(bitsPerPixel: 4);
                     break;
 
                 default:
@@ -599,7 +599,7 @@ namespace BeebPerf
 
                         if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
                             _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
-                    }
+                        }
 
                     // vertical sync?
                     if (_CRTCState.CharacterRow == _CRTCState.Register7_VerticalSyncPos &&
@@ -622,12 +622,12 @@ namespace BeebPerf
                 if (_DisplayState.VSyncCount > 0 && horizontalDisplayed && verticalDisplayed && _CRTCState.VideoOutputEnabled)
                 {
                     if (_ULAState.PaletteRegisterModified)
-                        BuildWriteBitmapDataTbl();
+                        BuildWriteDisplayDataTbl();
 
-                    _DisplayState.WriteBitmapDataFunc(_DisplayState.ReadScreenDataFunc());
+                    _DisplayState.WriteDisplayDataFunc(_DisplayState.ReadScreenDataFunc());
                 }
 
-                // advance CRTC state
+                // next character
                 _CRTCState.CharacterColumn++;
                 _CRTCState.CharacterAddress++;
 
@@ -643,9 +643,9 @@ namespace BeebPerf
                     if (_CRTCState.DisplayScanline >= _CRTCState.DisplayScanlineCount)
                         _CRTCState.DisplayScanline = 0;
 
+                    // next character row?
                     if (_CRTCState.CharacterScanline >= _CRTCState.Register9_ScanlinesPerCharacter + _CRTCState.ScanlinesPerCharacterAdjust)
                     {
-                        // next character row...
                         _CRTCState.CharacterRow++;
                         _CRTCState.CharacterScanline = _CRTCState.CharacterScanlineReset;
                         _CRTCState.CharacterRowAddress += _CRTCState.Register1_HorizontalDisplayed;
@@ -926,21 +926,21 @@ namespace BeebPerf
             }
         }
 
-        private void WriteBitmapData_32bits(byte value)
+        private void WriteDisplayData_32bits(byte value)
         {
             int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride) + (_CRTCState.DisplayScanlinePos);
-            Buffer.BlockCopy(_DisplayState.WriteBitmapDataTbl[value], 0, _DisplayState.FrameBuffer, index, 4);
+            Buffer.BlockCopy(_DisplayState.WriteDisplayDataTbl[value], 0, _DisplayState.FrameBuffer, index, 4);
             _CRTCState.DisplayScanlinePos += 4;
         }
 
-        private void WriteBitmapData_64bits(byte value)
+        private void WriteDisplayData_64bits(byte value)
         {
             int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride) + (_CRTCState.DisplayScanlinePos);
-            Buffer.BlockCopy(_DisplayState.WriteBitmapDataTbl[value], 0, _DisplayState.FrameBuffer, index, 8);
+            Buffer.BlockCopy(_DisplayState.WriteDisplayDataTbl[value], 0, _DisplayState.FrameBuffer, index, 8);
             _CRTCState.DisplayScanlinePos += 8;
         }
 
-        private void WriteBitmapData_Teletext(byte value)
+        private void WriteDisplayData_Teletext(byte value)
         {
             if (_CRTCState.CharacterColumn >= 40)
                 return;
@@ -1169,13 +1169,13 @@ namespace BeebPerf
             _TeletextState.ForeColor = _TeletextState.ForeColorPending;
         }
 
-        private void BuildWriteBitmapDataTbl_4bpp(int bitsPerPixel)
+        private void BuildWriteDisplayDataTbl_4bpp(int bitsPerPixel)
         {
             Debug.Assert(bitsPerPixel == 1);
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeBitmapTbl = _DisplayState.WriteBitmapDataTbl[value];
+                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i += 2)
@@ -1211,18 +1211,18 @@ namespace BeebPerf
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
                     byte pixelPair = (byte)((firstPaletteEntry << 4) | secondPaletteEntry);
-                    writeBitmapTbl[i >> 1] = pixelPair;
+                    writeDisplayData[i >> 1] = pixelPair;
                 }
             }
         }
 
-        private void BuildWriteBitmapDataTbl_8bpp(int bitsPerPixel)
+        private void BuildWriteDisplayDataTbl_8bpp(int bitsPerPixel)
         {
             Debug.Assert(bitsPerPixel == 1 || bitsPerPixel == 2);
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeBitmapTbl = _DisplayState.WriteBitmapDataTbl[value];
+                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1242,18 +1242,18 @@ namespace BeebPerf
                     shiftRegister = (shiftRegister << 1) | 0x1;
 
                     byte pixelPair = (byte)((paletteEntry << 4) | paletteEntry);
-                    writeBitmapTbl[i] = pixelPair;
+                    writeDisplayData[i] = pixelPair;
                 }
             }
         }
 
-        private void BuildWriteBitmapDataTbl_16bpp(int bitsPerPixel)
+        private void BuildWriteDisplayDataTbl_16bpp(int bitsPerPixel)
         {
             Debug.Assert(bitsPerPixel == 2 || bitsPerPixel == 4);
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeBitmapTbl = _DisplayState.WriteBitmapDataTbl[value];
+                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1274,19 +1274,19 @@ namespace BeebPerf
 
                     var pixelPair = (byte)((paletteEntry << 4) | paletteEntry);
                     int j = i << 1;
-                    writeBitmapTbl[j++] = pixelPair;
-                    writeBitmapTbl[j] = pixelPair;
+                    writeDisplayData[j++] = pixelPair;
+                    writeDisplayData[j] = pixelPair;
                 }
             }
         }
 
-        private void BuildWriteBitmapDataTbl_32bpp(int bitsPerPixel)
+        private void BuildWriteDisplayDataTbl_32bpp(int bitsPerPixel)
         {
             Debug.Assert(bitsPerPixel == 4);
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeBitmapTbl = _DisplayState.WriteBitmapDataTbl[value];
+                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
@@ -1307,10 +1307,10 @@ namespace BeebPerf
 
                     var pixelPair = (byte)((paletteEntry << 4) | paletteEntry);
                     int j = i << 2;
-                    writeBitmapTbl[j++] = pixelPair;
-                    writeBitmapTbl[j++] = pixelPair;
-                    writeBitmapTbl[j++] = pixelPair;
-                    writeBitmapTbl[j] = pixelPair;
+                    writeDisplayData[j++] = pixelPair;
+                    writeDisplayData[j++] = pixelPair;
+                    writeDisplayData[j++] = pixelPair;
+                    writeDisplayData[j] = pixelPair;
                 }
             }
         }
@@ -1459,14 +1459,14 @@ namespace BeebPerf
         {
             public DisplayState()
             {
-                WriteBitmapDataFunc = WriteBitmapData_Void;
+                WriteDisplayDataFunc = WriteDisplayData_Void;
                 ReadScreenDataFunc = ReadScreenData_Void;
 
                 for (int i = 0; i < 256; i++)
-                    WriteBitmapDataTbl[i] = new byte[8];
+                    WriteDisplayDataTbl[i] = new byte[8];
             }
 
-            private void WriteBitmapData_Void(byte value)
+            private void WriteDisplayData_Void(byte value)
             {
             }
 
@@ -1481,7 +1481,7 @@ namespace BeebPerf
             public const float AspectRatio_NonTeletext = 0.46f;
             public const int FrameBufferStride = MaxWidth / 2;
 
-            public WriteBitmapData WriteBitmapDataFunc;
+            public WriteBitmapData WriteDisplayDataFunc;
             public ReadScreenData ReadScreenDataFunc;
 
             public int FrameNumber;
@@ -1496,7 +1496,7 @@ namespace BeebPerf
             public int LastDisplayScanline;
 
             public byte[] FrameBuffer = new byte[MaxHeight * FrameBufferStride];
-            public byte[][] WriteBitmapDataTbl = new byte[256][];
+            public byte[][] WriteDisplayDataTbl = new byte[256][];
         }
         private DisplayState _DisplayState = new();
 
