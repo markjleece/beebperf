@@ -520,13 +520,11 @@ namespace BeebPerf
 
         private void CRTCFrameStart(CRTCFrameState frameState)
         {
-            // capture last frame
             if (!frameState.SplitScreen)
             {
-                if (_DisplayState.FrameNumber > 0)
+                // capture last frame?
+                if (_DisplayState.FrameNumber++ > 0)
                     CaptureDisplayFrame();
-
-                _DisplayState.FrameNumber++;
 
                 // reset display state
                 _DisplayState.FirstDisplayScanline = -1;
@@ -641,10 +639,11 @@ namespace BeebPerf
                         _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
                     }
 
-                    // read screen memory and rasterize it
+                    // rebuild write display table?
                     if (_ULAState.WriteDisplayDataTblInvalid)
                         BuildWriteDisplayDataTbl();
 
+                    // read screen memory and rasterize it
                     _DisplayState.WriteDisplayDataFunc(_DisplayState.ReadScreenDataFunc());
                 }
 

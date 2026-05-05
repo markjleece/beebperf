@@ -21,8 +21,6 @@
 
 using BeebPerf.model;
 using System.Diagnostics;
-using static BeebPerf.FrameAnalysis.Frame;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Window;
 
 namespace BeebPerf.ux
 {
@@ -90,11 +88,7 @@ namespace BeebPerf.ux
             _FrameSettings = frameSettings;
             _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
             _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
-
-            // calculate max cycle count
-            _MaxCycleCount = 0;
-            foreach (var frame in frames)
-                _MaxCycleCount = int.Max(_MaxCycleCount, frame.EndCycleCount - frame.StartCycleCount);
+            _MaxDisplayedCycleCount = CalcMaxDisplayedCycleCount(frames);
 
             // set data
             if (frames.Count > 0)
@@ -200,6 +194,42 @@ namespace BeebPerf.ux
             return $"{duration:N0} ({percentage:F2}%)";
         }
 
+        private int CalcMaxDisplayedCycleCount(List<FrameAnalysis.Frame> frames)
+        {
+            if (frames.Count == 0) return 0;
+
+            // calculate mean
+            double sum = 0.0;
+            foreach (var frame in frames)
+                sum += (frame.EndCycleCount - frame.StartCycleCount);
+            double mean = sum / frames.Count;
+
+            // calculate standard deviation
+            double sumSq = 0.0;
+            foreach (var frame in frames)
+            {
+                double d = (frame.EndCycleCount - frame.StartCycleCount) - mean;
+                sumSq += d * d;
+            }
+            double sd = Math.Sqrt(sumSq / frames.Count);
+
+            // find largest duration, ignoring outliers
+            int maxDisplayCycleCount = 0;
+            foreach (var frame in frames)
+            {
+                int duration = frame.EndCycleCount - frame.StartCycleCount;
+                if (sd != 0.0)
+                {
+                    double zScore = (duration - mean) / sd;
+                    if (zScore > 3.0)
+                        continue; // outlier, so ignore
+                }
+                maxDisplayCycleCount = Math.Max(maxDisplayCycleCount, duration);
+            }
+
+            return maxDisplayCycleCount;
+        }
+
         string[] IGridExporter.GetHeaders()
         {
             string[] headers = [
@@ -283,9 +313,9 @@ namespace BeebPerf.ux
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
                 // calc cycles extents
-                int maxCycleCount = gridView._MaxCycleCount;
+                int maxCycleCount = gridView._MaxDisplayedCycleCount;
                 if (frameSettings != null && frameSettings.ThresholdCycles > 0)
-                    maxCycleCount = int.Max(gridView._MaxCycleCount, frameSettings.ThresholdCycles);
+                    maxCycleCount = int.Max(gridView._MaxDisplayedCycleCount, frameSettings.ThresholdCycles);
 
                 // draw background
                 PaintBackground(graphics, cellBounds, cellStyle, selected);
@@ -453,7 +483,7 @@ namespace BeebPerf.ux
         private FrameSettings? _FrameSettings = null;
         private bool _HighlightWritesBeforeDisplay = false;
         private bool _HighlightWritesAfterDisplay = false;
-        private int _MaxCycleCount = 0;
+        private int _MaxDisplayedCycleCount = 0;
         private ReentrancyGuard _ReentrancyGuard = new();
     }
 }
