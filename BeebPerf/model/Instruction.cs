@@ -35,7 +35,8 @@ namespace BeebPerf.model
     {
         Instruction = 0x00,
         IRQ = 0x10,
-        NMI = 0x20
+        NMI = 0x20,
+        CRTCFrameStart = 0x40
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -49,6 +50,7 @@ namespace BeebPerf.model
         public bool IsInstruction => (Type == InstructionType.Instruction);
         public bool IsIRQ => (Type == InstructionType.IRQ);
         public bool IsNMI => (Type == InstructionType.NMI);
+        public bool IsCRTCFrameStart => (Type == InstructionType.CRTCFrameStart);
 
         public InstructionType Type
         {
@@ -231,6 +233,20 @@ namespace BeebPerf.model
             }
         }
 
+        public int CRTCFrameStateIndex
+        {
+            get
+            {
+                Debug.Assert(IsCRTCFrameStart);
+                return _CRTCFrameStateIndex;
+            }
+            set
+            {
+                Debug.Assert(IsCRTCFrameStart);
+                _CRTCFrameStateIndex = value;
+            }
+        }
+
         // common fields
         [FieldOffset(0)] private byte _TypeAndCycleCount;
 
@@ -256,6 +272,9 @@ namespace BeebPerf.model
 
         [FieldOffset(1)] private byte _ReturnAddressPage;      // overrides _OpcodeAddressPage
         [FieldOffset(10)] private ushort _ReturnAddress;       // overrides _MemoryReadValue & _MemoryWriteValue
+
+        // CRTC frame start fields
+        [FieldOffset(8)] private int _CRTCFrameStateIndex;     // overrides _MemoryAddress, _MemoryReadValue & _MemoryWriteValue
 
         public string ToString(InstructionSet instructionSet)
         {
@@ -290,6 +309,10 @@ namespace BeebPerf.model
             else if (IsIRQ)
             {
                 return $"NON-MASKABLE INTERRUPT to {DestinationAddress}";
+            }
+            else if (IsCRTCFrameStart)
+            {
+                return $"CRTC-FRAME-START-EVENT";
             }
             else
             {

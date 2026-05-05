@@ -6444,7 +6444,7 @@ index 49a1c2e..bf7a73a 100644
    <ItemGroup>
      <Image Include="..\Help\bbcmicro.png">
 diff --git a/Src/BeebMem.cpp b/Src/BeebMem.cpp
-index a27e15f..a63bad1 100644
+index a27e15f..4934a83 100644
 --- a/Src/BeebMem.cpp
 +++ b/Src/BeebMem.cpp
 @@ -92,7 +92,7 @@ bool ShEn = false;   // Shadow RAM Enable
@@ -6547,7 +6547,7 @@ index a27e15f..a63bad1 100644
 +		case 0:
 +		case 1:
 +		case 2:
-+			return MemPage_WholeRam; // low memory - not paged.
++			return MemPage_WholeRam; // Low memory - not paged.
 +		case 3:
 +		case 4:
 +		case 5:
@@ -7207,10 +7207,10 @@ index c087f1f..8ff2b1f 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..d00f2ec
+index 0000000..277076a
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1048 @@
+@@ -0,0 +1,1060 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -7252,7 +7252,7 @@ index 0000000..d00f2ec
 +PerfWriter* perfWriter = nullptr;
 +
 +//
-+// file IO helpers
++// File IO helpers
 +//
 +
 +inline static FILE* FileOpen(const CHAR* psFileName)
@@ -7289,7 +7289,7 @@ index 0000000..d00f2ec
 +
 +inline static void FileWriteInt32(FILE* pFile, int32_t value)
 +{
-+    FileWrite(pFile, &value, sizeof(value)); // assumes little endian host architecture
++    FileWrite(pFile, &value, sizeof(value)); // Assumes little endian host architecture
 +}
 +
 +inline static int Clamp(int value, int low, int high)
@@ -7395,9 +7395,9 @@ index 0000000..d00f2ec
 +    static const byte memoryAccessTable6502[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
 +        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 0 
-+        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 1 memory read
-+        0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // 2 memory write
-+        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 3 memory read and write
++        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 1 Memory read
++        0,1,0,3,1,1,3,3,0,0,0,0,1,1,3,3, // 2 Memory write
++        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 3 Memory read and write
 +        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 4
 +        0,1,0,3,0,1,3,3,0,1,0,3,0,1,3,3, // 5 
 +        0,1,0,3,0,1,3,3,0,0,0,0,0,1,3,3, // 6
@@ -7415,9 +7415,9 @@ index 0000000..d00f2ec
 +    static const byte memoryAccessTable65C02[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
 +        0,1,0,0,3,1,3,3,0,0,0,0,3,1,3,0, // 0 
-+        0,1,1,0,3,1,3,3,0,1,0,0,3,1,3,0, // 1 memory read
-+        0,1,0,0,1,1,3,3,0,0,0,0,1,1,3,0, // 2 memory write
-+        0,1,1,0,1,1,3,3,0,1,0,0,1,1,3,0, // 3 memory read and write
++        0,1,1,0,3,1,3,3,0,1,0,0,3,1,3,0, // 1 Memory read
++        0,1,0,0,1,1,3,3,0,0,0,0,1,1,3,0, // 2 Memory write
++        0,1,1,0,1,1,3,3,0,1,0,0,1,1,3,0, // 3 Memory read and write
 +        0,1,0,0,0,1,3,3,0,0,0,0,0,1,3,0, // 4
 +        0,1,1,0,0,1,3,3,0,1,0,0,0,1,3,0, // 5 
 +        0,1,0,0,2,1,3,3,0,0,0,0,0,1,3,0, // 6
@@ -7434,8 +7434,8 @@ index 0000000..d00f2ec
 +
 +    static const byte addressModeTable6502[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-+        0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 0 implied, immediate, relative, absolute, or zero-page addressing
-+        0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 1 indexed and/or indirect addressing
++        0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 0 Implied, immediate, relative, absolute, or zero-page addressing
++        0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 1 Indexed and/or indirect addressing
 +        0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 2 
 +        0,1,0,1,0,1,1,1,0,1,0,1,0,1,1,1, // 3 
 +        0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0, // 4 
@@ -7454,8 +7454,8 @@ index 0000000..d00f2ec
 +
 +    static const byte addressModeTable65C02[] = {
 +     // 0 1 2 3 4 5 6 7 8 9 a b c d e f
-+        0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 implied, immediate, relative, absolute, or zero-page addressing
-+        0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0, // 1 indexed and/or indirect addressing
++        0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 Implied, immediate, relative, absolute, or zero-page addressing
++        0,1,1,0,0,1,1,0,0,1,0,0,0,1,1,0, // 1 Indexed and/or indirect addressing
 +        0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2 
 +        0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // 3 
 +        0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4 
@@ -7545,10 +7545,9 @@ index 0000000..d00f2ec
 +
 +void PerfWriter::CreateResources()
 +{
-+    // init critical section
 +    InitializeCriticalSection(&m_cs);
 +
-+    // create events
++    // Create events
 +    m_hStartupEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 +    if (m_hStartupEvent == NULL)
 +    {
@@ -7573,7 +7572,7 @@ index 0000000..d00f2ec
 +        throw std::exception("CreateEvent failed!");
 +    }
 +
-+    // create thread, waiting for it to startup
++    // Create thread, waiting for it to startup
 +    unsigned int threadId = 0;
 +    m_hThread = (HANDLE)_beginthreadex(nullptr, 0, ThreadFunc, this, 0, &threadId);
 +    if (m_hThread == NULL)
@@ -7586,7 +7585,7 @@ index 0000000..d00f2ec
 +
 +void PerfWriter::DestroyResources()
 +{
-+    // close thread
++    // Close thread
 +    if (m_hThread != NULL)
 +    {
 +        if (m_hShutdownEvent != NULL)
@@ -7598,7 +7597,7 @@ index 0000000..d00f2ec
 +        m_hThread = NULL;
 +    }
 +
-+    // close events
++    // Close events
 +    if (m_hStartupEvent != NULL)
 +    {
 +        CloseHandle(m_hStartupEvent);
@@ -7623,7 +7622,6 @@ index 0000000..d00f2ec
 +        m_hReadBufferConsumedEvent = NULL;
 +    }
 +
-+    // delete critical section
 +    DeleteCriticalSection(&m_cs);
 +}
 +
@@ -7655,7 +7653,7 @@ index 0000000..d00f2ec
 +    }
 +    headerData.WriteByte(bbcModel);
 +
-+    headerData.WriteInt32(0); // execution count placeholder (updated when capture ends)
++    headerData.WriteInt32(0); // Execution count placeholder (updated when capture ends)
 +
 +    WriteFileChunk("PFhd", false/*compressed*/, headerData);
 +}
@@ -7683,7 +7681,7 @@ index 0000000..d00f2ec
 +
 +void PerfWriter::WriteSnapshotChunk()
 +{
-+    // calculate snapshot size
++    // Calculate snapshot size
 +    bool bShadowRAM = (MachineType == Model::BPlus || MachineType == Model::IntegraB || MachineType == Model::Master128 || MachineType == Model::MasterET);
 +    bool bPrivateRAM = (MachineType == Model::BPlus || MachineType == Model::IntegraB);
 +    bool bPrivateMosRAM = (MachineType == Model::Master128 || MachineType == Model::MasterET);
@@ -7699,20 +7697,18 @@ index 0000000..d00f2ec
 +
 +    int snapshotSize =
 +        7 +                         // CPU registers
-+        2 +                         // paging registers
-+        (bHiddenRAM ? 1 : 0) +      // hidden ram address (IntegraB)
-+        1 + m_stackFrameCount * 8 + // call stack
-+        17 +                        // video ULA state
-+        25 +                        // video CRTC state
-+        1 +                         // screen wrap address
-+        65536 +                     // base memory (64K)
-+        1 +                         // memory page count
-+        bankCount * (2 + 16384) +   // memory page data (bank-id, read-only flag, memory (16K))
-+        (bShadowRAM ? 20480 : 0) +  // shadow ram (20K)
-+        (bPrivateRAM ? 12288 : 0) + // private ram (12K)
-+        (bPrivateMosRAM ? 4096 : 0) + // private ram (4K)
-+        (bFilingSystemRAM ? 8192 : 0) + // filing system ram (8K)
-+        (bHiddenRAM ? 256 : 0);     // hidden ram (256-bytes)
++        2 +                         // Paging registers
++        (bHiddenRAM ? 1 : 0) +      // Hidden ram address (IntegraB)
++        1 + m_stackFrameCount * 8 + // Call stack
++        1 +                         // Screen wrap address
++        65536 +                     // Base memory (64K)
++        1 +                         // Memory page count
++        bankCount * (2 + 16384) +   // Memory page data (bank-id, read-only flag, memory (16K))
++        (bShadowRAM ? 20480 : 0) +  // Shadow ram (20K)
++        (bPrivateRAM ? 12288 : 0) + // Private ram (12K)
++        (bPrivateMosRAM ? 4096 : 0) + // Private ram (4K)
++        (bFilingSystemRAM ? 8192 : 0) + // Filing system ram (8K)
++        (bHiddenRAM ? 256 : 0);     // Hidden ram (256-bytes)
 +
 +    Buffer snapshotData(snapshotSize);
 +
@@ -7724,17 +7720,17 @@ index 0000000..d00f2ec
 +    snapshotData.WriteByte(m_statusRegister);
 +    snapshotData.WriteByte(m_stackRegister);
 +
-+    // paging registers
++    // Paging registers
 +    snapshotData.WriteByte(PagedRomReg);
 +    snapshotData.WriteByte(ACCCON);
 +
-+    // hidden RAM address
++    // Hidden RAM address
 +    if (bHiddenRAM)
 +    {
 +        snapshotData.WriteByte((byte)HidAdd);
 +    }
 +
-+    // call stack
++    // Call stack
 +    snapshotData.WriteByte((byte)m_stackFrameCount);
 +    for (int i = 0; i < m_stackFrameCount; i++)
 +    {
@@ -7747,48 +7743,10 @@ index 0000000..d00f2ec
 +        snapshotData.WriteByte(stackFrame->ReturnStackReg);
 +    }
 +
-+    // video ULA
-+    snapshotData.WriteByte(VideoULA_ControlReg);
-+    for (int i = 0; i < 16; i++)
-+    {
-+        snapshotData.WriteByte(VideoULA_Palette[i] ^ 0x07); // save physical color bits 0..2 inverted
-+    }
-+
-+    // video CRTC
-+    snapshotData.WriteByte(CRTCControlReg);
-+    byte CRTCRegs[] = {
-+        CRTC_HorizontalTotal,     // R0
-+        CRTC_HorizontalDisplayed, // R1
-+        CRTC_HorizontalSyncPos,   // R2
-+        CRTC_SyncWidth,           // R3
-+        CRTC_VerticalTotal,       // R4
-+        CRTC_VerticalTotalAdjust, // R5
-+        CRTC_VerticalDisplayed,   // R6
-+        CRTC_VerticalSyncPos,     // R7
-+        CRTC_InterlaceAndDelay,   // R8
-+        CRTC_ScanLinesPerChar,    // R9
-+        CRTC_CursorStart,         // R10
-+        CRTC_CursorEnd,           // R11
-+        CRTC_ScreenStartHigh,     // R12
-+        CRTC_ScreenStartLow,      // R13
-+        CRTC_CursorPosHigh,       // R14
-+        CRTC_CursorPosLow,        // R15
-+        CRTC_LightPenHigh,        // R16
-+        CRTC_LightPenLow };       // R17
-+    snapshotData.Write(CRTCRegs, sizeof(CRTCRegs));
-+
-+    int videoCharRow, videoCharColumn, videoCharScanline, videoDisplayScanline, videoDisplayField;
-+    VideoGetState(&videoCharRow, &videoCharColumn, &videoCharScanline, &videoDisplayScanline, &videoDisplayField);
-+    snapshotData.WriteByte((byte)videoCharRow);
-+    snapshotData.WriteByte((byte)videoCharColumn);
-+    snapshotData.WriteByte((byte)videoCharScanline);
-+    snapshotData.WriteInt16((int16_t)videoDisplayScanline);
-+    snapshotData.WriteByte((byte)videoDisplayField);
-+
-+    // screen wrap address (B5 & B4 of System-VIA Port B addressable latch)
++    // Screen wrap address (B5 & B4 of System-VIA Port B addressable latch)
 +    snapshotData.WriteByte((IC32State & 0x30) >> 4);
 +
-+    // memory
++    // Memory
 +    snapshotData.Write(WholeRam, 65536);
 +
 +    snapshotData.WriteByte((byte)bankCount);
@@ -7840,7 +7798,7 @@ index 0000000..d00f2ec
 +    int outputSize = buffer.Size();
 +    const byte* outputData = buffer.Data();
 +
-+    // compress buffer
++    // Compress buffer
 +    if (compressed) 
 +    {
 +        static byte compressedData[BufferSize];
@@ -7864,7 +7822,7 @@ index 0000000..d00f2ec
 +        int ret = deflate(&deflateStream, Z_FINISH);
 +        if (ret != Z_STREAM_END && ret != Z_OK && ret != Z_BUF_ERROR)
 +        {
-+            // error!
++            // Error!
 +            std::string error = "deflate failed with error";
 +            if (deflateStream.msg)
 +            {
@@ -7885,14 +7843,68 @@ index 0000000..d00f2ec
 +        deflateEnd(&deflateStream);
 +    }
 +   
-+    // write chunk header to file
++    // Write chunk header to file
 +    FileWrite(m_pFile, chunkTag, strlen(chunkTag));
 +    FileWriteByte(m_pFile, (byte)compressed);
-+    FileWriteInt32(m_pFile, buffer.Size()); // original size
-+    FileWriteInt32(m_pFile, outputSize);    // compressed size
++    FileWriteInt32(m_pFile, buffer.Size()); // Original size
++    FileWriteInt32(m_pFile, outputSize);    // Compressed size
 +
-+    // write chunk data to file
++    // Write chunk data to file
 +    FileWrite(m_pFile, outputData, outputSize);
++}
++
++void PerfWriter::WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
++{
++    if (m_pFile == nullptr || m_error) return;
++
++    if (m_writeBuffer->Size() >= (BufferSize - CRTCFrameStartEventSize)) // Buffer almost full?
++    {
++        // Swap read / write buffers
++        if (!SwapReadWriteBuffers()) return;
++    }
++
++    // Write CRTC frame-start event marker (0x80, 0x02)
++    m_writeBuffer->WriteByteUnchecked(0x80);
++    m_writeBuffer->WriteByteUnchecked(0x02);
++
++    // Write video ULA state
++    m_writeBuffer->WriteByteUnchecked(VideoULA_ControlReg);
++    for (int i = 0; i < 16; i++)
++    {
++        m_writeBuffer->WriteByteUnchecked(VideoULA_Palette[i]);
++    }
++
++    // Write video CRTC state
++    m_writeBuffer->WriteByteUnchecked(CRTCControlReg);
++
++    m_writeBuffer->WriteByteUnchecked(CRTC_HorizontalTotal);
++    m_writeBuffer->WriteByteUnchecked(CRTC_HorizontalDisplayed);
++    m_writeBuffer->WriteByteUnchecked(CRTC_HorizontalSyncPos);
++    m_writeBuffer->WriteByteUnchecked(CRTC_SyncWidth);
++    m_writeBuffer->WriteByteUnchecked(CRTC_VerticalTotal);
++    m_writeBuffer->WriteByteUnchecked(CRTC_VerticalTotalAdjust);
++    m_writeBuffer->WriteByteUnchecked(CRTC_VerticalDisplayed);
++    m_writeBuffer->WriteByteUnchecked(CRTC_VerticalSyncPos);
++    m_writeBuffer->WriteByteUnchecked(CRTC_InterlaceAndDelay);
++    m_writeBuffer->WriteByteUnchecked(CRTC_ScanLinesPerChar);
++    m_writeBuffer->WriteByteUnchecked(CRTC_CursorStart);
++    m_writeBuffer->WriteByteUnchecked(CRTC_CursorEnd);
++    m_writeBuffer->WriteByteUnchecked(CRTC_ScreenStartHigh);
++    m_writeBuffer->WriteByteUnchecked(CRTC_ScreenStartLow);
++    m_writeBuffer->WriteByteUnchecked(CRTC_CursorPosHigh);
++    m_writeBuffer->WriteByteUnchecked(CRTC_CursorPosLow);
++    m_writeBuffer->WriteByteUnchecked(CRTC_LightPenHigh);
++    m_writeBuffer->WriteByteUnchecked(CRTC_LightPenLow);
++
++    m_writeBuffer->WriteByteUnchecked((byte)(displayScanline & 0xFF));
++    m_writeBuffer->WriteByteUnchecked((byte)(displayScanline >> 8));
++
++    byte flags = 0;
++    if (displayField) flags |= 0x01;
++    if (splitScreen) flags |= 0x02;
++    m_writeBuffer->WriteByteUnchecked(flags);
++
++    m_executionCount++;
 +}
 +
 +void PerfWriter::WriteInterruptEvent(
@@ -7900,28 +7912,28 @@ index 0000000..d00f2ec
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
-+    if (m_writeBuffer->Size() >= (BufferSize - MaxInstructionSize)) // buffer almost full?
++    if (m_writeBuffer->Size() >= (BufferSize - InterruptEventSize)) // Buffer almost full?
 +    {
-+        // swap read / write buffers
++        // Swap read / write buffers
 +        if (!SwapReadWriteBuffers()) return;
 +    }
 +
-+    // write maskable or non-maskable interrupt marker (0x80, 0|1)
++    // Write maskable or non-maskable interrupt marker (0x80, 0|1)
 +    m_writeBuffer->WriteByteUnchecked(0x80);
 +    m_writeBuffer->WriteByteUnchecked((byte)interruptType);
 +
-+    // write cycle count
++    // Write cycle count
 +    m_writeBuffer->WriteByteUnchecked((byte)cycleCount);
 +
-+    // write destination address
++    // Write destination address
 +    m_writeBuffer->WriteByteUnchecked((byte)(postPC & 0xFF));
 +    m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +
-+    // write pushed return address
++    // Write pushed return address
 +    m_writeBuffer->WriteByteUnchecked((byte)(prePC & 0xFF));
 +    m_writeBuffer->WriteByteUnchecked((byte)(prePC >> 8));
 +
-+    // stack status register
++    // Stack status register
 +    m_writeBuffer->WriteByteUnchecked(stackStatusRegister);
 +
 +    m_executionCount++;
@@ -7934,16 +7946,16 @@ index 0000000..d00f2ec
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
-+    if (m_writeBuffer->Size() >= (BufferSize - MaxInstructionSize)) // buffer almost full?
++    if (m_writeBuffer->Size() >= (BufferSize - MaxInstructionSize)) // Buffer almost full?
 +    {
-+        // swap read / write buffers
++        // Swap read / write buffers
 +        if (!SwapReadWriteBuffers()) return;
 +    }
 +
-+    // get opcode's traits
++    // Get opcode's traits
 +    const OpcodeTraits opcodeTraits = m_opcodeTraitsTable[opcode];
 +
-+    // write opcode address (prePC) in compressed form if possible
++    // Write opcode address (prePC) in compressed form if possible
 +    int diff = prePC - m_lastOpcodeAddress;
 +    m_lastOpcodeAddress = prePC;
 +    if (abs(diff) <= 63)
@@ -7959,15 +7971,15 @@ index 0000000..d00f2ec
 +            m_writeBuffer->WriteByteUnchecked(0x80);
 +        }
 +
-+        // big-endian encoding
++        // Big-endian encoding
 +        m_writeBuffer->WriteByteUnchecked((byte)(prePC >> 8));
 +        m_writeBuffer->WriteByteUnchecked((byte)prePC);
 +    }
 +
-+    // write opcode
++    // Write opcode
 +    m_writeBuffer->WriteByteUnchecked(opcode);
 +
-+    // write operand
++    // Write operand
 +    byte operand1 = 0;
 +    if (opcodeTraits.Size > 1)
 +    {
@@ -7982,7 +7994,7 @@ index 0000000..d00f2ec
 +        m_writeBuffer->WriteByteUnchecked(operand2);
 +    }
 +
-+    // calculate modified registers flags
++    // Calculate modified registers flags
 +    byte modifiedRegisters = 0;
 +    if (postAccumulator != m_accumulator)
 +    {
@@ -8009,10 +8021,10 @@ index 0000000..d00f2ec
 +        modifiedRegisters |= ModifiedRegister::StackPointer;
 +    }
 +
-+    // write cycle count (2..9) and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
++    // Write cycle count (2..9) and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
 +    m_writeBuffer->WriteByteUnchecked((byte)Clamp(cycleCount - 2, 0, 7) | modifiedRegisters);
 +
-+    // update / write modified registers
++    // Update / write modified registers
 +    if (modifiedRegisters & ModifiedRegister::Accumulator)
 +    {
 +        m_accumulator = postAccumulator;
@@ -8049,13 +8061,13 @@ index 0000000..d00f2ec
 +        opcode == 0x6C/*JMP (abs)*/ || 
 +        (opcode == 0x7C/*JMP (abs,X)*/ && m_cpu == CPU::CPU65C12))
 +    {
-+        // write destination address
++        // Write destination address
 +        m_writeBuffer->WriteByteUnchecked((byte)postPC);
 +        m_writeBuffer->WriteByteUnchecked((byte)(postPC >> 8));
 +    }
 +    else if ((opcodeTraits.MemoryAccess & (MemoryAccess::Read | MemoryAccess::Write)) != 0)
 +    {
-+        // write memory access address
++        // Write memory access address
 +        if (opcodeTraits.AddressingMode == AddressingMode::IndexedOrIndirect)
 +        {
 +            m_writeBuffer->WriteByteUnchecked((byte)memoryAddress);
@@ -8066,7 +8078,7 @@ index 0000000..d00f2ec
 +            assert(memoryAddress == ((operand2 << 8) | operand1));
 +        }
 +
-+        // write read / write values
++        // Write read / write values
 +        if (!opcodeTraits.LoadOrStore) 
 +        {
 +            if ((opcodeTraits.MemoryAccess & MemoryAccess::Read) != 0)
@@ -8135,7 +8147,7 @@ index 0000000..d00f2ec
 +    {
 +        try
 +        {
-+            // patch execution count
++            // Patch execution count
 +            fseek(m_pFile, 16, SEEK_SET);
 +            FileWriteInt32(m_pFile, m_executionCount);
 +        }
@@ -8208,12 +8220,12 @@ index 0000000..d00f2ec
 +
 +        switch (result)
 +        {
-+        case WAIT_OBJECT_0 + 0: // read buffer ready event
++        case WAIT_OBJECT_0 + 0: // Read buffer ready event
 +            if (m_readBuffer->Size())
 +            {
 +                try
 +                {
-+                    // write execution chunk
++                    // Write execution chunk
 +                    WriteFileChunk("PFex", true/*compressed*/, *m_readBuffer);
 +                }
 +                catch (std::exception& e)
@@ -8226,7 +8238,7 @@ index 0000000..d00f2ec
 +            SetEvent(m_hReadBufferConsumedEvent);
 +            break;
 +
-+        case WAIT_OBJECT_0 + 1: // shutdown event
++        case WAIT_OBJECT_0 + 1: // Shutdown event
 +            bTerminate = true;
 +            break;
 +
@@ -8261,10 +8273,10 @@ index 0000000..d00f2ec
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..4709137
+index 0000000..52a772e
 --- /dev/null
 +++ b/Src/PerfWriter.h
-@@ -0,0 +1,354 @@
+@@ -0,0 +1,365 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -8310,6 +8322,7 @@ index 0000000..4709137
 +
 +	bool Initialise(const CHAR* psFileName);
 +	bool Close();
++	void WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen);
 +	void WriteInterruptEvent(
 +		InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister);
 +	void WriteInstruction(
@@ -8406,7 +8419,7 @@ index 0000000..4709137
 +
 +	enum ModifiedRegister
 +	{
-+		// cycle count held in bits 0..3
++		// Cycle count held in bits 0..3
 +		Accumulator = 0x08,
 +		XRegister = 0x10,
 +		YRegister = 0x20,
@@ -8438,13 +8451,15 @@ index 0000000..4709137
 +	struct OpcodeTraits
 +	{
 +        byte Size : 2; // 1, 2 or 3 bytes (including opcode)
-+        byte AddressingMode : 1; // AddressingMode
-+		byte MemoryAccess : 2; // MemoryAccess
-+        byte LoadOrStore : 1; // LoadOrStore
++        byte AddressingMode : 1;
++		byte MemoryAccess : 2;
++        byte LoadOrStore : 1;
 +	};
 +
 +	OpcodeTraits m_opcodeTraitsTable[256];
 +
++	const static int CRTCFrameStartEventSize = 41;
++	const static int InterruptEventSize = 8;
 +	const static int MaxInstructionSize = 16;
 +	const static int BufferSize = 0x80000; // 512K
 +
@@ -8465,8 +8480,16 @@ index 0000000..4709137
 +};
 +
 +//
-+// inlines...
++// Inlines...
 +//
++inline void PerfWriter_WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
++{
++	if (perfWriter != nullptr)
++	{
++		perfWriter->WriteCRTCFrameStartEvent(displayScanline, displayField, splitScreen);
++	}
++}
++
 +inline void PerfWriter_WriteInterruptEvent(
 +	PerfWriter::InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister)
 +{
@@ -8528,7 +8551,7 @@ index 0000000..4709137
 +
 +inline void PerfWriter::Buffer::WriteInt16(int16_t value)
 +{
-+	// assumes little endian host architecture
++	// Assumes little endian host architecture
 +	if (m_size + 2 > m_capacity) 
 +	{
 +		throw std::exception("buffer full!");
@@ -8539,7 +8562,7 @@ index 0000000..4709137
 +
 +inline void PerfWriter::Buffer::WriteInt32(int32_t value)
 +{
-+	// assumes little endian host architecture
++	// Assumes little endian host architecture
 +	if (m_size + 4 > m_capacity)
 +	{
 +		throw std::exception("buffer full!");
@@ -8655,96 +8678,86 @@ index e271e44..7b476bf 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c17d038..dba49d8 100644
+index c17d038..e405c82 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
-@@ -117,6 +117,7 @@ struct VideoStateT {
+@@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
+ #include "DebugTrace.h"
+ #include "Log.h"
+ #include "Main.h"
++#include "PerfWriter.h"
+ #include "Sound.h"
+ #include "SysVia.h"
+ #include "UefState.h"
+@@ -117,6 +118,8 @@ struct VideoStateT {
    bool IsNewTVFrame; // Specifies the start of a new TV frame, following VSync (used so we only calibrate speed once per frame)
    bool InterlaceFrame;
    bool DoCA1Int;
-+  int DisplayScanline; // Number of horizontal syncs since the last vertical sync - used in performance capture - MJSL
++  int DisplayScanline; // Current display scanline (0..311) - used in performance capture - MJSL
++  bool SplitScreen; // Split screen flag, set if frame is displayed below another - used in performance capture - MJSL
  };
  
  static VideoStateT VideoState;
-@@ -1273,6 +1274,14 @@ void VideoDoScanLine(void) {
-       IncTrigger((CRTC_HorizontalTotal + 1) * ((VideoULA_ControlReg & 16) ? 1 : 2), VideoTriggerCount);
-     }
-   } /* Teletext if */
-+ 
-+  // Reset/increment DisplayScanline - used for performance capture - MJSL
-+  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0) {
-+    VideoState.DisplayScanline = 0;
-+  } 
-+  else {
-+    VideoState.DisplayScanline++;
+@@ -647,6 +650,8 @@ static void DoFastTable() {
+ static void VideoStartOfFrame()
+ {
+   /* FrameNum is determined by the window handler */
++  VideoState.SplitScreen = !VideoState.IsNewTVFrame; // used for performance capture - MJSL
++
+   if (VideoState.IsNewTVFrame)	// RTW - only calibrate timing once per frame
+   {
+     VideoState.IsNewTVFrame = false;
+@@ -1105,6 +1110,20 @@ void RedoMPTR(void) {
+ void VideoDoScanLine(void) {
+   int l;
+   // DebugTrace("CharLine=%d InCharLineUp=%d\n", VideoState.CharLine, VideoState.InCharLineUp);
++
++  // Log frame start event - used for performance capture - MJSL
++  if (VideoState.CharLine == 0 && VideoState.InCharLineUp == 0) {
++    PerfWriter_WriteCRTCFrameStartEvent(VideoState.DisplayScanline, VideoState.InterlaceFrame, VideoState.SplitScreen);
 +  }
++
++  // Increment display scanline - used for performance capture - MJSL
++  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0) {
++      VideoState.DisplayScanline = 0;
++  }
++  else if (VideoState.DisplayScanline < 311) {
++      VideoState.DisplayScanline++;
++  }
++
+   if (VideoState.IsTeletext) {
+     if (VideoState.DoCA1Int) {
+       SysVIATriggerCA1Int(0);
+@@ -1312,6 +1331,10 @@ void VideoInit(void) {
+   VideoState.IsNewTVFrame = false;
+   CurY=-1;
+   //AdjustVideo();
++
++  // Used for performance capture - MJSL
++  VideoState.DisplayScanline = 0;
++  VideoState.SplitScreen = false;
  }
  
  /*-------------------------------------------------------------------------------------------------------------*/
-@@ -1310,6 +1319,7 @@ void VideoInit(void) {
-   VideoState.LastPixmapLine=0;
-   VideoState.PreviousLastPixmapLine=256;
-   VideoState.IsNewTVFrame = false;
-+  VideoState.DisplayScanline = 0; // Used for performance capture - MJSL
-   CurY=-1;
-   //AdjustVideo();
- }
-@@ -1673,6 +1683,7 @@ void SaveVideoUEF(FILE *SUEF)
+@@ -1673,6 +1696,8 @@ void SaveVideoUEF(FILE *SUEF)
  	UEFWrite32(Mode7FlashTrigger, SUEF);
  	UEFWrite8(Mode7FlashOn, SUEF);
  	UEFWrite32(VideoTriggerCount - TotalCycles, SUEF);
 +    UEFWrite32(VideoState.DisplayScanline, SUEF); // Used for performance capture - MJSL
++    UEFWrite8(VideoState.SplitScreen, SUEF); // Used for performance capture - MJSL
  }
  
  void LoadVideoUEF(FILE *SUEF, int Version)
-@@ -1737,6 +1748,10 @@ void LoadVideoUEF(FILE *SUEF, int Version)
+@@ -1737,6 +1762,12 @@ void LoadVideoUEF(FILE *SUEF, int Version)
  		Mode7FlashOn = UEFReadBool(SUEF);
  		VideoTriggerCount = TotalCycles + UEFRead32(SUEF);
  	}
 +
 +    if (Version >= 16) {
-+        VideoState.DisplayScanline = UEFRead32(SUEF); // Used for performance capture - MJSL
++        // Used for performance capture - MJSL
++        VideoState.DisplayScanline = UEFRead32(SUEF); 
++        VideoState.SplitScreen = UEFRead8(SUEF);
 +    }
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1805,3 +1820,27 @@ void VideoGetText(char *text, int line)
- 
- 	text[x] = '\0';
- }
-+
-+/*-------------------------------------------------------------------------------------------------------------*/
-+
-+// Get video state - used for performance capture - MJSL
-+
-+void VideoGetState(int* pCharLine, int* pCharColumn, int* pInCharLineUp, int* pDisplayScanline, int *pDisplayField)
-+{
-+    int HorizontalTotal = CRTC_HorizontalTotal + 1;
-+    int CyclesToNextScanline = VideoTriggerCount - TotalCycles;
-+    int CharacterClockCycles = ((VideoULA_ControlReg & 0x10) ? 1 : 2);
-+
-+    int CharColumn = HorizontalTotal - (CyclesToNextScanline / CharacterClockCycles);
-+
-+    if (CharColumn < 0)
-+        CharColumn = 0;
-+    else if (CharColumn > HorizontalTotal)
-+        CharColumn = HorizontalTotal;
-+
-+    *pCharLine = VideoState.CharLine;
-+    *pCharColumn = CharColumn;
-+    *pInCharLineUp = VideoState.InCharLineUp;
-+    *pDisplayScanline = VideoState.DisplayScanline;
-+    *pDisplayField = (int)VideoState.InterlaceFrame;
-+}
-diff --git a/Src/Video.h b/Src/Video.h
-index 4fd7b6c..5b36f93 100644
---- a/Src/Video.h
-+++ b/Src/Video.h
-@@ -64,6 +64,7 @@ void VideoInit(void);
- void VideoDoScanLine(void);
- void VideoGetText(char *text, int line);
- void VideoLightPenStrobe();
-+void VideoGetState(int* pCharLine, int* pCharColumn, int* pInCharLineUp, int* pHSyncCount, int* pField);
- 
- extern bool TeletextEnabled;
- 

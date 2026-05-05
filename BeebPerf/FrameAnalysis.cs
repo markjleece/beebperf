@@ -119,9 +119,15 @@ namespace BeebPerf
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
                 }
+                else if (instruction.IsCRTCFrameStart)
+                {
+                    CRTCFrameStart(model.CRTCFrameStates[instruction.CRTCFrameStateIndex]);
+                }
+
+                if (_DisplayState.FrameNumber > 0)
+                    DisplayMemory(postCycleCount);
 
                 cycleCount = postCycleCount;
-                DisplayMemory(cycleCount);
             }
 
             UpdateAnalysisFrames();
@@ -212,7 +218,7 @@ namespace BeebPerf
             _AnalysisFrameState.WritesBeforeDisplayRead = 0;
             _AnalysisFrameState.WritesAfterDisplayRead = 0;
 
-            // find end instruction paletteIndex based on frame settings
+            // find end instruction index based on frame settings
             _AnalysisFrameState.EndInstructionIndex = -1;
             switch (_AnalysisFrameState.FrameSettings!.Type)
             {
@@ -316,43 +322,15 @@ namespace BeebPerf
         //
         private void InitializeVideo(Model model)
         {
-            // initialize video ULA state
-            _ULAState.ControlRegister = model.Snapshot.ULAControlRegister;
-            _ULAState.PaletteRegisters = model.Snapshot.ULAPalette.ToArray();
-            _ULAState.ControlRegisterModified = true;
-            _ULAState.PaletteRegisterModified = true;
-
-            // initialize CRTC (MC6845) state
-            _CRTCState.RegisterSelect = model.Snapshot.CRTCRegisterSelect;
-            _CRTCState.Register0_HorizontalTotal = model.Snapshot.CRTCRegisters[0];
-            _CRTCState.Register1_HorizontalDisplayed = model.Snapshot.CRTCRegisters[1];
-            _CRTCState.Register2_HorizontalSyncPos = model.Snapshot.CRTCRegisters[2];
-            _CRTCState.Register3_SyncWidth = model.Snapshot.CRTCRegisters[3];
-            _CRTCState.Register4_VerticalTotal = model.Snapshot.CRTCRegisters[4];
-            _CRTCState.Register5_VerticalTotalAdjust = model.Snapshot.CRTCRegisters[5];
-            _CRTCState.Register6_VerticalDisplayed = model.Snapshot.CRTCRegisters[6];
-            _CRTCState.Register7_VerticalSyncPos = model.Snapshot.CRTCRegisters[7];
-            _CRTCState.Register8_InterlaceAndDelay = model.Snapshot.CRTCRegisters[8];
-            _CRTCState.Register9_ScanlinesPerCharacter = model.Snapshot.CRTCRegisters[9];
-            _CRTCState.Register12_ScreenStartHigh = model.Snapshot.CRTCRegisters[12];
-            _CRTCState.Register13_ScreenStartLow = model.Snapshot.CRTCRegisters[13];
-
-            _CRTCState.CharacterRow = model.Snapshot.CRTCCharacterRow;
-            _CRTCState.CharacterColumn = model.Snapshot.CRTCCharacterColumn;
-            _CRTCState.CharacterScanline = model.Snapshot.CRTCCharacterScanline;
-            _CRTCState.DisplayScanline = model.Snapshot.CRTCDisplayScanline;
-            _CRTCState.DisplayField = model.Snapshot.CRTCDisplayField;
-            _CRTCState.RegisterModified = true;
-            _CRTCState.DisplayScanlinePos = _CRTCState.CharacterColumn * CalcDisplayBytesPerCharacter();
-
             // initialize display state
             _DisplayState.CharacterCycleCount = 0;
-            _DisplayState.FrameNumber = 1;
-            _DisplayState.FrameBuffer = new byte[DisplayState.MaxHeight * DisplayState.FrameBufferStride];
+            _DisplayState.FrameNumber = 0;
+            _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
             _DisplayState.FirstDisplayScanline = -1;
             _DisplayState.LastDisplayScanline = -1;
-            _DisplayState.PostVSync = false;
-            _DisplayState.VSyncCount = 0;
+
+            // initialize ULA state
+            _ULAState.WriteDisplayDataTblInvalid = true;
 
             // initialize screen memory
             _ScreenMemory.Memory = new byte[32768];
@@ -384,10 +362,41 @@ namespace BeebPerf
         {
             Debug.Assert(_DisplayState.EndCycleCount - _DisplayState.StartCycleCount < 80000/*two frames*/);
 
-            int frameHeight = _DisplayState.LastDisplayScanline - _DisplayState.FirstDisplayScanline + 1;
-            int frameOffset = _DisplayState.FirstDisplayScanline * DisplayState.FrameBufferStride;
+            // calculate top scanline and scanline count
+            int topScanline, scanlineCount;
+            if (_DisplayState.CaptureTeletextMode)
+            {
+                topScanline = _DisplayState.FirstDisplayScanline;
+                scanlineCount = 250;
 
-            Bitmap bitmap = new Bitmap(_DisplayState.Width, frameHeight, PixelFormat.Format4bppIndexed);
+                if (topScanline + scanlineCount > 312)
+                    topScanline = 312 - scanlineCount;
+            }
+            else
+            {
+                topScanline = 35;
+                scanlineCount = 256;
+
+                if (topScanline + scanlineCount > 312)
+                    topScanline = 312 - scanlineCount;
+            }
+
+            // calculate bitmap height and frame buffer stride
+            int bitmapHeight, frameBufferStride;
+            if (_DisplayState.CaptureTeletextMode)
+            {
+                bitmapHeight = scanlineCount * 2;
+                frameBufferStride = DisplayState.FrameBufferStride;
+            }
+            else
+            {
+                bitmapHeight = scanlineCount;
+                frameBufferStride = DisplayState.FrameBufferStride * 2;
+            }
+
+            int frameBufferOffset = topScanline * DisplayState.FrameBufferStride * 2;
+
+            Bitmap bitmap = new Bitmap(_DisplayState.Width, bitmapHeight, PixelFormat.Format4bppIndexed);
             bitmap.Palette = ULAState.BBCPalette;
 
             Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
@@ -400,10 +409,10 @@ namespace BeebPerf
                     fixed (byte* src = _DisplayState.FrameBuffer)
                     {
                         byte* dst = (byte*)data.Scan0;
-                        for (int i = 0; i < frameHeight; i++)
+                        for (int i = 0; i < bitmapHeight; i++)
                         {
                             Buffer.MemoryCopy(
-                                src + frameOffset + (i * DisplayState.FrameBufferStride),
+                                src + frameBufferOffset + (i * frameBufferStride),
                                 dst + (i * data.Stride),
                                 data.Stride,
                                 data.Stride);
@@ -420,7 +429,7 @@ namespace BeebPerf
             DisplayFrames.Add(new()
             {
                 AspectRatio = _DisplayState.AspectRatio,
-                FrameNumber = _DisplayState.FrameNumber++,
+                FrameNumber = _DisplayState.FrameNumber,
                 StartCycleCount = _DisplayState.StartCycleCount,
                 EndCycleCount = _DisplayState.EndCycleCount,
                 Bitmap = bitmap
@@ -438,8 +447,6 @@ namespace BeebPerf
                 _CRTCState.CharacterScanlineIncrement = interlaceVideo ? 2 : 1;
                 _CRTCState.CharacterScanlineReset = (!interlaceVideo || _CRTCState.DisplayField == CRTCState.DisplayFieldEven) ? 0 : 1;
                 _CRTCState.ScanlinesPerCharacterAdjust = (interlaceVideo && (_CRTCState.Register9_ScanlinesPerCharacter % 2) == 0) ? 2 : 1;
-                _CRTCState.DisplayScanlineIncrement = _ULAState.TeletextMode ? 2 : 1;
-                _CRTCState.DisplayScanlineCount = _ULAState.TeletextMode ? 624 : 312;
                 _CRTCState.VideoOutputEnabled = (_CRTCState.Register8_InterlaceAndDelay & 0x30) != 0x30;
 
                 int displayWidth = _CRTCState.Register1_HorizontalDisplayed * CalcDisplayBytesPerCharacter();
@@ -509,26 +516,53 @@ namespace BeebPerf
                     throw new NotImplementedException();
             }
 
-            _ULAState.PaletteRegisterModified = false;
+            _ULAState.WriteDisplayDataTblInvalid = false;
         }
 
-        private void StartNewFrame()
+        private void CRTCFrameStart(CRTCFrameState frameState)
         {
-            // if we're called after a v-sync, reset the display state. In split screen
-            // scenarios, StartNewFrame() is called multiple times per display frame
-            if (_DisplayState.PostVSync)
+            // capture last frame
+            if (!frameState.SplitScreen)
             {
-                _DisplayState.PostVSync = false;
+                if (_DisplayState.FrameNumber > 0)
+                    CaptureDisplayFrame();
 
+                _DisplayState.FrameNumber++;
+            }
+
+            // does the write display data table need rebuilding?
+            _ULAState.WriteDisplayDataTblInvalid |= ((_ULAState.ControlRegister ^ frameState.ULAControlRegister) & 0x1D) != 0;
+            for (int i = 0; i < _ULAState.ColorPalette.Length && i < frameState.ULAColorPalette.Length; i++)
+                _ULAState.WriteDisplayDataTblInvalid |= (_ULAState.ColorPalette[i] != frameState.ULAColorPalette[i]);
+
+            // reset registers
+            _ULAState.ControlRegister = frameState.ULAControlRegister;
+            _ULAState.ColorPalette = frameState.ULAColorPalette.ToArray();
+
+            _CRTCState.RegisterSelect = frameState.CRTCRegisterSelect;
+            _CRTCState.Register0_HorizontalTotal = frameState.CRTCRegisters[0];
+            _CRTCState.Register1_HorizontalDisplayed = frameState.CRTCRegisters[1];
+            _CRTCState.Register2_HorizontalSyncPos = frameState.CRTCRegisters[2];
+            _CRTCState.Register3_SyncWidth = frameState.CRTCRegisters[3];
+            _CRTCState.Register4_VerticalTotal = frameState.CRTCRegisters[4];
+            _CRTCState.Register5_VerticalTotalAdjust = frameState.CRTCRegisters[5];
+            _CRTCState.Register6_VerticalDisplayed = frameState.CRTCRegisters[6];
+            _CRTCState.Register7_VerticalSyncPos = frameState.CRTCRegisters[7];
+            _CRTCState.Register8_InterlaceAndDelay = frameState.CRTCRegisters[8];
+            _CRTCState.Register9_ScanlinesPerCharacter = frameState.CRTCRegisters[9];
+            _CRTCState.Register12_ScreenStartHigh = frameState.CRTCRegisters[12];
+            _CRTCState.Register13_ScreenStartLow = frameState.CRTCRegisters[13];
+
+            _CRTCState.DisplayScanline = frameState.DisplayScanline;
+            _CRTCState.DisplayField = frameState.DisplayField;
+            _CRTCState.SplitScreen = frameState.SplitScreen;
+
+            if (!frameState.SplitScreen)
+            {
                 // reset display state
                 _DisplayState.FirstDisplayScanline = -1;
                 _DisplayState.LastDisplayScanline = -1;
                 _DisplayState.Width = -1;
-
-                // toggle display field (we do this irrespective of interlace mode)
-                _CRTCState.DisplayField = (_CRTCState.DisplayField == CRTCState.DisplayFieldEven)
-                    ? CRTCState.DisplayFieldOdd
-                    : CRTCState.DisplayFieldEven;
 
                 // reset teletext state
                 _TeletextState.DoubleHeightRow = TeletextState.DoubleHeightTopRow;
@@ -549,8 +583,7 @@ namespace BeebPerf
             // reset CRTC counters
             _CRTCState.CharacterRow = 0;
             _CRTCState.CharacterColumn = 0;
-            _CRTCState.CharacterScanline = _CRTCState.CharacterScanlineReset;
-            _CRTCState.VerticalAdjustCounter = 0;
+            _CRTCState.CharacterScanline = _CRTCState.CharacterScanlineReset; // set in UpdateVideoState()
 
             // calculate first character row address
             if (_ULAState.TeletextMode)
@@ -569,6 +602,9 @@ namespace BeebPerf
                 _ScreenMemory.StartAddress *= 8;
                 _ScreenMemory.Size *= 8;
             }
+
+            // clear frame buffer
+            Array.Clear(_DisplayState.FrameBuffer, 0, DisplayState.MaxHeight * 2 * DisplayState.FrameBufferStride);
         }
 
         private void DisplayMemory(int cycleCount)
@@ -581,53 +617,37 @@ namespace BeebPerf
             {
                 _DisplayState.CharacterCycleCount += _ULAState.CyclesPerCharacter;
 
-                bool horizontalDisplayed = (_CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed);
-                bool verticalDisplayed = (_CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed);
-
-                if (_CRTCState.CharacterColumn == 0) // start of scanline?
+                // update variables used to extract the image from the frame buffer
+                if (_CRTCState.CharacterColumn == 0 &&
+                    _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed)
                 {
-                    // clear scanline
-                    Array.Clear(_DisplayState.FrameBuffer, _CRTCState.DisplayScanline * DisplayState.FrameBufferStride, DisplayState.FrameBufferStride);
-
-                    if (verticalDisplayed)
+                    if (_DisplayState.FirstDisplayScanline == -1)
                     {
-                        if (_DisplayState.FirstDisplayScanline == -1)
-                        {
-                            _DisplayState.FirstDisplayScanline = _CRTCState.DisplayScanline;
-                            _DisplayState.StartCycleCount = cycleCount;
-                        }
-
-                        if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
-                            _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
-                        }
-
-                    // vertical sync?
-                    if (_CRTCState.CharacterRow == _CRTCState.Register7_VerticalSyncPos &&
-                        _CRTCState.CharacterScanline == _CRTCState.CharacterScanlineReset)
-                    {
-                        // capture display frames from the second v-sync
-                        if (++_DisplayState.VSyncCount > 1)
-                            CaptureDisplayFrame();
-
-                        _CRTCState.DisplayScanline = 0;
-                        _DisplayState.PostVSync = true;
+                        _DisplayState.FirstDisplayScanline = _CRTCState.DisplayScanline;
+                        _DisplayState.StartCycleCount = cycleCount;
                     }
-                }
-                else if (_CRTCState.CharacterColumn == _CRTCState.Register1_HorizontalDisplayed && verticalDisplayed)
-                {
-                    _DisplayState.EndCycleCount = cycleCount;
+
+                    if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
+                    {
+                        _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
+                        _DisplayState.EndCycleCount = cycleCount;
+                        _DisplayState.CaptureTeletextMode = _ULAState.TeletextMode;
+                    }
                 }
 
                 // read screen memory and rasterize it
-                if (_DisplayState.VSyncCount > 0 && horizontalDisplayed && verticalDisplayed && _CRTCState.VideoOutputEnabled)
+                if (_CRTCState.DisplayScanline < 312 &&
+                    _CRTCState.VideoOutputEnabled &&
+                    _CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed &&
+                    _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed)
                 {
-                    if (_ULAState.PaletteRegisterModified)
+                    if (_ULAState.WriteDisplayDataTblInvalid)
                         BuildWriteDisplayDataTbl();
 
                     _DisplayState.WriteDisplayDataFunc(_DisplayState.ReadScreenDataFunc());
                 }
 
-                // next character
+                // advance CRTC counters
                 _CRTCState.CharacterColumn++;
                 _CRTCState.CharacterAddress++;
 
@@ -639,9 +659,7 @@ namespace BeebPerf
 
                     // increment display scanline
                     _CRTCState.DisplayScanlinePos = 0;
-                    _CRTCState.DisplayScanline += _CRTCState.DisplayScanlineIncrement;
-                    if (_CRTCState.DisplayScanline >= _CRTCState.DisplayScanlineCount)
-                        _CRTCState.DisplayScanline = 0;
+                    _CRTCState.DisplayScanline++;
 
                     // next character row?
                     if (_CRTCState.CharacterScanline >= _CRTCState.Register9_ScanlinesPerCharacter + _CRTCState.ScanlinesPerCharacterAdjust)
@@ -652,25 +670,8 @@ namespace BeebPerf
                     }
 
                     _CRTCState.CharacterAddress = _CRTCState.CharacterRowAddress;
-
-                    // vertical adjust period
-                    if (_CRTCState.CharacterRow == _CRTCState.Register4_VerticalTotal + 1 || _CRTCState.VerticalAdjustCounter > 0)
-                    {
-                        int verticalTotalAdjust = _CRTCState.Register5_VerticalTotalAdjust;
-                        if (IsInterlacedSyncOddField())
-                            verticalTotalAdjust++;
-
-                        if (_CRTCState.VerticalAdjustCounter++ >= verticalTotalAdjust)
-                            StartNewFrame();
-                    }
                 }
             }
-        }
-
-        private bool IsInterlacedSyncOddField()
-        {
-            bool interlacedSync = (_CRTCState.Register8_InterlaceAndDelay & 0x01) == 0x01;
-            return (interlacedSync && _CRTCState.DisplayField == CRTCState.DisplayFieldOdd);
         }
 
         private int CalcDisplayBytesPerCharacter()
@@ -807,13 +808,16 @@ namespace BeebPerf
             }
             else if (address == 0xFE20)
             {
+                _ULAState.WriteDisplayDataTblInvalid |= ((value ^ _ULAState.ControlRegister) & 0x1D) != 0;
                 _ULAState.ControlRegisterModified |= (value != _ULAState.ControlRegister);
                 _ULAState.ControlRegister = value;
             }
             else if (address == 0xFE21)
             {
-                _ULAState.PaletteRegisterModified |= (value != _ULAState.PaletteRegisters[value >> 4]);
-                _ULAState.PaletteRegisters[value >> 4] = value;
+                int index = value >> 4;
+                byte color = (byte)((value ^ 0x7) & 0xF);
+                _ULAState.WriteDisplayDataTblInvalid |= (color != _ULAState.ColorPalette[index]);
+                _ULAState.ColorPalette[index] = color;
             }
             else if (address == 0xFE40 || address == 0xFE50)
             {
@@ -928,15 +932,19 @@ namespace BeebPerf
 
         private void WriteDisplayData_32bits(byte value)
         {
-            int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride) + (_CRTCState.DisplayScanlinePos);
-            Buffer.BlockCopy(_DisplayState.WriteDisplayDataTbl[value], 0, _DisplayState.FrameBuffer, index, 4);
+            int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + (_CRTCState.DisplayScanlinePos);
+            var displayData = _ULAState.WriteDisplayDataTbl[value];
+            Buffer.BlockCopy(displayData, 0, _DisplayState.FrameBuffer, index, 4);
+            Buffer.BlockCopy(displayData, 0, _DisplayState.FrameBuffer, index + DisplayState.FrameBufferStride, 4);
             _CRTCState.DisplayScanlinePos += 4;
         }
 
         private void WriteDisplayData_64bits(byte value)
         {
-            int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride) + (_CRTCState.DisplayScanlinePos);
-            Buffer.BlockCopy(_DisplayState.WriteDisplayDataTbl[value], 0, _DisplayState.FrameBuffer, index, 8);
+            int index = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + (_CRTCState.DisplayScanlinePos);
+            var displayData = _ULAState.WriteDisplayDataTbl[value];
+            Buffer.BlockCopy(displayData, 0, _DisplayState.FrameBuffer, index, 8);
+            Buffer.BlockCopy(displayData, 0, _DisplayState.FrameBuffer, index + DisplayState.FrameBufferStride, 8);
             _CRTCState.DisplayScanlinePos += 8;
         }
 
@@ -1103,7 +1111,7 @@ namespace BeebPerf
 
             value &= 0x7F; // clear top bit
 
-            // determine foreground color (considering flash state)
+            // determine foreground & background colors (considering flash state)
             byte foreColor;
             if (_TeletextState.Flash && !_TeletextState.FlashOn)
                 foreColor = _TeletextState.BackColor;
@@ -1112,14 +1120,14 @@ namespace BeebPerf
 
             byte backColor = _TeletextState.BackColor;
 
-            // convert character code to font paletteIndex
+            // convert character code to font index
             int fontIndex = Math.Max(value - 32, 0);
 
             // get offset into frame buffer, advancing DisplayScanlinePos
-            int frameBufferOffset = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride) + _CRTCState.DisplayScanlinePos;
+            int frameBufferOffset = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + _CRTCState.DisplayScanlinePos;
             _CRTCState.DisplayScanlinePos += 6;
 
-            // determine scanline paletteIndex
+            // determine scanline index
             int characterScanlineEven = (_CRTCState.CharacterScanline & ~1); 
             int fontScanlineIndex;
             if (_TeletextState.DoubleHeight)
@@ -1150,19 +1158,16 @@ namespace BeebPerf
 
             // render 12 pixels (6 bytes), one scanline below
             frameBufferIndex = frameBufferOffset + DisplayState.FrameBufferStride;
-            if (frameBufferIndex < DisplayState.MaxHeight * DisplayState.FrameBufferStride)
+            pixelMask = 0x800;
+            while (pixelMask != 0)
             {
-                pixelMask = 0x800;
-                while (pixelMask != 0)
-                {
-                    uint hiColor = ((characterScanline & pixelMask) != 0) ? foreColor : backColor;
-                    pixelMask >>= 1;
+                uint hiColor = ((characterScanline & pixelMask) != 0) ? foreColor : backColor;
+                pixelMask >>= 1;
 
-                    uint loColor = ((characterScanline & pixelMask) != 0) ? foreColor : backColor;
-                    pixelMask >>= 1;
+                uint loColor = ((characterScanline & pixelMask) != 0) ? foreColor : backColor;
+                pixelMask >>= 1;
 
-                    _DisplayState.FrameBuffer[frameBufferIndex++] = (byte)((hiColor << 4) | loColor);
-                }
+                _DisplayState.FrameBuffer[frameBufferIndex++] = (byte)((hiColor << 4) | loColor);
             }
 
             // commit pending foreground color
@@ -1175,7 +1180,7 @@ namespace BeebPerf
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
+                var writeDisplayData = _ULAState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i += 2)
@@ -1183,10 +1188,8 @@ namespace BeebPerf
                     // first entry
                     int firstPaletteIndex = _ULAState.PaletteIndices[shiftRegister & 0xFF];
 
-                    int firstPaletteEntry = _ULAState.PaletteRegisters[firstPaletteIndex] & 0xF;
-                    firstPaletteEntry ^= 0x7;
-
-                    if (firstPaletteEntry > 0x7) // flashing color?
+                    int firstPaletteEntry = _ULAState.ColorPalette[firstPaletteIndex];
+                    if (firstPaletteEntry > 7) // flashing color?
                     {
                         firstPaletteEntry &= 0x7;
                         if ((_ULAState.ControlRegister & 0x1) != 0)
@@ -1198,10 +1201,8 @@ namespace BeebPerf
                     // second entry
                     int secondPaletteIndex = _ULAState.PaletteIndices[shiftRegister & 0xFF];
 
-                    int secondPaletteEntry = _ULAState.PaletteRegisters[secondPaletteIndex] & 0xF;
-                    secondPaletteEntry ^= 0x7;
-
-                    if (secondPaletteEntry > 0x7) // flashing color?
+                    int secondPaletteEntry = _ULAState.ColorPalette[secondPaletteIndex];
+                    if (secondPaletteEntry > 7) // flashing color?
                     {
                         secondPaletteEntry &= 0x7;
                         if ((_ULAState.ControlRegister & 0x1) != 0)
@@ -1222,17 +1223,15 @@ namespace BeebPerf
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
+                var writeDisplayData = _ULAState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
                     int paletteIndex = _ULAState.PaletteIndices[shiftRegister & 0xFF];
 
-                    int paletteEntry = _ULAState.PaletteRegisters[paletteIndex] & 0xF;
-                    paletteEntry ^= 0x7;
-
-                    if (paletteEntry > 0x7) // flashing color?
+                    int paletteEntry = _ULAState.ColorPalette[paletteIndex];
+                    if (paletteEntry > 7) // flashing color?
                     {
                         paletteEntry &= 0x7;
                         if ((_ULAState.ControlRegister & 0x1) != 0)
@@ -1253,17 +1252,15 @@ namespace BeebPerf
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
+                var writeDisplayData = _ULAState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
                     int paletteIndex = _ULAState.PaletteIndices[shiftRegister & 0xFF];
 
-                    int paletteEntry = _ULAState.PaletteRegisters[paletteIndex] & 0xF;
-                    paletteEntry ^= 0x7;
-
-                    if (paletteEntry > 0x7) // flashing color?
+                    int paletteEntry = _ULAState.ColorPalette[paletteIndex];
+                    if (paletteEntry > 7) // flashing color?
                     {
                         paletteEntry &= 0x7;
                         if ((_ULAState.ControlRegister & 0x1) != 0)
@@ -1286,17 +1283,15 @@ namespace BeebPerf
             int shiftCount = 8 / bitsPerPixel;
             for (int value = 0; value < 256; value++)
             {
-                var writeDisplayData = _DisplayState.WriteDisplayDataTbl[value];
+                var writeDisplayData = _ULAState.WriteDisplayDataTbl[value];
 
                 int shiftRegister = value;
                 for (int i = 0; i < shiftCount; i++)
                 {
                     int paletteIndex = _ULAState.PaletteIndices[shiftRegister & 0xFF];
 
-                    int paletteEntry = _ULAState.PaletteRegisters[paletteIndex] & 0xF;
-                    paletteEntry ^= 0x7;
-
-                    if (paletteEntry > 0x7) // flashing color?
+                    int paletteEntry = _ULAState.ColorPalette[paletteIndex];
+                    if (paletteEntry > 7) // flashing color?
                     {
                         paletteEntry &= 0x7;
                         if ((_ULAState.ControlRegister & 0x1) != 0)
@@ -1461,9 +1456,6 @@ namespace BeebPerf
             {
                 WriteDisplayDataFunc = WriteDisplayData_Void;
                 ReadScreenDataFunc = ReadScreenData_Void;
-
-                for (int i = 0; i < 256; i++)
-                    WriteDisplayDataTbl[i] = new byte[8];
             }
 
             private void WriteDisplayData_Void(byte value)
@@ -1476,7 +1468,7 @@ namespace BeebPerf
             }
 
             public const int MaxWidth = 1024;
-            public const int MaxHeight = 624;
+            public const int MaxHeight = 312;
             public const float AspectRatio_Teletext = 0.813f;
             public const float AspectRatio_NonTeletext = 0.46f;
             public const int FrameBufferStride = MaxWidth / 2;
@@ -1490,13 +1482,10 @@ namespace BeebPerf
             public int Width;
             public float AspectRatio;
             public int CharacterCycleCount;
-            public bool PostVSync;
-            public int VSyncCount;
             public int FirstDisplayScanline;
             public int LastDisplayScanline;
-
-            public byte[] FrameBuffer = new byte[MaxHeight * FrameBufferStride];
-            public byte[][] WriteDisplayDataTbl = new byte[256][];
+            public bool CaptureTeletextMode;
+            public byte[] FrameBuffer = [];
         }
         private DisplayState _DisplayState = new();
 
@@ -1506,21 +1495,26 @@ namespace BeebPerf
             public ULAState()
             {
                 for (int i = 0; i < 256; i++)
+                {
                     PaletteIndices[i] = (byte)(
                         ((i >> 4) & 0x8) | 
                         ((i >> 3) & 0x4) | 
                         ((i >> 2) & 0x2) | 
                         ((i >> 1) & 0x1));
+                 
+                    WriteDisplayDataTbl[i] = new byte[8];
+                }
             }
 
             public byte ControlRegister;
-            public byte[] PaletteRegisters = [];
+            public byte[] ColorPalette = new byte[16];
             public byte[] PaletteIndices = new byte[256];
 
             public int CyclesPerCharacter;
             public bool TeletextMode;
             public bool ControlRegisterModified;
-            public bool PaletteRegisterModified;
+            public bool WriteDisplayDataTblInvalid;
+            public byte[][] WriteDisplayDataTbl = new byte[256][];
 
             public static ColorPalette BBCPalette = new([
                 Color.Black,
@@ -1572,12 +1566,10 @@ namespace BeebPerf
             public int CharacterScanlineIncrement;
             public int CharacterScanlineReset;
             public int ScanlinesPerCharacterAdjust;
-            public int VerticalAdjustCounter;
             public int DisplayScanline;
-            public int DisplayScanlineIncrement;
-            public int DisplayScanlineCount;
             public int DisplayScanlinePos;
             public int DisplayField;
+            public bool SplitScreen;
             public bool VideoOutputEnabled;
         }
         private CRTCState _CRTCState = new();

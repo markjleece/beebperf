@@ -200,32 +200,6 @@ namespace BeebPerf
                 model.Snapshot.StackFrames[i] = new(type, startAddr, returnAddr, returnStackPointer);
             }
 
-            // video ULA
-            model.Snapshot.ULAControlRegister = ReadByte(dataStream);
-
-            byte[] palette = new byte[16];
-            dataStream.ReadExactly(palette);
-            model.Snapshot.ULAPalette = palette;
-
-            // video CRTC
-            byte controlRegister = ReadByte(dataStream);
-            if (controlRegister >= 18)
-                throw new InvalidDataException("invalid .perf file format: invalid CTRL control register");
-            model.Snapshot.CRTCRegisterSelect = controlRegister;
-
-            byte[] registers = new byte[18];
-            dataStream.ReadExactly(registers);
-            model.Snapshot.CRTCRegisters = registers;
-            model.Snapshot.CRTCCharacterRow = ReadByte(dataStream);
-            model.Snapshot.CRTCCharacterColumn = ReadByte(dataStream);
-            model.Snapshot.CRTCCharacterScanline = ReadByte(dataStream);
-            model.Snapshot.CRTCDisplayScanline = ReadShort(dataStream);
-
-            byte displayField = ReadByte(dataStream);
-            if (displayField != 0 && displayField != 1)
-                throw new InvalidDataException("invalid .perf file format: invalid display field");
-            model.Snapshot.CRTCDisplayField = displayField;
-
             // screen wrap address
             byte screenWrapAddress = ReadByte(dataStream);
             model.Snapshot.ScreenWrapAddress = screenWrapAddress switch
@@ -357,6 +331,51 @@ namespace BeebPerf
 
                             // skip pushed status register, not used
                             ReadByte(dataStream); 
+
+                            model.Instructions[_InstructionCount++] = instruction;
+                            continue;
+                        }
+                        else if (eventType == EventType.CRTCFrameStart)
+                        {
+                            // CRTC frame start event
+                            instruction.Type = InstructionType.CRTCFrameStart;
+
+                            var crtcFrameState = new CRTCFrameState();
+                            instruction.CRTCFrameStateIndex = model.CRTCFrameStates.Count;
+                            model.CRTCFrameStates.Add(crtcFrameState);
+
+                            // video ULA state
+                            crtcFrameState.ULAControlRegister = ReadByte(dataStream);
+
+                            byte[] colorPalette = new byte[16];
+                            dataStream.ReadExactly(colorPalette);
+                            for (int i = 0; i < colorPalette.Length; i++)
+                                if (colorPalette[i] >= 16)
+                                    throw new InvalidDataException("invalid .perf file format: invalid colorPalette entry");
+                            crtcFrameState.ULAColorPalette = colorPalette;
+
+                            // CRTC state
+                            byte registerSelect = ReadByte(dataStream);
+                            if (registerSelect >= 18)
+                                throw new InvalidDataException("invalid .perf file format: invalid CTRL register select");
+                            crtcFrameState.CRTCRegisterSelect = registerSelect;
+
+                            byte[] registers = new byte[18];
+                            dataStream.ReadExactly(registers);
+                            crtcFrameState.CRTCRegisters = registers;
+
+                            // display scanline
+                            crtcFrameState.DisplayScanline = ReadShort(dataStream);
+
+                            // display bit flags
+                            byte bitFlags = ReadByte(dataStream);
+                            
+                            var displayField = (byte)(bitFlags & 0x01);
+                            if (displayField != 0 && displayField != 1)
+                                throw new InvalidDataException("invalid .perf file format: invalid display field");
+                            crtcFrameState.DisplayField = displayField;
+
+                            crtcFrameState.SplitScreen = ((bitFlags & 0x02) == 0x02);
 
                             model.Instructions[_InstructionCount++] = instruction;
                             continue;
@@ -767,6 +786,7 @@ namespace BeebPerf
         {
             IRQ = 0,
             NMI = 1,
+            CRTCFrameStart = 2
         }
 
         private enum ModifiedRegister : byte

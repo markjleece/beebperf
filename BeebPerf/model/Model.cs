@@ -57,6 +57,7 @@ namespace BeebPerf.model
                 InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
+                CRTCFrameStates = CRTCFrameStates.ToList(),
                 Labels = Labels.ToList()
             };
         }
@@ -67,6 +68,7 @@ namespace BeebPerf.model
             InstructionSet = other.InstructionSet;
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
+            CRTCFrameStates = other.CRTCFrameStates;
             Labels = other.Labels;
         }
 
@@ -87,16 +89,7 @@ namespace BeebPerf.model
                     RomPagingRegister = RomPagingRegister,
                     AccessControlRegister = AccessControlRegister,
                     ScreenWrapAddress = ScreenWrapAddress,
-                    HiddenRamAddress = HiddenRamAddress,
-                    ULAControlRegister = ULAControlRegister,
-                    ULAPalette = (byte[])ULAPalette.Clone(),
-                    CRTCRegisterSelect = CRTCRegisterSelect,
-                    CRTCRegisters = (byte[])CRTCRegisters.Clone(),
-                    CRTCCharacterRow = CRTCCharacterRow,
-                    CRTCCharacterColumn = CRTCCharacterColumn,
-                    CRTCCharacterScanline = CRTCCharacterScanline,
-                    CRTCDisplayScanline = CRTCDisplayScanline,
-                    CRTCDisplayField = CRTCDisplayField
+                    HiddenRamAddress = HiddenRamAddress
                 };
             }
 
@@ -112,21 +105,13 @@ namespace BeebPerf.model
             public byte AccessControlRegister;
             public ushort ScreenWrapAddress;
             public byte HiddenRamAddress;
-            public byte ULAControlRegister;
-            public byte[] ULAPalette = [];
-            public byte CRTCRegisterSelect;
-            public byte[] CRTCRegisters = [];
-            public byte CRTCCharacterRow;
-            public byte CRTCCharacterColumn;
-            public byte CRTCCharacterScanline;
-            public ushort CRTCDisplayScanline;
-            public byte CRTCDisplayField;
         }
 
         public BBCModelType BBCModel;
         public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
+        public List<CRTCFrameState> CRTCFrameStates = [];
         public List<(string Name, ushort Address)> Labels = [];
     }
 }
