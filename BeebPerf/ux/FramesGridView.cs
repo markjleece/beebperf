@@ -88,7 +88,11 @@ namespace BeebPerf.ux
             _FrameSettings = frameSettings;
             _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
             _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
-            _MaxDisplayedCycleCount = CalcMaxDisplayedCycleCount(frames);
+
+            int maxCycleCount = GetMaxCycleCount(frames);
+            if (frameSettings != null && frameSettings.ThresholdCycles > 0)
+                maxCycleCount = int.Max(maxCycleCount, frameSettings.ThresholdCycles);
+            _MaxDisplayedCycleCount = maxCycleCount;
 
             // set data
             if (frames.Count > 0)
@@ -194,7 +198,7 @@ namespace BeebPerf.ux
             return $"{duration:N0} ({percentage:F2}%)";
         }
 
-        private int CalcMaxDisplayedCycleCount(List<FrameAnalysis.Frame> frames)
+        private static int GetMaxCycleCount(List<FrameAnalysis.Frame> frames)
         {
             if (frames.Count == 0) return 0;
 
@@ -313,9 +317,7 @@ namespace BeebPerf.ux
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
                 // calc cycles extents
-                int maxCycleCount = gridView._MaxDisplayedCycleCount;
-                if (frameSettings != null && frameSettings.ThresholdCycles > 0)
-                    maxCycleCount = int.Max(gridView._MaxDisplayedCycleCount, frameSettings.ThresholdCycles);
+                int maxDisplayedCycleCount = gridView._MaxDisplayedCycleCount;
 
                 // draw background
                 PaintBackground(graphics, cellBounds, cellStyle, selected);
@@ -325,9 +327,9 @@ namespace BeebPerf.ux
                 graphics.IntersectClip(cellBounds);
 
                 // draw foreground
-                PaintFrame(graphics, cellBounds, cellStyle, gridView, frame, maxCycleCount);
-                PaintDisplayFrames(graphics, cellBounds, cellStyle, gridView, frame, maxCycleCount);
-                PaintThreshold(graphics, cellBounds, cellStyle, gridView, frameSettings, maxCycleCount);
+                PaintFrame(graphics, cellBounds, cellStyle, gridView, frame, maxDisplayedCycleCount);
+                PaintDisplayFrames(graphics, cellBounds, cellStyle, gridView, frame, maxDisplayedCycleCount);
+                PaintThreshold(graphics, cellBounds, cellStyle, gridView, frameSettings, maxDisplayedCycleCount);
 
                 // restore state
                 graphics.Restore(graphicsState);
@@ -348,10 +350,10 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 FramesGridView gridView, 
                 FrameAnalysis.Frame frame, 
-                int maxCycleCount)
+                int maxDisplayedCycleCount)
             {
                 // measure
-                int width = CyclesToCell(frame.EndCycleCount - frame.StartCycleCount, maxCycleCount, cellBounds);
+                int width = CyclesToCell(frame.EndCycleCount - frame.StartCycleCount, maxDisplayedCycleCount, cellBounds);
                 int margin = cellBounds.Height / 8;
                 var rect = new Rectangle(
                     cellBounds.Left,
@@ -371,7 +373,7 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 FramesGridView gridView, 
                 FrameAnalysis.Frame frame, 
-                int maxCycleCount)
+                int maxDisplayedCycleCount)
             {
                 // measure
                 int arrowHeadLength = cellBounds.Height / 3;
@@ -404,8 +406,8 @@ namespace BeebPerf.ux
                     int startCycleCount = displayFrameSpan.StartCycleCount - frame.StartCycleCount;
                     int endCycleCount = displayFrameSpan.EndCycleCount - frame.StartCycleCount;
 
-                    int arrowLeft = cellBounds.Left + CyclesToCell(startCycleCount, maxCycleCount, cellBounds);
-                    int arrowRight = cellBounds.Left + CyclesToCell(endCycleCount, maxCycleCount, cellBounds);
+                    int arrowLeft = cellBounds.Left + CyclesToCell(startCycleCount, maxDisplayedCycleCount, cellBounds);
+                    int arrowRight = cellBounds.Left + CyclesToCell(endCycleCount, maxDisplayedCycleCount, cellBounds);
                     int arrowCenterX = (arrowRight + arrowLeft) / 2;
 
                     string frameNumberText = displayFrameSpan.FrameNumber.ToString();
@@ -458,12 +460,12 @@ namespace BeebPerf.ux
                 DataGridViewCellStyle cellStyle,
                 FramesGridView gridView,
                 FrameSettings? frameSettings,
-                int maxCycleCount)
+                int maxDisplayedCycleCount)
             {
                 if (frameSettings != null && frameSettings.ThresholdCycles > 0)
                 {
                     // measure
-                    int thresholdX = cellBounds.Left + CyclesToCell(frameSettings.ThresholdCycles, maxCycleCount, cellBounds);
+                    int thresholdX = cellBounds.Left + CyclesToCell(frameSettings.ThresholdCycles, maxDisplayedCycleCount, cellBounds);
 
                     // paint
                     var backColor = cellStyle.BackColor;
