@@ -258,7 +258,7 @@ namespace BeebPerf
                 _AnalysisFrameState.FrameSettings.StartAddress.Equals(_AnalysisFrameState.FrameSettings.EndAddress))
                 _AnalysisFrameState.StartInstructionIndex = instructionIndex;
             else
-                _AnalysisFrameState.StartInstructionIndex = FindInstructionIndex(indexFrom: instructionIndex + 1, _AnalysisFrameState.FrameSettings!.StartAddress);
+                _AnalysisFrameState.StartInstructionIndex = FindInstructionIndex(instructionIndex + 1, _AnalysisFrameState.FrameSettings!.StartAddress);
 
             _AnalysisFrameState.EndInstructionIndex = -1;
         }
@@ -364,26 +364,25 @@ namespace BeebPerf
 
             // calculate top scanline and scanline count
             int topScanline, scanlineCount;
-            if (_DisplayState.CaptureTeletextMode)
+
+            scanlineCount = _DisplayState.LastDisplayScanline - _DisplayState.FirstDisplayScanline + 1;
+            if (_DisplayState.CaptureTeletextFrame)
             {
                 topScanline = _DisplayState.FirstDisplayScanline;
                 scanlineCount = 250;
-
-                if (topScanline + scanlineCount > 312)
-                    topScanline = 312 - scanlineCount;
             }
             else
             {
-                topScanline = 35;
+                topScanline = 40;
                 scanlineCount = 256;
-
-                if (topScanline + scanlineCount > 312)
-                    topScanline = 312 - scanlineCount;
             }
+
+            if (topScanline + scanlineCount > 312)
+                topScanline = 312 - scanlineCount;
 
             // calculate bitmap height and frame buffer stride
             int bitmapHeight, frameBufferStride;
-            if (_DisplayState.CaptureTeletextMode)
+            if (_DisplayState.CaptureTeletextFrame)
             {
                 bitmapHeight = scanlineCount * 2;
                 frameBufferStride = DisplayState.FrameBufferStride;
@@ -528,6 +527,23 @@ namespace BeebPerf
                     CaptureDisplayFrame();
 
                 _DisplayState.FrameNumber++;
+
+                // reset display state
+                _DisplayState.FirstDisplayScanline = -1;
+                _DisplayState.LastDisplayScanline = -1;
+                _DisplayState.Width = -1;
+
+                // reset teletext state
+                _TeletextState.DoubleHeightRow = TeletextState.DoubleHeightTopRow;
+                _TeletextState.LastRowCounter = -1;
+
+                if (--_TeletextState.FlashTrigger < 0)
+                {
+                    _TeletextState.FlashTrigger = _TeletextState.FlashOn
+                        ? TeletextState.FlashOffFrameCount
+                        : TeletextState.FlashOnFrameCount;
+                    _TeletextState.FlashOn = !_TeletextState.FlashOn; // toggle flash state
+                }
             }
 
             // does the write display data table need rebuilding?
@@ -556,26 +572,6 @@ namespace BeebPerf
             _CRTCState.DisplayScanline = frameState.DisplayScanline;
             _CRTCState.DisplayField = frameState.DisplayField;
             _CRTCState.SplitScreen = frameState.SplitScreen;
-
-            if (!frameState.SplitScreen)
-            {
-                // reset display state
-                _DisplayState.FirstDisplayScanline = -1;
-                _DisplayState.LastDisplayScanline = -1;
-                _DisplayState.Width = -1;
-
-                // reset teletext state
-                _TeletextState.DoubleHeightRow = TeletextState.DoubleHeightTopRow;
-                _TeletextState.LastRowCounter = -1;
-
-                if (--_TeletextState.FlashTrigger < 0)
-                {
-                    _TeletextState.FlashTrigger = _TeletextState.FlashOn
-                        ? TeletextState.FlashOffFrameCount
-                        : TeletextState.FlashOnFrameCount;
-                    _TeletextState.FlashOn = !_TeletextState.FlashOn; // toggle flash state
-                }
-            }
 
             // update video state
             UpdateVideoState(forceUpdate: true);
@@ -609,7 +605,7 @@ namespace BeebPerf
 
         private void DisplayMemory(int cycleCount)
         {
-            // update video state if registers have been modified
+            // update video state if any registers have been modified
             if (_CRTCState.RegisterModified || _ULAState.ControlRegisterModified)
                 UpdateVideoState();
 
@@ -617,30 +613,35 @@ namespace BeebPerf
             {
                 _DisplayState.CharacterCycleCount += _ULAState.CyclesPerCharacter;
 
-                // update variables used to extract the image from the frame buffer
-                if (_CRTCState.CharacterColumn == 0 &&
-                    _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed)
+                if (_CRTCState.DisplayScanline >= 312)
+                    continue;
+
+                if (_CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed &&
+                    _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed &&
+                    _CRTCState.VideoOutputEnabled)
                 {
-                    if (_DisplayState.FirstDisplayScanline == -1)
+                    // update variables used to extract the image from the frame buffer
+                    if (_CRTCState.CharacterColumn == 0)
                     {
-                        _DisplayState.FirstDisplayScanline = _CRTCState.DisplayScanline;
-                        _DisplayState.StartCycleCount = cycleCount;
+                        if (_DisplayState.FirstDisplayScanline == -1)
+                        {
+                            _DisplayState.FirstDisplayScanline = _CRTCState.DisplayScanline;
+                            _DisplayState.StartCycleCount = cycleCount;
+                        }
+
+                        if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
+                        {
+                            _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
+                        }
                     }
 
-                    if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
+                    if (_CRTCState.CharacterColumn == _CRTCState.Register1_HorizontalDisplayed - 1)
                     {
-                        _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
                         _DisplayState.EndCycleCount = cycleCount;
-                        _DisplayState.CaptureTeletextMode = _ULAState.TeletextMode;
+                        _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
                     }
-                }
 
-                // read screen memory and rasterize it
-                if (_CRTCState.DisplayScanline < 312 &&
-                    _CRTCState.VideoOutputEnabled &&
-                    _CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed &&
-                    _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed)
-                {
+                    // read screen memory and rasterize it
                     if (_ULAState.WriteDisplayDataTblInvalid)
                         BuildWriteDisplayDataTbl();
 
@@ -1111,7 +1112,7 @@ namespace BeebPerf
 
             value &= 0x7F; // clear top bit
 
-            // determine foreground & background colors (considering flash state)
+            // determine foreground & background colors, considering flash state
             byte foreColor;
             if (_TeletextState.Flash && !_TeletextState.FlashOn)
                 foreColor = _TeletextState.BackColor;
@@ -1484,7 +1485,7 @@ namespace BeebPerf
             public int CharacterCycleCount;
             public int FirstDisplayScanline;
             public int LastDisplayScanline;
-            public bool CaptureTeletextMode;
+            public bool CaptureTeletextFrame;
             public byte[] FrameBuffer = [];
         }
         private DisplayState _DisplayState = new();
