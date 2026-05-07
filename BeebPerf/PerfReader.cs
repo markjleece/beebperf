@@ -339,6 +339,7 @@ namespace BeebPerf
                         {
                             // CRTC frame start event
                             instruction.Type = InstructionType.CRTCFrameStart;
+                            instruction.CycleCount = 0;
 
                             var crtcFrameState = new CRTCFrameState();
                             instruction.CRTCFrameStateIndex = model.CRTCFrameStates.Count;

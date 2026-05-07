@@ -121,7 +121,7 @@ namespace BeebPerf
                 }
                 else if (instruction.IsCRTCFrameStart)
                 {
-                    CRTCFrameStart(model.CRTCFrameStates[instruction.CRTCFrameStateIndex]);
+                    CRTCFrameStart(model.CRTCFrameStates[instruction.CRTCFrameStateIndex], cycleCount);
                 }
 
                 if (_DisplayState.FrameNumber > 0)
@@ -323,11 +323,9 @@ namespace BeebPerf
         private void InitializeVideo(Model model)
         {
             // initialize display state
-            _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameNumber = 0;
+            _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
-            _DisplayState.FirstDisplayScanline = -1;
-            _DisplayState.LastDisplayScanline = -1;
 
             // initialize ULA state
             _ULAState.WriteDisplayDataTblInvalid = true;
@@ -518,18 +516,23 @@ namespace BeebPerf
             _ULAState.WriteDisplayDataTblInvalid = false;
         }
 
-        private void CRTCFrameStart(CRTCFrameState frameState)
+        private void CRTCFrameStart(CRTCFrameState frameState, int cycleCount)
         {
-            if (!frameState.SplitScreen)
+            if (!frameState.SplitScreen) // true frame?
             {
-                // capture last frame?
-                if (_DisplayState.FrameNumber++ > 0)
+                // capture previous frame
+                if (_DisplayState.FrameNumber > 0)
                     CaptureDisplayFrame();
 
-                // reset display state
-                _DisplayState.FirstDisplayScanline = -1;
-                _DisplayState.LastDisplayScanline = -1;
-                _DisplayState.Width = -1;
+                // increment frame number, setting CharacterCycleCount once
+                if (++_DisplayState.FrameNumber == 1)
+                    _DisplayState.CharacterCycleCount = cycleCount;
+
+                // initialize display state
+                _DisplayState.StartCycleCount = cycleCount;
+                _DisplayState.FirstDisplayScanline = frameState.DisplayScanline;
+                _DisplayState.LastDisplayScanline = frameState.DisplayScanline;
+                _DisplayState.Width = 0; // updated in UpdateVideoState(...)
 
                 // reset teletext state
                 _TeletextState.DoubleHeightRow = TeletextState.DoubleHeightTopRow;
@@ -542,6 +545,13 @@ namespace BeebPerf
                         : TeletextState.FlashOnFrameCount;
                     _TeletextState.FlashOn = !_TeletextState.FlashOn; // toggle flash state
                 }
+
+                // clear frame buffer
+                Array.Clear(_DisplayState.FrameBuffer, 0, DisplayState.MaxHeight * 2 * DisplayState.FrameBufferStride);
+            }
+            else if (_DisplayState.FrameNumber == 0)
+            {
+                return; // ignore split screen frames that occur before the first true frame
             }
 
             // does the write display data table need rebuilding?
@@ -596,9 +606,6 @@ namespace BeebPerf
                 _ScreenMemory.StartAddress *= 8;
                 _ScreenMemory.Size *= 8;
             }
-
-            // clear frame buffer
-            Array.Clear(_DisplayState.FrameBuffer, 0, DisplayState.MaxHeight * 2 * DisplayState.FrameBufferStride);
         }
 
         private void DisplayMemory(int cycleCount)
@@ -619,25 +626,9 @@ namespace BeebPerf
                     _CRTCState.VideoOutputEnabled)
                 {
                     // update variables used to extract the image from the frame buffer
-                    if (_CRTCState.CharacterColumn == 0)
-                    {
-                        if (_DisplayState.FirstDisplayScanline == -1)
-                        {
-                            _DisplayState.FirstDisplayScanline = _CRTCState.DisplayScanline;
-                            _DisplayState.StartCycleCount = cycleCount;
-                        }
-
-                        if (_CRTCState.DisplayScanline >= _DisplayState.FirstDisplayScanline)
-                        {
-                            _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
-                        }
-                    }
-
-                    if (_CRTCState.CharacterColumn == _CRTCState.Register1_HorizontalDisplayed - 1)
-                    {
-                        _DisplayState.EndCycleCount = cycleCount;
-                        _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
-                    }
+                    _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
+                    _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
+                    _DisplayState.EndCycleCount = cycleCount;
 
                     // rebuild write display table?
                     if (_ULAState.WriteDisplayDataTblInvalid)

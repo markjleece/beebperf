@@ -8678,7 +8678,7 @@ index e271e44..7b476bf 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c17d038..e405c82 100644
+index c17d038..f8a694d 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -8707,28 +8707,25 @@ index c17d038..e405c82 100644
    if (VideoState.IsNewTVFrame)	// RTW - only calibrate timing once per frame
    {
      VideoState.IsNewTVFrame = false;
-@@ -1105,6 +1110,20 @@ void RedoMPTR(void) {
+@@ -1105,6 +1110,17 @@ void RedoMPTR(void) {
  void VideoDoScanLine(void) {
    int l;
    // DebugTrace("CharLine=%d InCharLineUp=%d\n", VideoState.CharLine, VideoState.InCharLineUp);
 +
 +  // Log frame start event - used for performance capture - MJSL
-+  if (VideoState.CharLine == 0 && VideoState.InCharLineUp == 0) {
-+    PerfWriter_WriteCRTCFrameStartEvent(VideoState.DisplayScanline, VideoState.InterlaceFrame, VideoState.SplitScreen);
-+  }
++  // Ideally we'd pass PixmapLine, but can't because in Teletext mode it's not the actual display scanline
++  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0)
++    VideoState.DisplayScanline = 0;
++  else if (VideoState.DisplayScanline < 311)
++    VideoState.DisplayScanline++;
 +
-+  // Increment display scanline - used for performance capture - MJSL
-+  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0) {
-+      VideoState.DisplayScanline = 0;
-+  }
-+  else if (VideoState.DisplayScanline < 311) {
-+      VideoState.DisplayScanline++;
-+  }
++  if (VideoState.CharLine == 0 && VideoState.InCharLineUp == 0)
++    PerfWriter_WriteCRTCFrameStartEvent(VideoState.DisplayScanline, VideoState.InterlaceFrame, VideoState.SplitScreen);
 +
    if (VideoState.IsTeletext) {
      if (VideoState.DoCA1Int) {
        SysVIATriggerCA1Int(0);
-@@ -1312,6 +1331,10 @@ void VideoInit(void) {
+@@ -1312,6 +1328,10 @@ void VideoInit(void) {
    VideoState.IsNewTVFrame = false;
    CurY=-1;
    //AdjustVideo();
@@ -8739,7 +8736,7 @@ index c17d038..e405c82 100644
  }
  
  /*-------------------------------------------------------------------------------------------------------------*/
-@@ -1673,6 +1696,8 @@ void SaveVideoUEF(FILE *SUEF)
+@@ -1673,6 +1693,8 @@ void SaveVideoUEF(FILE *SUEF)
  	UEFWrite32(Mode7FlashTrigger, SUEF);
  	UEFWrite8(Mode7FlashOn, SUEF);
  	UEFWrite32(VideoTriggerCount - TotalCycles, SUEF);
@@ -8748,7 +8745,7 @@ index c17d038..e405c82 100644
  }
  
  void LoadVideoUEF(FILE *SUEF, int Version)
-@@ -1737,6 +1762,12 @@ void LoadVideoUEF(FILE *SUEF, int Version)
+@@ -1737,6 +1759,12 @@ void LoadVideoUEF(FILE *SUEF, int Version)
  		Mode7FlashOn = UEFReadBool(SUEF);
  		VideoTriggerCount = TotalCycles + UEFRead32(SUEF);
  	}
