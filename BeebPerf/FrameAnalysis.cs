@@ -97,7 +97,7 @@ namespace BeebPerf
             InitializeVideo(model);
             InitializeAnalysisFrames(frameSettings);
 
-            // process instructions whilst emulating video ICs to generate display frames whilst
+            // process instructions whilst emulating video hardware to generate display frames whilst
             // also creating analysis frames based on the provided frame settings
             DisplayFrames = [];
             int cycleCount = 0;
@@ -121,7 +121,7 @@ namespace BeebPerf
                 }
                 else if (instruction.IsFrameStart)
                 {
-                    FrameStart(model.FrameStartParams[instructions[instructionIndex].FrameStartParamsIndex], cycleCount);
+                    FrameStart(model.FrameStartEventParamsList[instruction.FrameStartEventParamsIndex], cycleCount);
                 }
 
                 if (_DisplayState.FrameNumber > 0)

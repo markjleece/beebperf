@@ -232,7 +232,7 @@ namespace BeebPerf.model
             }
         }
 
-        public int FrameStartParamsIndex
+        public int FrameStartEventParamsIndex
         {
             get
             {
@@ -311,7 +311,7 @@ namespace BeebPerf.model
             }
             else if (IsFrameStart)
             {
-                return $"FRAME-START-EVENT (params index: {FrameStartParamsIndex})";
+                return $"FRAME-START-EVENT (params index: {FrameStartEventParamsIndex})";
             }
             else
             {

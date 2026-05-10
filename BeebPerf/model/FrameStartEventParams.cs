@@ -22,7 +22,7 @@
 namespace BeebPerf.model
 {
     //
-    // Holds a frame start event's paramters, loaded from a .perf file.
+    // Holds a frame start event's parameters, loaded from a .perf file.
     // 
     public class FrameStartEventParams
     {

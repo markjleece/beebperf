@@ -55,7 +55,7 @@ namespace BeebPerf.model
                 InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
-                FrameStartParams = FrameStartParams.ToList(),
+                FrameStartEventParamsList = FrameStartEventParamsList.ToList(),
                 Labels = Labels.ToList()
             };
         }
@@ -66,7 +66,7 @@ namespace BeebPerf.model
             InstructionSet = other.InstructionSet;
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
-            FrameStartParams = other.FrameStartParams;
+            FrameStartEventParamsList = other.FrameStartEventParamsList;
             Labels = other.Labels;
         }
 
@@ -109,7 +109,7 @@ namespace BeebPerf.model
         public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
-        public List<FrameStartEventParams> FrameStartParams = [];
+        public List<FrameStartEventParams> FrameStartEventParamsList = [];
         public List<(string Name, ushort Address)> Labels = [];
     }
 }

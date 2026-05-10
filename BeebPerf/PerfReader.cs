@@ -342,8 +342,8 @@ namespace BeebPerf
                             instruction.CycleCount = 0;
 
                             var frameStartEventParams = new FrameStartEventParams();
-                            instruction.FrameStartParamsIndex = model.FrameStartParams.Count;
-                            model.FrameStartParams.Add(frameStartEventParams);
+                            instruction.FrameStartEventParamsIndex = model.FrameStartEventParamsList.Count;
+                            model.FrameStartEventParamsList.Add(frameStartEventParams);
 
                             // offset cycle count
                             frameStartEventParams.OffsetCycleCount = ReadByte(dataStream);
