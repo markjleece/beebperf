@@ -934,7 +934,7 @@ namespace BeebPerf.ux
         private void UpdateToolbarState()
         {
             bool fileLoaded = (timelineView.Duration > 0);
-            openButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
+            openButton.Enabled = (AppState == 0);
             undoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanUndo();
             redoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanRedo();
             selectAllButton.Enabled = timelineView.CanSelectAll();
@@ -942,10 +942,10 @@ namespace BeebPerf.ux
             zoomOutButton.Enabled = timelineView.CanZoomOut();
             fitSelectionButton.Enabled = timelineView.CanFitSelection();
             fitFramesButton.Enabled = timelineView.CanFitFrames();
-            hotRoutinesButton.Enabled = fileLoaded && (AppState & AppStateFlags.Loading) == 0;
-            hotPathsButton.Enabled = fileLoaded && (AppState & AppStateFlags.Loading) == 0;
+            hotRoutinesButton.Enabled = fileLoaded && (AppState == 0);
+            hotPathsButton.Enabled = fileLoaded && (AppState == 0);
             memoryZeroPageCheckBox.Enabled = (AppState & AppStateFlags.DynamicMemoryAnalysis) == 0;
-            labelsButton.Enabled = (AppState & AppStateFlags.Loading) == 0;
+            labelsButton.Enabled = (AppState == 0);
         }
 
         private void SetState(AppStateFlags state)
