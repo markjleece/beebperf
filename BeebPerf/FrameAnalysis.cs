@@ -97,8 +97,8 @@ namespace BeebPerf
             InitializeVideo(model);
             InitializeAnalysisFrames(frameSettings);
 
-            // process instructions whilst emulating video CRTC (MC6845), video ULA, and teletext (SAA5050) ICs 
-            // to generate display frames whilst also creating analysis frames based on the provided frame settings
+            // process instructions whilst emulating video ICs to generate display frames whilst
+            // also creating analysis frames based on the provided frame settings
             DisplayFrames = [];
             int cycleCount = 0;
             for (int instructionIndex = 0; instructionIndex < instructions.Length; instructionIndex++)
@@ -119,9 +119,9 @@ namespace BeebPerf
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                         MemoryWrite(instruction.MemoryAddress, instruction.MemoryWriteValue);
                 }
-                else if (instruction.IsCRTCFrameStart)
+                else if (instruction.IsFrameStart)
                 {
-                    CRTCFrameStart(model.CRTCFrameStates[instruction.CRTCFrameStateIndex], cycleCount);
+                    FrameStart(model.FrameStartParams[instructions[instructionIndex].FrameStartParamsIndex], cycleCount);
                 }
 
                 if (_DisplayState.FrameNumber > 0)
@@ -516,22 +516,24 @@ namespace BeebPerf
             _ULAState.WriteDisplayDataTblInvalid = false;
         }
 
-        private void CRTCFrameStart(CRTCFrameState frameState, int cycleCount)
+        private void FrameStart(FrameStartEventParams frameStartParams, int cycleCount)
         {
-            if (!frameState.SplitScreen) // true frame?
+            int startFrameCycleCount = cycleCount - frameStartParams.OffsetCycleCount;
+            _DisplayState.CharacterCycleCount = startFrameCycleCount;
+
+            if (!frameStartParams.SplitScreen) // true frame?
             {
                 // capture previous frame
                 if (_DisplayState.FrameNumber > 0)
                     CaptureDisplayFrame();
 
-                // increment frame number, setting CharacterCycleCount once
-                if (++_DisplayState.FrameNumber == 1)
-                    _DisplayState.CharacterCycleCount = cycleCount;
+                // increment frame number
+                _DisplayState.FrameNumber++;
 
                 // initialize display state
-                _DisplayState.StartCycleCount = cycleCount;
-                _DisplayState.FirstDisplayScanline = frameState.DisplayScanline;
-                _DisplayState.LastDisplayScanline = frameState.DisplayScanline;
+                _DisplayState.StartCycleCount = startFrameCycleCount;
+                _DisplayState.FirstDisplayScanline = frameStartParams.DisplayScanline;
+                _DisplayState.LastDisplayScanline = frameStartParams.DisplayScanline;
                 _DisplayState.Width = 0; // updated in UpdateVideoState(...)
 
                 // reset teletext state
@@ -555,31 +557,32 @@ namespace BeebPerf
             }
 
             // does the write display data table need rebuilding?
-            _ULAState.WriteDisplayDataTblInvalid |= ((_ULAState.ControlRegister ^ frameState.ULAControlRegister) & 0x1D) != 0;
-            for (int i = 0; i < _ULAState.ColorPalette.Length && i < frameState.ULAColorPalette.Length; i++)
-                _ULAState.WriteDisplayDataTblInvalid |= (_ULAState.ColorPalette[i] != frameState.ULAColorPalette[i]);
+            _ULAState.WriteDisplayDataTblInvalid |= ((_ULAState.ControlRegister ^ frameStartParams.ULAControlRegister) & 0x1D) != 0;
+            for (int i = 0; i < _ULAState.ColorPalette.Length && i < frameStartParams.ULAColorPalette.Length; i++)
+                _ULAState.WriteDisplayDataTblInvalid |= (_ULAState.ColorPalette[i] != frameStartParams.ULAColorPalette[i]);
 
             // reset registers
-            _ULAState.ControlRegister = frameState.ULAControlRegister;
-            _ULAState.ColorPalette = frameState.ULAColorPalette.ToArray();
+            _ULAState.ControlRegister = frameStartParams.ULAControlRegister;
+            _ULAState.ColorPalette = frameStartParams.ULAColorPalette.ToArray();
 
-            _CRTCState.RegisterSelect = frameState.CRTCRegisterSelect;
-            _CRTCState.Register0_HorizontalTotal = frameState.CRTCRegisters[0];
-            _CRTCState.Register1_HorizontalDisplayed = frameState.CRTCRegisters[1];
-            _CRTCState.Register2_HorizontalSyncPos = frameState.CRTCRegisters[2];
-            _CRTCState.Register3_SyncWidth = frameState.CRTCRegisters[3];
-            _CRTCState.Register4_VerticalTotal = frameState.CRTCRegisters[4];
-            _CRTCState.Register5_VerticalTotalAdjust = frameState.CRTCRegisters[5];
-            _CRTCState.Register6_VerticalDisplayed = frameState.CRTCRegisters[6];
-            _CRTCState.Register7_VerticalSyncPos = frameState.CRTCRegisters[7];
-            _CRTCState.Register8_InterlaceAndDelay = frameState.CRTCRegisters[8];
-            _CRTCState.Register9_ScanlinesPerCharacter = frameState.CRTCRegisters[9];
-            _CRTCState.Register12_ScreenStartHigh = frameState.CRTCRegisters[12];
-            _CRTCState.Register13_ScreenStartLow = frameState.CRTCRegisters[13];
+            _CRTCState.RegisterSelect = frameStartParams.CRTCRegisterSelect;
+            _CRTCState.Register0_HorizontalTotal = frameStartParams.CRTCRegisters[0];
+            _CRTCState.Register1_HorizontalDisplayed = frameStartParams.CRTCRegisters[1];
+            _CRTCState.Register2_HorizontalSyncPos = frameStartParams.CRTCRegisters[2];
+            _CRTCState.Register3_SyncWidth = frameStartParams.CRTCRegisters[3];
+            _CRTCState.Register4_VerticalTotal = frameStartParams.CRTCRegisters[4];
+            _CRTCState.Register5_VerticalTotalAdjust = frameStartParams.CRTCRegisters[5];
+            _CRTCState.Register6_VerticalDisplayed = frameStartParams.CRTCRegisters[6];
+            _CRTCState.Register7_VerticalSyncPos = frameStartParams.CRTCRegisters[7];
+            _CRTCState.Register8_InterlaceAndDelay = frameStartParams.CRTCRegisters[8];
+            _CRTCState.Register9_ScanlinesPerCharacter = frameStartParams.CRTCRegisters[9];
+            _CRTCState.Register12_ScreenStartHigh = frameStartParams.CRTCRegisters[12];
+            _CRTCState.Register13_ScreenStartLow = frameStartParams.CRTCRegisters[13];
 
-            _CRTCState.DisplayScanline = frameState.DisplayScanline;
-            _CRTCState.DisplayField = frameState.DisplayField;
-            _CRTCState.SplitScreen = frameState.SplitScreen;
+            _CRTCState.DisplayScanline = frameStartParams.DisplayScanline;
+            _CRTCState.DisplayScanlinePos = 0;
+            _CRTCState.DisplayField = frameStartParams.DisplayField;
+            _CRTCState.SplitScreen = frameStartParams.SplitScreen;
 
             // update video state
             UpdateVideoState(forceUpdate: true);

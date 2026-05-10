@@ -22,10 +22,11 @@
 namespace BeebPerf.model
 {
     //
-    // Represents the state of a CRTC frame loaded from a .perf file.
+    // Holds a frame start event's paramters, loaded from a .perf file.
     // 
-    public class CRTCFrameState
+    public class FrameStartEventParams
     {
+        public byte OffsetCycleCount;
         public byte ULAControlRegister;
         public byte[] ULAColorPalette = [];
         public byte CRTCRegisterSelect;

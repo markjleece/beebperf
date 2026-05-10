@@ -21,7 +21,6 @@
 
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace BeebPerf.model
 {
@@ -36,7 +35,7 @@ namespace BeebPerf.model
         Instruction = 0x00,
         IRQ = 0x10,
         NMI = 0x20,
-        CRTCFrameStart = 0x40
+        FrameStart = 0x40
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -50,7 +49,7 @@ namespace BeebPerf.model
         public bool IsInstruction => (Type == InstructionType.Instruction);
         public bool IsIRQ => (Type == InstructionType.IRQ);
         public bool IsNMI => (Type == InstructionType.NMI);
-        public bool IsCRTCFrameStart => (Type == InstructionType.CRTCFrameStart);
+        public bool IsFrameStart => (Type == InstructionType.FrameStart);
 
         public InstructionType Type
         {
@@ -233,17 +232,17 @@ namespace BeebPerf.model
             }
         }
 
-        public int CRTCFrameStateIndex
+        public int FrameStartParamsIndex
         {
             get
             {
-                Debug.Assert(IsCRTCFrameStart);
-                return _CRTCFrameStateIndex;
+                Debug.Assert(IsFrameStart);
+                return _FrameStartParamsIndex;
             }
             set
             {
-                Debug.Assert(IsCRTCFrameStart);
-                _CRTCFrameStateIndex = value;
+                Debug.Assert(IsFrameStart);
+                _FrameStartParamsIndex = value;
             }
         }
 
@@ -273,8 +272,8 @@ namespace BeebPerf.model
         [FieldOffset(1)] private byte _ReturnAddressPage;      // overrides _OpcodeAddressPage
         [FieldOffset(10)] private ushort _ReturnAddress;       // overrides _MemoryReadValue & _MemoryWriteValue
 
-        // CRTC frame start fields
-        [FieldOffset(8)] private int _CRTCFrameStateIndex;     // overrides _MemoryAddress, _MemoryReadValue & _MemoryWriteValue
+        // frame start event fields
+        [FieldOffset(8)] private int _FrameStartParamsIndex;   // overrides _MemoryAddress, _MemoryReadValue & _MemoryWriteValue
 
         public string ToString(InstructionSet instructionSet)
         {
@@ -310,9 +309,9 @@ namespace BeebPerf.model
             {
                 return $"NON-MASKABLE INTERRUPT to {DestinationAddress}";
             }
-            else if (IsCRTCFrameStart)
+            else if (IsFrameStart)
             {
-                return $"CRTC-FRAME-START-EVENT";
+                return $"FRAME-START-EVENT (params index: {FrameStartParamsIndex})";
             }
             else
             {

@@ -7207,10 +7207,10 @@ index c087f1f..8ff2b1f 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..277076a
+index 0000000..9c18692
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1060 @@
+@@ -0,0 +1,1064 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -7853,19 +7853,23 @@ index 0000000..277076a
 +    FileWrite(m_pFile, outputData, outputSize);
 +}
 +
-+void PerfWriter::WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
++void PerfWriter::WriteFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
 +{
 +    if (m_pFile == nullptr || m_error) return;
 +
-+    if (m_writeBuffer->Size() >= (BufferSize - CRTCFrameStartEventSize)) // Buffer almost full?
++    if (m_writeBuffer->Size() >= (BufferSize - FrameStartEventSize)) // Buffer almost full?
 +    {
 +        // Swap read / write buffers
 +        if (!SwapReadWriteBuffers()) return;
 +    }
 +
-+    // Write CRTC frame-start event marker (0x80, 0x02)
++    // Write frame start event marker (0x80, 0x02)
 +    m_writeBuffer->WriteByteUnchecked(0x80);
 +    m_writeBuffer->WriteByteUnchecked(0x02);
++
++    // Write offset cycles
++    int offsetCycleCount = TotalCycles - VideoTriggerCount;
++    m_writeBuffer->WriteByteUnchecked((byte)offsetCycleCount);
 +
 +    // Write video ULA state
 +    m_writeBuffer->WriteByteUnchecked(VideoULA_ControlReg);
@@ -8273,7 +8277,7 @@ index 0000000..277076a
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..52a772e
+index 0000000..efbbcc3
 --- /dev/null
 +++ b/Src/PerfWriter.h
 @@ -0,0 +1,365 @@
@@ -8322,7 +8326,7 @@ index 0000000..52a772e
 +
 +	bool Initialise(const CHAR* psFileName);
 +	bool Close();
-+	void WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen);
++	void WriteFrameStartEvent(int displayScanline, byte displayField, bool splitScreen);
 +	void WriteInterruptEvent(
 +		InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister);
 +	void WriteInstruction(
@@ -8458,7 +8462,7 @@ index 0000000..52a772e
 +
 +	OpcodeTraits m_opcodeTraitsTable[256];
 +
-+	const static int CRTCFrameStartEventSize = 41;
++	const static int FrameStartEventSize = 42;
 +	const static int InterruptEventSize = 8;
 +	const static int MaxInstructionSize = 16;
 +	const static int BufferSize = 0x80000; // 512K
@@ -8482,11 +8486,11 @@ index 0000000..52a772e
 +//
 +// Inlines...
 +//
-+inline void PerfWriter_WriteCRTCFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
++inline void PerfWriter_WriteFrameStartEvent(int displayScanline, byte displayField, bool splitScreen)
 +{
 +	if (perfWriter != nullptr)
 +	{
-+		perfWriter->WriteCRTCFrameStartEvent(displayScanline, displayField, splitScreen);
++		perfWriter->WriteFrameStartEvent(displayScanline, displayField, splitScreen);
 +	}
 +}
 +
@@ -8678,7 +8682,7 @@ index e271e44..7b476bf 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c17d038..f8a694d 100644
+index c17d038..f3bd8d2 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -8713,14 +8717,14 @@ index c17d038..f8a694d 100644
    // DebugTrace("CharLine=%d InCharLineUp=%d\n", VideoState.CharLine, VideoState.InCharLineUp);
 +
 +  // Log frame start event - used for performance capture - MJSL
-+  // Ideally we'd pass PixmapLine, but can't because in Teletext mode it's not the actual display scanline
++  // Ideally we'd use PixmapLine, but can't because in Teletext mode it's not the actual display scanline
 +  if (VideoState.CharLine == CRTC_VerticalSyncPos && VideoState.InCharLineUp == 0)
 +    VideoState.DisplayScanline = 0;
 +  else if (VideoState.DisplayScanline < 311)
 +    VideoState.DisplayScanline++;
 +
 +  if (VideoState.CharLine == 0 && VideoState.InCharLineUp == 0)
-+    PerfWriter_WriteCRTCFrameStartEvent(VideoState.DisplayScanline, VideoState.InterlaceFrame, VideoState.SplitScreen);
++    PerfWriter_WriteFrameStartEvent(VideoState.DisplayScanline, VideoState.InterlaceFrame, VideoState.SplitScreen);
 +
    if (VideoState.IsTeletext) {
      if (VideoState.DoCA1Int) {

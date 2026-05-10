@@ -335,38 +335,41 @@ namespace BeebPerf
                             model.Instructions[_InstructionCount++] = instruction;
                             continue;
                         }
-                        else if (eventType == EventType.CRTCFrameStart)
+                        else if (eventType == EventType.FrameStart)
                         {
-                            // CRTC frame start event
-                            instruction.Type = InstructionType.CRTCFrameStart;
+                            // frame start event
+                            instruction.Type = InstructionType.FrameStart;
                             instruction.CycleCount = 0;
 
-                            var crtcFrameState = new CRTCFrameState();
-                            instruction.CRTCFrameStateIndex = model.CRTCFrameStates.Count;
-                            model.CRTCFrameStates.Add(crtcFrameState);
+                            var frameStartEventParams = new FrameStartEventParams();
+                            instruction.FrameStartParamsIndex = model.FrameStartParams.Count;
+                            model.FrameStartParams.Add(frameStartEventParams);
+
+                            // offset cycle count
+                            frameStartEventParams.OffsetCycleCount = ReadByte(dataStream);
 
                             // video ULA state
-                            crtcFrameState.ULAControlRegister = ReadByte(dataStream);
+                            frameStartEventParams.ULAControlRegister = ReadByte(dataStream);
 
                             byte[] colorPalette = new byte[16];
                             dataStream.ReadExactly(colorPalette);
                             for (int i = 0; i < colorPalette.Length; i++)
                                 if (colorPalette[i] >= 16)
                                     throw new InvalidDataException("invalid .perf file format: invalid colorPalette entry");
-                            crtcFrameState.ULAColorPalette = colorPalette;
+                            frameStartEventParams.ULAColorPalette = colorPalette;
 
                             // CRTC state
                             byte registerSelect = ReadByte(dataStream);
                             if (registerSelect >= 18)
                                 throw new InvalidDataException("invalid .perf file format: invalid CTRL register select");
-                            crtcFrameState.CRTCRegisterSelect = registerSelect;
+                            frameStartEventParams.CRTCRegisterSelect = registerSelect;
 
                             byte[] registers = new byte[18];
                             dataStream.ReadExactly(registers);
-                            crtcFrameState.CRTCRegisters = registers;
+                            frameStartEventParams.CRTCRegisters = registers;
 
                             // display scanline
-                            crtcFrameState.DisplayScanline = ReadShort(dataStream);
+                            frameStartEventParams.DisplayScanline = ReadShort(dataStream);
 
                             // display bit flags
                             byte bitFlags = ReadByte(dataStream);
@@ -374,9 +377,9 @@ namespace BeebPerf
                             var displayField = (byte)(bitFlags & 0x01);
                             if (displayField != 0 && displayField != 1)
                                 throw new InvalidDataException("invalid .perf file format: invalid display field");
-                            crtcFrameState.DisplayField = displayField;
+                            frameStartEventParams.DisplayField = displayField;
 
-                            crtcFrameState.SplitScreen = ((bitFlags & 0x02) == 0x02);
+                            frameStartEventParams.SplitScreen = ((bitFlags & 0x02) == 0x02);
 
                             model.Instructions[_InstructionCount++] = instruction;
                             continue;
@@ -787,7 +790,7 @@ namespace BeebPerf
         {
             IRQ = 0,
             NMI = 1,
-            CRTCFrameStart = 2
+            FrameStart = 2
         }
 
         private enum ModifiedRegister : byte

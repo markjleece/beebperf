@@ -19,8 +19,6 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using static BeebPerf.model.Model;
-
 namespace BeebPerf.model
 {
     //
@@ -57,7 +55,7 @@ namespace BeebPerf.model
                 InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
-                CRTCFrameStates = CRTCFrameStates.ToList(),
+                FrameStartParams = FrameStartParams.ToList(),
                 Labels = Labels.ToList()
             };
         }
@@ -68,7 +66,7 @@ namespace BeebPerf.model
             InstructionSet = other.InstructionSet;
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
-            CRTCFrameStates = other.CRTCFrameStates;
+            FrameStartParams = other.FrameStartParams;
             Labels = other.Labels;
         }
 
@@ -111,7 +109,7 @@ namespace BeebPerf.model
         public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
-        public List<CRTCFrameState> CRTCFrameStates = [];
+        public List<FrameStartEventParams> FrameStartParams = [];
         public List<(string Name, ushort Address)> Labels = [];
     }
 }
