@@ -440,11 +440,15 @@ namespace BeebPerf
                 _ULAState.TeletextMode = (_ULAState.ControlRegister & 0x02) == 0x02;
                 _ULAState.CyclesPerCharacter = ((_ULAState.ControlRegister & 0x10) == 0x10) ? 1 : 2;
 
-                bool interlaceVideo = (_CRTCState.Register8_InterlaceAndDelay & 0x03) == 0x03;
-                _CRTCState.CharacterScanlineIncrement = interlaceVideo ? 2 : 1;
-                _CRTCState.CharacterScanlineReset = (!interlaceVideo || _CRTCState.DisplayField == CRTCState.DisplayFieldEven) ? 0 : 1;
-                _CRTCState.ScanlinesPerCharacterAdjust = (interlaceVideo && (_CRTCState.Register9_ScanlinesPerCharacter % 2) == 0) ? 2 : 1;
+                bool interlacedSyncAndVideo = (_CRTCState.Register8_InterlaceAndDelay & 0x03) == 0x03;
+                _CRTCState.CharacterScanlineIncrement = interlacedSyncAndVideo ? 2 : 1;
+                _CRTCState.CharacterScanlineReset = (!interlacedSyncAndVideo || _CRTCState.DisplayField == CRTCState.DisplayFieldEven) ? 0 : 1;
                 _CRTCState.VideoOutputEnabled = (_CRTCState.Register8_InterlaceAndDelay & 0x30) != 0x30;
+
+                // in Interlaced Sync & Video mode (mode 7), the ScanlinesPerCharacter register is required
+                // to hold an odd value (ref MC6845 data sheet). However, in mode 7 its value is set to 18!
+                // Account for the undocumented behavior where even values are treated as the next odd values.
+                _CRTCState.ScanlinesPerCharacterAdjust = (interlacedSyncAndVideo && (_CRTCState.Register9_ScanlinesPerCharacter % 2) == 0) ? 1 : 0;
 
                 int displayWidth = _CRTCState.Register1_HorizontalDisplayed * CalcDisplayBytesPerCharacter();
                 if (displayWidth > _DisplayState.Width)
@@ -656,7 +660,7 @@ namespace BeebPerf
                     _CRTCState.DisplayScanline++;
 
                     // next character row?
-                    if (_CRTCState.CharacterScanline >= _CRTCState.Register9_ScanlinesPerCharacter + _CRTCState.ScanlinesPerCharacterAdjust)
+                    if (_CRTCState.CharacterScanline > _CRTCState.Register9_ScanlinesPerCharacter + _CRTCState.ScanlinesPerCharacterAdjust)
                     {
                         _CRTCState.CharacterRow++;
                         _CRTCState.CharacterScanline = _CRTCState.CharacterScanlineReset;
