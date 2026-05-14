@@ -166,7 +166,7 @@ namespace BeebPerf
                 var displayFrameSpans = new List<Frame.DisplayFrameSpan>();
                 int nextFrameStartCycleCount = -1;
 
-                // skip any prior display frames 
+                // skip any prior display frames
                 while (displayFrame != null && displayFrame.EndCycleCount < frame.StartCycleCount)
                 {
                     displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
@@ -202,6 +202,23 @@ namespace BeebPerf
 
                 frame.DisplayFrameSpans = displayFrameSpans.ToArray();
 
+                // update WritesBeforeDisplayRead & WritesAfterDisplayRead
+                if (displayFrameSpans.Count == 0)
+                {
+                    frame.WritesBeforeDisplayRead = 0;
+                    frame.WritesAfterDisplayRead = 0;
+                }
+                else if (displayFrameSpans[0].StartCycleCount >= frame.StartCycleCount)
+                {
+                    // use counts associated with the next display frame
+                    frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
+                    frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
+                }
+
+                // clear, as no longer used
+                frame.WritesBeforeDisplayReadNext = 0;
+                frame.WritesAfterDisplayReadNext = 0;
+
                 if (nextFrameStartCycleCount != 0)
                     frame.DisplayFrameOffset = nextFrameStartCycleCount - frame.StartCycleCount;
                 else
@@ -214,9 +231,11 @@ namespace BeebPerf
             // remember cycle count
             _AnalysisFrameState.StartCycleCount = cycleCount;
 
-            // reset counts
+            // reset counts (for current and next display frames)
             _AnalysisFrameState.WritesBeforeDisplayRead = 0;
             _AnalysisFrameState.WritesAfterDisplayRead = 0;
+            _AnalysisFrameState.WritesBeforeDisplayReadNext = 0;
+            _AnalysisFrameState.WritesAfterDisplayReadNext = 0;
 
             // find end instruction index based on frame settings
             _AnalysisFrameState.EndInstructionIndex = -1;
@@ -251,6 +270,8 @@ namespace BeebPerf
                 EndCycleCount = cycleCount,
                 WritesBeforeDisplayRead = _AnalysisFrameState.WritesBeforeDisplayRead,
                 WritesAfterDisplayRead = _AnalysisFrameState.WritesAfterDisplayRead,
+                WritesBeforeDisplayReadNext = _AnalysisFrameState.WritesBeforeDisplayReadNext,
+                WritesAfterDisplayReadNext = _AnalysisFrameState.WritesAfterDisplayReadNext,
             });
 
             // find next start instruction
@@ -714,10 +735,17 @@ namespace BeebPerf
 
                 if (displayFrame != -1)
                 {
+                    // increment counts for current display frame
                     if (displayFrame < _DisplayState.FrameNumber)
                         _AnalysisFrameState.WritesBeforeDisplayRead++;
                     else
                         _AnalysisFrameState.WritesAfterDisplayRead++;
+
+                    // increment counts for next display frame
+                    if (displayFrame < _DisplayState.FrameNumber + 1)
+                        _AnalysisFrameState.WritesBeforeDisplayReadNext++;
+                    else
+                        _AnalysisFrameState.WritesAfterDisplayReadNext++;
                 }
 
                 return;
@@ -1407,6 +1435,8 @@ namespace BeebPerf
             public required int EndCycleCount;
             public required int WritesBeforeDisplayRead;
             public required int WritesAfterDisplayRead;
+            public required int WritesBeforeDisplayReadNext;
+            public required int WritesAfterDisplayReadNext;
             public int DisplayFrameOffset;
             public DisplayFrameSpan[] DisplayFrameSpans = [];
         }
@@ -1436,11 +1466,13 @@ namespace BeebPerf
             public FrameSettings? FrameSettings;
             public int WritesBeforeDisplayRead;
             public int WritesAfterDisplayRead;
+            public int WritesBeforeDisplayReadNext;
+            public int WritesAfterDisplayReadNext;
             public int StartInstructionIndex;
             public int EndInstructionIndex;
             public int StartCycleCount;
             public int FrameNumber = 0;
-
+            
             public int[] MemoryDisplayFrame = [];
             public int[] ShadowRamDisplayFrame = [];
             public int[] FilingSystemRamDisplayFrame = [];
