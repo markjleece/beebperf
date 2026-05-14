@@ -262,7 +262,7 @@ namespace BeebPerf
 
         private void EndAnalysisFrame(int cycleCount, int instructionIndex)
         {
-            // create display frame
+            // create analysis frame
             Frames.Add(new FrameAnalysis.Frame()
             {
                 FrameNumber = _AnalysisFrameState.FrameNumber++,
@@ -1435,8 +1435,8 @@ namespace BeebPerf
             public required int EndCycleCount;
             public required int WritesBeforeDisplayRead;
             public required int WritesAfterDisplayRead;
-            public required int WritesBeforeDisplayReadNext;
-            public required int WritesAfterDisplayReadNext;
+            public required int WritesBeforeDisplayReadNext; // only used during analysis
+            public required int WritesAfterDisplayReadNext; // only used during analysis
             public int DisplayFrameOffset;
             public DisplayFrameSpan[] DisplayFrameSpans = [];
         }
