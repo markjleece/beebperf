@@ -434,7 +434,7 @@ namespace BeebPerf.ux
             if (routine.Label.Length > 0)
                 return $"{FormatAddress(routine.StartAddress)} {routine.Label} {percentage:F2}%";
             else
-                return FormatAddress(routine.StartAddress);
+                return $"{FormatAddress(routine.StartAddress)} {percentage:F2}%";
         }
 
         private string FormatAddress(CanonicalAddress address)

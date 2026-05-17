@@ -732,7 +732,7 @@ namespace BeebPerf
 
                 if (displayFrame != -1)
                 {
-                    // increment counts for current display frame
+                    // increment counts for initial display frame
                     if (displayFrame < _AnalysisFrameState.InitialDisplayFrameNumber)
                         _AnalysisFrameState.WritesBeforeDisplayRead++;
                     else
