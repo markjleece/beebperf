@@ -157,28 +157,23 @@ namespace BeebPerf
 
         private void UpdateAnalysisFrames()
         {
+            // populate display frame spans
             int displayFrameIndex = 0;
             DisplayFrame? displayFrame = DisplayFrames.Count > 0 ? DisplayFrames[displayFrameIndex] : null;
 
-            for (int frameIndex = 0; frameIndex < Frames.Count; frameIndex++)
+            foreach (var frame in Frames)
             {
-                var frame = Frames[frameIndex];
-                var displayFrameSpans = new List<Frame.DisplayFrameSpan>();
-                int nextFrameStartCycleCount = -1;
-
                 // skip any prior display frames
-                while (displayFrame != null && displayFrame.EndCycleCount < frame.StartCycleCount)
-                {
+                while (displayFrame != null && displayFrame.EndCycleCount <= frame.StartCycleCount)
                     displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
-                }
 
                 // process intersecting frames
+                var displayFrameSpans = new List<Frame.DisplayFrameSpan>();
+
                 bool first = true;
                 while (displayFrame != null && (first || displayFrame.StartCycleCount < frame.EndCycleCount))
                 {
                     first = false;
-                    if (nextFrameStartCycleCount == -1)
-                        nextFrameStartCycleCount = displayFrame.StartCycleCount;
 
                     displayFrameSpans.Add(new Frame.DisplayFrameSpan()
                     {
@@ -190,37 +185,36 @@ namespace BeebPerf
                     displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
                 }
 
-                if (displayFrame != null)
-                {
-                    if (nextFrameStartCycleCount == -1)
-                        nextFrameStartCycleCount = displayFrame.StartCycleCount;
-
-                    // back up to deal with cross spans
-                    if (displayFrameIndex > 0)
-                        displayFrame = DisplayFrames[--displayFrameIndex];
-                }
-
                 frame.DisplayFrameSpans = displayFrameSpans.ToArray();
 
-                // update WritesBeforeDisplayRead & WritesAfterDisplayRead
-                if (displayFrameSpans.Count == 0)
+                // back up to handle potential cross spans
+                if (displayFrame != null && displayFrameIndex > 0)
+                    displayFrame = DisplayFrames[--displayFrameIndex];
+            }
+
+            // update WritesBeforeDisplayRead & WritesAfterDisplayRead
+            foreach (var frame in Frames)
+            {
+                if (frame.DisplayFrameSpans.Length == 0)
                 {
                     frame.WritesBeforeDisplayRead = 0;
                     frame.WritesAfterDisplayRead = 0;
                 }
-                else if (displayFrameSpans[0].StartCycleCount >= frame.StartCycleCount)
+                else if (frame.DisplayFrameSpans[0].StartCycleCount >= frame.StartCycleCount)
                 {
-                    // use counts associated with the next display frame
                     frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
                     frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
                 }
 
-                // clear, as no longer used
-                frame.WritesBeforeDisplayReadNext = 0;
-                frame.WritesAfterDisplayReadNext = 0;
+                frame.WritesBeforeDisplayReadNext = 0; // clear as no longer used
+                frame.WritesAfterDisplayReadNext = 0; // clear as no longer used
+            }
 
-                if (nextFrameStartCycleCount != 0)
-                    frame.DisplayFrameOffset = nextFrameStartCycleCount - frame.StartCycleCount;
+            // set display offsets
+            foreach (var frame in Frames)
+            {
+                if (frame.DisplayFrameSpans.Length > 0)
+                    frame.DisplayFrameOffset = frame.DisplayFrameSpans[0].StartCycleCount - frame.StartCycleCount;
                 else
                     frame.DisplayFrameOffset = 0;
             }
@@ -231,7 +225,10 @@ namespace BeebPerf
             // remember cycle count
             _AnalysisFrameState.StartCycleCount = cycleCount;
 
-            // reset counts (for current and next display frames)
+            // remember initial display frame number
+            _AnalysisFrameState.InitialDisplayFrameNumber = _DisplayState.FrameNumber;
+
+            // reset counts (for initial and next display frames)
             _AnalysisFrameState.WritesBeforeDisplayRead = 0;
             _AnalysisFrameState.WritesAfterDisplayRead = 0;
             _AnalysisFrameState.WritesBeforeDisplayReadNext = 0;
@@ -736,13 +733,13 @@ namespace BeebPerf
                 if (displayFrame != -1)
                 {
                     // increment counts for current display frame
-                    if (displayFrame < _DisplayState.FrameNumber)
+                    if (displayFrame < _AnalysisFrameState.InitialDisplayFrameNumber)
                         _AnalysisFrameState.WritesBeforeDisplayRead++;
                     else
                         _AnalysisFrameState.WritesAfterDisplayRead++;
 
                     // increment counts for next display frame
-                    if (displayFrame < _DisplayState.FrameNumber + 1)
+                    if (displayFrame < _AnalysisFrameState.InitialDisplayFrameNumber + 1)
                         _AnalysisFrameState.WritesBeforeDisplayReadNext++;
                     else
                         _AnalysisFrameState.WritesAfterDisplayReadNext++;
@@ -1471,7 +1468,8 @@ namespace BeebPerf
             public int StartInstructionIndex;
             public int EndInstructionIndex;
             public int StartCycleCount;
-            public int FrameNumber = 0;
+            public int FrameNumber;
+            public int InitialDisplayFrameNumber;
             
             public int[] MemoryDisplayFrame = [];
             public int[] ShadowRamDisplayFrame = [];
