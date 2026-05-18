@@ -478,13 +478,17 @@ namespace BeebPerf.ux
             _SelectedMemoryAccess = memoryAccess;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-            SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess);
+            bool memoryAccessApplicable = (tabControl.SelectedTab == memoryTabPage);
+            SetCodeAsync(
+                _SelectedRoutine, 
+                callStackApplicable ? _SelectedCallStack : null, 
+                memoryAccessApplicable ? _SelectedMemoryAccess : null);
             SetCallerCalleeAsync(_SelectedRoutine);
 
-            routinesView.SelectRoutine(routine);
-            callTreeView.SelectRoutine(routine, callStack!);
-            flameGraphView.SelectRoutine(routine, callStack!);
-            memoryRoutinesView.SelectRoutine(routine);
+            routinesView.SelectRoutine(_SelectedRoutine);
+            callTreeView.SelectRoutine(_SelectedRoutine, _SelectedCallStack!);
+            flameGraphView.SelectRoutine(_SelectedRoutine, _SelectedCallStack!);
+            memoryRoutinesView.SelectRoutine(_SelectedRoutine);
         }
 
         private void SetCodeAsync(Routine routine, CallStack? callStack, RoutineMemoryAccess? memoryAccess)
@@ -686,7 +690,11 @@ namespace BeebPerf.ux
             if (_SelectedRoutine != null)
             {
                 bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-                SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
+                bool memoryAccessApplicable = (tabControl.SelectedTab == memoryTabPage);
+                SetCodeAsync(
+                    _SelectedRoutine,
+                    callStackApplicable ? _SelectedCallStack : null,
+                    memoryAccessApplicable ? _SelectedMemoryAccess : null);
             }
         }
 
