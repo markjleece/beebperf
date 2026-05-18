@@ -478,7 +478,7 @@ namespace BeebPerf.ux
             _SelectedMemoryAccess = memoryAccess;
 
             bool callStackApplicable = (tabControl.SelectedTab == callTreeTabPage) || (tabControl.SelectedTab == flameGraphTabPage);
-            SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess: null);
+            SetCodeAsync(_SelectedRoutine, callStackApplicable ? _SelectedCallStack : null, memoryAccess);
             SetCallerCalleeAsync(_SelectedRoutine);
 
             routinesView.SelectRoutine(routine);
