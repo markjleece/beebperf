@@ -50,21 +50,32 @@ namespace BeebPerf
         static public void CopyToClipboard(BeebPerfForm form, Bitmap bitmap, float aspectRatio)
         {
             // round aspect ratio to nearest factor of two, so pixels end up square
+            int newWidth, newHeight;
             if (Math.Abs(aspectRatio - 0.5) < Math.Abs(aspectRatio - 1.0))
-                aspectRatio = 0.5f;
+            {
+                // aspect ratio rounded to 0.5
+                newWidth = bitmap.Width;
+                newHeight = bitmap.Height * 2;
+            }
             else if (Math.Abs(aspectRatio - 1.0) < Math.Abs(aspectRatio - 2.0))
-                aspectRatio = 1.0f;
+            {
+                // aspect ratio rounded to 1
+                newWidth = bitmap.Width;
+                newHeight = bitmap.Height;
+            }
             else
-                aspectRatio = 2.0f;
-
-            // calc new width
-            int newWidth = (int)double.Round(aspectRatio * bitmap.Width);
+            {
+                // aspect ratio rounded to 2
+                newWidth = bitmap.Width * 2;
+                newHeight = bitmap.Height;
+            }
 
             // create new stretched bitmap
-            var newBitmap = new Bitmap(newWidth, bitmap.Height);
+            var newBitmap = new Bitmap(newWidth, newHeight);
             using (Graphics graphics = Graphics.FromImage(newBitmap))
             {
-                var bitmapRect = new Rectangle(0, 0, newWidth, bitmap.Height);
+                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+                var bitmapRect = new Rectangle(0, 0, newWidth, newHeight);
                 graphics.DrawImage(bitmap, bitmapRect);
             }
 

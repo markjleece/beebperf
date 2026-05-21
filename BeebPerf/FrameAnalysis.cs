@@ -50,11 +50,11 @@ namespace BeebPerf
     // - Non-standard video modes (e.g. Mode 8)
     // - Mixed non-teletext modes (mid-frame ULA changes)
     // - Interlaced support
+    // - Cursor support
     // - Over-scan resolutions up to 1024x640
     // - Hardware scrolling and split screen support
     // 
     // Limitations:
-    // - No support for the hardware cursor
     // - No support for custom teletext modes
     // - No support for graphics tablets
     // - No support for custom ULA hardware
@@ -344,6 +344,10 @@ namespace BeebPerf
             _DisplayState.FrameNumber = 0;
             _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
+            _DisplayState.PreviousCaptureTopScanline = -1;
+
+            // initialize CRTC state
+            _CRTCState.CursorFieldCount = 0;
 
             // initialize ULA state
             _ULAState.WriteDisplayDataTblInvalid = true;
@@ -386,15 +390,21 @@ namespace BeebPerf
             {
                 topScanline = _DisplayState.FirstDisplayScanline;
                 scanlineCount = 250;
+
+                _DisplayState.PreviousCaptureTopScanline = -1;
             }
             else
             {
-                topScanline = 40;
-                scanlineCount = 256;
-            }
+                topScanline = (_DisplayState.FirstDisplayScanline < 40) ? 32 : 40;
+                if (_DisplayState.PreviousCaptureTopScanline != -1)
+                    topScanline = Math.Min(topScanline, _DisplayState.PreviousCaptureTopScanline);
 
-            if (topScanline + scanlineCount > 312)
-                topScanline = 312 - scanlineCount;
+                scanlineCount = Math.Max(scanlineCount, 256);
+                if (topScanline + scanlineCount > 312)
+                    topScanline = 312 - scanlineCount;
+
+                _DisplayState.PreviousCaptureTopScanline = topScanline;
+            }
 
             // calculate bitmap height and frame buffer stride
             int bitmapHeight, frameBufferStride;
@@ -545,9 +555,12 @@ namespace BeebPerf
 
             if (!frameStartParams.SplitScreen) // true frame?
             {
-                // capture previous frame
+                // capture previous frame, after drawing cursor
                 if (_DisplayState.FrameNumber > 0)
+                {
+                    DrawCursor();
                     CaptureDisplayFrame();
+                }
 
                 // increment frame number
                 _DisplayState.FrameNumber++;
@@ -568,6 +581,37 @@ namespace BeebPerf
                         ? TeletextState.FlashOffFrameCount
                         : TeletextState.FlashOnFrameCount;
                     _TeletextState.FlashOn = !_TeletextState.FlashOn; // toggle flash state
+                }
+
+                // cursor flash
+                _CRTCState.CursorFieldCount--;
+                if (_CRTCState.CursorFieldCount < 0)
+                {
+                    int cursorBlinkRate = _CRTCState.Register10_CursorStart & 0x60;
+                    if (cursorBlinkRate == 0)
+                    {
+                        // 0 is cursor displays, but does not blink
+                        _CRTCState.CursorFieldCount = 0;
+                        _CRTCState.CursorOnState = true;
+                    }
+                    else if (cursorBlinkRate == 0x20)
+                    {
+                        // 32 is no cursor
+                        _CRTCState.CursorFieldCount = 0;
+                        _CRTCState.CursorOnState = false;
+                    }
+                    else if (cursorBlinkRate == 0x40)
+                    {
+                        // 64 is 1/16 fast blink
+                        _CRTCState.CursorFieldCount = 8;
+                        _CRTCState.CursorOnState = !_CRTCState.CursorOnState;
+                    }
+                    else if (cursorBlinkRate == 0x60)
+                    {
+                        // 96 is 1/32 slow blink
+                        _CRTCState.CursorFieldCount = 16;
+                        _CRTCState.CursorOnState = !_CRTCState.CursorOnState;
+                    }
                 }
 
                 // clear frame buffer
@@ -598,8 +642,12 @@ namespace BeebPerf
             _CRTCState.Register7_VerticalSyncPos = frameStartParams.CRTCRegisters[7];
             _CRTCState.Register8_InterlaceAndDelay = frameStartParams.CRTCRegisters[8];
             _CRTCState.Register9_ScanlinesPerCharacter = frameStartParams.CRTCRegisters[9];
+            _CRTCState.Register10_CursorStart = frameStartParams.CRTCRegisters[10];
+            _CRTCState.Register11_CursorEnd = frameStartParams.CRTCRegisters[11];
             _CRTCState.Register12_ScreenStartHigh = frameStartParams.CRTCRegisters[12];
             _CRTCState.Register13_ScreenStartLow = frameStartParams.CRTCRegisters[13];
+            _CRTCState.Register14_CursorStartHigh = frameStartParams.CRTCRegisters[14];
+            _CRTCState.Register15_CursorStartLow = frameStartParams.CRTCRegisters[15];
 
             _CRTCState.DisplayScanline = frameStartParams.DisplayScanline;
             _CRTCState.DisplayScanlinePos = 0;
@@ -616,7 +664,7 @@ namespace BeebPerf
 
             // calculate first character row address
             if (_ULAState.TeletextMode)
-                _CRTCState.CharacterRowAddress = (((_CRTCState.Register12_ScreenStartHigh ^ 0x20) + 0x74) << 8) + _CRTCState.Register13_ScreenStartLow;
+                _CRTCState.CharacterRowAddress = ((((_CRTCState.Register12_ScreenStartHigh ^ 0x20) + 0x74) & 0xFF) << 8) + _CRTCState.Register13_ScreenStartLow;
             else
                 _CRTCState.CharacterRowAddress = (_CRTCState.Register12_ScreenStartHigh << 8) + _CRTCState.Register13_ScreenStartLow;
 
@@ -631,6 +679,14 @@ namespace BeebPerf
                 _ScreenMemory.StartAddress *= 8;
                 _ScreenMemory.Size *= 8;
             }
+
+            // calculate cursor address
+            if (_ULAState.TeletextMode)
+                _CRTCState.CursorAddress = ((((_CRTCState.Register14_CursorStartHigh ^ 0x20) + 0x74) & 0xFF) << 8) + _CRTCState.Register15_CursorStartLow;
+            else
+                _CRTCState.CursorAddress = (_CRTCState.Register14_CursorStartHigh << 8) + _CRTCState.Register15_CursorStartLow;
+
+            _DisplayState.CursorCharacterPos = -1;
         }
 
         private void DisplayMemory(int cycleCount)
@@ -658,6 +714,11 @@ namespace BeebPerf
                     // rebuild write display table?
                     if (_ULAState.WriteDisplayDataTblInvalid)
                         BuildWriteDisplayDataTbl();
+
+                    // remember cursor screen buffer position
+                    if (_CRTCState.CharacterAddress == _CRTCState.CursorAddress &&
+                        _CRTCState.CharacterScanline == _CRTCState.CharacterScanlineReset)
+                        _DisplayState.CursorCharacterPos = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + _CRTCState.DisplayScanlinePos;
 
                     // read screen memory and rasterize it
                     _DisplayState.WriteDisplayDataFunc(_DisplayState.ReadScreenDataFunc());
@@ -804,7 +865,6 @@ namespace BeebPerf
                         break;
 
                     case 8:
-                        value &= 0x3F; // 6 bit register
                         _CRTCState.RegisterModified = (value != _CRTCState.Register8_InterlaceAndDelay);
                         _CRTCState.Register8_InterlaceAndDelay = value;
                         break;
@@ -815,7 +875,18 @@ namespace BeebPerf
                         _CRTCState.Register9_ScanlinesPerCharacter = value;
                         break;
 
+                    case 10:
+                        value &= 0x7F; // 7 bit register
+                        _CRTCState.Register10_CursorStart = value;
+                        break;
+
+                    case 11:
+                        value &= 0x1F; // 5 bit register
+                        _CRTCState.Register11_CursorEnd = value;
+                        break;
+
                     case 12:
+                        value &= 0x3F; // 6 bit register
                         _CRTCState.RegisterModified = (value != _CRTCState.Register12_ScreenStartHigh);
                         _CRTCState.Register12_ScreenStartHigh = value;
                         break;
@@ -823,6 +894,15 @@ namespace BeebPerf
                     case 13:
                         _CRTCState.RegisterModified = (value != _CRTCState.Register13_ScreenStartLow);
                         _CRTCState.Register13_ScreenStartLow = value;
+                        break;
+
+                    case 14:
+                        value &= 0x3F; // 6 bit register
+                        _CRTCState.Register14_CursorStartHigh = value;
+                        break;
+
+                    case 15:
+                        _CRTCState.Register15_CursorStartLow = value;
                         break;
 
                     default:
@@ -1418,6 +1498,79 @@ namespace BeebPerf
             return true;
         }
 
+        private void DrawCursor()
+        {
+            // check if cursor is hidden
+            int cursorWidthBits = (_ULAState.ControlRegister & 0xE0);
+            int cursorDelay = (_CRTCState.Register8_InterlaceAndDelay & 0xC0) >> 6;
+            int cursorBlinkRateBits = (_CRTCState.Register10_CursorStart & 0x60);
+
+            if (cursorWidthBits == 0 ||               // cursor width: zero?
+                cursorBlinkRateBits == 0x20 ||        // cursor blink rate: displayed?
+                cursorDelay == 0x3 ||                 // cursor delay: disabled?
+                !_CRTCState.CursorOnState ||          // cursor state: off?
+                _DisplayState.CursorCharacterPos < 0) // unknown cursor position?
+            {
+                return;
+            }
+
+            // get cursor start & end scanlines
+            int cursorStart = _CRTCState.Register10_CursorStart & 0x1F;
+            if (_ULAState.TeletextMode)
+                cursorStart /= 2;
+
+            int cursorEnd = _CRTCState.Register11_CursorEnd;
+            if (cursorEnd > 11)
+                cursorEnd = 11;
+
+            // determine scanline count
+            int scanlineCount = 2 * (cursorEnd - cursorStart + 1);
+            if (scanlineCount < 1)
+                return;
+
+            // get cursor framebuffer width (bytes)
+            int cursorFrameBufferWidth;
+            switch (_ULAState.ControlRegister & 0xF0)
+            {
+                case 0x10: // mode 0
+                case 0x90: // mode 3
+                    cursorFrameBufferWidth = 4;
+                    break;
+
+                case 0xD0: // mode 1
+                case 0x80: // mode 4, 6
+                    cursorFrameBufferWidth = 8;
+                    break;
+
+                case 0xF0: // mode 2
+                case 0xC0: // mode 5
+                    cursorFrameBufferWidth = 16;
+                    break;
+
+                case 0x40: // mode 7
+                    cursorFrameBufferWidth = 6;
+                    break;
+
+                default: // unsupported
+                    return;
+            };
+
+            // calc initial framebuffer position
+            int index = _DisplayState.CursorCharacterPos + (2 * cursorStart * DisplayState.FrameBufferStride);
+            index += (cursorDelay * cursorFrameBufferWidth);
+            if (_ULAState.TeletextMode)
+                index -= (2 * cursorFrameBufferWidth);
+
+            // xor framebuffer
+            for (int y = cursorStart; y <= cursorEnd && y <= _CRTCState.Register9_ScanlinesPerCharacter; y++)
+            {
+                for (int j = 0; j < cursorFrameBufferWidth && index + j < _DisplayState.FrameBuffer.Length; j++)
+                    _DisplayState.FrameBuffer[index + j] ^= 0x77;
+
+                index += DisplayState.FrameBufferStride;
+            }
+        }
+
         public class Frame
         {
             public struct DisplayFrameSpan
@@ -1512,7 +1665,9 @@ namespace BeebPerf
             public int CharacterCycleCount;
             public int FirstDisplayScanline;
             public int LastDisplayScanline;
+            public int PreviousCaptureTopScanline;
             public bool CaptureTeletextFrame;
+            public int CursorCharacterPos;
             public byte[] FrameBuffer = [];
         }
         private DisplayState _DisplayState = new();
@@ -1544,7 +1699,7 @@ namespace BeebPerf
             public bool WriteDisplayDataTblInvalid;
             public byte[][] WriteDisplayDataTbl = new byte[256][];
 
-            public static ColorPalette BBCPalette = new([
+            public static readonly ColorPalette BBCPalette = new([
                 Color.Black,
                 Color.Red,
                 Color.Green,
@@ -1582,8 +1737,12 @@ namespace BeebPerf
             public byte Register7_VerticalSyncPos;
             public byte Register8_InterlaceAndDelay;
             public byte Register9_ScanlinesPerCharacter;
+            public byte Register10_CursorStart;
+            public byte Register11_CursorEnd;
             public byte Register12_ScreenStartHigh;
             public byte Register13_ScreenStartLow;
+            public byte Register14_CursorStartHigh;
+            public byte Register15_CursorStartLow;
             public bool RegisterModified;
 
             public int CharacterAddress;
@@ -1599,6 +1758,9 @@ namespace BeebPerf
             public int DisplayField;
             public bool SplitScreen;
             public bool VideoOutputEnabled;
+            public int CursorAddress;
+            public int CursorFieldCount;
+            public bool CursorOnState;
         }
         private CRTCState _CRTCState = new();
 
