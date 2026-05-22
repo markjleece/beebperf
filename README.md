@@ -31,7 +31,7 @@ I suggest you first explore **BeebPerf** by opening  one of the sample **.perf**
 1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
 2.	**Overlapping code**.  If code is loaded and executed over previously executed code, the profiler may not function correctly.  Current algorithms for identifying routines and stack frames does not support overlapping code.
 3.	**Code-patterns**.  Some 6502 coding patterns can result in deep tail-call paths being generated, which can impede analysis.  For example, calling into the middle of a loop from  another routine can result in deep call-paths.
-4.	**Display-frame reconstruction**. Does not support the hardware cursor, custom teletext modes, or custom ULA hardware.
+4.	**Display-frame reconstruction**. Does not support custom teletext modes or custom ULA hardware.
 
 # Documentation
 | File name | Description |
