@@ -49,6 +49,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 5. Reopen and rebuild the solution (x64 configuration).
 6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items.
 
+The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
+
 See [docs/BeebPerf.docx](docs/BeebPerf.docx) for more information.
 
 # Acknowlegements
