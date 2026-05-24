@@ -10,7 +10,7 @@
 
 # Features
 - **Hot routines** and **hot path** analysis.
-- **Frame/game-loop analysis**, allowing duration/threshold analysis and frame to display-frame analysis.  The latter includes tracking screen memory writes and whether these occur before or after the screen memory is scanned and displayed.
+- **Frame/game-loop analysis**, allowing duration/threshold analysis and frame to display-frame analysis.  The latter includes tracking screen memory writes and whether these occur before or after the screen memory is scanned for display.
 - **Memory analysis**, providing metrics on which memory addresses are accessed the most, by which routines, and by which instructions.
 - **Interactive timeline and profiler views** including: Timeline, Routines, Caller/Callee, Call Tree, Flame graph, Memory, Frames, and Code.
 - **Display frame reconstruction**, with generated snapshots displayed under the timeline.
