@@ -1,6 +1,5 @@
 # BeebPerf - Windows based Profiler for the BBC Micro
-**BeebPerf** is a Windows-based profiler for the **BBC Micro**. It works in tandem with a modified version of **BeebEm** that can record a performance session to a **.perf** file (see below).
-**BeebPerf** can open **.perf** files, providing a set of interactive profiler views over the contained information.
+**BeebPerf** is a Windows-based profiler for the **BBC Micro** that provides a set of interactive profiler views on a performance session (**.perf** file) recorded by a modified version of **BeebEm**.
 
 <img width="300" alt="layout" src="https://github.com/user-attachments/assets/167909b8-a154-45e0-a1cc-56dbd7accab0" />
 <img width="300" alt="flame graph" src="https://github.com/user-attachments/assets/35a829a5-1603-4ee3-8ad6-4718244e9cfc" />
@@ -11,22 +10,22 @@
 
 # Features
 - **Hot routines** and **hot path** analysis.
-- **Frame/game-loop analysis**, allowing duration/threshold analysis and frame to display-frame analysis.  The latter includes tracking screen memory writes and whether these occur before or after the display screen memory scan.
+- **Frame/game-loop analysis**, allowing duration/threshold analysis and frame to display-frame analysis.  The latter includes tracking screen memory writes and whether these occur before or after the screen memory is scanned and displayed.
 - **Memory analysis**, providing metrics on which memory addresses are accessed the most, by which routines, and by which instructions.
 - **Interactive timeline and profiler views** including: Timeline, Routines, Caller/Callee, Call Tree, Flame graph, Memory, Frames, and Code.
 - **Display frame reconstruction**, with generated snapshots displayed under the timeline.
-- **Label support** - labels can imported from files and enabled/disabled.
-- **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  The frame snapshots and flame graph images can also be copied to the clipboard.
+- **Label support** - labels can be imported from assembler output files, or optionaly embedded in **.perf** files (see below).
+- **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Frame snapshots and flame graph images can also be copied to the clipboard.
 
 # Building and running BeebPerf
-**BeebPerf** can be built using **Visual Studio 2022** or **2026**.  You will need the following components installed:
+**BeebPerf** can be built using **Visual Studio 2022** or **2026**.  The following Visual Studio components are required:
    - .Net 10 runtime and development tools
    - MSVS v142 – VS 2019 C++ x64/x86 build tools (v14.29 – 16.11)
 
 After cloning this repository, open the solution file: **BeebPerf.sln**, rebuild all, set the **BeebPerf** project as the startup project, and run it.
 
-I suggest you first explore **BeebPerf** by opening  one of the sample **.perf** files from the **samples** folder before building a version of **BeebEm** that can take performance recordings (see below).
-
+Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and become familiar with the profiler's functionality.  A **'getting started'** guide can be shown by clicking the toolbar **help** button.  
+ 
 # Limitations
 1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
 2.	**Overlapping code**.  If code is loaded and executed over previously executed code, the profiler may not function correctly.  Current algorithms for identifying routines and stack frames does not support overlapping code.
@@ -46,14 +45,14 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
    - C++ v14.29 (16.11) MFC for v142 build tool (x86 & x64) – needed for afxres.h/rc
 2.	Download and install the [Microsoft DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) from the Microsoft download site.
 3.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
-4.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  The path to the patch file may changing.
+4.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  (the path to the patch file will likely need changing).
 5. Reopen and rebuild the solution (x64 configuration).
 6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items.
 
 See [docs/BeebPerf.docx](docs/BeebPerf.docx) for more information.
 
 # Acknowlegements
-- Portions of the display reconstruction code were based on **BeebEm's** video class, specifically the Mode 7 font loading and initialization code, and Mode 7 state-machine code. Many thanks to the **BeebEm** contributors for creating and maintaining this wonderful peice of software. 
+- Portions of the display reconstruction code were based on **BeebEm's** video class. Many thanks to the **BeebEm** contributors for creating and maintaining this wonderful piece of software. 
 - The **.perf** files are compressed and uncompressed using the **ZLib library** - Many thanks to **Jean-loup Gailly** and **Mark Adler** for creating such an excellent and useful library. 
 
 # BeebPerf Copyright
