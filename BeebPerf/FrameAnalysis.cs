@@ -27,7 +27,6 @@
 using BeebPerf.model;
 using System.Diagnostics;
 using System.Drawing.Imaging;
-using System.Reflection.PortableExecutable;
 
 namespace BeebPerf
 {
@@ -517,14 +516,12 @@ namespace BeebPerf
                 if (_ULAState.TeletextMode)
                 {
                     // teletext (Mode 7)
-                    _DisplayState.ReadScreenDataFunc = ReadScreenData_Teletext;
                     _DisplayState.WriteDisplayDataFunc = WriteDisplayData_Teletext;
                     _DisplayState.AspectRatio = DisplayState.AspectRatio_Teletext;
                 }
                 else
                 {
                     // non-teletext modes (Modes 0-6, and 8)
-                    _DisplayState.ReadScreenDataFunc = ReadScreenData_NonTeletext;
                     _DisplayState.WriteDisplayDataFunc = ((_ULAState.ControlRegister & 0x10) == 0x10)
                         ? WriteDisplayData_32bits  // modes 0,1,2,3
                         : WriteDisplayData_64bits; // modes 4,5,6,8,
@@ -669,14 +666,10 @@ namespace BeebPerf
             _CRTCState.CharacterAddress = startAddress;
 
             // calculate screen memory start address and size
-            _ScreenMemory.StartAddress = startAddress;
+            _ScreenMemory.StartAddress = GetScreenAddress(startAddress);
             _ScreenMemory.Size = _CRTCState.Register6_VerticalDisplayed * _CRTCState.Register1_HorizontalDisplayed;
-
             if (!_ULAState.TeletextMode)
-            {
-                _ScreenMemory.StartAddress *= 8;
                 _ScreenMemory.Size *= 8;
-            }
 
             // calculate cursor address
             if (_ULAState.TeletextMode)
@@ -719,7 +712,8 @@ namespace BeebPerf
                         _DisplayState.CursorCharacterPos = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + _CRTCState.DisplayScanlinePos;
 
                     // read screen memory and rasterize it
-                    _DisplayState.WriteDisplayDataFunc(_DisplayState.ReadScreenDataFunc());
+                    int screenAddress = GetScreenAddress(_CRTCState.CharacterAddress, _CRTCState.CharacterScanline);
+                    _DisplayState.WriteDisplayDataFunc(ReadScreenMemory(screenAddress));
                 }
 
                 // advance CRTC counters
@@ -978,30 +972,34 @@ namespace BeebPerf
             }
         }
 
-        private byte ReadScreenData_Teletext()
+        private int GetScreenAddress(int characterAddress, int characterScanline = 0)
         {
-            int memoryAddress = _CRTCState.CharacterAddress;
+            int memoryAddress = 0;
 
-            if (memoryAddress >= 0x8000)
-                memoryAddress = (memoryAddress - _ScreenMemory.WrapOffset) & 0x7FFF;
+            if ((characterAddress & 0x2000) != 0)
+            {
+                // teletext address
+                if (_BBCModel == BBCModelType.B || _BBCModel == BBCModelType.IntegraB)
+                    memoryAddress = ((characterAddress & 0x800) << 3) | 0x3c00 | (characterAddress & 0x3ff);
+                else
+                    memoryAddress = 0x7c00 | (characterAddress & 0x3ff);
+            }
+            else
+            {
+                // non teletext address
+                if (characterScanline >= 8)
+                    return 0;
 
-            return ReadDisplayMemory(memoryAddress);
+                memoryAddress = (characterAddress << 3) + characterScanline;
+
+                if (memoryAddress >= 0x8000)
+                    memoryAddress = (memoryAddress - _ScreenMemory.WrapOffset) & 0x7FFF;
+            }
+
+            return memoryAddress;
         }
 
-        private byte ReadScreenData_NonTeletext()
-        {
-            if (_CRTCState.CharacterScanline >= 8)
-                return 0;
-
-            int memoryAddress = (_CRTCState.CharacterAddress << 3) + _CRTCState.CharacterScanline;
-
-            if (memoryAddress >= 0x8000)
-                memoryAddress = (memoryAddress - _ScreenMemory.WrapOffset) & 0x7FFF;
-
-            return ReadDisplayMemory(memoryAddress);
-        }
-
-        private byte ReadDisplayMemory(int address)
+        private byte ReadScreenMemory(int address)
         {
             if (_ScreenMemory.DisplayShadowRam)
             {
@@ -1636,16 +1634,10 @@ namespace BeebPerf
             public DisplayState()
             {
                 WriteDisplayDataFunc = WriteDisplayData_Void;
-                ReadScreenDataFunc = ReadScreenData_Void;
             }
 
             private void WriteDisplayData_Void(byte value)
             {
-            }
-
-            private byte ReadScreenData_Void()
-            {
-                return 0;
             }
 
             public const int MaxWidth = 1024;
@@ -1655,7 +1647,6 @@ namespace BeebPerf
             public const int FrameBufferStride = MaxWidth / 2;
 
             public WriteBitmapData WriteDisplayDataFunc;
-            public ReadScreenData ReadScreenDataFunc;
 
             public int FrameNumber;
             public int StartCycleCount;

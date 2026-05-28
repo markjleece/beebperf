@@ -7207,7 +7207,7 @@ index c087f1f..656df59 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..95e0f9b
+index 0000000..c02a173
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
 @@ -0,0 +1,1071 @@
@@ -7733,10 +7733,10 @@ index 0000000..95e0f9b
 +    }
 +
 +    // Video ULA registers
-+    m_writeBuffer->WriteByteUnchecked(VideoULA_ControlReg);
++    snapshotData.WriteByte(VideoULA_ControlReg);
 +    for (int i = 0; i < 16; i++)
 +    {
-+        m_writeBuffer->WriteByteUnchecked(VideoULA_Palette[i]);
++        snapshotData.WriteByte(VideoULA_Palette[i]);
 +    }
 +
 +    // CRTC registers

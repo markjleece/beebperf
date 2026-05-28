@@ -22,7 +22,6 @@
 using BeebPerf.model;
 using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 
