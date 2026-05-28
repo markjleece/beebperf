@@ -19,6 +19,8 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Diagnostics;
+
 namespace BeebPerf.model
 {
     // 

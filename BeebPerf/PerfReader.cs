@@ -22,6 +22,7 @@
 using BeebPerf.model;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -168,6 +169,34 @@ namespace BeebPerf
                 model.Snapshot.HiddenRamAddress = hiddenRamAddress;
             }
 
+            // video ULA
+            model.Snapshot.ULAControlRegister = ReadByte(dataStream);
+            model.Snapshot.ULAColorPalette = new byte[16];
+            dataStream.ReadExactly(model.Snapshot.ULAColorPalette);
+            for (int i = 0; i < model.Snapshot.ULAColorPalette.Length; i++)
+                if ((model.Snapshot.ULAColorPalette[i] & 0xF0) != 0)
+                    throw new InvalidDataException("invalid .perf file format: invalid ULA color palette");
+
+            // CRTC
+            model.Snapshot.CRTCRegisterSelect = ReadByte(dataStream);
+            if (model.Snapshot.CRTCRegisterSelect >= 18)
+                throw new InvalidDataException("invalid .perf file format: invalid CRTC register select");
+
+            model.Snapshot.CRTCRegisters = new byte[18];
+            dataStream.ReadExactly(model.Snapshot.CRTCRegisters);
+
+            // screen wrap address
+            byte screenWrapAddress = ReadByte(dataStream);
+            model.Snapshot.ScreenWrapAddress = screenWrapAddress switch
+            {
+                0 => 0x4000,
+                1 => 0x6000,
+                2 => 0x3000,
+                3 => 0x5800,
+                _ => throw new InvalidDataException("invalid .perf file format: invalid screen wrap address")
+            };
+
+            // stack
             int stackFrameCount = ReadByte(dataStream);
             model.Snapshot.StackFrames = new MiniStackFrame[stackFrameCount];
             for (int i = 0; i < stackFrameCount; i++)
@@ -199,17 +228,6 @@ namespace BeebPerf
 
                 model.Snapshot.StackFrames[i] = new(type, startAddr, returnAddr, returnStackPointer);
             }
-
-            // screen wrap address
-            byte screenWrapAddress = ReadByte(dataStream);
-            model.Snapshot.ScreenWrapAddress = screenWrapAddress switch
-            {
-                0 => 0x4000,
-                1 => 0x6000,
-                2 => 0x3000,
-                3 => 0x5800,
-                _ => throw new InvalidDataException("invalid .perf file format: invalid screen wrap address")
-            };
 
             // memory
             model.Snapshot.Memory = new byte[(int)MemoryPage.Count][];
@@ -341,45 +359,17 @@ namespace BeebPerf
                             instruction.Type = InstructionType.FrameStart;
                             instruction.CycleCount = 0;
 
-                            var frameStartEventParams = new FrameStartEventParams();
-                            instruction.FrameStartEventParamsIndex = model.FrameStartEventParamsList.Count;
-                            model.FrameStartEventParamsList.Add(frameStartEventParams);
-
                             // offset cycle count
-                            frameStartEventParams.OffsetCycleCount = ReadByte(dataStream);
+                            instruction.OffsetCycleCount = ReadByte(dataStream);
 
-                            // video ULA state
-                            frameStartEventParams.ULAControlRegister = ReadByte(dataStream);
-
-                            byte[] colorPalette = new byte[16];
-                            dataStream.ReadExactly(colorPalette);
-                            for (int i = 0; i < colorPalette.Length; i++)
-                                if (colorPalette[i] >= 16)
-                                    throw new InvalidDataException("invalid .perf file format: invalid colorPalette entry");
-                            frameStartEventParams.ULAColorPalette = colorPalette;
-
-                            // CRTC state
-                            byte registerSelect = ReadByte(dataStream);
-                            if (registerSelect >= 18)
-                                throw new InvalidDataException("invalid .perf file format: invalid CTRL register select");
-                            frameStartEventParams.CRTCRegisterSelect = registerSelect;
-
-                            byte[] registers = new byte[18];
-                            dataStream.ReadExactly(registers);
-                            frameStartEventParams.CRTCRegisters = registers;
+                            // start address
+                            instruction.StartAddress = ReadShort(dataStream);
 
                             // display scanline
-                            frameStartEventParams.DisplayScanline = ReadShort(dataStream);
+                            instruction.DisplayScanline = ReadShort(dataStream);
 
-                            // display bit flags
-                            byte bitFlags = ReadByte(dataStream);
-                            
-                            var displayField = (byte)(bitFlags & 0x01);
-                            if (displayField != 0 && displayField != 1)
-                                throw new InvalidDataException("invalid .perf file format: invalid display field");
-                            frameStartEventParams.DisplayField = displayField;
-
-                            frameStartEventParams.SplitScreen = ((bitFlags & 0x02) == 0x02);
+                            // display flags
+                            instruction.DisplayFlags = ReadByte(dataStream);
 
                             model.Instructions[_InstructionCount++] = instruction;
                             continue;
@@ -681,7 +671,11 @@ namespace BeebPerf
                         page = MemoryPage.WholeRam;
                     else if (address < 0x8000)
                     {
-                        if (_ShadowRamXBit || (_ShadowRamEBit && opcodeAddress >= 0xC000 && opcodeAddress < 0xE000))
+                        if (!_ShadowRamXBit && !_ShadowRamEBit)
+                            page = MemoryPage.WholeRam;
+                        else if (_ShadowRamXBit)
+                            page = MemoryPage.ShadowRam;
+                        else if (!_ShadowRamXBit && _ShadowRamEBit && opcodeAddress >= 0xC000 && opcodeAddress < 0xE000)
                             page = MemoryPage.ShadowRam;
                         else
                             page = MemoryPage.WholeRam;

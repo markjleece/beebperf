@@ -27,6 +27,7 @@
 using BeebPerf.model;
 using System.Diagnostics;
 using System.Drawing.Imaging;
+using System.Reflection.PortableExecutable;
 
 namespace BeebPerf
 {
@@ -121,7 +122,13 @@ namespace BeebPerf
                 }
                 else if (instruction.IsFrameStart)
                 {
-                    FrameStart(model.FrameStartEventParamsList[instruction.FrameStartEventParamsIndex], cycleCount);
+                    FrameStart(
+                        postCycleCount,
+                        instruction.OffsetCycleCount,
+                        instruction.StartAddress,
+                        instruction.DisplayScanline,
+                        instruction.DisplayField,
+                        instruction.SplitScreen);
                 }
 
                 if (_DisplayState.FrameNumber > 0)
@@ -340,17 +347,36 @@ namespace BeebPerf
         //
         private void InitializeVideo(Model model)
         {
+            // initialize video ULA state
+            _ULAState.ControlRegister = model.Snapshot.ULAControlRegister;
+            _ULAState.ColorPalette = (byte[])model.Snapshot.ULAColorPalette.Clone();
+            _ULAState.WriteDisplayDataTblInvalid = true;
+
+            // initialize CRTC state
+            _CRTCState.RegisterSelect = model.Snapshot.CRTCRegisterSelect;
+            _CRTCState.Register0_HorizontalTotal = model.Snapshot.CRTCRegisters[0];
+            _CRTCState.Register1_HorizontalDisplayed = model.Snapshot.CRTCRegisters[1];
+            _CRTCState.Register2_HorizontalSyncPos = model.Snapshot.CRTCRegisters[2];
+            _CRTCState.Register3_SyncWidth = model.Snapshot.CRTCRegisters[3];
+            _CRTCState.Register4_VerticalTotal = model.Snapshot.CRTCRegisters[4];
+            _CRTCState.Register5_VerticalTotalAdjust = model.Snapshot.CRTCRegisters[5];
+            _CRTCState.Register6_VerticalDisplayed = model.Snapshot.CRTCRegisters[6];
+            _CRTCState.Register7_VerticalSyncPos = model.Snapshot.CRTCRegisters[7];
+            _CRTCState.Register8_InterlaceAndDelay = model.Snapshot.CRTCRegisters[8];
+            _CRTCState.Register9_ScanlinesPerCharacter = model.Snapshot.CRTCRegisters[9];
+            _CRTCState.Register10_CursorStart = model.Snapshot.CRTCRegisters[10];
+            _CRTCState.Register11_CursorEnd = model.Snapshot.CRTCRegisters[11];
+            _CRTCState.Register12_ScreenStartHigh = model.Snapshot.CRTCRegisters[12];
+            _CRTCState.Register13_ScreenStartLow = model.Snapshot.CRTCRegisters[13];
+            _CRTCState.Register14_CursorStartHigh = model.Snapshot.CRTCRegisters[14];
+            _CRTCState.Register15_CursorStartLow = model.Snapshot.CRTCRegisters[15];
+            _CRTCState.CursorFieldCount = 0;
+
             // initialize display state
             _DisplayState.FrameNumber = 0;
             _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
             _DisplayState.PreviousCaptureTopScanline = -1;
-
-            // initialize CRTC state
-            _CRTCState.CursorFieldCount = 0;
-
-            // initialize ULA state
-            _ULAState.WriteDisplayDataTblInvalid = true;
 
             // initialize screen memory
             _ScreenMemory.Memory = new byte[32768];
@@ -548,12 +574,18 @@ namespace BeebPerf
             _ULAState.WriteDisplayDataTblInvalid = false;
         }
 
-        private void FrameStart(FrameStartEventParams frameStartParams, int cycleCount)
+        private void FrameStart(
+            int cycleCount,
+            int offsetCycleCount,
+            int startAddress,
+            int displayScanline,
+            int displayField,
+            bool splitScreen)
         {
-            int startFrameCycleCount = cycleCount - frameStartParams.OffsetCycleCount;
+            int startFrameCycleCount = cycleCount - offsetCycleCount;
             _DisplayState.CharacterCycleCount = startFrameCycleCount;
 
-            if (!frameStartParams.SplitScreen) // true frame?
+            if (!splitScreen) // true frame?
             {
                 // capture previous frame, after drawing cursor
                 if (_DisplayState.FrameNumber > 0)
@@ -567,8 +599,8 @@ namespace BeebPerf
 
                 // initialize display state
                 _DisplayState.StartCycleCount = startFrameCycleCount;
-                _DisplayState.FirstDisplayScanline = frameStartParams.DisplayScanline;
-                _DisplayState.LastDisplayScanline = frameStartParams.DisplayScanline;
+                _DisplayState.FirstDisplayScanline = displayScanline;
+                _DisplayState.LastDisplayScanline = displayScanline;
                 _DisplayState.Width = 0; // updated in UpdateVideoState(...)
 
                 // reset teletext state
@@ -622,56 +654,22 @@ namespace BeebPerf
                 return; // ignore split screen frames that occur before the first true frame
             }
 
-            // does the write display data table need rebuilding?
-            _ULAState.WriteDisplayDataTblInvalid |= ((_ULAState.ControlRegister ^ frameStartParams.ULAControlRegister) & 0x1D) != 0;
-            for (int i = 0; i < _ULAState.ColorPalette.Length && i < frameStartParams.ULAColorPalette.Length; i++)
-                _ULAState.WriteDisplayDataTblInvalid |= (_ULAState.ColorPalette[i] != frameStartParams.ULAColorPalette[i]);
-
-            // reset registers
-            _ULAState.ControlRegister = frameStartParams.ULAControlRegister;
-            _ULAState.ColorPalette = frameStartParams.ULAColorPalette.ToArray();
-
-            _CRTCState.RegisterSelect = frameStartParams.CRTCRegisterSelect;
-            _CRTCState.Register0_HorizontalTotal = frameStartParams.CRTCRegisters[0];
-            _CRTCState.Register1_HorizontalDisplayed = frameStartParams.CRTCRegisters[1];
-            _CRTCState.Register2_HorizontalSyncPos = frameStartParams.CRTCRegisters[2];
-            _CRTCState.Register3_SyncWidth = frameStartParams.CRTCRegisters[3];
-            _CRTCState.Register4_VerticalTotal = frameStartParams.CRTCRegisters[4];
-            _CRTCState.Register5_VerticalTotalAdjust = frameStartParams.CRTCRegisters[5];
-            _CRTCState.Register6_VerticalDisplayed = frameStartParams.CRTCRegisters[6];
-            _CRTCState.Register7_VerticalSyncPos = frameStartParams.CRTCRegisters[7];
-            _CRTCState.Register8_InterlaceAndDelay = frameStartParams.CRTCRegisters[8];
-            _CRTCState.Register9_ScanlinesPerCharacter = frameStartParams.CRTCRegisters[9];
-            _CRTCState.Register10_CursorStart = frameStartParams.CRTCRegisters[10];
-            _CRTCState.Register11_CursorEnd = frameStartParams.CRTCRegisters[11];
-            _CRTCState.Register12_ScreenStartHigh = frameStartParams.CRTCRegisters[12];
-            _CRTCState.Register13_ScreenStartLow = frameStartParams.CRTCRegisters[13];
-            _CRTCState.Register14_CursorStartHigh = frameStartParams.CRTCRegisters[14];
-            _CRTCState.Register15_CursorStartLow = frameStartParams.CRTCRegisters[15];
-
-            _CRTCState.DisplayScanline = frameStartParams.DisplayScanline;
-            _CRTCState.DisplayScanlinePos = 0;
-            _CRTCState.DisplayField = frameStartParams.DisplayField;
-            _CRTCState.SplitScreen = frameStartParams.SplitScreen;
-
             // update video state
             UpdateVideoState(forceUpdate: true);
 
-            // reset CRTC counters
+            // update CRTC state
+            _CRTCState.DisplayScanline = displayScanline;
+            _CRTCState.DisplayScanlinePos = 0;
+            _CRTCState.DisplayField = displayField;
+            _CRTCState.SplitScreen = splitScreen;
             _CRTCState.CharacterRow = 0;
             _CRTCState.CharacterColumn = 0;
             _CRTCState.CharacterScanline = _CRTCState.CharacterScanlineReset; // set in UpdateVideoState()
-
-            // calculate first character row address
-            if (_ULAState.TeletextMode)
-                _CRTCState.CharacterRowAddress = ((((_CRTCState.Register12_ScreenStartHigh ^ 0x20) + 0x74) & 0xFF) << 8) + _CRTCState.Register13_ScreenStartLow;
-            else
-                _CRTCState.CharacterRowAddress = (_CRTCState.Register12_ScreenStartHigh << 8) + _CRTCState.Register13_ScreenStartLow;
-
-            _CRTCState.CharacterAddress = _CRTCState.CharacterRowAddress;
+            _CRTCState.CharacterRowAddress = startAddress;
+            _CRTCState.CharacterAddress = startAddress;
 
             // calculate screen memory start address and size
-            _ScreenMemory.StartAddress = _CRTCState.CharacterRowAddress;
+            _ScreenMemory.StartAddress = startAddress;
             _ScreenMemory.Size = _CRTCState.Register6_VerticalDisplayed * _CRTCState.Register1_HorizontalDisplayed;
 
             if (!_ULAState.TeletextMode)
@@ -940,7 +938,9 @@ namespace BeebPerf
                 };
                 _ScreenMemory.WrapOffset = 0x8000 - _ScreenMemory.WrapAddress;
             }
-            else if (address >= 0xFE34 && address < 0xFE38)
+            else if ((address == 0xFE34 && _BBCModel == BBCModelType.IntegraB) ||
+                     (address >= 0xFE34 && address < 0xFE38 &&
+                      (_BBCModel == BBCModelType.BPlus || _BBCModel == BBCModelType.MasterET || _BBCModel == BBCModelType.Master128)))
             {
                 SetDisplayShadowRam(value);
             }
@@ -1699,10 +1699,10 @@ namespace BeebPerf
             public bool WriteDisplayDataTblInvalid;
             public byte[][] WriteDisplayDataTbl = new byte[256][];
 
-            public static readonly ColorPalette BBCPalette = new([
+            public static ColorPalette BBCPalette = new([
                 Color.Black,
                 Color.Red,
-                Color.Green,
+                Color.FromArgb(255, 0, 255, 0),
                 Color.Yellow,
                 Color.Blue,
                 Color.Magenta,
@@ -1710,7 +1710,7 @@ namespace BeebPerf
                 Color.White,
                 Color.Black,   // flashing black-white
                 Color.Red,     // flashing red-cyan
-                Color.Green,   // flashing green-magenta
+                Color.FromArgb(255, 0, 255, 0), // flashing green-magenta
                 Color.Yellow,  // flashing yellow-blue
                 Color.Blue,    // flashing blue-yellow
                 Color.Magenta, // flashing magenta-green

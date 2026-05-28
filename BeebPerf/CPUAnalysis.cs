@@ -169,13 +169,7 @@ namespace BeebPerf
                     }
                     else if (_InstructionSet!.IsBranchOrJump(instruction.Opcode))
                     {
-                        CanonicalAddress destination = instruction.DestinationAddress;
-                        if ((instruction.Opcode & 0x0F) == 0) // is branch?
-                        {
-                            int branchedAddress = unchecked(instruction.OpcodeAddress.Address + 2 + (sbyte)instruction.Operand);
-                            destination = new CanonicalAddress((ushort)branchedAddress, instruction.OpcodeAddress.Page);
-                        }
-                        branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, destination));
+                        branchesAndJumps.Add(new CanonicalAddressPair(instruction.OpcodeAddress, instruction.DestinationAddress));
                     }
                 }
                 else if (instruction.IsIRQ)

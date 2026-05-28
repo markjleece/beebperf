@@ -55,7 +55,6 @@ namespace BeebPerf.model
                 InstructionSet = InstructionSet,
                 Snapshot = Snapshot.Clone(),
                 Instructions = (Instruction[])Instructions.Clone(),
-                FrameStartEventParamsList = FrameStartEventParamsList.ToList(),
                 Labels = Labels.ToList()
             };
         }
@@ -66,7 +65,6 @@ namespace BeebPerf.model
             InstructionSet = other.InstructionSet;
             Snapshot = other.Snapshot;
             Instructions = other.Instructions;
-            FrameStartEventParamsList = other.FrameStartEventParamsList;
             Labels = other.Labels;
         }
 
@@ -76,40 +74,47 @@ namespace BeebPerf.model
             {
                 return new SnapshotType()
                 {
-                    Memory = (byte[][])Memory.Clone(),
-                    MemoryReadOnly = (bool[])MemoryReadOnly.Clone(),
                     ProgramCounter = ProgramCounter,
                     Accumulator = Accumulator,
                     XRegister = XRegister,
                     YRegister = YRegister,
                     StackPointer = StackPointer,
-                    StackFrames = (MiniStackFrame[])StackFrames.Clone(),
                     RomPagingRegister = RomPagingRegister,
                     AccessControlRegister = AccessControlRegister,
+                    HiddenRamAddress = HiddenRamAddress,
+                    ULAControlRegister = ULAControlRegister,
+                    ULAColorPalette = (byte[])ULAColorPalette.Clone(),
+                    CRTCRegisterSelect = CRTCRegisterSelect,
+                    CRTCRegisters = (byte[])CRTCRegisters.Clone(),
                     ScreenWrapAddress = ScreenWrapAddress,
-                    HiddenRamAddress = HiddenRamAddress
+                    StackFrames = (MiniStackFrame[])StackFrames.Clone(),
+                    Memory = (byte[][])Memory.Clone(),
+                    MemoryReadOnly = (bool[])MemoryReadOnly.Clone()
                 };
             }
 
-            public byte[][] Memory = [];
-            public bool[] MemoryReadOnly = [];
             public ushort ProgramCounter;
             public byte Accumulator;
             public byte XRegister;
             public byte YRegister;
             public byte StackPointer;
-            public MiniStackFrame[] StackFrames = [];
             public byte RomPagingRegister;
             public byte AccessControlRegister;
-            public ushort ScreenWrapAddress;
             public byte HiddenRamAddress;
+            public byte ULAControlRegister;
+            public byte[] ULAColorPalette = [];
+            public byte CRTCRegisterSelect;
+            public byte[] CRTCRegisters = [];
+            public ushort ScreenWrapAddress;
+            public MiniStackFrame[] StackFrames = [];
+            public byte[][] Memory = [];
+            public bool[] MemoryReadOnly = [];
         }
 
         public BBCModelType BBCModel;
         public InstructionSet? InstructionSet;
         public SnapshotType Snapshot = new();
         public Instruction[] Instructions = [];
-        public List<FrameStartEventParams> FrameStartEventParamsList = [];
         public List<(string Name, ushort Address)> Labels = [];
     }
 }

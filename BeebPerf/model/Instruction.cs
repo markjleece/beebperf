@@ -232,17 +232,77 @@ namespace BeebPerf.model
             }
         }
 
-        public int FrameStartEventParamsIndex
+        public byte OffsetCycleCount
         {
             get
             {
                 Debug.Assert(IsFrameStart);
-                return _FrameStartParamsIndex;
+                return _OffsetCycleCount;
             }
             set
             {
                 Debug.Assert(IsFrameStart);
-                _FrameStartParamsIndex = value;
+                _OffsetCycleCount = value;
+            }
+        }
+
+        public ushort StartAddress
+        {
+            get
+            {
+                Debug.Assert(IsFrameStart);
+                return _StartAddress;
+            }
+            set
+            {
+                Debug.Assert(IsFrameStart);
+                _StartAddress = value;
+            }
+        }
+
+        public ushort DisplayScanline
+        {
+            get
+            {
+                Debug.Assert(IsFrameStart);
+                return _DisplayScanline;
+            }
+            set
+            {
+                Debug.Assert(IsFrameStart);
+                _DisplayScanline = value;
+            }
+        }
+
+        public byte DisplayFlags
+        {
+            get 
+            {
+                Debug.Assert(IsFrameStart);
+                return _DisplayFlags; 
+            }
+            set
+            {
+                Debug.Assert(IsFrameStart);
+                _DisplayFlags = value;
+            }
+        }
+
+        public int DisplayField
+        {
+            get
+            {
+                Debug.Assert(IsFrameStart);
+                return (_DisplayFlags & 0x1);
+            }
+        }
+
+        public bool SplitScreen
+        {
+            get
+            {
+                Debug.Assert(IsFrameStart);
+                return ((_DisplayFlags & 0x2) == 0x2);
             }
         }
 
@@ -262,18 +322,21 @@ namespace BeebPerf.model
         [FieldOffset(10)] private byte _MemoryReadValue;
         [FieldOffset(11)] private byte _MemoryWriteValue;
 
-        [FieldOffset(10)] private byte _StackValue;            // overrides _MemoryReadValue
-        [FieldOffset(11)] private byte _StackPointer;          // overrides _MemoryWriteValue
+        [FieldOffset(10)] private byte _StackValue;             // overrides _MemoryReadValue
+        [FieldOffset(11)] private byte _StackPointer;           // overrides _MemoryWriteValue
 
         // interrupt and instruction fields
-        [FieldOffset(7)] private byte _DestinationAddressPage; // overrides _MemoryAddressPage
-        [FieldOffset(8)] private ushort _DestinationAddress;   // overrides _MemoryAddress
+        [FieldOffset(7)] private byte _DestinationAddressPage;  // overrides _MemoryAddressPage
+        [FieldOffset(8)] private ushort _DestinationAddress;    // overrides _MemoryAddress
 
-        [FieldOffset(1)] private byte _ReturnAddressPage;      // overrides _OpcodeAddressPage
-        [FieldOffset(10)] private ushort _ReturnAddress;       // overrides _MemoryReadValue & _MemoryWriteValue
+        [FieldOffset(1)] private byte _ReturnAddressPage;       // overrides _OpcodeAddressPage
+        [FieldOffset(10)] private ushort _ReturnAddress;        // overrides _MemoryReadValue & _MemoryWriteValue
 
-        // frame start event fields
-        [FieldOffset(8)] private int _FrameStartParamsIndex;   // overrides _MemoryAddress, _MemoryReadValue & _MemoryWriteValue
+        // CRTC vertical counter reset fields
+        [FieldOffset(6)] private byte _OffsetCycleCount;        // overrides _Opcode
+        [FieldOffset(7)] private byte _DisplayFlags;            // overrides _MemoryAddressPage
+        [FieldOffset(8)] private ushort _StartAddress;          // overrides _MemoryAddress 
+        [FieldOffset(10)] private ushort _DisplayScanline;      // overrides _MemoryReadValue & _MemoryWriteValue
 
         public string ToString(InstructionSet instructionSet)
         {
@@ -311,7 +374,7 @@ namespace BeebPerf.model
             }
             else if (IsFrameStart)
             {
-                return $"FRAME-START-EVENT (params index: {FrameStartEventParamsIndex})";
+                return $"FRAME-START-EVENT";
             }
             else
             {
