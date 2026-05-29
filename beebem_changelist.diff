@@ -6619,19 +6619,20 @@ index a27e15f..4934a83 100644
  unsigned char BeebReadMem(int Address) {
  	unsigned char Value = 0xff;
 diff --git a/Src/BeebMem.h b/Src/BeebMem.h
-index 6333326..a65e401 100644
+index 6333326..532bb20 100644
 --- a/Src/BeebMem.h
 +++ b/Src/BeebMem.h
-@@ -47,6 +47,8 @@ extern unsigned char WholeRam[65536];
+@@ -47,6 +47,9 @@ extern unsigned char WholeRam[65536];
  extern unsigned char Roms[ROM_BANK_COUNT][16384];
  extern unsigned char ROMSEL;
  extern unsigned char PagedRomReg;
 +extern unsigned char Hidden[256];
 +extern unsigned char Private[12288];
++extern unsigned char ShadowRam[20480]; // 20K Shadow RAM (IntegraB)
  
  /* Master 128 Specific Stuff */
  extern unsigned char FSRam[8192]; // 8K Filing System RAM
-@@ -55,6 +57,7 @@ extern unsigned char ShadowRAM[32768]; // 20K Shadow RAM
+@@ -55,6 +58,7 @@ extern unsigned char ShadowRAM[32768]; // 20K Shadow RAM
  extern unsigned char ACCCON; // ACCess CONtrol register
  
  extern bool MemSel, PrvEn, ShEn, Prvs1, Prvs4, Prvs8;
@@ -6639,7 +6640,7 @@ index 6333326..a65e401 100644
  
  enum RomFlags
  {
-@@ -92,9 +95,20 @@ extern char RomFile[MAX_PATH];
+@@ -92,9 +96,20 @@ extern char RomFile[MAX_PATH];
  
  extern char HardDrivePath[MAX_PATH]; // JGH
  
@@ -7207,10 +7208,10 @@ index c087f1f..656df59 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..c02a173
+index 0000000..abed64b
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1071 @@
+@@ -0,0 +1,1074 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -7793,7 +7794,10 @@ index 0000000..c02a173
 +
 +    if (bShadowRAM)
 +    {
-+        snapshotData.Write(ShadowRAM, 20480);
++        if (MachineType == Model::BPlus || MachineType == Model::Master128 || MachineType == Model::MasterET)
++            snapshotData.Write(ShadowRAM, 20480);
++        else if (MachineType == Model::IntegraB)
++            snapshotData.Write(ShadowRam, 20480);
 +    }
 +
 +    if (bPrivateRAM)

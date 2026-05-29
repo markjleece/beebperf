@@ -395,6 +395,9 @@ namespace BeebPerf
             _DisplayState.FrameNumber = 0;
             _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
+            _DisplayState.ModeTransition = false;
+            _DisplayState.PreviousFirstDisplayScanline = -1;
+            _DisplayState.PreviousLastDisplayScanline = -1;
 
             // initialize screen memory
             _ScreenMemory.Memory = new byte[32768];
@@ -426,23 +429,40 @@ namespace BeebPerf
         {
             Debug.Assert(_DisplayState.EndCycleCount - _DisplayState.StartCycleCount < 80000/*two frames*/);
 
-            // calculate top scanline and scanline count
-            int topScanline, scanlineCount;
+            // determine top and bottom scanline
+            int topScanline = _DisplayState.FirstDisplayScanline;
+            int bottomScanline = _DisplayState.LastDisplayScanline;
 
-            scanlineCount = _DisplayState.LastDisplayScanline - _DisplayState.FirstDisplayScanline + 1;
             if (_DisplayState.CaptureTeletextFrame)
             {
-                topScanline = _DisplayState.FirstDisplayScanline;
-                scanlineCount = 250;
+                _DisplayState.ModeTransition = false;
+                _DisplayState.PreviousFirstDisplayScanline = -1;
+                _DisplayState.PreviousLastDisplayScanline = -1;
             }
             else
             {
-                topScanline = (_DisplayState.FirstDisplayScanline < 40) ? 32 : 40;
+                if (_DisplayState.ModeTransition ||
+                    _DisplayState.PreviousFirstDisplayScanline == -1 ||
+                    _DisplayState.PreviousLastDisplayScanline == -1)
+                {
+                    _DisplayState.ModeTransition =
+                        (topScanline != _DisplayState.PreviousFirstDisplayScanline ||
+                         bottomScanline != _DisplayState.PreviousLastDisplayScanline);
+                }
+                else
+                {
+                    topScanline = Math.Min(topScanline, _DisplayState.PreviousFirstDisplayScanline);
+                    bottomScanline = Math.Max(bottomScanline, _DisplayState.PreviousLastDisplayScanline);
+                }
 
-                scanlineCount = Math.Max(scanlineCount, 256);
-                if (topScanline + scanlineCount > 312)
-                    topScanline = 312 - scanlineCount;
+                _DisplayState.PreviousFirstDisplayScanline = topScanline;
+                _DisplayState.PreviousLastDisplayScanline = bottomScanline;
             }
+
+            // scanline count
+            int scanlineCount = bottomScanline - topScanline + 1;
+            if (topScanline + scanlineCount > 312)
+                topScanline = 312 - scanlineCount;
 
             // calculate bitmap height and frame buffer stride
             int bitmapHeight, frameBufferStride;
@@ -684,12 +704,8 @@ namespace BeebPerf
             if (!_ULAState.TeletextMode)
                 _ScreenMemory.Size *= 8;
 
-            // calculate cursor address
-            if (_ULAState.TeletextMode)
-                _CRTCState.CursorAddress = ((((_CRTCState.Register14_CursorStartHigh ^ 0x20) + 0x74) & 0xFF) << 8) + _CRTCState.Register15_CursorStartLow;
-            else
-                _CRTCState.CursorAddress = (_CRTCState.Register14_CursorStartHigh << 8) + _CRTCState.Register15_CursorStartLow;
-
+            // calculate cursor address and reset frame buffer cursor position
+            _CRTCState.CursorAddress = (_CRTCState.Register14_CursorStartHigh << 8) + _CRTCState.Register15_CursorStartLow;
             _DisplayState.CursorCharacterPos = -1;
         }
 
@@ -699,7 +715,7 @@ namespace BeebPerf
             if (_CRTCState.RegisterModified || _ULAState.ControlRegisterModified)
                 UpdateVideoState();
 
-            while (_DisplayState.CharacterCycleCount < cycleCount)
+            while (_DisplayState.CharacterCycleCount <= cycleCount)
             {
                 _DisplayState.CharacterCycleCount += _ULAState.CyclesPerCharacter;
 
@@ -826,57 +842,65 @@ namespace BeebPerf
                 switch (_CRTCState.RegisterSelect)
                 {
                     case 0:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register0_HorizontalTotal);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register0_HorizontalTotal);
                         _CRTCState.Register0_HorizontalTotal = value;
                         break;
 
                     case 1:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register1_HorizontalDisplayed);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register1_HorizontalDisplayed);
                         _CRTCState.Register1_HorizontalDisplayed = value;
                         break;
 
                     case 2:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register2_HorizontalSyncPos);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register2_HorizontalSyncPos);
                         _CRTCState.Register2_HorizontalSyncPos = value;
                         break;
 
                     case 3:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register3_SyncWidth);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register3_SyncWidth);
                         _CRTCState.Register3_SyncWidth = value;
                         break;
 
                     case 4:
                         value &= 0x7F; // 7 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register4_VerticalTotal);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register4_VerticalTotal);
                         _CRTCState.Register4_VerticalTotal = value;
                         break;
 
                     case 5:
                         value &= 0x1F; // 5 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register5_VerticalTotalAdjust);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register5_VerticalTotalAdjust);
                         _CRTCState.Register5_VerticalTotalAdjust = value;
                         break;
 
                     case 6:
                         value &= 0x7F; // 7 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register6_VerticalDisplayed);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register6_VerticalDisplayed);
                         _CRTCState.Register6_VerticalDisplayed = value;
                         break;
 
                     case 7:
                         value &= 0x7F; // 7 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register7_VerticalSyncPos);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register7_VerticalSyncPos);
                         _CRTCState.Register7_VerticalSyncPos = value;
                         break;
 
                     case 8:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register8_InterlaceAndDelay);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register8_InterlaceAndDelay);
                         _CRTCState.Register8_InterlaceAndDelay = value;
                         break;
 
                     case 9:
                         value &= 0x1F; // 5 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register9_ScanlinesPerCharacter);
+                        if (value > 7 != _CRTCState.Register9_ScanlinesPerCharacter > 7)
+                        {
+                            // if crossing the 8 scanlines per character threshold, treat as a mode transition
+                            // so frame's top and bottom scanlines are not constrained by the previous frame
+                            _DisplayState.ModeTransition = true;
+                            _DisplayState.PreviousFirstDisplayScanline = -1;
+                            _DisplayState.PreviousLastDisplayScanline = -1;
+                        }
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register9_ScanlinesPerCharacter);
                         _CRTCState.Register9_ScanlinesPerCharacter = value;
                         break;
 
@@ -892,12 +916,12 @@ namespace BeebPerf
 
                     case 12:
                         value &= 0x3F; // 6 bit register
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register12_ScreenStartHigh);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register12_ScreenStartHigh);
                         _CRTCState.Register12_ScreenStartHigh = value;
                         break;
 
                     case 13:
-                        _CRTCState.RegisterModified = (value != _CRTCState.Register13_ScreenStartLow);
+                        _CRTCState.RegisterModified |= (value != _CRTCState.Register13_ScreenStartLow);
                         _CRTCState.Register13_ScreenStartLow = value;
                         break;
 
@@ -1000,8 +1024,8 @@ namespace BeebPerf
             else
             {
                 // non teletext address
-                if (characterScanline >= 8)
-                    return 0;
+                if (characterScanline > 7)
+                    return 0; // blank scanline, so no memory address
 
                 memoryAddress = (characterAddress << 3) + characterScanline;
 
@@ -1014,6 +1038,9 @@ namespace BeebPerf
 
         private byte ReadScreenMemory(int address)
         {
+            if (address == 0) 
+                return 0;
+
             if (_ScreenMemory.DisplayShadowRam)
             {
                 if (address < 0x3000)
@@ -1670,6 +1697,9 @@ namespace BeebPerf
             public int CharacterCycleCount;
             public int FirstDisplayScanline;
             public int LastDisplayScanline;
+            public bool ModeTransition;
+            public int PreviousFirstDisplayScanline;
+            public int PreviousLastDisplayScanline;
             public bool CaptureTeletextFrame;
             public int CursorCharacterPos;
             public byte[] FrameBuffer = [];
@@ -1706,7 +1736,7 @@ namespace BeebPerf
             public static ColorPalette BBCPalette = new([
                 Color.Black,
                 Color.Red,
-                Color.FromArgb(255, 0, 255, 0),
+                Color.FromArgb(255, 0, 255, 0), // pure green
                 Color.Yellow,
                 Color.Blue,
                 Color.Magenta,
