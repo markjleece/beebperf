@@ -201,6 +201,9 @@ namespace BeebPerf
             // update WritesBeforeDisplayRead & WritesAfterDisplayRead
             foreach (var frame in Frames)
             {
+                // set DisplayFrameIndex to the longest overlapping display frame, and
+                // select which WritesBefore/AfterRead apply to it
+                frame.DisplayFrameIndex = 0;
                 if (frame.DisplayFrameSpans.Length == 0)
                 {
                     frame.WritesBeforeDisplayRead = 0;
@@ -211,16 +214,33 @@ namespace BeebPerf
                     frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
                     frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
                 }
+                else if (frame.DisplayFrameSpans.Length > 1 &&
+                         overlap(frame.DisplayFrameSpans[1], frame) > overlap(frame.DisplayFrameSpans[0], frame))
+                {
+                    frame.DisplayFrameIndex = 1;
+                    frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
+                    frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
+                }
 
                 frame.WritesBeforeDisplayReadNext = 0; // clear as no longer used
                 frame.WritesAfterDisplayReadNext = 0; // clear as no longer used
+
+                int overlap(Frame.DisplayFrameSpan span, Frame frame)
+                {
+                    int length = span.EndCycleCount - span.StartCycleCount;
+                    if (span.StartCycleCount < frame.StartCycleCount)
+                        length -= frame.StartCycleCount - span.StartCycleCount;
+                    if (span.EndCycleCount > frame.EndCycleCount)
+                        length -= span.EndCycleCount - frame.EndCycleCount;
+                    return length;
+                }
             }
 
             // set display offsets
             foreach (var frame in Frames)
             {
                 if (frame.DisplayFrameSpans.Length > 0)
-                    frame.DisplayFrameOffset = frame.DisplayFrameSpans[0].StartCycleCount - frame.StartCycleCount;
+                    frame.DisplayFrameOffset = frame.DisplayFrameSpans[frame.DisplayFrameIndex].StartCycleCount - frame.StartCycleCount;
                 else
                     frame.DisplayFrameOffset = 0;
             }
@@ -375,7 +395,6 @@ namespace BeebPerf
             _DisplayState.FrameNumber = 0;
             _DisplayState.CharacterCycleCount = 0;
             _DisplayState.FrameBuffer = new byte[(DisplayState.MaxHeight * 2 + 1) * DisplayState.FrameBufferStride];
-            _DisplayState.PreviousCaptureTopScanline = -1;
 
             // initialize screen memory
             _ScreenMemory.Memory = new byte[32768];
@@ -415,20 +434,14 @@ namespace BeebPerf
             {
                 topScanline = _DisplayState.FirstDisplayScanline;
                 scanlineCount = 250;
-
-                _DisplayState.PreviousCaptureTopScanline = -1;
             }
             else
             {
                 topScanline = (_DisplayState.FirstDisplayScanline < 40) ? 32 : 40;
-                if (_DisplayState.PreviousCaptureTopScanline != -1)
-                    topScanline = Math.Min(topScanline, _DisplayState.PreviousCaptureTopScanline);
 
                 scanlineCount = Math.Max(scanlineCount, 256);
                 if (topScanline + scanlineCount > 312)
                     topScanline = 312 - scanlineCount;
-
-                _DisplayState.PreviousCaptureTopScanline = topScanline;
             }
 
             // calculate bitmap height and frame buffer stride
@@ -1586,6 +1599,7 @@ namespace BeebPerf
             public required int WritesBeforeDisplayReadNext; // only used during analysis
             public required int WritesAfterDisplayReadNext; // only used during analysis
             public int DisplayFrameOffset;
+            public int DisplayFrameIndex; // display frame the metrics apply to
             public DisplayFrameSpan[] DisplayFrameSpans = [];
         }
 
@@ -1656,7 +1670,6 @@ namespace BeebPerf
             public int CharacterCycleCount;
             public int FirstDisplayScanline;
             public int LastDisplayScanline;
-            public int PreviousCaptureTopScanline;
             public bool CaptureTeletextFrame;
             public int CursorCharacterPos;
             public byte[] FrameBuffer = [];

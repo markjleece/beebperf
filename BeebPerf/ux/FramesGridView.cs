@@ -395,13 +395,26 @@ namespace BeebPerf.ux
                 };
 
                 // pens & brushes
-                var color = cellStyle.ForeColor;
-                using var thinPen = new Pen(color, 1);
-                using var thickPen = new Pen(color, 3);
-                using var brush = new SolidBrush(color);
+                var primaryColor = cellStyle.ForeColor;
+                using var primaryThinPen = new Pen(primaryColor, 1);
+                using var primaryThickPen = new Pen(primaryColor, 3);
+                using var primaryBrush = new SolidBrush(primaryColor);
 
-                foreach (var displayFrameSpan in frame.DisplayFrameSpans)
+                var secondaryColor = Blend(cellStyle.ForeColor, cellStyle.BackColor, 0.5);
+                using var secondaryThinPen = new Pen(secondaryColor, 1);
+                using var secondaryThickPen = new Pen(secondaryColor, 3);
+                using var secondaryBrush = new SolidBrush(secondaryColor);
+
+                for (int i = 0; i < frame.DisplayFrameSpans.Length; i++)
                 {
+                    var displayFrameSpan = frame.DisplayFrameSpans[i];
+
+                    // select pens and brushes
+                    bool primaryDisplaySpan = (i == frame.DisplayFrameIndex);
+                    var thinPen = primaryDisplaySpan ? primaryThinPen : secondaryThinPen;
+                    var thickPen = primaryDisplaySpan ? primaryThickPen : secondaryThickPen;
+                    var brush = primaryDisplaySpan ? primaryBrush : secondaryBrush;
+
                     // measure
                     int startCycleCount = displayFrameSpan.StartCycleCount - frame.StartCycleCount;
                     int endCycleCount = displayFrameSpan.EndCycleCount - frame.StartCycleCount;
