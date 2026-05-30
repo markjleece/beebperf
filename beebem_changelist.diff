@@ -363,7 +363,7 @@ index b4ab85a..3e759b7 100644
 +# MFractors (Xamarin productivity tool) working folder 
 +.mfractor/
 diff --git a/Src/6502core.cpp b/Src/6502core.cpp
-index 52f9049..65e1480 100644
+index 52f9049..c557360 100644
 --- a/Src/6502core.cpp
 +++ b/Src/6502core.cpp
 @@ -43,6 +43,7 @@ Boston, MA  02110-1301, USA.
@@ -757,7 +757,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -437,528 +532,543 @@ INLINE static int PopWord()
+@@ -437,528 +532,540 @@ INLINE static int PopWord()
  
  INLINE static int RelAddrModeHandler_Data()
  {
@@ -1120,15 +1120,12 @@ index 52f9049..65e1480 100644
 +
 +    PushWord(ProgramCounter + 1);
 +    PSR |= FlagB; // Set B before pushing
-+    byte pushedPSR = PSR;
 +    Push(PSR);
 +    PSR |= FlagI; // Set I after pushing - see Birnbaum
 +    ProgramCounter = BeebReadMem(0xfffe) | (BeebReadMem(0xffff) << 8);
 +
-+    // Push stack frame and log interrupt - used for performance capture - MJSL
++    // Push stack frame - used for performance capture - MJSL
 +    PushStackFrame(StackFrameType_BRK, returnAddress, returnStackReg);
-+    PerfWriter_WriteInterruptEvent(
-+        PerfWriter::InterruptType::IRQ, returnAddress, ProgramCounter, IRQCycles, pushedPSR);
  }
  
  INLINE static void BVCInstrHandler()
@@ -1640,7 +1637,7 @@ index 52f9049..65e1480 100644
  }
  
  // ARR instruction hander.
-@@ -966,52 +1076,52 @@ INLINE static void STYInstrHandler(int Address)
+@@ -966,52 +1073,52 @@ INLINE static void STYInstrHandler(int Address)
  
  INLINE static void ARRInstrHandler(unsigned char Operand)
  {
@@ -1725,7 +1722,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1020,12 +1130,12 @@ INLINE static void KILInstrHandler()
+@@ -1020,12 +1127,12 @@ INLINE static void KILInstrHandler()
  
  INLINE static unsigned char AbsAddrModeHandler_Data()
  {
@@ -1743,7 +1740,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1034,12 +1144,12 @@ INLINE static unsigned char AbsAddrModeHandler_Data()
+@@ -1034,12 +1141,12 @@ INLINE static unsigned char AbsAddrModeHandler_Data()
  
  INLINE static int AbsAddrModeHandler_Address()
  {
@@ -1761,7 +1758,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1048,7 +1158,7 @@ INLINE static int AbsAddrModeHandler_Address()
+@@ -1048,7 +1155,7 @@ INLINE static int AbsAddrModeHandler_Address()
  
  INLINE static int ZeroPgAddrModeHandler_Address()
  {
@@ -1770,7 +1767,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1057,9 +1167,9 @@ INLINE static int ZeroPgAddrModeHandler_Address()
+@@ -1057,9 +1164,9 @@ INLINE static int ZeroPgAddrModeHandler_Address()
  
  INLINE static unsigned char IndXAddrModeHandler_Data()
  {
@@ -1783,7 +1780,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1068,9 +1178,9 @@ INLINE static unsigned char IndXAddrModeHandler_Data()
+@@ -1068,9 +1175,9 @@ INLINE static unsigned char IndXAddrModeHandler_Data()
  
  INLINE static int IndXAddrModeHandler_Address()
  {
@@ -1796,7 +1793,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1079,18 +1189,18 @@ INLINE static int IndXAddrModeHandler_Address()
+@@ -1079,18 +1186,18 @@ INLINE static int IndXAddrModeHandler_Address()
  
  INLINE static unsigned char IndYAddrModeHandler_Data()
  {
@@ -1824,7 +1821,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1099,17 +1209,17 @@ INLINE static unsigned char IndYAddrModeHandler_Data()
+@@ -1099,17 +1206,17 @@ INLINE static unsigned char IndYAddrModeHandler_Data()
  
  INLINE static int IndYAddrModeHandler_Address()
  {
@@ -1850,7 +1847,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1118,8 +1228,8 @@ INLINE static int IndYAddrModeHandler_Address()
+@@ -1118,8 +1225,8 @@ INLINE static int IndYAddrModeHandler_Address()
  
  INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  {
@@ -1861,7 +1858,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1128,7 +1238,7 @@ INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
+@@ -1128,7 +1235,7 @@ INLINE static unsigned char ZeroPgXAddrModeHandler_Data()
  
  INLINE static int ZeroPgXAddrModeHandler_Address()
  {
@@ -1870,7 +1867,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1137,18 +1247,18 @@ INLINE static int ZeroPgXAddrModeHandler_Address()
+@@ -1137,18 +1244,18 @@ INLINE static int ZeroPgXAddrModeHandler_Address()
  
  INLINE static unsigned char AbsXAddrModeHandler_Data()
  {
@@ -1898,7 +1895,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1157,18 +1267,18 @@ INLINE static unsigned char AbsXAddrModeHandler_Data()
+@@ -1157,18 +1264,18 @@ INLINE static unsigned char AbsXAddrModeHandler_Data()
  
  INLINE static int AbsXAddrModeHandler_Address()
  {
@@ -1926,7 +1923,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1177,18 +1287,18 @@ INLINE static int AbsXAddrModeHandler_Address()
+@@ -1177,18 +1284,18 @@ INLINE static int AbsXAddrModeHandler_Address()
  
  INLINE static unsigned char AbsYAddrModeHandler_Data()
  {
@@ -1954,7 +1951,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1197,18 +1307,18 @@ INLINE static unsigned char AbsYAddrModeHandler_Data()
+@@ -1197,18 +1304,18 @@ INLINE static unsigned char AbsYAddrModeHandler_Data()
  
  INLINE static int AbsYAddrModeHandler_Address()
  {
@@ -1982,7 +1979,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1217,27 +1327,27 @@ INLINE static int AbsYAddrModeHandler_Address()
+@@ -1217,27 +1324,27 @@ INLINE static int AbsYAddrModeHandler_Address()
  
  INLINE static int IndAddrModeHandler_Address()
  {
@@ -2028,7 +2025,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1246,10 +1356,10 @@ INLINE static int IndAddrModeHandler_Address()
+@@ -1246,10 +1353,10 @@ INLINE static int IndAddrModeHandler_Address()
  
  INLINE static int ZPIndAddrModeHandler_Address()
  {
@@ -2043,7 +2040,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1258,10 +1368,10 @@ INLINE static int ZPIndAddrModeHandler_Address()
+@@ -1258,10 +1365,10 @@ INLINE static int ZPIndAddrModeHandler_Address()
  
  INLINE static unsigned char ZPIndAddrModeHandler_Data()
  {
@@ -2058,7 +2055,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1271,13 +1381,13 @@ INLINE static unsigned char ZPIndAddrModeHandler_Data()
+@@ -1271,13 +1378,13 @@ INLINE static unsigned char ZPIndAddrModeHandler_Data()
  
  INLINE static int IndAddrXModeHandler_Address()
  {
@@ -2077,7 +2074,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1286,8 +1396,8 @@ INLINE static int IndAddrXModeHandler_Address()
+@@ -1286,8 +1393,8 @@ INLINE static int IndAddrXModeHandler_Address()
  
  INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  {
@@ -2088,7 +2085,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1296,7 +1406,7 @@ INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
+@@ -1296,7 +1403,7 @@ INLINE static unsigned char ZeroPgYAddrModeHandler_Data()
  
  INLINE static int ZeroPgYAddrModeHandler_Address()
  {
@@ -2097,7 +2094,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1305,63 +1415,87 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
+@@ -1305,63 +1412,87 @@ INLINE static int ZeroPgYAddrModeHandler_Address()
  
  void Init6502Core()
  {
@@ -2236,7 +2233,7 @@ index 52f9049..65e1480 100644
  } /* DoNMI */
  
  /*-------------------------------------------------------------------------*/
-@@ -1388,58 +1522,58 @@ void DoNMI(void) {
+@@ -1388,58 +1519,58 @@ void DoNMI(void) {
  
  static void ClipboardREMVHandler()
  {
@@ -2347,7 +2344,7 @@ index 52f9049..65e1480 100644
  }
  
  // The routine indirected through the CNPV vector is used by the operating
-@@ -1464,25 +1598,25 @@ static void ClipboardREMVHandler()
+@@ -1464,25 +1595,25 @@ static void ClipboardREMVHandler()
  
  static void ClipboardCNPVHandler()
  {
@@ -2392,7 +2389,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -1491,1858 +1625,1870 @@ static void ClipboardCNPVHandler()
+@@ -1491,1858 +1622,1870 @@ static void ClipboardCNPVHandler()
  
  void Exec6502Instruction()
  {
@@ -6105,7 +6102,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3351,7 +3497,7 @@ static void PollHardware(unsigned int nCycles)
+@@ -3351,7 +3494,7 @@ static void PollHardware(unsigned int nCycles)
  
  int MillisecondsToCycles(int Time)
  {
@@ -6114,7 +6111,7 @@ index 52f9049..65e1480 100644
  }
  
  /*-------------------------------------------------------------------------*/
-@@ -3360,49 +3506,73 @@ int MillisecondsToCycles(int Time)
+@@ -3360,49 +3503,73 @@ int MillisecondsToCycles(int Time)
  
  int MicrosecondsToCycles(int Time)
  {
