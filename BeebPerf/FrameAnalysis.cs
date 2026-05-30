@@ -761,7 +761,7 @@ namespace BeebPerf
                 _CRTCState.CharacterColumn++;
                 _CRTCState.CharacterAddress++;
 
-                if (_CRTCState.CharacterColumn >= _CRTCState.Register0_HorizontalTotal + 1)
+                if (_CRTCState.CharacterColumn > _CRTCState.Register0_HorizontalTotal)
                 {
                     // next scanline
                     _CRTCState.CharacterColumn = 0;
