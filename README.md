@@ -35,7 +35,9 @@ Then open one of the sample **.perf** files from the **sample** folder (e.g. **e
 # Documentation
 | File name | Description |
 |---|---|
-| [docs/BeebPerf.docx](docs/BeebPerf.docx) | Provides details on **BeebPerf** and the **.perf** file format, which may be of interest |
+| [docs/GettingStartedGuide.docx](docs/GettingStartedGuide.docx) | Getting started guide |
+| [docs/BeebPerf.docx](docs/BeebPerf.docx) | Details on the development of **BeebPerf**, which may be of interest |
+| [docs/FileFormat.docx](docs/FileFormat.docx) | **.Pref** file format specification (v1.0) |
 
 # Building BeebEm with performance logging capabilities
 The performance changes add **Capture Perf…** and **End Perf** File menu items allowing a performance session to be recorded to a **.perf** file.
@@ -46,8 +48,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 2.	Download and install the [Microsoft DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) from the Microsoft download site.
 3.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
 4.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  (the path to the patch file will likely need changing).
-5. Reopen and rebuild the solution (x64 configuration).
-6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items.
+5. Reopen and rebuild the solution (x64 configuration). You may need to individually reload each of the solution’s projects before building.  This can be achieved by right-clicking on each project and selecting **‘Reload’**.
+6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items. You may need to set the **BeebEm** project as the Startup Project.  This can be achieved by right-clicking on the **BeebEm** project and selecting **‘Set as Startup Project’**.
 
 The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
 
