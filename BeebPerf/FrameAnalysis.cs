@@ -1483,6 +1483,9 @@ namespace BeebPerf
             if (topScanline + scanlineCount > 312)
                 topScanline = 312 - scanlineCount;
 
+            // calculate initial frame buffer offset
+            int frameBufferOffset = topScanline * DisplayState.FrameBufferStride * 2;
+
             // calculate bitmap height and frame buffer stride
             int bitmapHeight, frameBufferStride;
             if (_DisplayState.CaptureTeletextFrame)
@@ -1496,8 +1499,7 @@ namespace BeebPerf
                 frameBufferStride = DisplayState.FrameBufferStride * 2;
             }
 
-            int frameBufferOffset = topScanline * DisplayState.FrameBufferStride * 2;
-
+            // create bitmap and copy frame buffer data
             Bitmap bitmap = new Bitmap(_DisplayState.Width, bitmapHeight, PixelFormat.Format4bppIndexed);
             bitmap.Palette = ULAState.BBCPalette;
 
@@ -1528,6 +1530,7 @@ namespace BeebPerf
                     bitmap.UnlockBits(data);
             }
 
+            // add display frame
             DisplayFrames.Add(new()
             {
                 AspectRatio = _DisplayState.AspectRatio,
@@ -1708,7 +1711,7 @@ namespace BeebPerf
         }
         private DisplayState _DisplayState = new();
 
-        // ULA state
+        // video ULA state
         private struct ULAState
         {
             public ULAState()
