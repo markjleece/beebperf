@@ -521,31 +521,12 @@ namespace BeebPerf
 
         private void UpdateVideoState(bool forceUpdate = false)
         {
-            if (forceUpdate || _ULAState.ControlRegisterModified || _CRTCState.RegisterModified)
+            // update ULA state
+            if (forceUpdate || _ULAState.ControlRegisterModified)
             {
                 _ULAState.TeletextMode = (_ULAState.ControlRegister & 0x02) == 0x02;
                 _ULAState.CyclesPerCharacter = ((_ULAState.ControlRegister & 0x10) == 0x10) ? 1 : 2;
 
-                bool interlacedSyncAndVideo = (_CRTCState.Register8_InterlaceAndDelay & 0x03) == 0x03;
-                _CRTCState.CharacterScanlineIncrement = interlacedSyncAndVideo ? 2 : 1;
-                _CRTCState.CharacterScanlineReset = (!interlacedSyncAndVideo || _CRTCState.DisplayField == CRTCState.DisplayFieldEven) ? 0 : 1;
-                _CRTCState.VideoOutputEnabled = (_CRTCState.Register8_InterlaceAndDelay & 0x30) != 0x30;
-
-                // in Interlaced Sync & Video mode (mode 7), the ScanlinesPerCharacter register is required
-                // to hold an odd value (ref MC6845 data sheet). However, in mode 7 its value is set to 18!
-                // Account for the undocumented behavior where even values are treated as the next odd values.
-                _CRTCState.ScanlinesPerCharacterAdjust = (interlacedSyncAndVideo && (_CRTCState.Register9_ScanlinesPerCharacter % 2) == 0) ? 1 : 0;
-
-                int displayWidth = _CRTCState.Register1_HorizontalDisplayed * CalcDisplayBytesPerCharacter();
-                if (displayWidth > _DisplayState.Width)
-                    _DisplayState.Width = displayWidth;
-
-                // clear ULA modified flag
-                _ULAState.ControlRegisterModified = false;
-            }
-
-            if (forceUpdate || _ULAState.ControlRegisterModified)
-            {
                 if (_ULAState.TeletextMode)
                 {
                     // teletext (Mode 7)
@@ -560,10 +541,41 @@ namespace BeebPerf
                         : WriteDisplayData_64bits; // modes 4,5,6,8,
                     _DisplayState.AspectRatio = DisplayState.AspectRatio_NonTeletext;
                 }
-
-                // clear CRTC modified flag
-                _CRTCState.RegisterModified = false;
             }
+
+            // update CRTC state
+            if (forceUpdate || _CRTCState.RegisterModified)
+            {
+                bool interlacedSyncAndVideo = (_CRTCState.Register8_InterlaceAndDelay & 0x03) == 0x03;
+                _CRTCState.CharacterScanlineIncrement = interlacedSyncAndVideo ? 2 : 1;
+                _CRTCState.CharacterScanlineReset = (!interlacedSyncAndVideo || _CRTCState.DisplayField == CRTCState.DisplayFieldEven) ? 0 : 1;
+                _CRTCState.VideoOutputEnabled = (_CRTCState.Register8_InterlaceAndDelay & 0x30) != 0x30;
+
+                // in Interlaced Sync & Video mode (mode 7), the ScanlinesPerCharacter register is required
+                // to hold an odd value (ref MC6845 data sheet). However, in mode 7 its value is set to 18!
+                // Account for the undocumented behavior where even values are treated as the next odd values.
+                _CRTCState.ScanlinesPerCharacterAdjust = (interlacedSyncAndVideo && (_CRTCState.Register9_ScanlinesPerCharacter % 2) == 0) ? 1 : 0;
+            }
+
+            // update display width
+            if (forceUpdate || _ULAState.ControlRegisterModified || _CRTCState.RegisterModified)
+            {
+                int bytesPerCharacter;
+                if ((_ULAState.ControlRegister & 0x2) != 0)
+                    bytesPerCharacter = 12; // modes 7 (teletext)
+                else if ((_ULAState.ControlRegister & 0x10) != 0)
+                    bytesPerCharacter = 8; // modes 0,1,2,3
+                else
+                    bytesPerCharacter = 16; // modes 4,5,6,8
+
+                int displayWidth = _CRTCState.Register1_HorizontalDisplayed * bytesPerCharacter;
+                if (displayWidth > _DisplayState.Width)
+                    _DisplayState.Width = displayWidth;
+            }
+
+            // clear modified flags
+            _ULAState.ControlRegisterModified = false;
+            _CRTCState.RegisterModified = false;
         }
 
         private void BuildWriteDisplayDataTbl()
@@ -770,16 +782,6 @@ namespace BeebPerf
                     _CRTCState.CharacterAddress = _CRTCState.CharacterRowAddress;
                 }
             }
-        }
-
-        private int CalcDisplayBytesPerCharacter()
-        {
-            if ((_ULAState.ControlRegister & 0x2) != 0)
-                return 12; // modes 7 (teletext)
-            else if ((_ULAState.ControlRegister & 0x10) != 0)
-                return 8; // modes 0,1,2,3
-            else
-                return 16; // modes 4,5,6,8
         }
 
         private void MemoryWrite(CanonicalAddress memoryAddress, byte value)
