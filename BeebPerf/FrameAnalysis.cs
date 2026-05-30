@@ -425,100 +425,6 @@ namespace BeebPerf
             SetDisplayShadowRam(model.Snapshot.AccessControlRegister);
         }
 
-        private void CaptureDisplayFrame()
-        {
-            Debug.Assert(_DisplayState.EndCycleCount - _DisplayState.StartCycleCount < 80000/*two frames*/);
-
-            // determine top and bottom scanline
-            int topScanline = _DisplayState.FirstDisplayScanline;
-            int bottomScanline = _DisplayState.LastDisplayScanline;
-
-            if (_DisplayState.CaptureTeletextFrame)
-            {
-                _DisplayState.ModeTransition = false;
-                _DisplayState.PreviousFirstDisplayScanline = -1;
-                _DisplayState.PreviousLastDisplayScanline = -1;
-            }
-            else
-            {
-                if (_DisplayState.ModeTransition ||
-                    _DisplayState.PreviousFirstDisplayScanline == -1 ||
-                    _DisplayState.PreviousLastDisplayScanline == -1)
-                {
-                    _DisplayState.ModeTransition =
-                        (topScanline != _DisplayState.PreviousFirstDisplayScanline ||
-                         bottomScanline != _DisplayState.PreviousLastDisplayScanline);
-                }
-                else
-                {
-                    topScanline = Math.Min(topScanline, _DisplayState.PreviousFirstDisplayScanline);
-                    bottomScanline = Math.Max(bottomScanline, _DisplayState.PreviousLastDisplayScanline);
-                }
-
-                _DisplayState.PreviousFirstDisplayScanline = topScanline;
-                _DisplayState.PreviousLastDisplayScanline = bottomScanline;
-            }
-
-            // scanline count
-            int scanlineCount = bottomScanline - topScanline + 1;
-            if (topScanline + scanlineCount > 312)
-                topScanline = 312 - scanlineCount;
-
-            // calculate bitmap height and frame buffer stride
-            int bitmapHeight, frameBufferStride;
-            if (_DisplayState.CaptureTeletextFrame)
-            {
-                bitmapHeight = scanlineCount * 2;
-                frameBufferStride = DisplayState.FrameBufferStride;
-            }
-            else
-            {
-                bitmapHeight = scanlineCount;
-                frameBufferStride = DisplayState.FrameBufferStride * 2;
-            }
-
-            int frameBufferOffset = topScanline * DisplayState.FrameBufferStride * 2;
-
-            Bitmap bitmap = new Bitmap(_DisplayState.Width, bitmapHeight, PixelFormat.Format4bppIndexed);
-            bitmap.Palette = ULAState.BBCPalette;
-
-            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
-            System.Drawing.Imaging.BitmapData? data = null;
-            try
-            {
-                data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
-                unsafe
-                {
-                    fixed (byte* src = _DisplayState.FrameBuffer)
-                    {
-                        byte* dst = (byte*)data.Scan0;
-                        for (int i = 0; i < bitmapHeight; i++)
-                        {
-                            Buffer.MemoryCopy(
-                                src + frameBufferOffset + (i * frameBufferStride),
-                                dst + (i * data.Stride),
-                                data.Stride,
-                                data.Stride);
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                if (data != null)
-                    bitmap.UnlockBits(data);
-            }
-
-            DisplayFrames.Add(new()
-            {
-                AspectRatio = _DisplayState.AspectRatio,
-                FrameNumber = _DisplayState.FrameNumber,
-                StartCycleCount = _DisplayState.StartCycleCount,
-                EndCycleCount = _DisplayState.EndCycleCount,
-                Bitmap = bitmap
-            });
-        }
-
         private void UpdateVideoState(bool forceUpdate = false)
         {
             // update ULA state
@@ -576,44 +482,6 @@ namespace BeebPerf
             // clear modified flags
             _ULAState.ControlRegisterModified = false;
             _CRTCState.RegisterModified = false;
-        }
-
-        private void BuildWriteDisplayDataTbl()
-        {
-            if (_ULAState.TeletextMode)
-                return;
-
-            switch ((_ULAState.ControlRegister >> 2) & 0x7)
-            {
-                case 7: // Mode 0 & 3 (2 colors, high res)
-                    BuildWriteDisplayDataTbl_4bpp(bitsPerPixel: 1);
-                    break;
-
-                case 6: // Mode 1 (4 colors, medium res)
-                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 2);
-                    break;
-
-                case 5: // Mode 2 (16 colors, low res)
-                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 4);
-                    break;
-
-                case 2: // Mode 4 & 6 (2 colors, medium res)
-                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 1);
-                    break;
-
-                case 1: // Mode 5 (4 colors, low res)
-                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 2);
-                    break;
-
-                case 0: // Mode 8 (16 colors, very low res)
-                    BuildWriteDisplayDataTbl_32bpp(bitsPerPixel: 4);
-                    break;
-
-                default:
-                    throw new NotImplementedException();
-            }
-
-            _ULAState.WriteDisplayDataTblInvalid = false;
         }
 
         private void FrameStart(
@@ -727,21 +595,18 @@ namespace BeebPerf
             if (_CRTCState.RegisterModified || _ULAState.ControlRegisterModified)
                 UpdateVideoState();
 
-            while (_DisplayState.CharacterCycleCount <= cycleCount)
+            while (_DisplayState.CharacterCycleCount < cycleCount)
             {
-                _DisplayState.CharacterCycleCount += _ULAState.CyclesPerCharacter;
-
-                if (_CRTCState.DisplayScanline >= 312)
-                    continue;
-
+                // only display memory if within the visible area, video output is enabled, and within the maximum scanline count
                 if (_CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed &&
                     _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed &&
-                    _CRTCState.VideoOutputEnabled)
+                    _CRTCState.VideoOutputEnabled &&
+                    _CRTCState.DisplayScanline < 312)
                 {
                     // update variables used to extract the image from the frame buffer
                     _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
                     _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
-                    _DisplayState.EndCycleCount = cycleCount;
+                    _DisplayState.EndCycleCount = _DisplayState.CharacterCycleCount;
 
                     // rebuild write display table?
                     if (_ULAState.WriteDisplayDataTblInvalid)
@@ -781,6 +646,9 @@ namespace BeebPerf
 
                     _CRTCState.CharacterAddress = _CRTCState.CharacterRowAddress;
                 }
+
+                // advance character cycle count
+                _DisplayState.CharacterCycleCount += _ULAState.CyclesPerCharacter;
             }
         }
 
@@ -1317,6 +1185,44 @@ namespace BeebPerf
             _TeletextState.ForeColor = _TeletextState.ForeColorPending;
         }
 
+        private void BuildWriteDisplayDataTbl()
+        {
+            if (_ULAState.TeletextMode)
+                return;
+
+            switch ((_ULAState.ControlRegister >> 2) & 0x7)
+            {
+                case 7: // Mode 0 & 3 (2 colors, high res)
+                    BuildWriteDisplayDataTbl_4bpp(bitsPerPixel: 1);
+                    break;
+
+                case 6: // Mode 1 (4 colors, medium res)
+                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 2);
+                    break;
+
+                case 5: // Mode 2 (16 colors, low res)
+                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 4);
+                    break;
+
+                case 2: // Mode 4 & 6 (2 colors, medium res)
+                    BuildWriteDisplayDataTbl_8bpp(bitsPerPixel: 1);
+                    break;
+
+                case 1: // Mode 5 (4 colors, low res)
+                    BuildWriteDisplayDataTbl_16bpp(bitsPerPixel: 2);
+                    break;
+
+                case 0: // Mode 8 (16 colors, very low res)
+                    BuildWriteDisplayDataTbl_32bpp(bitsPerPixel: 4);
+                    break;
+
+                default:
+                    throw new NotImplementedException();
+            }
+
+            _ULAState.WriteDisplayDataTblInvalid = false;
+        }
+
         private void BuildWriteDisplayDataTbl_4bpp(int bitsPerPixel)
         {
             Debug.Assert(bitsPerPixel == 1);
@@ -1536,6 +1442,100 @@ namespace BeebPerf
             }
 
             return true;
+        }
+
+        private void CaptureDisplayFrame()
+        {
+            Debug.Assert(_DisplayState.EndCycleCount - _DisplayState.StartCycleCount < 80000/*two frames*/);
+
+            // determine top and bottom scanline
+            int topScanline = _DisplayState.FirstDisplayScanline;
+            int bottomScanline = _DisplayState.LastDisplayScanline;
+
+            if (_DisplayState.CaptureTeletextFrame)
+            {
+                _DisplayState.ModeTransition = false;
+                _DisplayState.PreviousFirstDisplayScanline = -1;
+                _DisplayState.PreviousLastDisplayScanline = -1;
+            }
+            else
+            {
+                if (_DisplayState.ModeTransition ||
+                    _DisplayState.PreviousFirstDisplayScanline == -1 ||
+                    _DisplayState.PreviousLastDisplayScanline == -1)
+                {
+                    _DisplayState.ModeTransition =
+                        (topScanline != _DisplayState.PreviousFirstDisplayScanline ||
+                         bottomScanline != _DisplayState.PreviousLastDisplayScanline);
+                }
+                else
+                {
+                    topScanline = Math.Min(topScanline, _DisplayState.PreviousFirstDisplayScanline);
+                    bottomScanline = Math.Max(bottomScanline, _DisplayState.PreviousLastDisplayScanline);
+                }
+
+                _DisplayState.PreviousFirstDisplayScanline = topScanline;
+                _DisplayState.PreviousLastDisplayScanline = bottomScanline;
+            }
+
+            // scanline count
+            int scanlineCount = bottomScanline - topScanline + 1;
+            if (topScanline + scanlineCount > 312)
+                topScanline = 312 - scanlineCount;
+
+            // calculate bitmap height and frame buffer stride
+            int bitmapHeight, frameBufferStride;
+            if (_DisplayState.CaptureTeletextFrame)
+            {
+                bitmapHeight = scanlineCount * 2;
+                frameBufferStride = DisplayState.FrameBufferStride;
+            }
+            else
+            {
+                bitmapHeight = scanlineCount;
+                frameBufferStride = DisplayState.FrameBufferStride * 2;
+            }
+
+            int frameBufferOffset = topScanline * DisplayState.FrameBufferStride * 2;
+
+            Bitmap bitmap = new Bitmap(_DisplayState.Width, bitmapHeight, PixelFormat.Format4bppIndexed);
+            bitmap.Palette = ULAState.BBCPalette;
+
+            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            System.Drawing.Imaging.BitmapData? data = null;
+            try
+            {
+                data = bitmap.LockBits(rect, ImageLockMode.WriteOnly, bitmap.PixelFormat);
+                unsafe
+                {
+                    fixed (byte* src = _DisplayState.FrameBuffer)
+                    {
+                        byte* dst = (byte*)data.Scan0;
+                        for (int i = 0; i < bitmapHeight; i++)
+                        {
+                            Buffer.MemoryCopy(
+                                src + frameBufferOffset + (i * frameBufferStride),
+                                dst + (i * data.Stride),
+                                data.Stride,
+                                data.Stride);
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (data != null)
+                    bitmap.UnlockBits(data);
+            }
+
+            DisplayFrames.Add(new()
+            {
+                AspectRatio = _DisplayState.AspectRatio,
+                FrameNumber = _DisplayState.FrameNumber,
+                StartCycleCount = _DisplayState.StartCycleCount,
+                EndCycleCount = _DisplayState.EndCycleCount,
+                Bitmap = bitmap
+            });
         }
 
         private void DrawCursor()
