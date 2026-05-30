@@ -7208,10 +7208,10 @@ index c087f1f..656df59 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..abed64b
+index 0000000..6918201
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1074 @@
+@@ -0,0 +1,1088 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -7724,8 +7724,22 @@ index 0000000..abed64b
 +    snapshotData.WriteByte(m_stackRegister);
 +
 +    // Paging registers
-+    snapshotData.WriteByte(PagedRomReg);
-+    snapshotData.WriteByte(ACCCON);
++    byte pagedRomReg = PagedRomReg;
++    byte acccon = ACCCON;
++
++    if (MachineType == Model::BPlus)
++    {
++        pagedRomReg |= (int)MemSel << 7;
++        acccon = (int)Sh_Display << 7;
++    }
++    else if (MachineType == Model::IntegraB)
++    {
++        pagedRomReg |= (int)MemSel << 7 | (int)PrvEn << 6;
++        acccon = (int)ShEn << 7 | (int)Prvs8 << 6 | (int)Prvs4 << 5 | (int)Prvs1 << 4;
++    }
++
++    snapshotData.WriteByte(pagedRomReg);
++    snapshotData.WriteByte(acccon);
 +
 +    // Hidden RAM address
 +    if (bHiddenRAM)
@@ -7795,7 +7809,7 @@ index 0000000..abed64b
 +    if (bShadowRAM)
 +    {
 +        if (MachineType == Model::BPlus || MachineType == Model::Master128 || MachineType == Model::MasterET)
-+            snapshotData.Write(ShadowRAM, 20480);
++            snapshotData.Write(ShadowRAM + 12288, 20480);
 +        else if (MachineType == Model::IntegraB)
 +            snapshotData.Write(ShadowRam, 20480);
 +    }
