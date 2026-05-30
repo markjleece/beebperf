@@ -1,4 +1,4 @@
-# BeebPerf - Windows based Profiler for the BBC Micro
+# BeebPerf (Beta) - Windows based Profiler for the BBC Micro
 **BeebPerf** is a Windows-based profiler for the **BBC Micro** that provides a set of interactive profiler views on a performance session (**.perf** file) recorded using a modified version of **BeebEm**.
 
 <img width="300" alt="layout" src="https://github.com/user-attachments/assets/167909b8-a154-45e0-a1cc-56dbd7accab0" />
