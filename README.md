@@ -18,10 +18,15 @@
 - **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Frame snapshots and flame graph images can also be copied to the clipboard.
 
 # Building and running BeebPerf
-**BeebPerf** can be built using **Visual Studio 2022** or **2026**.  The following Visual Studio components are required:
-   - .Net 10 runtime and development tools
-   - MSVS v142 – VS 2019 C++ x64/x86 build tools (v14.29 – 16.11)
+**BeebPerf** can be built using **Visual Studio 2022** or **2026**.  The following Visual Studio workloads and components are required:
 
+Workloads:
+   - .NET desktop development
+   - Desktop development with C++
+
+Individual components:
+   - MSVC Build Tools for x64/x86 (Latest)
+   
 After cloning this repository, open the solution file: **BeebPerf.sln**, rebuild all, set the **BeebPerf** project as the startup project, and run it.
 
 Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and become familiar with the profiler's functionality.  A **'getting started'** guide can be shown by clicking the toolbar **help** button.  
@@ -42,9 +47,15 @@ Then open one of the sample **.perf** files from the **sample** folder (e.g. **e
 # Building BeebEm with performance logging capabilities
 The performance changes add **Capture Perf…** and **End Perf** File menu items allowing a performance session to be recorded to a **.perf** file.
 A modified version of **BeebEm** can be built using **Visual Studio 2022** or **2026** using the following instructions:
-1.	Using the **Tools** -> **Get Tools and Features…** ensure the following components are installed:
-   - MSVS v142 – VS 2019 C++ x64/x86 build tools (v14.29 – 16.11)
-   - C++ v14.29 (16.11) MFC for v142 build tool (x86 & x64) – needed for afxres.h/rc
+1.	Using the **Tools** -> **Get Tools and Features…** ensure the following workloads and individual components are installed:
+
+    Workloads:
+    - Desktop development with C++
+
+    Individual components:
+    - MSVC Build Tools for x64/x86 (Latest)
+    - C++ MFC for x64/x86 (Latest MSVC) – needed for afxres.h/rc
+      
 2.	Download and install the [Microsoft DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) from the Microsoft download site.
 3.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
 4.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  (the path to the patch file will likely need changing).
