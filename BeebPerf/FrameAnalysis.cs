@@ -466,15 +466,15 @@ namespace BeebPerf
             // update display width
             if (forceUpdate || _ULAState.ControlRegisterModified || _CRTCState.RegisterModified)
             {
-                int bytesPerCharacter;
+                int pixelsPerCharacter;
                 if ((_ULAState.ControlRegister & 0x2) != 0)
-                    bytesPerCharacter = 12; // modes 7 (teletext)
+                    pixelsPerCharacter = 12; // modes 7 (teletext)
                 else if ((_ULAState.ControlRegister & 0x10) != 0)
-                    bytesPerCharacter = 8; // modes 0,1,2,3
+                    pixelsPerCharacter = 8; // modes 0,1,2,3
                 else
-                    bytesPerCharacter = 16; // modes 4,5,6,8
+                    pixelsPerCharacter = 16; // modes 4,5,6,8
 
-                int displayWidth = _CRTCState.Register1_HorizontalDisplayed * bytesPerCharacter;
+                int displayWidth = _CRTCState.Register1_HorizontalDisplayed * pixelsPerCharacter;
                 if (displayWidth > _DisplayState.Width)
                     _DisplayState.Width = displayWidth;
             }
@@ -526,8 +526,7 @@ namespace BeebPerf
                 }
 
                 // cursor flash
-                _CRTCState.CursorFieldCount--;
-                if (_CRTCState.CursorFieldCount < 0)
+                if (--_CRTCState.CursorFieldCount < 0)
                 {
                     int cursorBlinkRate = _CRTCState.Register10_CursorStart & 0x60;
                     if (cursorBlinkRate == 0)
@@ -612,14 +611,14 @@ namespace BeebPerf
                     if (_ULAState.WriteDisplayDataTblInvalid)
                         BuildWriteDisplayDataTbl();
 
+                    // read screen memory and rasterize it
+                    int screenAddress = GetScreenAddress(_CRTCState.CharacterAddress, _CRTCState.CharacterScanline);
+                    _DisplayState.WriteDisplayDataFunc(ReadScreenMemory(screenAddress));
+
                     // remember cursor screen buffer position
                     if (_CRTCState.CharacterAddress == _CRTCState.CursorAddress &&
                         _CRTCState.CharacterScanline == _CRTCState.CharacterScanlineReset)
                         _DisplayState.CursorCharacterPos = (_CRTCState.DisplayScanline * DisplayState.FrameBufferStride * 2) + _CRTCState.DisplayScanlinePos;
-
-                    // read screen memory and rasterize it
-                    int screenAddress = GetScreenAddress(_CRTCState.CharacterAddress, _CRTCState.CharacterScanline);
-                    _DisplayState.WriteDisplayDataFunc(ReadScreenMemory(screenAddress));
                 }
 
                 // advance CRTC counters
