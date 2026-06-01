@@ -1922,10 +1922,10 @@ index c087f1f..656df59 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..10d9b62
+index 0000000..811edcf
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1088 @@
+@@ -0,0 +1,1087 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -2615,7 +2615,7 @@ index 0000000..10d9b62
 +	FileWrite(m_pFile, outputData, outputSize);
 +}
 +
-+void PerfWriter::WriteFrameStartEvent(int startAddress, int displayScanline, byte displayField, bool splitScreen)
++void PerfWriter::WriteFrameStartEvent(int offsetCycleCount, int startAddress, int displayScanline, byte displayField, bool splitScreen)
 +{
 +	if (m_pFile == nullptr || m_error) return;
 +
@@ -2630,7 +2630,6 @@ index 0000000..10d9b62
 +	m_writeBuffer->WriteByteUnchecked(0x02);
 +
 +	// Write offset cycles
-+	int offsetCycleCount = TotalCycles - VideoTriggerCount;
 +	m_writeBuffer->WriteByteUnchecked((byte)offsetCycleCount);
 +
 +	// Write start address
@@ -3016,7 +3015,7 @@ index 0000000..10d9b62
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..ebff101
+index 0000000..a4c31e0
 --- /dev/null
 +++ b/Src/PerfWriter.h
 @@ -0,0 +1,364 @@
@@ -3065,7 +3064,7 @@ index 0000000..ebff101
 +
 +	bool Initialise(const CHAR* psFileName);
 +	bool Close();
-+	void WriteFrameStartEvent(int startAddress, int displayScanline, byte displayField, bool splitScreen);
++	void WriteFrameStartEvent(int offsetCycleCount, int startAddress, int displayScanline, byte displayField, bool splitScreen);
 +	void WriteInterruptEvent(InterruptType interruptType, int prePC, int postPC, byte cycleCount, byte stackStatusRegister);
 +	void WriteInstruction(
 +		int prePC, int postPC, byte opcode, byte cycleCount, 
@@ -3224,11 +3223,11 @@ index 0000000..ebff101
 +//
 +// Inlines...
 +//
-+inline void PerfWriter_WriteFrameStartEvent(int startAddress, int displayScanline, byte displayField, bool splitScreen)
++inline void PerfWriter_WriteFrameStartEvent(int offsetCycleCount, int startAddress, int displayScanline, byte displayField, bool splitScreen)
 +{
 +	if (perfWriter != nullptr)
 +	{
-+		perfWriter->WriteFrameStartEvent(startAddress, displayScanline, displayField, splitScreen);
++		perfWriter->WriteFrameStartEvent(offsetCycleCount, startAddress, displayScanline, displayField, splitScreen);
 +	}
 +}
 +
@@ -3420,7 +3419,7 @@ index e271e44..7b476bf 100644
  /*-------------------------------------------------------------------------*/
  
 diff --git a/Src/Video.cpp b/Src/Video.cpp
-index c17d038..5931497 100644
+index c17d038..4a0f3f1 100644
 --- a/Src/Video.cpp
 +++ b/Src/Video.cpp
 @@ -38,6 +38,7 @@ Boston, MA  02110-1301, USA.
@@ -3448,21 +3447,22 @@ index c17d038..5931497 100644
    if (VideoState.IsNewTVFrame)	// RTW - only calibrate timing once per frame
    {
      VideoState.IsNewTVFrame = false;
-@@ -1105,6 +1109,13 @@ void RedoMPTR(void) {
+@@ -1105,6 +1109,14 @@ void RedoMPTR(void) {
  void VideoDoScanLine(void) {
    int l;
    // DebugTrace("CharLine=%d InCharLineUp=%d\n", VideoState.CharLine, VideoState.InCharLineUp);
-+  if (VideoState.CharLine == 0 && VideoState.InCharLineUp == 0)
++  if (VideoState.CharLine==0 && VideoState.InCharLineUp==0)
 +    PerfWriter_WriteFrameStartEvent(
-+        VideoState.StartAddr,
-+        VideoState.PixmapLine < 312 ? VideoState.PixmapLine : 40/*Mode 7*/,
-+        VideoState.InterlaceFrame,
-+        VideoState.SplitScreen);
++      TotalCycles - VideoTriggerCount,
++      VideoState.StartAddr,
++      VideoState.PixmapLine < 312 ? VideoState.PixmapLine : 40/*Mode 7*/,
++      !VideoState.InterlaceFrame,
++      VideoState.SplitScreen);
 +
    if (VideoState.IsTeletext) {
      if (VideoState.DoCA1Int) {
        SysVIATriggerCA1Int(0);
-@@ -1673,6 +1684,7 @@ void SaveVideoUEF(FILE *SUEF)
+@@ -1673,6 +1685,7 @@ void SaveVideoUEF(FILE *SUEF)
  	UEFWrite32(Mode7FlashTrigger, SUEF);
  	UEFWrite8(Mode7FlashOn, SUEF);
  	UEFWrite32(VideoTriggerCount - TotalCycles, SUEF);
@@ -3470,7 +3470,7 @@ index c17d038..5931497 100644
  }
  
  void LoadVideoUEF(FILE *SUEF, int Version)
-@@ -1737,6 +1749,11 @@ void LoadVideoUEF(FILE *SUEF, int Version)
+@@ -1737,6 +1750,11 @@ void LoadVideoUEF(FILE *SUEF, int Version)
  		Mode7FlashOn = UEFReadBool(SUEF);
  		VideoTriggerCount = TotalCycles + UEFRead32(SUEF);
  	}
