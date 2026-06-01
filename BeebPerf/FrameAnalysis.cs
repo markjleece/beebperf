@@ -596,7 +596,7 @@ namespace BeebPerf
 
             while (_DisplayState.CharacterCycleCount < cycleCount)
             {
-                // only display memory if within the visible area, video output is enabled, and within the maximum scanline count
+                // only display memory if within the visible area, if video output is enabled, and if within the maximum scanline count
                 if (_CRTCState.CharacterColumn < _CRTCState.Register1_HorizontalDisplayed &&
                     _CRTCState.CharacterRow < _CRTCState.Register6_VerticalDisplayed &&
                     _CRTCState.VideoOutputEnabled &&

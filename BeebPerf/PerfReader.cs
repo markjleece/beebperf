@@ -360,15 +360,21 @@ namespace BeebPerf
 
                             // offset cycle count
                             instruction.OffsetCycleCount = ReadByte(dataStream);
+                            if (instruction.OffsetCycleCount > 8)
+                                throw new InvalidDataException("invalid .perf file format: invalid offset cycle count");
 
                             // start address
                             instruction.StartAddress = ReadShort(dataStream);
 
                             // display scanline
                             instruction.DisplayScanline = ReadShort(dataStream);
+                            if (instruction.DisplayScanline < 0 || instruction.DisplayScanline >= 312)
+                                throw new InvalidDataException("invalid .perf file format: invalid display scanline");
 
                             // display flags
                             instruction.DisplayFlags = ReadByte(dataStream);
+                            if (instruction.DisplayFlags > 0x03)
+                                throw new InvalidDataException("invalid .perf file format: invalid display flags");
 
                             model.Instructions[_InstructionCount++] = instruction;
                             continue;
