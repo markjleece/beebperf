@@ -158,11 +158,11 @@
             okButton.UseVisualStyleBackColor = true;
             okButton.Click += OkButton_Click;
             // 
-            // canelButton
+            // cancelButton
             // 
             cancelButton.DialogResult = DialogResult.Cancel;
             cancelButton.Location = new Point(355, 164);
-            cancelButton.Name = "canelButton";
+            cancelButton.Name = "cancelButton";
             cancelButton.Size = new Size(112, 34);
             cancelButton.TabIndex = 0;
             cancelButton.Text = "Cancel";
@@ -170,10 +170,11 @@
             // 
             // SelectionDialog
             // 
+            AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(477, 206);
             CancelButton = cancelButton;
+            ClientSize = new Size(477, 206);
             Controls.Add(secondsLabel);
             Controls.Add(cyclesLabel);
             Controls.Add(fromLabel);
