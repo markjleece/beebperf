@@ -130,7 +130,8 @@ namespace BeebPerf
                 FileName = fileName,
                 Labels = labels,
                 Status = status,
-                Enabled = (status == LabelsFileStatus.Loaded)
+                Enabled = (status == LabelsFileStatus.Loaded),
+                Transient = false
             };
         }
     }

@@ -21,7 +21,10 @@
 
 using BeebPerf.model;
 using BeebPerf.operation;
+using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using static BeebPerf.CPUAnalysis;
 using static BeebPerf.MemoryAnalysis;
 
@@ -170,7 +173,7 @@ namespace BeebPerf.ux
                     FilePathName = filePathName;
                     InstructionSet = _Model.InstructionSet;
 
-                    InsertPerfFileLabels(_LabelsFiles, filePathName, _Model.Labels);
+                    UpdateLabelFiles(filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
                     // defer frame analysis if its dependent on static analysis
@@ -733,23 +736,93 @@ namespace BeebPerf.ux
             Invalidate(true);
         }
 
-        static private void InsertPerfFileLabels(
-            List<LabelsFile> labelsFiles,
+        private void UpdateLabelFiles(
             string perfFileName,
-            List<(string Name, ushort Address)> labels)
+            List<(string Name, ushort Address)> perfFileLabels)
         {
-            var pseudoLabelsFile = new LabelsFile()
+            // remove any transient label files
+            for (int i = _LabelsFiles.Count - 1; i >= 0; i--)
             {
-                FileName = $"<{perfFileName}>",
-                Labels = labels,
+                if (_LabelsFiles[i].Transient)
+                    _LabelsFiles.RemoveAt(i);
+            }
+
+            // insert perf file labels
+            _LabelsFiles.Insert(0, new LabelsFile()
+            {
+                FileName = $"{perfFileName} (embedded labels)",
+                Labels = perfFileLabels,
                 Status = LabelsFileStatus.Loaded,
-                Enabled = true
-            };
+                Enabled = true,
+                Transient = true
+            });
 
-            if (labelsFiles.Count > 0 && labelsFiles[0].FileName.StartsWith('<'))
-                labelsFiles.RemoveAt(0);
+            // insert MOS labels
+            (var mosName, var mosLabels) = LoadMOSLabels();
+            if (mosName != string.Empty)
+            {
+                _LabelsFiles.Insert(1, new LabelsFile()
+                {
+                    FileName = mosName,
+                    Labels = mosLabels,
+                    Status = LabelsFileStatus.Loaded,
+                    Enabled = true,
+                    Transient = true
+                });
+            }
+        }
 
-            labelsFiles.Insert(0, pseudoLabelsFile);
+        private (string mosName, List<(string Name, ushort Address)> mosLabels) LoadMOSLabels() 
+        {
+            // finger print MOS memory, excluding FRED, JIM, and SHEILA
+            byte[] mosMemory = new byte[0x4000 - 0x300];
+            Buffer.BlockCopy(_Model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0xC000, mosMemory, 0, 0xFC00 - 0xC000);
+            Buffer.BlockCopy(_Model.Snapshot.Memory[(int)MemoryPage.WholeRam], 0xFF00, mosMemory, 0xFC00 - 0xC000, 0x10);
+            byte[] mosHash = MD5.HashData(mosMemory);
+            // Debug.WriteLine($"mosHash: {Convert.ToHexString(mosHash)}");
+
+            // match against known MOS fingerprints
+            string mosResource, mosName;
+            var labels = new List<(string Name, ushort Address)>();
+            if (mosHash.SequenceEqual(Convert.FromHexString("4EAFE9B5D17DFA80C213EAB71CDED9FC")))
+            {
+                mosResource = "mos120_labels";
+                mosName = "MOS 1.2";
+            }
+            else if (mosHash.SequenceEqual(Convert.FromHexString("2A763CFC810035C09B8AA76C21466F46")))
+            {
+                mosResource = "mos200_labels";
+                mosName = "MOS 2.0";
+            }
+            else
+            {
+                return (string.Empty, labels);
+            }
+
+            // load labels from resource
+            var resources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
+            var text = (String)resources.GetObject(mosResource)!;
+
+            // parse labels. Format is [{'LabelName':AddressL, ...}]
+            text = text.Trim([' ', '\t', '\n', '\r']);
+            text = text.Substring(2, text.Length - 4); // remove surrounding [{ and }]
+
+            var nameAndAddressRegex = new Regex(@"^\'(?<name>.[A-Za-z_][.A-Za-z0-9_]*)'\:(?<address>\d+)L$", RegexOptions.Compiled);
+
+            foreach (var part in text.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string nameAndAddress = part.Trim();
+                var m = nameAndAddressRegex.Match(nameAndAddress);
+                Debug.Assert(m.Success);
+
+                string name = m.Groups["name"].Value;
+                long address = long.Parse(m.Groups["address"].Value);
+                Debug.Assert(name.Length >= 2 && address >= 0 && address <= 0xFFFF);
+
+                labels.Add((name, (ushort)address));
+            }
+
+            return (mosName, labels);
         }
 
         static private string EncodeLabels(List<LabelsFile> labelsFiles)
@@ -757,7 +830,7 @@ namespace BeebPerf.ux
             StringBuilder sb = new StringBuilder();
             foreach (var labelsFile in labelsFiles)
             {
-                if (!labelsFile.FileName.StartsWith('<'))
+                if (!labelsFile.Transient)
                 {
                     if (sb.Length > 0) sb.Append('|');
                     sb.Append(labelsFile.FileName);

@@ -45,13 +45,15 @@ namespace BeebPerf.model
                 FileName = FileName,
                 Labels = Labels.ToList(),
                 Status = Status,
-                Enabled = Enabled
+                Enabled = Enabled,
+                Transient = Transient
             };
         }
 
-        public string FileName = string.Empty;
-        public List<(string Name, ushort Address)> Labels = new();
-        public LabelsFileStatus Status = LabelsFileStatus.None;
-        public bool Enabled = false;
+        public required string FileName = string.Empty;
+        public required List<(string Name, ushort Address)> Labels = new();
+        public required LabelsFileStatus Status = LabelsFileStatus.None;
+        public required bool Enabled = false;
+        public required bool Transient = false;
     }
 }

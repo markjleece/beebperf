@@ -136,7 +136,7 @@ namespace BeebPerf.ux
             if (enabled)
             {
                 var labelsFile = LabelsFiles[labelsGridView.SelectedRows[0].Index];
-                enabled = !labelsFile.FileName.StartsWith('<'); // embedded labels?
+                enabled = !labelsFile.Transient;
             }
             reloadButton.Enabled = enabled;
             removeButton.Enabled = enabled;
