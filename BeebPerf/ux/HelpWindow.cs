@@ -21,15 +21,15 @@
 
 namespace BeebPerf.ux
 {
-    public partial class HelpDialog : Form
+    public partial class HelpWindow : Form
     {
-        public HelpDialog(BeebPerfForm form)
+        public HelpWindow(BeebPerfForm form)
         {
             InitializeComponent();
             Owner = form;
 
             // populate help text
-            var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpDialog));
+            var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpWindow));
             var bytes = (byte[])resources.GetObject("help.RTF")!;
             using var ms = new MemoryStream(bytes!);
             richTextBox.LoadFile(ms, RichTextBoxStreamType.RichText);

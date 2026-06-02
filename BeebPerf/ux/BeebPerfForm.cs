@@ -324,7 +324,7 @@ namespace BeebPerf.ux
             }
         }
 
-        private void selectAllButton_Click(object sender, EventArgs e)
+        private void resetAllButton_Click(object sender, EventArgs e)
         {
             SetAnalysisRange(analysisFrom: 0, analysisTo: timelineView.Duration);
         }
@@ -413,8 +413,20 @@ namespace BeebPerf.ux
 
         private void helpButton_Click(object sender, EventArgs e)
         {
-            var dialog = new HelpDialog(this);
-            dialog.ShowDialog();
+            if (_HelpWindow != null)
+                return;
+
+            _HelpWindow = new HelpWindow(this);
+            _HelpWindow.TopMost = true;
+            _HelpWindow.Show();
+            UpdateToolbarState();
+
+            _HelpWindow.FormClosed += (s, args) =>
+            {
+                _HelpWindow.Dispose();
+                _HelpWindow = null;
+                UpdateToolbarState();
+            };
         }
 
         private void MemoryZeroPageCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -945,7 +957,8 @@ namespace BeebPerf.ux
             openButton.Enabled = (AppState == 0);
             undoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanUndo();
             redoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanRedo();
-            selectAllButton.Enabled = timelineView.CanSelectAll();
+            helpButton.Enabled = (_HelpWindow == null);
+            resetAllButton.Enabled = timelineView.CanSelectAll() || timelineView.CanZoomOut();
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();
             fitSelectionButton.Enabled = timelineView.CanFitSelection();
@@ -1095,6 +1108,7 @@ namespace BeebPerf.ux
         private List<LabelsFile> _LabelsFiles = [];
         private List<FrameSettings> _FrameSettingsList = [];
 
+        private HelpWindow? _HelpWindow;
         private UndoRedoHistory _UndoRedoHistory;
         private Model _Model;
         private LabelResolver _LabelResolver;

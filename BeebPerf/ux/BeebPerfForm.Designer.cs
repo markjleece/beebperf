@@ -40,7 +40,7 @@ namespace BeebPerf.ux
             undoButton = new ToolStripButton();
             redoButton = new ToolStripButton();
             toolStripSeparator2 = new ToolStripSeparator();
-            selectAllButton = new ToolStripButton();
+            resetAllButton = new ToolStripButton();
             toolStripSeparator3 = new ToolStripSeparator();
             zoomInButton = new ToolStripButton();
             zoomOutButton = new ToolStripButton();
@@ -100,7 +100,7 @@ namespace BeebPerf.ux
                 undoButton, 
                 redoButton, 
                 toolStripSeparator2,
-                selectAllButton,
+                resetAllButton,
                 toolStripSeparator3,
                 zoomInButton, 
                 zoomOutButton,
@@ -182,15 +182,15 @@ namespace BeebPerf.ux
             toolStripSeparator2.Name = "toolStripSeparator2";
             toolStripSeparator2.Size = new Size(6, 33);
             // 
-            // selectAllButton
+            // resetAllButton
             // 
-            selectAllButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            selectAllButton.Image = (Image)resources.GetObject("selectAllButton.Image");
-            selectAllButton.ImageTransparentColor = Color.Magenta;
-            selectAllButton.Name = "selectAllButton";
-            selectAllButton.Size = new Size(34, 28);
-            selectAllButton.Text = "Select All";
-            selectAllButton.Click += selectAllButton_Click;
+            resetAllButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            resetAllButton.Image = (Image)resources.GetObject("resetAllButton.Image");
+            resetAllButton.ImageTransparentColor = Color.Magenta;
+            resetAllButton.Name = "resetAllButton";
+            resetAllButton.Size = new Size(34, 28);
+            resetAllButton.Text = "Reset All";
+            resetAllButton.Click += resetAllButton_Click;
             // 
             // toolStripSeparator3
             // 
@@ -519,7 +519,7 @@ namespace BeebPerf.ux
         private ToolStripButton undoButton;
         private ToolStripButton redoButton;
         private ToolStripSeparator toolStripSeparator2;
-        private ToolStripButton selectAllButton;
+        private ToolStripButton resetAllButton;
         private ToolStripSeparator toolStripSeparator3;
         private ToolStripButton zoomInButton;
         private ToolStripButton zoomOutButton;

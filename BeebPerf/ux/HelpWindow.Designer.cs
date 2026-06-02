@@ -1,6 +1,6 @@
 ﻿namespace BeebPerf.ux
 {
-    partial class HelpDialog
+    partial class HelpWindow
     {
         /// <summary>
         /// Required designer variable.
@@ -39,20 +39,20 @@
             richTextBox.Location = new Point(16, 0);
             richTextBox.Name = "richTextBox";
             richTextBox.ReadOnly = true;
-            richTextBox.TabStop = false;
             richTextBox.Size = new Size(1242, 744);
             richTextBox.TabIndex = 0;
+            richTextBox.TabStop = false;
             richTextBox.Text = "";
             // 
-            // HelpDialog
+            // HelpWindow
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1258, 744);
             Controls.Add(richTextBox);
-            Name = "HelpDialog";
+            Name = "HelpWindow";
             Padding = new Padding(16, 0, 0, 0);
-            Text = "Help";
+            Text = "BeebPerf - Help";
             ResumeLayout(false);
         }
 
