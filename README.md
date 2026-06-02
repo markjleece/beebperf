@@ -68,7 +68,8 @@ See [docs/BeebPerf.docx](docs/BeebPerf.docx) for more information.
 
 # Acknowlegements
 - Portions of the display reconstruction code were based on **BeebEm's** video class. Many thanks to the **BeebEm** contributors for creating and maintaining this wonderful piece of software. 
-- The **.perf** files are compressed and uncompressed using the **ZLib library** - Many thanks to **Jean-loup Gailly** and **Mark Adler** for creating such an excellent and useful library. 
+- The **.perf** files are compressed and uncompressed using the **ZLib library** - Many thanks to **Jean-loup Gailly** and **Mark Adler** for creating such an excellent and useful library.
+- The MOS 1.2 and 2.0 labels were taken from Toby Nelson’s **MOS Reassembly for the BBC Micro**. Thank you Toby for creating and maintaining this excellent resource.
 
 # BeebPerf Copyright
 Copyright (C) 2026 Mark John Leece
