@@ -48,7 +48,7 @@ namespace BeebPerf.ux
             // update button states when grid selection changes
             labelsGridView.SelectionChanged += (s, e) =>
             {
-                UpdateButtonStates();
+                UpdateControlStates();
             };
 
             // add grid columns
@@ -127,10 +127,10 @@ namespace BeebPerf.ux
             foreach (var labelsFile in LabelsFiles)
                 labelsGridView.Rows.Add(labelsFile.FileName, ToStatusString(labelsFile), labelsFile.Enabled);
 
-            UpdateButtonStates();
+            UpdateControlStates();
         }
 
-        private void UpdateButtonStates()
+        private void UpdateControlStates()
         {
             bool enabled = (labelsGridView.SelectedRows.Count == 1);
             if (enabled)
@@ -140,6 +140,16 @@ namespace BeebPerf.ux
             }
             reloadButton.Enabled = enabled;
             removeButton.Enabled = enabled;
+
+            for (int i = 0; i < labelsGridView.Rows.Count; i++)
+            {
+                var cell = labelsGridView[2, i];
+                if (LabelsFiles[i].Labels.Count == 0)
+                {
+                    cell.ReadOnly = true;
+                    cell.Value = false;
+                }
+            }
         }
 
         private void CloseButton_Click(object sender, EventArgs e)
