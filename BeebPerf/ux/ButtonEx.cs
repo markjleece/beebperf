@@ -47,6 +47,39 @@ namespace BeebPerf.ux
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
         }
 
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            if (Image == null)
+                return;
+
+            // compute innerRect rectangle
+            var innerRect = new Rectangle(
+                ClientRectangle.Left + Padding.Left,
+                ClientRectangle.Top + Padding.Top,
+                ClientRectangle.Width - Padding.Horizontal,
+                ClientRectangle.Height - Padding.Vertical);
+
+            // compute aspect ratio preserving scale
+            float scaleX = (float)innerRect.Width / Image.Width;
+            float scaleY = (float)innerRect.Height / Image.Height;
+            float scale = Math.Min(scaleX, scaleY);
+
+            // scale image if more than 20% different from original newSize
+            var newSize = (scale >= 0.8f && scale <= 1.2f)
+                ? Image.Size
+                : new Size((int)(Image.Width * scale), (int)(Image.Height * scale));
+
+            // center the image
+            int left = innerRect.Left + (innerRect.Width - newSize.Width) / 2;
+            int top = innerRect.Top + (innerRect.Height - newSize.Height) / 2;
+
+            // draw the image
+            e.Graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            e.Graphics.DrawImage(Image, left, top, newSize.Width, newSize.Height);
+        }
+
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);

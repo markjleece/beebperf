@@ -166,9 +166,17 @@ namespace BeebPerf.ux
                 // load labels file
                 var labelsFile = new LabelsFileReader().ReadFile(filePathName);
 
+                // clear selection
+                labelsGridView.ClearSelection();
+
                 // add row and update public state
-                labelsGridView.Rows.Add(filePathName, ToStatusString(labelsFile), labelsFile.Enabled);
                 LabelsFiles.Add(labelsFile);
+                labelsGridView.Rows.Add(filePathName, ToStatusString(labelsFile), labelsFile.Enabled);
+
+                // select added row and scroll into view
+                int lastRow = labelsGridView.Rows.Count - 1;
+                labelsGridView.Rows[lastRow].Selected = true;
+                labelsGridView.FirstDisplayedScrollingRowIndex = lastRow;
             }
         }
 
