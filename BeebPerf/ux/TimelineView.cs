@@ -436,8 +436,57 @@ namespace BeebPerf.ux
             using var greyPen = new Pen(Color.Gray);
             using var textBrush = new SolidBrush(ForeColor);
 
+            using var arrowThinPen = new Pen(ForeColor, 1);
+            using var arrowThickPen = new Pen(ForeColor, 3);
+            using var arrowBrush = new SolidBrush(ForeColor);
+
             foreach (var frame in _Frames)
             {
+                // draw display span arrow
+                if (frame.Start < frame.Rect.Left || frame.End > frame.Rect.Right)
+                {
+                    // measure
+                    int arrowHeadLength = Font.Height / 2;
+                    int arrowHeadHalfHeight = Font.Height / 3;
+
+                    int arrowCenterY = frame.Rect.Top + frame.Rect.Height / 2;
+                    int arrowTop = arrowCenterY - arrowHeadHalfHeight;
+                    int arrowBottom = arrowCenterY + arrowHeadHalfHeight;
+
+                    int arrowLeft = frame.Start;
+                    int arrowRight = frame.End;
+
+                    // paint arrow line
+                    graphics.DrawLine(arrowThickPen,
+                        arrowLeft + arrowHeadLength, arrowCenterY,
+                        arrowRight - arrowHeadLength, arrowCenterY);
+
+                    // paint left arrow head
+                    Point[] leftArrowHeadPoints = [
+                        new() { X = arrowLeft, Y = arrowCenterY },
+                        new() { X = arrowLeft + arrowHeadLength, Y = arrowTop },
+                        new() { X = arrowLeft + arrowHeadLength, Y = arrowBottom },
+                    ];
+
+                    graphics.FillPolygon(arrowBrush, leftArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.DrawPolygon(arrowThinPen, leftArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+
+                    // paint right arrow head
+                    Point[] rightArrowHeadPoints = [
+                        new() { X = arrowRight, Y = arrowCenterY },
+                        new() { X = arrowRight - arrowHeadLength, Y = arrowTop },
+                        new() { X = arrowRight - arrowHeadLength, Y = arrowBottom },
+                    ];
+
+                    graphics.FillPolygon(arrowBrush, rightArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                    graphics.DrawPolygon(arrowThinPen, rightArrowHeadPoints);
+                    graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+                }
+
+                // paint frame background and border
                 var frameBitmap = frame.Bitmap;
                 var frameRect = frame.Rect;
 
@@ -986,10 +1035,21 @@ namespace BeebPerf.ux
                     left = CyclesToPixels(frameBitmap.StartCycleCount);
                 }
 
-                if (left < Width && left + width > 0)
+                int right = CyclesToPixels(frameBitmap.EndCycleCount);
+
+                if (left < Width && (left + width > 0 || right > 0))
                 {
                     var rect = new Rectangle(left, top, width, height);
-                    _Frames.Add(new Frame() { Bitmap = frameBitmap, Rect = rect });
+                    int span = right - left + 1;
+                    if (span > width)
+                        rect.Offset((span - width) / 2, 0);
+
+                    _Frames.Add(new Frame() {
+                        Bitmap = frameBitmap, 
+                        Rect = rect,
+                        Start = left,
+                        End = right,
+                    });
                 }
 
                 leftEdge = left + width;
@@ -1051,6 +1111,8 @@ namespace BeebPerf.ux
         {
             public DisplayFrame Bitmap;
             public Rectangle Rect;
+            public int Start;
+            public int End;
         }
 
         private int _RecordingDuration;
