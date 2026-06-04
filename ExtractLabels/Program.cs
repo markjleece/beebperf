@@ -27,7 +27,7 @@ namespace ExtractLabels
 {
     //
     // Usage: ExtractLabels <input-filename>
-    // The output can be piped to an output file.
+    // The output can be piped to an output fileName.
     //
     // Extracts labels from assembler output files or from label
     // files that have the form:
@@ -37,16 +37,43 @@ namespace ExtractLabels
     {
         static void Main(string[] args)
         {
-            if (args.Length != 1)
+            // command line options
+            bool showHelp = (args.Length == 0);
+            bool stripLineNumbers = false;
+            string fileName = string.Empty;
+
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine("Usage: ExtractLabels <inputfile>");
+                if (args[i] == "-h" && !showHelp)
+                    showHelp = true;
+                else if (args[i] == "-s" && !stripLineNumbers)
+                    stripLineNumbers = true;
+                else if (args[i].StartsWith("-") || fileName != string.Empty)
+                {
+                    showHelp = true;
+                }
+                else
+                {
+                    fileName = args[i];
+                }
+            }
+
+            if (showHelp || fileName == string.Empty)
+            {
+                Console.WriteLine("ExtractLabels - Extract labels from assembler output files");
+                Console.WriteLine("Usage:");
+                Console.WriteLine("  ExtractLabels [options...] [fileName]...");
+                Console.WriteLine("Options:");
+                Console.WriteLine("  -h  show this help");
+                Console.WriteLine("  -s  strip line numbers");
                 return;
             }
 
+            // read input file
             string text;
             try
             {
-                text = File.ReadAllText(args[0]).Trim([' ', '\t', '\n', '\r']);
+                text = File.ReadAllText(fileName).Trim([' ', '\t', '\n', '\r']);
             }
             catch (Exception ex)
             {
@@ -54,13 +81,28 @@ namespace ExtractLabels
                 return;
             }
 
+            // extract labels: look for lines containing a label name and an address
             var nameRegex = new Regex(@"(?<=^| )(?<name>\.[A-Za-z_][A-Za-z0-9_.]*)(?=$| )", RegexOptions.Compiled);
             var addressRegex = new Regex(@"(?<=^| )(?<address>[A-Fa-f0-9]{4})(?=$| )", RegexOptions.Compiled);
 
             var labels = new List<(string Name, ushort Address)>();
             string name = string.Empty;
-            foreach (var line in text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line_ in text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
             {
+                string line = line_!.Trim();
+
+                if (stripLineNumbers)
+                {
+                    // strip leading digits (line numbers)
+                    int digitCount = 0;
+                    while (digitCount < line.Length && line[digitCount] >= '0' && line[digitCount] <= '9')
+                        digitCount++;
+                    line = line.Substring(digitCount);
+                }
+
+                if (line.Length > 6)
+                    line = line.Substring(6);
+
                 var nameMatch = nameRegex.Match(line);
                 if (nameMatch.Success)
                     name = nameMatch.Groups["name"].Value;
