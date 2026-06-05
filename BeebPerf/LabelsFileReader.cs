@@ -77,26 +77,11 @@ namespace BeebPerf
                 }
                 else
                 {
-                    // try to parse a BeebAsm.exe output file
+                    // try to parse an assembler listing file
 
-                    var nameRegex = new Regex(@"(?<=^| )(?<name>\.[A-Za-z_][A-Za-z0-9_.]*)(?=$| )", RegexOptions.Compiled);
-                    var addressRegex = new Regex(@"(?<=^| )(?<address>[A-Fa-f0-9]{4})(?=$| )", RegexOptions.Compiled);
+                    string[] lines = text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
 
-                    string name = string.Empty;
-                    foreach (var line in text.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        var nameMatch = nameRegex.Match(line);
-                        if (nameMatch.Success)
-                            name = nameMatch.Groups["name"].Value;
-
-                        var addressMatch = addressRegex.Match(line);
-                        if (addressMatch.Success && name.Length > 0)
-                        {
-                            ushort address = (ushort)Convert.ToInt32(addressMatch.Groups["address"].Value, 16);
-                            labels.Add((name, address));
-                            name = string.Empty;
-                        }
-                    }
+                    labels = ExtractLabels.Extract(lines, includeAssignments: true, addressesFrom: 0);
 
                     if (labels.Count == 0)
                         status = LabelsFileStatus.Error_InvalidFileFormat;
@@ -133,6 +118,51 @@ namespace BeebPerf
                 Enabled = (status == LabelsFileStatus.Loaded),
                 Transient = false
             };
+        }
+
+        private static void TrimLineNumbers(string[] lines)
+        {
+            // detect if line numbers are present by checking if the
+            // start of each line contains a number that increments from 1
+            bool hasLineNumbers = false;
+            int lastLineNumber = 0;
+
+            foreach (var line in lines)
+            {
+                int digitCount = 0;
+                while (digitCount < line.Length && line[digitCount] >= '0' && line[digitCount] <= '9')
+                    digitCount++;
+
+                if (digitCount > 0)
+                {
+                    int lineNumber = Convert.ToInt32(line.Substring(0, digitCount));
+                    if (lineNumber == lastLineNumber + 1)
+                    {
+                        hasLineNumbers = true;
+                        lastLineNumber = lineNumber;
+                    }
+                    else
+                    {
+                        hasLineNumbers = false;
+                        break;
+                    }
+                }
+            }
+
+            // if line numbers are present, trim them from the start of each line
+            if (hasLineNumbers)
+            {
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    var line = lines[i];
+
+                    int digitCount = 0;
+                    while (digitCount < line.Length && line[digitCount] >= '0' && line[digitCount] <= '9')
+                        digitCount++;
+
+                    lines[i] = line.Substring(digitCount);
+                }
+            }
         }
     }
 }
