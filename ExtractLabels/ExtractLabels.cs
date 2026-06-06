@@ -174,22 +174,17 @@ public class ExtractLabels
 
     // regex patterns
     private static readonly Regex regexEquate =
-        new(@"^\s*(?<label>[A-Za-z_\.][A-Za-z0-9_\.]*)" + regexEnd +
-            @"\s*=\s*(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)" + regexEnd);
+        new (@"^\s*(?<label>\.[A-Za-z_][A-Za-z0-9_.]*)\s*=\s*(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)\s*$");
 
     private static readonly Regex regexLabelOnly =
-        new(@"^\s*(?<label>[A-Za-z_\.][A-Za-z0-9_\.]*)" + regexEnd + @"\s*$");
+        new(@"^\s*(?<label>\.[A-Za-z_][A-Za-z0-9_.]*)\s*$");
 
     private static readonly Regex regexAddrThenLabel =
-        new(@"(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)" + regexEnd +
-            @".*?(?<label>[A-Za-z_\.][A-Za-z0-9_\.]*)" + regexEnd);
+        new(@"^\s*(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)\s+(?<label>\.[A-Za-z_][A-Za-z0-9_.]*)\s*$");
 
     private static readonly Regex regexFirstAddress =
-        new(@"^\s*(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)" + regexEnd);
+        new(@"^\s*(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)(?:\s+|$)");
 
     private static readonly Regex regexLineNumber =
-        new(@"^\s*(?<lineNumber>[0-9]+)\b");
-
-    private const string regexEnd = @"(?=\s|$|=)";
-    private const string regexHexAddr = @"(?:\$|&|0x)?(?<addr>[0-9A-Fa-f]+)";
+        new(@"^\s*(?<lineNumber>[0-9]+)(?:\s+|$)");
 }

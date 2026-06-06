@@ -23,17 +23,73 @@ class Program
 {
     static void Main(string[] args)
     {
-        if (args.Length != 1)
+        // command line
+        bool showHelp = (args.Length == 0);
+        bool includeAssignments = true;
+        int addressesFrom = 0;
+
+        for (int i = 0; i < args.Length; i++)
         {
-            Console.WriteLine("Usage: ExtractLabels <listingfile>");
+            if (args[i] == "-h" || args[i] == "--help")
+            {
+                showHelp = true;
+                break;
+            }
+            else if (args[i] == "-i")
+            {
+                includeAssignments = false;
+            }
+            else if (args[i] == "-r" && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[i + 1], System.Globalization.NumberStyles.HexNumber, null, out int addr))
+                {
+                    if (addr < 0 || addr > 0xFFFF)
+                    {
+                        Console.WriteLine($"Address out of range: {args[i + 1]:X4}");
+                        return;
+                    }
+                    addressesFrom = addr;
+                    i++;
+                }
+                else
+                {
+                    Console.WriteLine($"Invalid hex address: {args[i + 1]}");
+                    return;
+                }
+            }
+            else if (args[i].StartsWith('-'))
+            {
+                Console.WriteLine($"Unknown option: {args[i]}");
+                showHelp = true;
+                break;
+            }
+        }
+
+        if (showHelp)
+        {
+            Console.WriteLine("Usage:");
+            Console.WriteLine("  ExtractLabels <options> <listingfile>");
+            Console.WriteLine("Options:");
+            Console.WriteLine("  -h, --help     Show this help message");
+            Console.WriteLine("  -i             Ignore labels assigned a value (e.g. label = XXXX)");
+            Console.WriteLine("  -r XXXX        Ignore labels with address below XXXX");
             return;
         }
 
         // read all lines from listing file
-        var lines = File.ReadAllLines(args[0]);
+        string[] lines;
+        try
+        {
+            lines = File.ReadAllLines(args[args.Length - 1]);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading listing file: {ex.Message}");
+            return;
+        }
 
         // extract labels from assembly listing
-        var labels = ExtractLabels.Extract(lines, includeAssignments: false, addressesFrom: 0xC000);
+        var labels = ExtractLabels.Extract(lines, includeAssignments: includeAssignments, addressesFrom: addressesFrom);
 
         // output labels in BeebAsm.exe -labels format: [{'label1':1234L,'label2':5678L}]
         Console.Write("[{");
