@@ -37,7 +37,7 @@ namespace BeebPerf.ux
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new(_LabelResolver);
-            _FrameAnalysis = new();
+            _MetricAnalysis = new();
             _UndoRedoHistory = new();
             _Model = new();
 
@@ -176,14 +176,14 @@ namespace BeebPerf.ux
                     UpdateLabelFiles(filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
-                    // defer frame analysis if its dependent on static analysis
-                    bool deferFrameAnalysis = 
-                        (_SelectedFrameSettings != null && _SelectedFrameSettings.Type != FrameSettings.FrameType.StartAndEndAddresses);
+                    // defer metric analysis if its dependent on static analysis
+                    bool deferMetricAnalysis = 
+                        (_SelectedMetric != null && _SelectedMetric.Type != Metric.MetricType.StartAndEndAddresses);
 
-                    StaticAnalysis(deferFrameAnalysis);
+                    StaticAnalysis(deferMetricAnalysis);
 
-                    if (!deferFrameAnalysis)
-                        FrameAnalysis();
+                    if (!deferMetricAnalysis)
+                        MetricAnalysis();
                 }));
             });
         }
@@ -212,9 +212,9 @@ namespace BeebPerf.ux
                     // execute dynamic analysis for the selected range (or whole range if no selection)
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
 
-                    // execute frame analysis
+                    // execute metric analysis
                     if (performFrameAnalysis)
-                        FrameAnalysis();
+                        MetricAnalysis();
                 }));
             });
         }
@@ -287,24 +287,24 @@ namespace BeebPerf.ux
             });
         }
 
-        private void FrameAnalysis()
+        private void MetricAnalysis()
         {
-            // frame analysis...
+            // metric analysis...
             SetState(AppStateFlags.FrameAnalysis);
 
-            var frameAnalysisTask = _FrameAnalysis.AnalysisAsync(
+            var metricAnalysisTask = _MetricAnalysis.AnalysisAsync(
                 _Model.Instructions,
                 InstructionSet!,
                 _Model,
-                _SelectedFrameSettings,
+                _SelectedMetric,
                 _CPUAnalysis.RootStackFrame).ContinueWith((success) =>
                 {
                     this.Invoke((Action)(() =>
                     {
                         ClearState(AppStateFlags.FrameAnalysis);
 
-                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrames;
-                        framesView.SetResults(_FrameAnalysis.Frames);
+                        timelineView.FrameBitmaps = _MetricAnalysis.DisplayFrames;
+                        metricsView.SetIteractions(_MetricAnalysis.Iterations);
                     }));
                 });
         }
@@ -581,7 +581,7 @@ namespace BeebPerf.ux
             else
                 timelineView.SelectRange(analysisFrom, analysisTo);
 
-            framesView.SelectRange(analysisFrom, analysisTo);
+            metricsView.SelectRange(analysisFrom, analysisTo);
         }
 
         public void SetSelectedMemoryAddress(CanonicalAddress address)
@@ -633,51 +633,51 @@ namespace BeebPerf.ux
             memoryRoutinesView.Clear();
         }
 
-        public void SetSelectedFrameSettings(FrameSettings frameSettings)
+        public void SetSelectedMetric(Metric metric)
         {
-            var operation = new SelectFrameSettingsOperation(this, frameSettings, _SelectedFrameSettings);
+            var operation = new SelectMetricOperation(this, metric, _SelectedMetric);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
 
-        public void SetSelectedFrameSettingsInternal(FrameSettings frameSettings)
+        public void SetSelectedMetricInternal(Metric metric)
         {
-            _SelectedFrameSettings = frameSettings;
-            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
-            FrameAnalysis();
+            _SelectedMetric = metric;
+            metricsView.SetMetrics(_Metrics, _SelectedMetric);
+            MetricAnalysis();
         }
 
-        public void ClearSelectedFrameSettings()
+        public void ClearSelectedMetric()
         {
-            var operation = new SelectFrameSettingsOperation(this, null, _SelectedFrameSettings);
+            var operation = new SelectMetricOperation(this, null, _SelectedMetric);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
 
-        public void ClearSelectedFrameSettingsInternal()
+        public void ClearSelectedMetricInternal()
         {
-            _SelectedFrameSettings = null;
-            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
-            framesView.SetResults([]);
+            _SelectedMetric = null;
+            metricsView.SetMetrics(_Metrics, _SelectedMetric);
+            metricsView.SetIteractions([]);
         }
 
-        public void AddFrameSettings()
+        public void AddMetric()
         {
-            var operation = new AddFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList, _Model.Instructions);
+            var operation = new AddMetricOperation(this, _SelectedMetric!, _Metrics, _Model.Instructions);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
 
-        public void EditFrameSettings()
+        public void EditMetric()
         {
-            var operation = new EditFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList, _Model.Instructions);
+            var operation = new EditMetricOperation(this, _SelectedMetric!, _Metrics, _Model.Instructions);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
 
-        public void RemoveFrameSettings()
+        public void RemoveMetric()
         {
-            var operation = new RemoveFrameSettingsOperation(this, _SelectedFrameSettings!, _FrameSettingsList);
+            var operation = new RemoveMetricOperation(this, _SelectedMetric!, _Metrics);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
@@ -850,23 +850,23 @@ namespace BeebPerf.ux
             return result;
         }
 
-        static private string EncodeFrameSettings(List<FrameSettings> frameSettingsList)
+        static private string EncodeMetrics(List<Metric> frameSettingsList)
         {
             StringBuilder sb = new StringBuilder();
-            foreach (var frameSettings in frameSettingsList)
+            foreach (var metric in frameSettingsList)
             {
                 if (sb.Length > 0) sb.Append('|');
-                sb.Append(FrameSettings.Serialize(frameSettings));
+                sb.Append(Metric.Serialize(metric));
             }
             return sb.ToString();
         }
 
-        static private List<FrameSettings> DecodeFrameSettings(string value)
+        static private List<Metric> DecodeMetrics(string value)
         {
-            List<FrameSettings> result = [];
+            List<Metric> result = [];
             var values = value.Split('|', StringSplitOptions.RemoveEmptyEntries);
             for (int i = 0; i < values.Length; i++)
-                result.Add(FrameSettings.DeSerialize(values[i]));
+                result.Add(Metric.DeSerialize(values[i]));
             return result;
         }
 
@@ -875,7 +875,7 @@ namespace BeebPerf.ux
             var bounds = (WindowState == FormWindowState.Normal) ? Bounds : RestoreBounds;
             var windowState = (WindowState == FormWindowState.Minimized) ? FormWindowState.Normal : WindowState;
             var displaySettings = DisplaySettings.Serialize(this.DisplaySettings!);
-            var recentFrameSettings = _SelectedFrameSettings != null ? _SelectedFrameSettings.Name : string.Empty;
+            var recentFrameSettings = _SelectedMetric != null ? _SelectedMetric.Name : string.Empty;
             Properties.Settings.Default.WindowLocation = bounds.Location;
             Properties.Settings.Default.WindowSize = bounds.Size;
             Properties.Settings.Default.WindowState = (int)windowState;
@@ -889,7 +889,7 @@ namespace BeebPerf.ux
             Properties.Settings.Default.SecondarySplitterDistance = secondarySplitContainer.SplitterDistance;
             Properties.Settings.Default.DisplaySettings = displaySettings;
             Properties.Settings.Default.ColorTheme = (int)ColorTheme.Get();
-            Properties.Settings.Default.FrameSettingsList = EncodeFrameSettings(_FrameSettingsList);
+            Properties.Settings.Default.FrameSettingsList = EncodeMetrics(_Metrics);
             Properties.Settings.Default.RecentSelectedFrameSettings = recentFrameSettings;
             Properties.Settings.Default.UnexpectedClose = false;
             Properties.Settings.Default.Save();
@@ -905,18 +905,18 @@ namespace BeebPerf.ux
             _LabelsFilesEncoding = Properties.Settings.Default.LabelsFiles;
             RecentExportFolderPath = Properties.Settings.Default.RecentExportFolderPath;
 
-            // frame settings
-            _FrameSettingsList = DecodeFrameSettings(Properties.Settings.Default.FrameSettingsList);
+            // metrics
+            _Metrics = DecodeMetrics(Properties.Settings.Default.FrameSettingsList);
             var recentFrameSettings = Properties.Settings.Default.RecentSelectedFrameSettings;
-            foreach (var frameSettings in _FrameSettingsList)
+            foreach (var metric in _Metrics)
             {
-                if (frameSettings.Name == recentFrameSettings)
+                if (metric.Name == recentFrameSettings)
                 {
-                    _SelectedFrameSettings = frameSettings;
+                    _SelectedMetric = metric;
                     break;
                 }
             }
-            framesView.SetSettings(_FrameSettingsList, _SelectedFrameSettings);
+            metricsView.SetMetrics(_Metrics, _SelectedMetric);
 
             // color theme
             var colorTheme = Properties.Settings.Default.ColorTheme;
@@ -1169,7 +1169,7 @@ namespace BeebPerf.ux
         private RoutineMemoryAccess? _SelectedMemoryAccess;
         private Panel? _SelectedTab;
         private CanonicalAddress? _SelectedMemoryAddress;
-        private FrameSettings? _SelectedFrameSettings;
+        private Metric? _SelectedMetric;
 
         private string _RecentPerfFilePathName = string.Empty;
         private int _RecentStartCycleCount = 0;
@@ -1179,7 +1179,7 @@ namespace BeebPerf.ux
         private int _SuppressTabChange;
         private int _SuppressCheckBoxChange;
         private List<LabelsFile> _LabelsFiles = [];
-        private List<FrameSettings> _FrameSettingsList = [];
+        private List<Metric> _Metrics = [];
 
         private HelpWindow? _HelpWindow;
         private UndoRedoHistory _UndoRedoHistory;
@@ -1187,7 +1187,7 @@ namespace BeebPerf.ux
         private LabelResolver _LabelResolver;
         private CPUAnalysis _CPUAnalysis;
         private MemoryAnalysis _MemoryAnalysis;
-        private FrameAnalysis _FrameAnalysis;
+        private MetricAnalysis _MetricAnalysis;
         private Font _BaseFont;
         private bool _UnexpectedClose;
         private FormWindowState _InitialFormWindowState;

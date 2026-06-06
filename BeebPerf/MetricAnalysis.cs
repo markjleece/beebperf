@@ -31,24 +31,24 @@ using System.Drawing.Imaging;
 namespace BeebPerf
 {
     //
-    // Frame analysis generates a list of analysis frames, which captures
-    // how long each game-loop iteration takes, and a list of display
+    // Metric analysis generates a list of metric iterations, which captures
+    // how long each iteration of the metric takes, and a list of display
     // frames, which captures the displayed CRT frames.
     //
-    // Analysis frames also capture the number of screen writes
+    // Metric iterations also capture the number of screen writes
     // that occur before and after the screen memory is scanned for
-    // display, and their offset (cycles) from the next display frame.
+    // display, and their offset (cycles) from the next display iteration.
     // 
     // The video code emulates the 6845, ULA, and SAA5050 at a
     // character/address level.
     //
-    // The code renders frame bitmaps in 4bpp indexed format, where
+    // The code renders iteration bitmaps in 4bpp indexed format, where
     // the palette is set to match the BBC Micro's 16-color palette.
     //
     // Supports:
     // - Standard modes 0-6, and teletext mode 7
     // - Non-standard video modes (e.g. Mode 8)
-    // - Mixed non-teletext modes (mid-frame ULA changes)
+    // - Mixed non-teletext modes (mid-iteration ULA changes)
     // - Interlaced support
     // - Cursor support
     // - Over-scan resolutions up to 1024x640
@@ -59,12 +59,12 @@ namespace BeebPerf
     // - No support for graphics tablets
     // - No support for custom ULA hardware
     //
-    public class FrameAnalysis
+    public class MetricAnalysis
     {
         private delegate byte ReadScreenData();
         private delegate void WriteBitmapData(byte value);
 
-        public FrameAnalysis()
+        public MetricAnalysis()
         {
             ConstructMode7Fonts();
         }
@@ -73,12 +73,12 @@ namespace BeebPerf
             Instruction[] instructions,
             InstructionSet instructionSet,
             Model model,
-            FrameSettings? frameSettings,
+            Metric? metric,
             model.StackFrame rootStackFrame)
         {
             return await Task.Run(() =>
             {
-                return Analysis(instructions, instructionSet, model, frameSettings, rootStackFrame);
+                return Analysis(instructions, instructionSet, model, metric, rootStackFrame);
             });
         }
 
@@ -86,7 +86,7 @@ namespace BeebPerf
             Instruction[] instructions,
             InstructionSet instructionSet,
             Model model,
-            FrameSettings? frameSettings,
+            Metric? metric,
             model.StackFrame? rootStackFrame)
         {
             _RootStackFrame = rootStackFrame;
@@ -95,10 +95,10 @@ namespace BeebPerf
             _BBCModel = model.BBCModel;
 
             InitializeVideo(model);
-            InitializeAnalysisFrames(frameSettings);
+            InitializeMetric(metric);
 
             // process instructions whilst emulating video hardware to generate display frames whilst
-            // also creating analysis frames based on the provided frame settings
+            // also creating metric iterations based on the provided metric
             DisplayFrames = [];
             int cycleCount = 0;
             for (int instructionIndex = 0; instructionIndex < instructions.Length; instructionIndex++)
@@ -106,11 +106,11 @@ namespace BeebPerf
                 ref var instruction = ref instructions[instructionIndex];
                 int postCycleCount = cycleCount + instruction.CycleCount;
 
-                if (instructionIndex == _AnalysisFrameState.EndInstructionIndex)
-                    EndAnalysisFrame(postCycleCount, instructionIndex);
+                if (instructionIndex == _AnalysisMetricState.EndInstructionIndex)
+                    EndMetricIteration(postCycleCount, instructionIndex);
 
-                if (instructionIndex == _AnalysisFrameState.StartInstructionIndex)
-                    StartAnalysisFrame(cycleCount, instructionIndex);
+                if (instructionIndex == _AnalysisMetricState.StartInstructionIndex)
+                    StartMetricIteration(cycleCount, instructionIndex);
 
                 if (instruction.IsInstruction)
                 {
@@ -136,52 +136,52 @@ namespace BeebPerf
                 cycleCount = postCycleCount;
             }
 
-            UpdateAnalysisFrames();
+            UpdateMetricIterations();
 
             return true;
         }
 
         //
-        // Analysis frames...
+        // Metric analysis...
         //
-        private void InitializeAnalysisFrames(FrameSettings? frameSettings)
+        private void InitializeMetric(Metric? metric)
         {
-            Frames = [];
-            _AnalysisFrameState.FrameNumber = 1;
+            Iterations = [];
+            _AnalysisMetricState.IterationNumber = 1;
 
-            if (frameSettings != null && !frameSettings.Match(_Instructions))
-                frameSettings = null;
+            if (metric != null && !metric.Match(_Instructions))
+                metric = null;
 
-            _AnalysisFrameState.FrameSettings = frameSettings;
-            _AnalysisFrameState.StartInstructionIndex = (frameSettings != null) ? FindInstructionIndex(indexFrom: 0, frameSettings.StartAddress) : -1;
-            _AnalysisFrameState.EndInstructionIndex = -1;
+            _AnalysisMetricState.Metric = metric;
+            _AnalysisMetricState.StartInstructionIndex = (metric != null) ? FindInstructionIndex(indexFrom: 0, metric.StartAddress) : -1;
+            _AnalysisMetricState.EndInstructionIndex = -1;
 
-            _AnalysisFrameState.MemoryDisplayFrame = new int[32768];
-            _AnalysisFrameState.ShadowRamDisplayFrame = new int[20480];
-            _AnalysisFrameState.FilingSystemRamDisplayFrame = new int[8192];
+            _AnalysisMetricState.MemoryDisplayFrame = new int[32768];
+            _AnalysisMetricState.ShadowRamDisplayFrame = new int[20480];
+            _AnalysisMetricState.FilingSystemRamDisplayFrame = new int[8192];
         }
 
-        private void UpdateAnalysisFrames()
+        private void UpdateMetricIterations()
         {
-            // populate display frame spans
+            // populate display iteration spans
             int displayFrameIndex = 0;
             DisplayFrame? displayFrame = DisplayFrames.Count > 0 ? DisplayFrames[displayFrameIndex] : null;
 
-            foreach (var frame in Frames)
+            foreach (var iteration in Iterations)
             {
                 // skip any prior display frames
-                while (displayFrame != null && displayFrame.EndCycleCount <= frame.StartCycleCount)
+                while (displayFrame != null && displayFrame.EndCycleCount <= iteration.StartCycleCount)
                     displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
 
                 // process intersecting frames
-                var displayFrameSpans = new List<Frame.DisplayFrameSpan>();
+                var displayFrameSpans = new List<MetricIteration.DisplayFrameSpan>();
 
                 bool first = true;
-                while (displayFrame != null && (first || displayFrame.StartCycleCount < frame.EndCycleCount))
+                while (displayFrame != null && (first || displayFrame.StartCycleCount < iteration.EndCycleCount))
                 {
                     first = false;
 
-                    displayFrameSpans.Add(new Frame.DisplayFrameSpan()
+                    displayFrameSpans.Add(new MetricIteration.DisplayFrameSpan()
                     {
                         FrameNumber = displayFrame.FrameNumber,
                         StartCycleCount = displayFrame.StartCycleCount,
@@ -191,7 +191,7 @@ namespace BeebPerf
                     displayFrame = displayFrameIndex < DisplayFrames.Count - 1 ? DisplayFrames[++displayFrameIndex] : null;
                 }
 
-                frame.DisplayFrameSpans = displayFrameSpans.ToArray();
+                iteration.DisplayFrameSpans = displayFrameSpans.ToArray();
 
                 // back up to handle potential cross spans
                 if (displayFrame != null && displayFrameIndex > 0)
@@ -199,112 +199,112 @@ namespace BeebPerf
             }
 
             // update WritesBeforeDisplayRead & WritesAfterDisplayRead
-            foreach (var frame in Frames)
+            foreach (var iteration in Iterations)
             {
-                // set DisplayFrameIndex to the longest overlapping display frame, and
+                // set DisplayFrameIndex to the longest overlapping display iteration, and
                 // select which WritesBefore/AfterRead apply to it
-                frame.DisplayFrameIndex = 0;
-                if (frame.DisplayFrameSpans.Length == 0)
+                iteration.DisplayFrameIndex = 0;
+                if (iteration.DisplayFrameSpans.Length == 0)
                 {
-                    frame.WritesBeforeDisplayRead = 0;
-                    frame.WritesAfterDisplayRead = 0;
+                    iteration.WritesBeforeDisplayRead = 0;
+                    iteration.WritesAfterDisplayRead = 0;
                 }
-                else if (frame.DisplayFrameSpans[0].StartCycleCount >= frame.StartCycleCount)
+                else if (iteration.DisplayFrameSpans[0].StartCycleCount >= iteration.StartCycleCount)
                 {
-                    frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
-                    frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
+                    iteration.WritesBeforeDisplayRead = iteration.WritesBeforeDisplayReadNext;
+                    iteration.WritesAfterDisplayRead = iteration.WritesAfterDisplayReadNext;
                 }
-                else if (frame.DisplayFrameSpans.Length > 1 &&
-                         overlap(frame.DisplayFrameSpans[1], frame) > overlap(frame.DisplayFrameSpans[0], frame))
+                else if (iteration.DisplayFrameSpans.Length > 1 &&
+                         overlap(iteration.DisplayFrameSpans[1], iteration) > overlap(iteration.DisplayFrameSpans[0], iteration))
                 {
-                    frame.DisplayFrameIndex = 1;
-                    frame.WritesBeforeDisplayRead = frame.WritesBeforeDisplayReadNext;
-                    frame.WritesAfterDisplayRead = frame.WritesAfterDisplayReadNext;
+                    iteration.DisplayFrameIndex = 1;
+                    iteration.WritesBeforeDisplayRead = iteration.WritesBeforeDisplayReadNext;
+                    iteration.WritesAfterDisplayRead = iteration.WritesAfterDisplayReadNext;
                 }
 
-                frame.WritesBeforeDisplayReadNext = 0; // clear as no longer used
-                frame.WritesAfterDisplayReadNext = 0; // clear as no longer used
+                iteration.WritesBeforeDisplayReadNext = 0; // clear as no longer used
+                iteration.WritesAfterDisplayReadNext = 0; // clear as no longer used
 
-                int overlap(Frame.DisplayFrameSpan span, Frame frame)
+                int overlap(MetricIteration.DisplayFrameSpan span, MetricIteration iteration)
                 {
                     int length = span.EndCycleCount - span.StartCycleCount;
-                    if (span.StartCycleCount < frame.StartCycleCount)
-                        length -= frame.StartCycleCount - span.StartCycleCount;
-                    if (span.EndCycleCount > frame.EndCycleCount)
-                        length -= span.EndCycleCount - frame.EndCycleCount;
+                    if (span.StartCycleCount < iteration.StartCycleCount)
+                        length -= iteration.StartCycleCount - span.StartCycleCount;
+                    if (span.EndCycleCount > iteration.EndCycleCount)
+                        length -= span.EndCycleCount - iteration.EndCycleCount;
                     return length;
                 }
             }
 
             // set display offsets
-            foreach (var frame in Frames)
+            foreach (var iteration in Iterations)
             {
-                if (frame.DisplayFrameSpans.Length > 0)
-                    frame.DisplayFrameOffset = frame.DisplayFrameSpans[frame.DisplayFrameIndex].StartCycleCount - frame.StartCycleCount;
+                if (iteration.DisplayFrameSpans.Length > 0)
+                    iteration.DisplayFrameOffset = iteration.DisplayFrameSpans[iteration.DisplayFrameIndex].StartCycleCount - iteration.StartCycleCount;
                 else
-                    frame.DisplayFrameOffset = 0;
+                    iteration.DisplayFrameOffset = 0;
             }
         }
 
-        private void StartAnalysisFrame(int cycleCount, int instructionIndex)
+        private void StartMetricIteration(int cycleCount, int instructionIndex)
         {
             // remember cycle count
-            _AnalysisFrameState.StartCycleCount = cycleCount;
+            _AnalysisMetricState.StartCycleCount = cycleCount;
 
-            // remember initial display frame number
-            _AnalysisFrameState.InitialDisplayFrameNumber = _DisplayState.FrameNumber;
+            // remember initial display iteration number
+            _AnalysisMetricState.InitialDisplayFrameNumber = _DisplayState.FrameNumber;
 
             // reset counts (for initial and next display frames)
-            _AnalysisFrameState.WritesBeforeDisplayRead = 0;
-            _AnalysisFrameState.WritesAfterDisplayRead = 0;
-            _AnalysisFrameState.WritesBeforeDisplayReadNext = 0;
-            _AnalysisFrameState.WritesAfterDisplayReadNext = 0;
+            _AnalysisMetricState.WritesBeforeDisplayRead = 0;
+            _AnalysisMetricState.WritesAfterDisplayRead = 0;
+            _AnalysisMetricState.WritesBeforeDisplayReadNext = 0;
+            _AnalysisMetricState.WritesAfterDisplayReadNext = 0;
 
-            // find end instruction index based on frame settings
-            _AnalysisFrameState.EndInstructionIndex = -1;
-            switch (_AnalysisFrameState.FrameSettings!.Type)
+            // find end instruction index based on metric settings
+            _AnalysisMetricState.EndInstructionIndex = -1;
+            switch (_AnalysisMetricState.Metric!.Type)
             {
-                case FrameSettings.FrameType.StartAndEndAddresses:
-                    _AnalysisFrameState.EndInstructionIndex = FindInstructionIndex(instructionIndex + 1, _AnalysisFrameState.FrameSettings.EndAddress);
+                case Metric.MetricType.StartAndEndAddresses:
+                    _AnalysisMetricState.EndInstructionIndex = FindInstructionIndex(instructionIndex + 1, _AnalysisMetricState.Metric.EndAddress);
                     break;
 
-                case FrameSettings.FrameType.RoutineAddress:
+                case Metric.MetricType.RoutineAddress:
                     var stackFrame = FindStackFrame(instructionIndex);
-                    _AnalysisFrameState.EndInstructionIndex = stackFrame.LastInstructionIndex;
+                    _AnalysisMetricState.EndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
 
-                case FrameSettings.FrameType.JSRAddress:
+                case Metric.MetricType.JSRAddress:
                     var destinationAddress = _Instructions[instructionIndex].DestinationAddress;
                     var destinationInstructionIndex = FindInstructionIndex(instructionIndex + 1, destinationAddress);
 
                     stackFrame = FindStackFrame(destinationInstructionIndex);
-                    _AnalysisFrameState.EndInstructionIndex = stackFrame.LastInstructionIndex;
+                    _AnalysisMetricState.EndInstructionIndex = stackFrame.LastInstructionIndex;
                     break;
             }
         }
 
-        private void EndAnalysisFrame(int cycleCount, int instructionIndex)
+        private void EndMetricIteration(int cycleCount, int instructionIndex)
         {
-            // create analysis frame
-            Frames.Add(new FrameAnalysis.Frame()
+            // create metric iteration
+            Iterations.Add(new MetricAnalysis.MetricIteration()
             {
-                FrameNumber = _AnalysisFrameState.FrameNumber++,
-                StartCycleCount = _AnalysisFrameState.StartCycleCount,
+                IterationNumber = _AnalysisMetricState.IterationNumber++,
+                StartCycleCount = _AnalysisMetricState.StartCycleCount,
                 EndCycleCount = cycleCount,
-                WritesBeforeDisplayRead = _AnalysisFrameState.WritesBeforeDisplayRead,
-                WritesAfterDisplayRead = _AnalysisFrameState.WritesAfterDisplayRead,
-                WritesBeforeDisplayReadNext = _AnalysisFrameState.WritesBeforeDisplayReadNext,
-                WritesAfterDisplayReadNext = _AnalysisFrameState.WritesAfterDisplayReadNext,
+                WritesBeforeDisplayRead = _AnalysisMetricState.WritesBeforeDisplayRead,
+                WritesAfterDisplayRead = _AnalysisMetricState.WritesAfterDisplayRead,
+                WritesBeforeDisplayReadNext = _AnalysisMetricState.WritesBeforeDisplayReadNext,
+                WritesAfterDisplayReadNext = _AnalysisMetricState.WritesAfterDisplayReadNext,
             });
 
             // find next start instruction
-            if (_AnalysisFrameState.FrameSettings!.Type == FrameSettings.FrameType.StartAndEndAddresses &&
-                _AnalysisFrameState.FrameSettings.StartAddress.Equals(_AnalysisFrameState.FrameSettings.EndAddress))
-                _AnalysisFrameState.StartInstructionIndex = instructionIndex;
+            if (_AnalysisMetricState.Metric!.Type == Metric.MetricType.StartAndEndAddresses &&
+                _AnalysisMetricState.Metric.StartAddress.Equals(_AnalysisMetricState.Metric.EndAddress))
+                _AnalysisMetricState.StartInstructionIndex = instructionIndex;
             else
-                _AnalysisFrameState.StartInstructionIndex = FindInstructionIndex(instructionIndex + 1, _AnalysisFrameState.FrameSettings!.StartAddress);
+                _AnalysisMetricState.StartInstructionIndex = FindInstructionIndex(instructionIndex + 1, _AnalysisMetricState.Metric!.StartAddress);
 
-            _AnalysisFrameState.EndInstructionIndex = -1;
+            _AnalysisMetricState.EndInstructionIndex = -1;
         }
 
         private int FindInstructionIndex(int indexFrom, CanonicalAddress address)
@@ -560,7 +560,7 @@ namespace BeebPerf
             }
             else if (_DisplayState.FrameNumber == 0)
             {
-                return; // ignore split screen frames that occur before the first true frame
+                return; // ignore split screen frames that occur before the first true iteration frame
             }
 
             // update video state
@@ -602,7 +602,7 @@ namespace BeebPerf
                     _CRTCState.VideoOutputEnabled &&
                     _CRTCState.DisplayScanline < 312)
                 {
-                    // update variables used to extract the image from the frame buffer
+                    // update variables used to extract the image from the frane buffer
                     _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
                     _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
                     _DisplayState.EndCycleCount = _DisplayState.CharacterCycleCount;
@@ -664,36 +664,36 @@ namespace BeebPerf
                     _ScreenMemory.Memory[address] = value;
 
                     if (IsScreenAddress(address))
-                        displayFrame = _AnalysisFrameState.MemoryDisplayFrame[address];
+                        displayFrame = _AnalysisMetricState.MemoryDisplayFrame[address];
                 }
                 else if (memoryAddress.Page == MemoryPage.ShadowRam)
                 {
                     _ScreenMemory.ShadowRam[address - 0x3000] = value;
 
                     if (IsScreenAddress(address))
-                        displayFrame = _AnalysisFrameState.ShadowRamDisplayFrame[address - 0x3000];
+                        displayFrame = _AnalysisMetricState.ShadowRamDisplayFrame[address - 0x3000];
                 }
                 else if (memoryAddress.Page == MemoryPage.FilingSystemRam)
                 {
                     _ScreenMemory.FilingSystemRam[address - 0xC000] = value;
 
                     if (IsScreenAddress(address))
-                        displayFrame = _AnalysisFrameState.FilingSystemRamDisplayFrame[address - 0xC000];
+                        displayFrame = _AnalysisMetricState.FilingSystemRamDisplayFrame[address - 0xC000];
                 }
 
                 if (displayFrame != -1)
                 {
                     // increment counts for initial display frame
-                    if (displayFrame < _AnalysisFrameState.InitialDisplayFrameNumber)
-                        _AnalysisFrameState.WritesBeforeDisplayRead++;
+                    if (displayFrame < _AnalysisMetricState.InitialDisplayFrameNumber)
+                        _AnalysisMetricState.WritesBeforeDisplayRead++;
                     else
-                        _AnalysisFrameState.WritesAfterDisplayRead++;
+                        _AnalysisMetricState.WritesAfterDisplayRead++;
 
                     // increment counts for next display frame
-                    if (displayFrame < _AnalysisFrameState.InitialDisplayFrameNumber + 1)
-                        _AnalysisFrameState.WritesBeforeDisplayReadNext++;
+                    if (displayFrame < _AnalysisMetricState.InitialDisplayFrameNumber + 1)
+                        _AnalysisMetricState.WritesBeforeDisplayReadNext++;
                     else
-                        _AnalysisFrameState.WritesAfterDisplayReadNext++;
+                        _AnalysisMetricState.WritesAfterDisplayReadNext++;
                 }
 
                 return;
@@ -764,7 +764,7 @@ namespace BeebPerf
                         if (value > 7 != _CRTCState.Register9_ScanlinesPerCharacter > 7)
                         {
                             // if crossing the 8 scanlines per character threshold, treat as a mode transition
-                            // so frame's top and bottom scanlines are not constrained by the previous frame
+                            // so frame's top and bottom scanlines are not constrained by the previous iteration
                             _DisplayState.ModeTransition = true;
                             _DisplayState.PreviousFirstDisplayScanline = -1;
                             _DisplayState.PreviousLastDisplayScanline = -1;
@@ -917,25 +917,25 @@ namespace BeebPerf
                     if (_BBCModel == BBCModelType.Master128 || _BBCModel == BBCModelType.MasterET)
                     {
                         address -= 0xC000;
-                        _AnalysisFrameState.FilingSystemRamDisplayFrame[address] = _DisplayState.FrameNumber;
+                        _AnalysisMetricState.FilingSystemRamDisplayFrame[address] = _DisplayState.FrameNumber;
                         return _ScreenMemory.FilingSystemRam[address];
                     }
                     else
                     {
-                        _AnalysisFrameState.MemoryDisplayFrame[address] = _DisplayState.FrameNumber;
+                        _AnalysisMetricState.MemoryDisplayFrame[address] = _DisplayState.FrameNumber;
                         return _ScreenMemory.Memory[address];
                     }
                 }
                 else
                 {
                     address -= 0x3000;
-                    _AnalysisFrameState.ShadowRamDisplayFrame[address] = _DisplayState.FrameNumber;
+                    _AnalysisMetricState.ShadowRamDisplayFrame[address] = _DisplayState.FrameNumber;
                     return _ScreenMemory.ShadowRam[address];
                 }
             }
             else
             {
-                _AnalysisFrameState.MemoryDisplayFrame[address] = _DisplayState.FrameNumber;
+                _AnalysisMetricState.MemoryDisplayFrame[address] = _DisplayState.FrameNumber;
                 return _ScreenMemory.Memory[address];
             }
         }
@@ -1613,7 +1613,7 @@ namespace BeebPerf
             }
         }
 
-        public class Frame
+        public class MetricIteration
         {
             public struct DisplayFrameSpan
             {
@@ -1622,7 +1622,7 @@ namespace BeebPerf
                 public required int EndCycleCount;
             }
 
-            public required int FrameNumber; // 1, 2, 3...
+            public required int IterationNumber; // 1, 2, 3...
             public required int StartCycleCount;
             public required int EndCycleCount;
             public required int WritesBeforeDisplayRead;
@@ -1643,7 +1643,7 @@ namespace BeebPerf
             public float AspectRatio;
         }
 
-        public List<Frame> Frames = [];
+        public List<MetricIteration> Iterations = [];
         public List<DisplayFrame> DisplayFrames = [];
 
         private model.StackFrame? _RootStackFrame = null;
@@ -1651,12 +1651,12 @@ namespace BeebPerf
         private InstructionSet? _InstructionSet;
         private BBCModelType _BBCModel;
 
-        // analysis frame state
-        private struct AnalysisFrameState
+        // analysis metric state
+        private struct AnalysisMetricState
         {
-            public AnalysisFrameState() { }
+            public AnalysisMetricState() { }
 
-            public FrameSettings? FrameSettings;
+            public Metric? Metric;
             public int WritesBeforeDisplayRead;
             public int WritesAfterDisplayRead;
             public int WritesBeforeDisplayReadNext;
@@ -1664,14 +1664,14 @@ namespace BeebPerf
             public int StartInstructionIndex;
             public int EndInstructionIndex;
             public int StartCycleCount;
-            public int FrameNumber;
+            public int IterationNumber;
             public int InitialDisplayFrameNumber;
             
             public int[] MemoryDisplayFrame = [];
             public int[] ShadowRamDisplayFrame = [];
             public int[] FilingSystemRamDisplayFrame = [];
         }
-        private AnalysisFrameState _AnalysisFrameState = new();
+        private AnalysisMetricState _AnalysisMetricState = new();
 
         // display state
         private struct DisplayState

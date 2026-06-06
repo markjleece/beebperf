@@ -24,7 +24,7 @@ using System.Runtime.InteropServices;
 
 namespace BeebPerf.ux
 {
-    public partial class FrameSettingsDialog : Form
+    public partial class MetricDialog : Form
     {
         public enum DialogMode
         {
@@ -32,16 +32,16 @@ namespace BeebPerf.ux
             Edit
         }
 
-        public FrameSettingsDialog(
+        public MetricDialog(
             DialogMode dialogMode, 
-            FrameSettings frameSettings, 
+            Metric metric, 
             List<string> reservedNames, 
             Instruction[] instructions,
             BeebPerfForm form)
         {
             _DialogMode = dialogMode;
             _ReservedNames = reservedNames;
-            _FrameSettings = frameSettings;
+            _FrameSettings = metric;
             _Instructions = instructions;
 
             InitializeComponent();
@@ -49,8 +49,8 @@ namespace BeebPerf.ux
 
             Text = dialogMode switch
             {
-                DialogMode.New => "New Frame Settings",
-                DialogMode.Edit => "Edit Frame Settings",
+                DialogMode.New => "New Metric",
+                DialogMode.Edit => "Edit Metric",
                 _ => throw new InvalidOperationException()
             };
 
@@ -79,7 +79,7 @@ namespace BeebPerf.ux
             // start and end addresses
             if (_FrameSettings.StartAddress.Address != 0)
                 startTextBox.Text = FormatAddress(_FrameSettings.StartAddress);
-            if (_FrameSettings.EndAddress.Address != 0 && _FrameSettings.Type == FrameSettings.FrameType.StartAndEndAddresses)
+            if (_FrameSettings.EndAddress.Address != 0 && _FrameSettings.Type == Metric.MetricType.StartAndEndAddresses)
                 endTextBox.Text = FormatAddress(_FrameSettings.EndAddress);
 
             // page
@@ -128,19 +128,19 @@ namespace BeebPerf.ux
             var startAddress = ParseAddress(startTextBox);
             var endAddress = ParseAddress(endTextBox);
 
-            var frameType = (FrameSettings.FrameType)(typeComboBox.SelectedIndex + 1);
+            var frameType = (Metric.MetricType)(typeComboBox.SelectedIndex + 1);
             switch (frameType)
             {
-                case FrameSettings.FrameType.StartAndEndAddresses:
+                case Metric.MetricType.StartAndEndAddresses:
                     startLabel.Text = "Start address";
                     endLabel.Text = "End address";
                     break;
 
-                case FrameSettings.FrameType.RoutineAddress:
+                case Metric.MetricType.RoutineAddress:
                     startLabel.Text = "Address";
                     break;
 
-                case FrameSettings.FrameType.JSRAddress:
+                case Metric.MetricType.JSRAddress:
                     startLabel.Text = "Address";
                     break;
             }
@@ -149,7 +149,7 @@ namespace BeebPerf.ux
             startHexLabel.Text = hexPrefix;
             endHexLabel.Text = hexPrefix;
 
-            bool showEndAddress = (frameType == FrameSettings.FrameType.StartAndEndAddresses);
+            bool showEndAddress = (frameType == Metric.MetricType.StartAndEndAddresses);
             endLabel.Visible = showEndAddress;
             endHexLabel.Visible = showEndAddress;
             endTextBox.Visible = showEndAddress;
@@ -197,7 +197,7 @@ namespace BeebPerf.ux
         private Task<(AddressValidationResult startResult, AddressValidationResult endResult)> ValidateAddressesAsync(
             CanonicalAddress startAddress, 
             CanonicalAddress endAddress, 
-            FrameSettings.FrameType frameType)
+            Metric.MetricType frameType)
         {
             CancelAddressValidation();
 
@@ -211,17 +211,17 @@ namespace BeebPerf.ux
 
                 switch (frameType)
                 {
-                    case FrameSettings.FrameType.StartAndEndAddresses:
+                    case Metric.MetricType.StartAndEndAddresses:
                         startResult = ValidateAddressForInstruction(startAddress, cts);
                         endResult = ValidateAddressForInstruction(endAddress, cts);
                         break;
 
-                    case FrameSettings.FrameType.RoutineAddress:
+                    case Metric.MetricType.RoutineAddress:
                         startResult = ValidateAddressForInstruction(startAddress, cts);
                         endResult = new AddressValidationResult(true, string.Empty);
                         break;
 
-                    case FrameSettings.FrameType.JSRAddress:
+                    case Metric.MetricType.JSRAddress:
                         startResult = ValidateAddressForJSR(startAddress, cts);
                         endResult = new AddressValidationResult(true, string.Empty);
                         break;
@@ -372,9 +372,9 @@ namespace BeebPerf.ux
         {
             // commit changes
             _FrameSettings.Name = nameTextBox.Text;
-            _FrameSettings.Type = (FrameSettings.FrameType)(typeComboBox.SelectedIndex + 1);
+            _FrameSettings.Type = (Metric.MetricType)(typeComboBox.SelectedIndex + 1);
             _FrameSettings.StartAddress = ParseAddress(startTextBox);
-            if (_FrameSettings.Type == FrameSettings.FrameType.StartAndEndAddresses)
+            if (_FrameSettings.Type == Metric.MetricType.StartAndEndAddresses)
                 _FrameSettings.EndAddress = ParseAddress(endTextBox);
             else
                 _FrameSettings.EndAddress = new CanonicalAddress();
@@ -474,7 +474,7 @@ namespace BeebPerf.ux
             string ErrorMessage);
 
         private DialogMode _DialogMode;
-        private FrameSettings _FrameSettings;
+        private Metric _FrameSettings;
         private List<string> _ReservedNames;
         private Instruction[] _Instructions;
         private bool _IgnoreChanges = false;

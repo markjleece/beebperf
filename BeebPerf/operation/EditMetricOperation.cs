@@ -25,34 +25,34 @@ using BeebPerf.ux;
 namespace BeebPerf.operation
 {
     //
-    // Edit analysis frame settings UX operation
+    // Edit metric UX operation
     //
-    class EditFrameSettingsOperation : Operation
+    class EditMetricOperation : Operation
     {
-        public EditFrameSettingsOperation(
+        public EditMetricOperation(
             BeebPerfForm form, 
-            FrameSettings frameSettings, 
-            List<FrameSettings> frameSettingsList,
+            Metric metric, 
+            List<Metric> metrics,
             Instruction[] instructions)
         {
             _Form = form;
-            _FrameSettingsList = frameSettingsList;
+            _Metrcis = metrics;
             _Instructions = instructions;
 
             _ReservedNames = [];
-            foreach (FrameSettings settings in frameSettingsList)
-                if (settings != frameSettings)
+            foreach (Metric settings in metrics)
+                if (settings != metric)
                     _ReservedNames.Add(settings.Name);
 
-            _OldFrameSettings = frameSettings;
-            _NewFrameSettings = frameSettings.Clone();
+            _OldMetric = metric;
+            _NewMetric = metric.Clone();
         }
 
         public override bool Execute()
         {
-            var dialog = new FrameSettingsDialog(
-                FrameSettingsDialog.DialogMode.Edit, 
-                _NewFrameSettings, 
+            var dialog = new MetricDialog(
+                MetricDialog.DialogMode.Edit, 
+                _NewMetric, 
                 _ReservedNames, 
                 _Instructions,
                 _Form);
@@ -68,25 +68,25 @@ namespace BeebPerf.operation
 
         public override void Redo()
         {
-            _FrameSettingsList.Remove(_OldFrameSettings);
-            _FrameSettingsList.Add(_NewFrameSettings);
-            _Form.ClearSelectedFrameSettingsInternal();
-            _Form.SetSelectedFrameSettingsInternal(_NewFrameSettings!);
+            _Metrcis.Remove(_OldMetric);
+            _Metrcis.Add(_NewMetric);
+            _Form.ClearSelectedMetricInternal();
+            _Form.SetSelectedMetricInternal(_NewMetric!);
         }
 
         public override void Undo()
         {
-            _FrameSettingsList.Remove(_NewFrameSettings);
-            _FrameSettingsList.Add(_OldFrameSettings);
-            _Form.ClearSelectedFrameSettingsInternal();
-            _Form.SetSelectedFrameSettingsInternal(_OldFrameSettings);
+            _Metrcis.Remove(_NewMetric);
+            _Metrcis.Add(_OldMetric);
+            _Form.ClearSelectedMetricInternal();
+            _Form.SetSelectedMetricInternal(_OldMetric);
         }
 
         private BeebPerfForm _Form;
-        private List<FrameSettings> _FrameSettingsList;
+        private List<Metric> _Metrcis;
         private Instruction[] _Instructions;
         private List<string> _ReservedNames;
-        private FrameSettings _OldFrameSettings;
-        private FrameSettings _NewFrameSettings;
+        private Metric _OldMetric;
+        private Metric _NewMetric;
     }
 }

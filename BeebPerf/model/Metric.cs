@@ -22,15 +22,14 @@
 namespace BeebPerf.model
 {
     // 
-    // Frame settings - used to define what a 'frame' is,
-    // defining the span and threshold settings.
+    // Metric - used to define a metric's span and threshold settings.
     //
     // The span can be defined by setting its type to 
     // start & end address, routine address, of JSR address.
     //
-    public class FrameSettings
+    public class Metric
     {
-        public enum FrameType : int
+        public enum MetricType : int
         {
             None = 0,
             StartAndEndAddresses = 1,
@@ -38,9 +37,9 @@ namespace BeebPerf.model
             JSRAddress = 3
         }
 
-        public FrameSettings Clone()
+        public Metric Clone()
         {
-            return new FrameSettings()
+            return new Metric()
             {
                 Type = Type,
                 Name = Name,
@@ -50,24 +49,24 @@ namespace BeebPerf.model
             };
         }
 
-        static public string Serialize(FrameSettings frameSettings)
+        static public string Serialize(Metric metric)
         {
             return 
-                $"{(int)frameSettings.Type};" +
-                $"{frameSettings.Name};" +
-                $"{frameSettings.StartAddress.Address};" +
-                $"{(int)frameSettings.StartAddress.Page};" +
-                $"{frameSettings.EndAddress.Address};" + 
-                $"{(int)frameSettings.EndAddress.Page};" + 
-                $"{frameSettings.ThresholdCycles}";
+                $"{(int)metric.Type};" +
+                $"{metric.Name};" +
+                $"{metric.StartAddress.Address};" +
+                $"{(int)metric.StartAddress.Page};" +
+                $"{metric.EndAddress.Address};" + 
+                $"{(int)metric.EndAddress.Page};" + 
+                $"{metric.ThresholdCycles}";
         }
 
-        static public FrameSettings DeSerialize(string encoding)
+        static public Metric DeSerialize(string encoding)
         {
             var parts = encoding.Split(';');
-            return new FrameSettings()
+            return new Metric()
             {
-                Type = (FrameType)int.Parse(parts[0]),
+                Type = (MetricType)int.Parse(parts[0]),
                 Name = parts[1],
                 StartAddress = new CanonicalAddress(ushort.Parse(parts[2]), (MemoryPage)int.Parse(parts[3])),
                 EndAddress = new CanonicalAddress(ushort.Parse(parts[4]), (MemoryPage)int.Parse(parts[5])),
@@ -79,12 +78,12 @@ namespace BeebPerf.model
         {
             return Type switch
             {
-                FrameSettings.FrameType.StartAndEndAddresses =>
+                Metric.MetricType.StartAndEndAddresses =>
                     AddressMatchesInstruction(StartAddress, instructions) &&
                     AddressMatchesInstruction(EndAddress, instructions),
-                FrameSettings.FrameType.RoutineAddress =>
+                Metric.MetricType.RoutineAddress =>
                     AddressMatchesInstruction(StartAddress, instructions),
-                FrameSettings.FrameType.JSRAddress =>
+                Metric.MetricType.JSRAddress =>
                     AddressMatchesJSRInstruction(StartAddress, instructions),
                 _ => false
             };
@@ -116,7 +115,7 @@ namespace BeebPerf.model
         }
 
 
-        public required FrameType Type;
+        public required MetricType Type;
         public required string Name;
         public required CanonicalAddress StartAddress;
         public required CanonicalAddress EndAddress;

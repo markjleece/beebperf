@@ -25,15 +25,15 @@ using BeebPerf.ux;
 namespace BeebPerf.operation
 {
     //
-    // Select analysis frame settings UX operation
+    // Remove metric operation
     //
-    class SelectFrameSettingsOperation : Operation
+    class RemoveMetricOperation : Operation
     {
-        public SelectFrameSettingsOperation(BeebPerfForm form, FrameSettings? newFrameSettings, FrameSettings? oldFrameSettings)
+        public RemoveMetricOperation(BeebPerfForm form, Metric metric, List<Metric> metrics)
         {
             _Form = form;
-            _NewFrameSettings = newFrameSettings;
-            _OldFrameSettings = oldFrameSettings;
+            _Metrics = metrics;
+            _Metric = metric;
         }
 
         public override bool Execute()
@@ -44,22 +44,18 @@ namespace BeebPerf.operation
 
         public override void Redo()
         {
-            if (_NewFrameSettings != null)
-                _Form.SetSelectedFrameSettingsInternal(_NewFrameSettings);
-            else
-                _Form.ClearSelectedFrameSettingsInternal();
+            _Metrics.Remove(_Metric);
+            _Form.ClearSelectedMetricInternal();
         }
 
         public override void Undo()
         {
-            if (_OldFrameSettings != null)
-                _Form.SetSelectedFrameSettingsInternal(_OldFrameSettings);
-            else
-                _Form.ClearSelectedMemoryAddressInternal();
+            _Metrics.Add(_Metric);
+            _Form.SetSelectedMetricInternal(_Metric);
         }
 
         private BeebPerfForm _Form;
-        private FrameSettings? _NewFrameSettings;
-        private FrameSettings? _OldFrameSettings;
+        private Metric _Metric;
+        private List<Metric> _Metrics;
     }
 }

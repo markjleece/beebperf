@@ -62,14 +62,14 @@ namespace BeebPerf.ux
             routinesView = new RoutinesView();
             flameGraphTabPage = new Panel();
             memoryTabPage = new Panel();
-            framesTabPage = new Panel();
+            metricsTabPage = new Panel();
             codeView = new CodeView();
             callerCalleeView = new CallerCalleeView();
             flameGraphView = new FlameGraphView();
             memoryZeroPageCheckBox = new CheckBox();
             memoryView = new MemoryView();
             memoryRoutinesView = new MemoryRoutinesView();
-            framesView = new FramesView();
+            metricsView = new MetricsView();
             spinner = new Spinner();
 
             toolStrip.SuspendLayout();
@@ -316,7 +316,7 @@ namespace BeebPerf.ux
             tabControl.Controls.Add(routinesTabPage);
             tabControl.Controls.Add(callerCalleeTabPage);
             tabControl.Controls.Add(memoryTabPage);
-            tabControl.Controls.Add(framesTabPage);
+            tabControl.Controls.Add(metricsTabPage);
             tabControl.SelectedIndex = 0;
             tabControl.Dock = DockStyle.Fill;
             tabControl.Location = new Point(0, 0);
@@ -453,24 +453,24 @@ namespace BeebPerf.ux
             memoryRoutinesView.Size = new Size(1745, 487);
             memoryRoutinesView.TabIndex = 0;
             // 
-            // framesTabPage
+            // metricsTabPage
             // 
-            framesTabPage.Controls.Add(framesView);
-            framesTabPage.BackColor = SystemColors.Window;
-            framesTabPage.Dock = DockStyle.Fill;
-            framesTabPage.Name = "framesTabPage";
-            framesTabPage.Padding = new Padding(3);
-            framesTabPage.TabIndex = 0;
-            framesTabPage.Text = "Frames";
+            metricsTabPage.Controls.Add(metricsView);
+            metricsTabPage.BackColor = SystemColors.Window;
+            metricsTabPage.Dock = DockStyle.Fill;
+            metricsTabPage.Name = "metricsTabPage";
+            metricsTabPage.Padding = new Padding(3);
+            metricsTabPage.TabIndex = 0;
+            metricsTabPage.Text = "Metrics";
             // 
-            // framesView
+            // metricsView
             // 
-            framesView.BackColor = SystemColors.Control;
-            framesView.Dock = DockStyle.Fill;
-            framesView.Location = new Point(3, 3);
-            framesView.Name = "framesView";
-            framesView.Size = new Size(1731, 442);
-            framesView.TabIndex = 0;
+            metricsView.BackColor = SystemColors.Control;
+            metricsView.Dock = DockStyle.Fill;
+            metricsView.Location = new Point(3, 3);
+            metricsView.Name = "metricsView";
+            metricsView.Size = new Size(1731, 442);
+            metricsView.TabIndex = 0;
             // 
             // codeView
             // 
@@ -538,7 +538,7 @@ namespace BeebPerf.ux
         private Panel routinesTabPage;
         private Panel callerCalleeTabPage;
         private Panel memoryTabPage;
-        private Panel framesTabPage;
+        private Panel metricsTabPage;
         private RoutinesView routinesView;
         private CallTreeView callTreeView;
         private CodeView codeView;
@@ -548,7 +548,7 @@ namespace BeebPerf.ux
         private CheckBox memoryZeroPageCheckBox;
         private MemoryView memoryView;
         private MemoryRoutinesView memoryRoutinesView;
-        private FramesView framesView;
+        private MetricsView metricsView;
         private Spinner spinner;
     }
 }

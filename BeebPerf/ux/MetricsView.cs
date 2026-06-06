@@ -24,17 +24,17 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace BeebPerf.ux
 {
-    internal class FramesView : Panel
+    internal class MetricsView : Panel
     {
-        public FramesView() : base()
+        public MetricsView() : base()
         {
             InitializeComponent();
             UpdateState();
         }
 
-        public void SetSettings(
-            List<FrameSettings> frameSettingsList,
-            FrameSettings? selectedFrameSettings)
+        public void SetMetrics(
+            List<Metric> frameSettingsList,
+            Metric? selectedFrameSettings)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
@@ -44,20 +44,20 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
-        public void SetResults(List<FrameAnalysis.Frame> frames)
+        public void SetIteractions(List<MetricAnalysis.MetricIteration> iterations)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            _Frames = frames;
+            _Iterations = iterations;
 
             // determine whether to highlight writes before or writes after
             int totalWritesBeforeDisplay = 0;
             int totalWritesAfterDisplay = 0;
-            foreach (var frame in frames)
+            foreach (var iteration in iterations)
             {
-                totalWritesBeforeDisplay += frame.WritesBeforeDisplayRead;
-                totalWritesAfterDisplay += frame.WritesAfterDisplayRead;
+                totalWritesBeforeDisplay += iteration.WritesBeforeDisplayRead;
+                totalWritesAfterDisplay += iteration.WritesAfterDisplayRead;
             }
 
             bool highlightWritesBeforeDisplay = false;
@@ -69,7 +69,7 @@ namespace BeebPerf.ux
             }
 
             // initialize grid
-            _GridView.Initialize(_Frames, _SelectedFrameSettings, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
+            _GridView.Initialize(_Iterations, _SelectedFrameSettings, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
 
             UpdateSummaryText(highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
             UpdateState();
@@ -80,42 +80,42 @@ namespace BeebPerf.ux
             bool highlightWritesAfterDisplay)
         {
             string text = string.Empty;
-            if (_Frames.Count > 0)
+            if (_Iterations.Count > 0)
             {
                 if (_SelectedFrameSettings != null && _SelectedFrameSettings.ThresholdCycles > 0)
                 {
                     int frameDuractionExceedsThresholdCount = 0;
-                    foreach (var frame in _Frames)
-                        if (frame.EndCycleCount - frame.StartCycleCount > _SelectedFrameSettings.ThresholdCycles)
+                    foreach (var iteration in _Iterations)
+                        if (iteration.EndCycleCount - iteration.StartCycleCount > _SelectedFrameSettings.ThresholdCycles)
                             frameDuractionExceedsThresholdCount++;
 
-                    double frameDurationExceedsThresholdPercentage = 100.0 * (double)frameDuractionExceedsThresholdCount / (double)_Frames.Count;
-                    text = $"Frames exceeding threshold: {frameDurationExceedsThresholdPercentage:F2}%. ";
+                    double frameDurationExceedsThresholdPercentage = 100.0 * (double)frameDuractionExceedsThresholdCount / (double)_Iterations.Count;
+                    text = $"Iterations exceeding threshold: {frameDurationExceedsThresholdPercentage:F2}%. ";
                 }
 
                 int totalWriteCount = 0;
                 int totalMissTimedWriteCount = 0;
                 int frameWithMissTimesWriteCount = 0;
-                foreach (var frame in _Frames)
+                foreach (var iteration in _Iterations)
                 {
-                    totalWriteCount += frame.WritesBeforeDisplayRead + frame.WritesAfterDisplayRead;
+                    totalWriteCount += iteration.WritesBeforeDisplayRead + iteration.WritesAfterDisplayRead;
 
-                    if (highlightWritesBeforeDisplay && frame.WritesBeforeDisplayRead > 0)
+                    if (highlightWritesBeforeDisplay && iteration.WritesBeforeDisplayRead > 0)
                     {
-                        totalMissTimedWriteCount += frame.WritesBeforeDisplayRead;
+                        totalMissTimedWriteCount += iteration.WritesBeforeDisplayRead;
                         frameWithMissTimesWriteCount++;
                     }
 
-                    if (highlightWritesAfterDisplay && frame.WritesAfterDisplayRead > 0)
+                    if (highlightWritesAfterDisplay && iteration.WritesAfterDisplayRead > 0)
                     {
-                        totalMissTimedWriteCount += frame.WritesAfterDisplayRead;
+                        totalMissTimedWriteCount += iteration.WritesAfterDisplayRead;
                         frameWithMissTimesWriteCount++;
                     }
                 }
 
-                double frameMissTimedWritePercentage = 100.0 * (double)frameWithMissTimesWriteCount / (double)_Frames.Count;
+                double frameMissTimedWritePercentage = 100.0 * (double)frameWithMissTimesWriteCount / (double)_Iterations.Count;
                 double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
-                text += $"Frames with miss-timed writes: {frameMissTimedWritePercentage:F2}%, " +
+                text += $"Iterations with miss-timed writes: {frameMissTimedWritePercentage:F2}%, " +
                         $"Total miss-timed writes: {overallMissTimedWritePercentage:F2}%";
             }
 
@@ -130,7 +130,7 @@ namespace BeebPerf.ux
             _GridView.SelectRange(analysisFrom, analysisTo);
         }
 
-        private void SettingsComboBox_SelectedIndexChanged(object? sender, EventArgs e)
+        private void MetricComboBox_SelectedIndexChanged(object? sender, EventArgs e)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
@@ -146,7 +146,7 @@ namespace BeebPerf.ux
                 if (settings.Name == comboBox.SelectedItem as string)
                 {
                     _SelectedFrameSettings = settings;
-                    form.SetSelectedFrameSettings(settings);
+                    form.SetSelectedMetric(settings);
                     break;
                 }
             }
@@ -157,7 +157,7 @@ namespace BeebPerf.ux
             var form = FindForm() as BeebPerfForm;
             if (form == null) return;
 
-            form.AddFrameSettings();
+            form.AddMetric();
         }
 
         private void EditButton_Click(object? sender, EventArgs e)
@@ -165,7 +165,7 @@ namespace BeebPerf.ux
             var form = FindForm() as BeebPerfForm;
             if (form == null) return;
 
-            form.EditFrameSettings();
+            form.EditMetric();
         }
 
         private void RemoveButton_Click(object? sender, EventArgs e)
@@ -173,7 +173,7 @@ namespace BeebPerf.ux
             var form = FindForm() as BeebPerfForm;
             if (form == null) return;
 
-            form.RemoveFrameSettings();
+            form.RemoveMetric();
         }
 
         private void CopyButton_Click(object? sender, EventArgs e)
@@ -192,41 +192,41 @@ namespace BeebPerf.ux
             Exporter.ExportCSVFile(form, _GridView);
         }
 
-        [MemberNotNull(nameof(_SettingsLabel), nameof(_SettingsComboBox), nameof(_SettingsComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_StatusLabel), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
+        [MemberNotNull(nameof(_MetricLabel), nameof(_MetricComboBox), nameof(_MetricComboBoxPanel), nameof(_AddButton), nameof(_EditButton), nameof(_StatusLabel), nameof(_RemoveButton), nameof(_CopyButton), nameof(_ExportButton), nameof(_GridView))]
         private void InitializeComponent()
         {
             // 
-            // _SettingsLabel
+            // _MetricLabel
             // 
-            _SettingsLabel = new();
-            _SettingsLabel.AutoSize = true;
-            _SettingsLabel.Font = new Font("Segoe UI", 9F);
-            _SettingsLabel.Name = "settingsLabel";
-            _SettingsLabel.Size = new Size(101, 25);
-            _SettingsLabel.TabIndex = 0;
-            _SettingsLabel.Text = "Settings:";
+            _MetricLabel = new();
+            _MetricLabel.AutoSize = true;
+            _MetricLabel.Font = new Font("Segoe UI", 9F);
+            _MetricLabel.Name = "settingsLabel";
+            _MetricLabel.Size = new Size(101, 25);
+            _MetricLabel.TabIndex = 0;
+            _MetricLabel.Text = "Metric:";
             // 
             // _SettingComboBox
             // 
-            _SettingsComboBox = new();
-            _SettingsComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _SettingsComboBox.Font = new Font("Segoe UI", 9F);
-            _SettingsComboBox.FormattingEnabled = true;
-            _SettingsComboBox.Name = "settingsComboBox";
-            _SettingsComboBox.TabIndex = 0;
-            _SettingsComboBox.Location = new Point(0, 0);
-            _SettingsComboBox.Size = new Size(200, 33);
-            _SettingsComboBox.SelectedIndexChanged += SettingsComboBox_SelectedIndexChanged;
+            _MetricComboBox = new();
+            _MetricComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _MetricComboBox.Font = new Font("Segoe UI", 9F);
+            _MetricComboBox.FormattingEnabled = true;
+            _MetricComboBox.Name = "settingsComboBox";
+            _MetricComboBox.TabIndex = 0;
+            _MetricComboBox.Location = new Point(0, 0);
+            _MetricComboBox.Size = new Size(200, 33);
+            _MetricComboBox.SelectedIndexChanged += MetricComboBox_SelectedIndexChanged;
             //
-            // _SettingsComboBoxPanel
+            // _MetricComboBoxPanel
             //
-            _SettingsComboBoxPanel = new();
-            _SettingsComboBoxPanel.BorderStyle = BorderStyle.FixedSingle;
-            _SettingsComboBoxPanel.BackColor = SystemColors.Window;
-            _SettingsComboBoxPanel.Size = new Size(200, 33);
-            _SettingsComboBoxPanel.AutoSize = false;
-            _SettingsComboBoxPanel.TabIndex = 0;
-            _SettingsComboBoxPanel.Controls.Add(_SettingsComboBox);
+            _MetricComboBoxPanel = new();
+            _MetricComboBoxPanel.BorderStyle = BorderStyle.FixedSingle;
+            _MetricComboBoxPanel.BackColor = SystemColors.Window;
+            _MetricComboBoxPanel.Size = new Size(200, 33);
+            _MetricComboBoxPanel.AutoSize = false;
+            _MetricComboBoxPanel.TabIndex = 0;
+            _MetricComboBoxPanel.Controls.Add(_MetricComboBox);
             // 
             // _AddButton
             // 
@@ -281,7 +281,7 @@ namespace BeebPerf.ux
             // 
             // _GridView
             // 
-            _GridView = new FramesGridView();
+            _GridView = new MetricsGridView();
             _GridView.BackColor = SystemColors.Control;
             // 
             // _StatusLabel
@@ -295,8 +295,8 @@ namespace BeebPerf.ux
             // 
             // FramesView - Add controls directly
             // 
-            Controls.Add(_SettingsLabel);
-            Controls.Add(_SettingsComboBoxPanel);
+            Controls.Add(_MetricLabel);
+            Controls.Add(_MetricComboBoxPanel);
             Controls.Add(_AddButton);
             Controls.Add(_EditButton);
             Controls.Add(_RemoveButton);
@@ -312,8 +312,8 @@ namespace BeebPerf.ux
 
             // layout children
             Control[] leftAlignedControls = [
-                _SettingsLabel,
-                _SettingsComboBoxPanel,
+                _MetricLabel,
+                _MetricComboBoxPanel,
                 _AddButton,
                 _EditButton,
                 _RemoveButton ];
@@ -367,7 +367,7 @@ namespace BeebPerf.ux
 
         private void UpdateState()
         {
-            _SettingsComboBox.Items.Clear();
+            _MetricComboBox.Items.Clear();
 
             bool hasSettings = _FrameSettingsList != null && _FrameSettingsList.Count > 0;
             if (hasSettings)
@@ -375,14 +375,14 @@ namespace BeebPerf.ux
                 int selectedIndex = -1;
                 foreach (var setting in _FrameSettingsList!)
                 {
-                    _SettingsComboBox.Items.Add(setting.Name);
+                    _MetricComboBox.Items.Add(setting.Name);
                     if (_SelectedFrameSettings != null && setting.Name == _SelectedFrameSettings.Name)
-                        selectedIndex = _SettingsComboBox.Items.Count - 1;
+                        selectedIndex = _MetricComboBox.Items.Count - 1;
                 }
-                _SettingsComboBox.SelectedIndex = selectedIndex;
+                _MetricComboBox.SelectedIndex = selectedIndex;
             }
 
-            _SettingsComboBoxPanel.Visible = hasSettings;
+            _MetricComboBoxPanel.Visible = hasSettings;
 
             _EditButton.Visible = hasSettings;
             _EditButton.Enabled = _SelectedFrameSettings != null;
@@ -392,25 +392,25 @@ namespace BeebPerf.ux
 
             _StatusLabel.Visible = _StatusLabel.Text.Length > 0;
 
-            _CopyButton.Visible = _Frames.Count > 0;
-            _ExportButton.Visible = _Frames.Count > 0;
+            _CopyButton.Visible = _Iterations.Count > 0;
+            _ExportButton.Visible = _Iterations.Count > 0;
         }
 
-        private List<FrameAnalysis.Frame> _Frames = [];
-        private List<FrameSettings>? _FrameSettingsList = [];
-        private FrameSettings? _SelectedFrameSettings = null;
+        private List<MetricAnalysis.MetricIteration> _Iterations = [];
+        private List<Metric>? _FrameSettingsList = [];
+        private Metric? _SelectedFrameSettings = null;
         private ReentrancyGuard _ReentrancyGuard = new();
 
         // controls
-        private Label _SettingsLabel;
-        private Panel _SettingsComboBoxPanel;
-        private ComboBox _SettingsComboBox;
+        private Label _MetricLabel;
+        private Panel _MetricComboBoxPanel;
+        private ComboBox _MetricComboBox;
         private Button _AddButton;
         private Button _EditButton;
         private Button _RemoveButton;
         private Label _StatusLabel;
         private ButtonEx _CopyButton;
         private ButtonEx _ExportButton;
-        private FramesGridView _GridView;
+        private MetricsGridView _GridView;
     }
 }

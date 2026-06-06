@@ -1,6 +1,6 @@
 ﻿namespace BeebPerf.ux
 {
-    partial class FrameSettingsDialog
+    partial class MetricDialog
     {
         /// <summary>
         /// Required designer variable.
@@ -325,7 +325,7 @@
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             // 
-            // FrameSettingsDialog
+            // MetricsDialog
             // 
             AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -343,8 +343,8 @@
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "FrameSettingsDialog";
-            Text = "Frame Settings";
+            Name = "MetricsDialog";
+            Text = "MetricIteration Settings";
             spanGroupBox.ResumeLayout(false);
             spanGroupBox.PerformLayout();
             thresholdGroupBox.ResumeLayout(false);
