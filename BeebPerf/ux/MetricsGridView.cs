@@ -68,9 +68,7 @@ namespace BeebPerf.ux
             SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "CPU cycles to start of display memory scan");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the screen memory read and display");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes after the screen memory read and display");
-            SetColumnHeaderToolTip(VisualizationColumnIndex,
-                "Shows the iteration's duration (blue), threshold (red line), and screen memory scans for display (arrows)\n" +
-                "The arrow numbers identify the corresponding displayed frames, shown under the timeline");
+            SetColumnHeaderToolTip(VisualizationColumnIndex, "Iteration visualization");
 
             SetColumnSortMode(IteractionNumberColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(DurationColumnIndex, DataGridViewColumnSortMode.Programmatic);
@@ -107,10 +105,28 @@ namespace BeebPerf.ux
             else
                 base.Clear();
 
+            // set column visibility
             bool displayAnalysis = (metric != null && metric.DisplayAnalysis);
             SetColumnVisibility(DisplayOffsetColumnIndex, displayAnalysis);
             SetColumnVisibility(WritesBeforeDisplayColumnIndex, displayAnalysis);
             SetColumnVisibility(WritesAfterDisplayColumnIndex, displayAnalysis);
+
+            // set visualization column tool-tip
+            string visualizationToolTip = string.Empty;
+            if (metric != null && metric.DisplayAnalysis && metric.ThresholdCycles > 0)
+                visualizationToolTip =
+                    "Shows the iteration's duration (blue), threshold (red line), and CRTC screen memory scans (arrows)\n" +
+                    "The arrow numbers identify the corresponding display frames, shown under the timeline";
+            else if (metric != null && metric.DisplayAnalysis)
+                visualizationToolTip =
+                    "Shows the iteration's duration (blue) and CRTC screen memory scans (arrows)\n" +
+                    "The arrow numbers identify the corresponding display frames, shown under the timeline";
+            else if (metric != null && metric.ThresholdCycles > 0)
+                visualizationToolTip = "Shows the iteration's duration (blue) and the threshold (red line)";
+            else
+                visualizationToolTip = "Shows the iteration's duration";
+
+            SetColumnHeaderToolTip(VisualizationColumnIndex, visualizationToolTip);
         }
 
         public void SelectRange(int analysisFrom, int analysisTo)
