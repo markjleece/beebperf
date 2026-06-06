@@ -30,8 +30,8 @@ namespace BeebPerf.ux
         private const int RoutineLabelColumnIndex = 1;
         private const int TotalCPUColumnIndex = 2;
         private const int SelfCPUColumnIndex = 3;
-        private const int ElapsedCPUColumnIndex = 4;
-        private const int InterruptsColumnIndex = 5;
+        private const int InterruptCPUColumnIndex = 4;
+        private const int ElapsedCPUColumnIndex = 5;
         private const int ExecutionCountColumnIndex = 6;
 
         private const int ExportRoutinePageColumnIndex = 0;
@@ -41,10 +41,10 @@ namespace BeebPerf.ux
         private const int ExportTotalCPUPercentageIndex = 4;
         private const int ExportSelfCPUColumnIndex = 5;
         private const int ExportSelfCPUPercentageIndex = 6;
-        private const int ExportElapsedCPUColumnIndex = 7;
-        private const int ExportElapsedCPUPercentageIndex = 8;
-        private const int ExportInterruptsColumnIndex = 9;
-        private const int ExportInterruptsPercentageIndex = 10;
+        private const int ExportInterruptCPUColumnIndex = 7;
+        private const int ExportInterruptCPUPercentageIndex = 8;
+        private const int ExportElapsedCPUColumnIndex = 9;
+        private const int ExportElapsedCPUPercentageIndex = 10;
         private const int ExportExecutionCountColumnIndex = 11;
         private const int ExportExecutionPercentageColumnIndex = 12;
         private const int ExportColumnCount = 13;
@@ -58,24 +58,24 @@ namespace BeebPerf.ux
             AddColumn("Label", "Label", cellTemplate);
             AddColumn("TotalCPU", "Total CPU [#cycles, %]", cellTemplate);
             AddColumn("SelfCPU", "Self CPU [#cycles, %]", cellTemplate);
+            AddColumn("InterruptCPU", "Interrupt CPU [#cycles, %]", cellTemplate);
             AddColumn("ElapsedCPU", "Elapsed CPU [#cycles, %]", cellTemplate);
-            AddColumn("Interrupts", "Interrupts [#cycles, %]", cellTemplate);
             AddColumn("ExecutionCount", "Execution count [#, %]", cellTemplate);
 
             SetColumnAlignment(RoutineAddressColumnIndex, DataGridViewContentAlignment.MiddleCenter);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(TotalCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(SelfCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
+            SetColumnAlignment(InterruptCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ElapsedCPUColumnIndex, DataGridViewContentAlignment.MiddleRight);
-            SetColumnAlignment(InterruptsColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(ExecutionCountColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
             SetColumnHeaderToolTip(RoutineAddressColumnIndex, "Routine address");
             SetColumnHeaderToolTip(RoutineLabelColumnIndex, "Routine label");
             SetColumnHeaderToolTip(TotalCPUColumnIndex, "Total cycles used by this routine and all routines it calls.");
             SetColumnHeaderToolTip(SelfCPUColumnIndex,"Cycles used just by this routine");
+            SetColumnHeaderToolTip(InterruptCPUColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
             SetColumnHeaderToolTip(ElapsedCPUColumnIndex, "Total cycles elapsed during execution of routine, including cycles in interrupts");
-            SetColumnHeaderToolTip(InterruptsColumnIndex, "Total cycles spent servicing interrupts during execution of routine");
             SetColumnHeaderToolTip(ExecutionCountColumnIndex, "Number of times this routine was executed");
         }
 
@@ -151,9 +151,9 @@ namespace BeebPerf.ux
                 RoutineLabelColumnIndex => a.Label.Trim('.').CompareTo(b.Label.Trim('.')),
                 SelfCPUColumnIndex => metrics_a.SelfCycleCount.CompareTo(metrics_b.SelfCycleCount),
                 TotalCPUColumnIndex => metrics_a.InclusiveCycleCount.CompareTo(metrics_b.InclusiveCycleCount),
-                ElapsedCPUColumnIndex => metrics_a.ElapsedCycleCount.CompareTo(metrics_b.ElapsedCycleCount),
-                InterruptsColumnIndex => (metrics_a.ElapsedCycleCount - metrics_a.InclusiveCycleCount).CompareTo(
+                InterruptCPUColumnIndex => (metrics_a.ElapsedCycleCount - metrics_a.InclusiveCycleCount).CompareTo(
                                          (metrics_b.ElapsedCycleCount - metrics_b.InclusiveCycleCount)),
+                ElapsedCPUColumnIndex => metrics_a.ElapsedCycleCount.CompareTo(metrics_b.ElapsedCycleCount),
                 ExecutionCountColumnIndex => metrics_a.ExecutionCount.CompareTo(metrics_b.ExecutionCount),
                 _ => 0
             };
@@ -181,8 +181,8 @@ namespace BeebPerf.ux
             {
                 SelfCPUColumnIndex => (value: metrics.SelfCycleCount, range: TotalCycleCount, clamp: true),
                 TotalCPUColumnIndex => (value: metrics.InclusiveCycleCount, range: TotalCycleCount, clamp: true),
+                InterruptCPUColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount, clamp: true),
                 ElapsedCPUColumnIndex => (value: metrics.ElapsedCycleCount, range: TotalCycleCount, clamp: true),
-                InterruptsColumnIndex => (value: metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, range: TotalCycleCount, clamp: true),
                 ExecutionCountColumnIndex => (value: metrics.ExecutionCount, range: _MaxExecutionCount, clamp: true),
                 _ => (value: -1, range: 1, clamp: false)
             };
@@ -214,10 +214,10 @@ namespace BeebPerf.ux
                 "Total CPU [%]",
                 "Self CPU [#]",
                 "Self CPU [%]",
+                "Interrupt CPU [#]",
+                "Interrupt CPU [%]",
                 "Elapsed CPU [#]",
                 "Elapsed CPU [%]",
-                "Interrupts [#]",
-                "Interrupts [%]",
                 "Execution count [#]",
                 "Execution count [%]"
             ];
@@ -255,10 +255,10 @@ namespace BeebPerf.ux
                 ExportTotalCPUPercentageIndex => FormatExportPercentage(metrics.InclusiveCycleCount, TotalCycleCount),
                 ExportSelfCPUColumnIndex => metrics.SelfCycleCount.ToString(),
                 ExportSelfCPUPercentageIndex => FormatExportPercentage(metrics.SelfCycleCount, TotalCycleCount),
+                ExportInterruptCPUColumnIndex => (metrics.ElapsedCycleCount - metrics.InclusiveCycleCount).ToString(),
+                ExportInterruptCPUPercentageIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, TotalCycleCount),
                 ExportElapsedCPUColumnIndex => metrics.ElapsedCycleCount.ToString(),
                 ExportElapsedCPUPercentageIndex => FormatExportPercentage(metrics.ElapsedCycleCount, TotalCycleCount),
-                ExportInterruptsColumnIndex => (metrics.ElapsedCycleCount - metrics.InclusiveCycleCount).ToString(),
-                ExportInterruptsPercentageIndex => FormatExportPercentage(metrics.ElapsedCycleCount - metrics.InclusiveCycleCount, TotalCycleCount),
                 ExportExecutionCountColumnIndex => metrics.ExecutionCount.ToString(),
                 ExportExecutionPercentageColumnIndex => FormatExportPercentage(metrics.ExecutionCount, _MaxExecutionCount),
                 _ => string.Empty
