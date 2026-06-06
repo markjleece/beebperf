@@ -31,13 +31,14 @@ using System.Drawing.Imaging;
 namespace BeebPerf
 {
     //
-    // Metric analysis generates a list of metric iterations, which captures
-    // how long each iteration of the metric takes, and a list of display
-    // frames, which captures the displayed CRT frames.
+    // Frame analysis generates a list of display frames, which captures
+    // the displayed CRT frames, and a list of metric iterations, which
+    // captures the execution of the provided metric, and their relationship
+    // to the display frames.
     //
-    // Metric iterations also capture the number of screen writes
+    // Metric iterations capture the number of screen writes
     // that occur before and after the screen memory is scanned for
-    // display, and their offset (cycles) from the next display iteration.
+    // display, and their offset (cpu cycles) from the next display iteration.
     // 
     // The video code emulates the 6845, ULA, and SAA5050 at a
     // character/address level.
@@ -59,12 +60,12 @@ namespace BeebPerf
     // - No support for graphics tablets
     // - No support for custom ULA hardware
     //
-    public class MetricAnalysis
+    public class FrameAnalysis
     {
         private delegate byte ReadScreenData();
         private delegate void WriteBitmapData(byte value);
 
-        public MetricAnalysis()
+        public FrameAnalysis()
         {
             ConstructMode7Fonts();
         }
@@ -146,7 +147,7 @@ namespace BeebPerf
         //
         private void InitializeMetric(Metric? metric)
         {
-            Iterations = [];
+            MetricIterations = [];
             _AnalysisMetricState.IterationNumber = 1;
 
             if (metric != null && !metric.Match(_Instructions))
@@ -167,7 +168,7 @@ namespace BeebPerf
             int displayFrameIndex = 0;
             DisplayFrame? displayFrame = DisplayFrames.Count > 0 ? DisplayFrames[displayFrameIndex] : null;
 
-            foreach (var iteration in Iterations)
+            foreach (var iteration in MetricIterations)
             {
                 // skip any prior display frames
                 while (displayFrame != null && displayFrame.EndCycleCount <= iteration.StartCycleCount)
@@ -199,7 +200,7 @@ namespace BeebPerf
             }
 
             // update WritesBeforeDisplayRead & WritesAfterDisplayRead
-            foreach (var iteration in Iterations)
+            foreach (var iteration in MetricIterations)
             {
                 // set DisplayFrameIndex to the longest overlapping display iteration, and
                 // select which WritesBefore/AfterRead apply to it
@@ -237,7 +238,7 @@ namespace BeebPerf
             }
 
             // set display offsets
-            foreach (var iteration in Iterations)
+            foreach (var iteration in MetricIterations)
             {
                 if (iteration.DisplayFrameSpans.Length > 0)
                     iteration.DisplayFrameOffset = iteration.DisplayFrameSpans[iteration.DisplayFrameIndex].StartCycleCount - iteration.StartCycleCount;
@@ -286,7 +287,7 @@ namespace BeebPerf
         private void EndMetricIteration(int cycleCount, int instructionIndex)
         {
             // create metric iteration
-            Iterations.Add(new MetricAnalysis.MetricIteration()
+            MetricIterations.Add(new FrameAnalysis.MetricIteration()
             {
                 IterationNumber = _AnalysisMetricState.IterationNumber++,
                 StartCycleCount = _AnalysisMetricState.StartCycleCount,
@@ -1643,7 +1644,7 @@ namespace BeebPerf
             public float AspectRatio;
         }
 
-        public List<MetricIteration> Iterations = [];
+        public List<MetricIteration> MetricIterations = [];
         public List<DisplayFrame> DisplayFrames = [];
 
         private model.StackFrame? _RootStackFrame = null;

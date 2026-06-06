@@ -19,7 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
-using static BeebPerf.MetricAnalysis;
+using static BeebPerf.FrameAnalysis;
 
 namespace BeebPerf.ux
 {

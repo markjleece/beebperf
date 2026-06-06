@@ -37,7 +37,7 @@ namespace BeebPerf.ux
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new(_LabelResolver);
-            _MetricAnalysis = new();
+            _FrameAnalysis = new();
             _UndoRedoHistory = new();
             _Model = new();
 
@@ -177,13 +177,13 @@ namespace BeebPerf.ux
                     _LabelResolver.Initialize(_LabelsFiles);
 
                     // defer metric analysis if its dependent on static analysis
-                    bool deferMetricAnalysis = 
+                    bool deferFrameAnalysis = 
                         (_SelectedMetric != null && _SelectedMetric.Type != Metric.MetricType.StartAndEndAddresses);
 
-                    StaticAnalysis(deferMetricAnalysis);
+                    StaticAnalysis(deferFrameAnalysis);
 
-                    if (!deferMetricAnalysis)
-                        MetricAnalysis();
+                    if (!deferFrameAnalysis)
+                        FrameAnalysis();
                 }));
             });
         }
@@ -214,7 +214,7 @@ namespace BeebPerf.ux
 
                     // execute metric analysis
                     if (performFrameAnalysis)
-                        MetricAnalysis();
+                        FrameAnalysis();
                 }));
             });
         }
@@ -287,12 +287,12 @@ namespace BeebPerf.ux
             });
         }
 
-        private void MetricAnalysis()
+        private void FrameAnalysis()
         {
-            // metric analysis...
+            // frame analysis...
             SetState(AppStateFlags.FrameAnalysis);
 
-            var metricAnalysisTask = _MetricAnalysis.AnalysisAsync(
+            var frameAnalysisTask = _FrameAnalysis.AnalysisAsync(
                 _Model.Instructions,
                 InstructionSet!,
                 _Model,
@@ -303,8 +303,8 @@ namespace BeebPerf.ux
                     {
                         ClearState(AppStateFlags.FrameAnalysis);
 
-                        timelineView.FrameBitmaps = _MetricAnalysis.DisplayFrames;
-                        metricsView.SetIteractions(_MetricAnalysis.Iterations);
+                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrames;
+                        metricsView.SetIteractions(_FrameAnalysis.MetricIterations);
                     }));
                 });
         }
@@ -644,7 +644,7 @@ namespace BeebPerf.ux
         {
             _SelectedMetric = metric;
             metricsView.SetMetrics(_Metrics, _SelectedMetric);
-            MetricAnalysis();
+            FrameAnalysis();
         }
 
         public void ClearSelectedMetric()
@@ -1187,7 +1187,7 @@ namespace BeebPerf.ux
         private LabelResolver _LabelResolver;
         private CPUAnalysis _CPUAnalysis;
         private MemoryAnalysis _MemoryAnalysis;
-        private MetricAnalysis _MetricAnalysis;
+        private FrameAnalysis _FrameAnalysis;
         private Font _BaseFont;
         private bool _UnexpectedClose;
         private FormWindowState _InitialFormWindowState;
