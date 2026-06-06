@@ -804,7 +804,7 @@ namespace BeebPerf
 
                 switch (stackFrame.CallType)
                 {
-                    case CallType.None:
+                    case CallType.Root:
                         if (ProgramCallTree == null)
                             ProgramCallTree = new CallTreeNode(stackFrame);
                         callTreeNode = ProgramCallTree;

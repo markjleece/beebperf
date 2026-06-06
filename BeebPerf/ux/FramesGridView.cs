@@ -50,7 +50,7 @@ namespace BeebPerf.ux
             var cellTemplate = new CellTemplate();
             AddColumn("FrameNumber", "Frame [#]", cellTemplate);
             AddColumn("Duration", "Duration [#, %]", cellTemplate);
-            AddColumn("DisplayFrameOffset", "Offset [#]", cellTemplate);
+            AddColumn("DisplayFrameOffset", "Display offset [#]", cellTemplate);
             AddColumn("ScreenWritesBeforeDisplayRead", "Writes before display [#, %]", cellTemplate);
             AddColumn("ScreenWritesBeforeDisplayRead", "Writes after display [#, %]", cellTemplate);
             AddColumn("Visualization", "Visualization", cellTemplate);
@@ -65,10 +65,12 @@ namespace BeebPerf.ux
 
             SetColumnHeaderToolTip(FrameNumberColumnIndex, "Frame number");
             SetColumnHeaderToolTip(DurationColumnIndex, "Number of cycles, percentage of cycles to threshold");
-            SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "Cycles before display scan starts");
-            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the display memory read");
-            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Nunber of screen memory writes after the display memory read");
-            SetColumnHeaderToolTip(VisualizationColumnIndex, "Visualization");
+            SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "CPU cycles to start of display memory scan");
+            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the screen memory read and display");
+            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes after the screen memory read and display");
+            SetColumnHeaderToolTip(VisualizationColumnIndex,
+                "Shows the frame's duration (blue), threshold (red line), and screen memory scans and display (arrows)\n" +
+                "The arrow numbers identify the corresponding displayed frames, shown under the timeline");
 
             SetColumnSortMode(FrameNumberColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(DurationColumnIndex, DataGridViewColumnSortMode.Programmatic);

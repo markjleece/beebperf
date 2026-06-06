@@ -26,7 +26,7 @@ namespace BeebPerf.model
     //
     public enum CallType
     {
-        None = 0,
+        Root = 0,
         JSR = 1,
         IRQ = 2,
         NMI = 3,

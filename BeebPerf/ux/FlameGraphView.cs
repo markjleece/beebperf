@@ -27,7 +27,7 @@ namespace BeebPerf.ux
 {
     internal class FlameGraphView : Panel, IDataView, IEMFExporter
     {
-        public FlameGraphView() : base() 
+        public FlameGraphView() : base()
         {
             DoubleBuffered = true;
             VisibleChanged += OnVisibleChanged;
@@ -239,61 +239,113 @@ namespace BeebPerf.ux
         {
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
 
-            // JSR cells
-            Color jsrLineColor = lightMode ? Color.DarkRed : _ColorLightRed;
-            Color jsrFillColor = lightMode ? _ColorLightRed : Color.DarkRed;
+            // create brushes and pens
+            var lightColors = new Color[] {
+                Color.LightBlue,                    // CallType.Root
+                Color.FromArgb(0xFF, 0x80, 0x80),   // CallType.JSR
+                Color.LightGreen,                   // CallType.IRQ
+                Color.Cyan,                         // CallType.NMI
+                Color.Yellow,                       // CallType.BRK
+                Color.LightGray,                    // CallType.TailCall
+                Color.Khaki };                      // CallType.FallThrough
 
-            using var jsrPen = new Pen(jsrLineColor);
-            using var jsrSelectedPen = new Pen(jsrLineColor, 2);
-            using var jsrBrush = new SolidBrush(jsrFillColor);
-            using var jsrFocusBrush = new SolidBrush(Blend(jsrFillColor, ForeColor, 0.1));
+            int colorCount = _ShowCallTypes ? lightColors.Length : 1;
 
-            // root-call cells
-            Color rootLineColor = Blend(jsrLineColor, ForeColor, 0.1);
-            Color rootFillColor = Blend(jsrFillColor, ForeColor, 0.1);
+            Pen[] pens = new Pen[colorCount];
+            Pen[] selectedPens = new Pen[colorCount];
+            Brush[] brushes = new Brush[colorCount];
+            Brush[] selectedBrushes = new Brush[colorCount];
 
-            using var rootPen = new Pen(rootLineColor);
-            using var rootSelectedPen = new Pen(rootLineColor, 2);
-            using var rootBrush = new SolidBrush(rootFillColor);
-            using var rootFocusBrush = new SolidBrush(Blend(rootFillColor, ForeColor, 0.1));
+            for (int i = 0; i < colorCount; i++)
+            {
+                int colorIndex = _ShowCallTypes ? i : 1;
 
-            // tail-call cells
-            Color tailCallFillColor = Blend(jsrFillColor, BackColor, 0.2);
-            Color tailCallLineColor = Blend(jsrLineColor, BackColor, 0.2);
+                Color lightColor = lightColors[colorIndex];
+                Color darkColor = Blend(lightColor, Color.Black, 0.5);
 
-            using var tailCallPen = new Pen(tailCallLineColor);
-            using var tailCallSelectedPen = new Pen(tailCallLineColor, 2);
-            using var tailCallBrush = new SolidBrush(tailCallFillColor);
-            using var tailCallFocusBrush = new SolidBrush(Blend(tailCallFillColor, ForeColor, 0.1));
+                Color lineColor = lightMode ? darkColor : lightColor;
+                Color fillColor = lightMode ? lightColor : darkColor;
 
-            // fall-through cells
-            Color fallThroughFillColor = Blend(jsrFillColor, BackColor, 0.4);
-            Color fallThroughLineColor = Blend(jsrLineColor, BackColor, 0.4);
-
-            using var fallThroughPen = new Pen(fallThroughLineColor);
-            using var fallThroughSelectedPen = new Pen(fallThroughLineColor, 2);
-            using var fallThroughBrush = new SolidBrush(fallThroughFillColor);
-            using var fallThroughFocusBrush = new SolidBrush(Blend(fallThroughFillColor, ForeColor, 0.1));
+                pens[i] = new Pen(lineColor);
+                selectedPens[i] = new Pen(lineColor, 2);
+                brushes[i] = new SolidBrush(fillColor);
+                selectedBrushes[i] = new SolidBrush(Blend(fillColor, ForeColor, 0.1));
+            }
 
             using var textBrush = new SolidBrush(ForeColor);
 
+            // draw cells
             foreach (var routineCell in _RoutineCells)
             {
-                var callType = routineCell.CallStack.CallType;
-                bool isJSRCall = (_ShowCallTypes && callType == CallType.JSR);
-                bool isTailCall = (_ShowCallTypes && callType == CallType.TailCall);
-                bool isFallThrough = (_ShowCallTypes && callType == CallType.FallThrough);
-                bool isRootCall = (_ShowCallTypes && !isJSRCall && !isTailCall && !isFallThrough);
+                int index = _ShowCallTypes ? (int)routineCell.CallStack.CallType : 0;
 
                 PaintRoutineCell(
                     graphics,
                     paintEMF,
                     routineCell,
-                    isRootCall ? rootPen : isTailCall ? tailCallPen : isFallThrough ? fallThroughPen : jsrPen,
-                    isRootCall ? rootSelectedPen : isTailCall ? tailCallSelectedPen : isFallThrough ? fallThroughSelectedPen : jsrSelectedPen,
-                    isRootCall ? rootBrush : isTailCall ? tailCallBrush : isFallThrough ? fallThroughBrush : jsrBrush,
-                    isRootCall ? rootFocusBrush : isTailCall ? tailCallFocusBrush : isFallThrough ? fallThroughFocusBrush : jsrFocusBrush,
+                    pens[index],
+                    selectedPens[index],
+                    brushes[index],
+                    selectedBrushes[index],
                     textBrush);
+            }
+
+            // draw call type legend
+            if (_ShowCallTypes)
+            {
+                // measure legend
+                int legendMargin = 5;
+                int legendSpacing = 5;
+
+                int width = 0;
+                int height = lightColors.Length * (Font.Height + legendSpacing) + legendSpacing;
+
+                for (int i = 0; i < lightColors.Length; i++)
+                {
+                    int formattedWidth = TextRenderer.MeasureText(ToString((CallType)i), Font).Width + Font.Height + legendSpacing * 2;
+                    width = Math.Max(width, formattedWidth);
+                }
+
+                // paint legend background
+                int legendX = legendMargin;
+                int legendY = legendMargin;
+                var legendRect = new Rectangle(legendX - legendMargin, legendY - legendMargin, width, height);
+
+                using var legendBrush = new SolidBrush(BackColor);
+                using var legendPen = new Pen(ForeColor, 1);
+                graphics.FillRectangle(legendBrush, legendRect);
+                graphics.DrawRectangle(legendPen, legendRect);
+
+                // paint legend entries
+                StringFormat textFormat = new StringFormat
+                {
+                    Alignment = StringAlignment.Near,
+                    LineAlignment = StringAlignment.Center,
+                    FormatFlags = StringFormatFlags.NoWrap,
+                };
+
+                for (int i = 0; i < lightColors.Length; i++)
+                {
+                    // paint color box
+                    var boxRect = new Rectangle(legendX, legendY, Font.Height, Font.Height);
+                    graphics.FillRectangle(brushes[i], boxRect);
+                    graphics.DrawRectangle(pens[i], boxRect);
+
+                    // paint call type text
+                    var textRect = new Rectangle(legendX + Font.Height + legendSpacing, legendY, width, Font.Height);
+                    graphics.DrawString(ToString((CallType)i), Font, textBrush, textRect, textFormat);
+
+                    legendY += Font.Height + legendSpacing;
+                }
+            }
+
+            // dispose brushes and pens
+            for (int i = 0; i < colorCount; i++)
+            {
+                pens[i].Dispose();
+                selectedPens[i].Dispose();
+                brushes[i].Dispose();
+                selectedBrushes[i].Dispose();
             }
         }
 
@@ -439,17 +491,23 @@ namespace BeebPerf.ux
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
-        private string FormatRoutineType(RoutineCell routineCell)
+        private string FormatCallType(RoutineCell routineCell)
         {
-            var callType = routineCell.CallStack.CallType;
+            return ToString(routineCell.CallStack.CallType);
+        }
+
+        private string ToString(CallType callType)
+        {
             return callType switch
             {
                 CallType.TailCall => "Tail call",
                 CallType.FallThrough => "Fall through",
                 CallType.JSR => "JSR",
-                CallType.IRQ or CallType.NMI => "Interrupt",
-                CallType.BRK or CallType.NMI => "BRK",
-                _ => "None"
+                CallType.IRQ => "IRQ",
+                CallType.NMI => "NMI",
+                CallType.BRK => "BRK",
+                CallType.Root => "Root",
+                _ => string.Empty
             };
         }
 
@@ -735,7 +793,7 @@ namespace BeebPerf.ux
             _ToolTipText = 
                 $"Routine: {FormatRoutine(routineCell)}\n" +
                 $"Total CPU: {FormatMetrics(routineCell)}\n" +
-                $"Routine type: {FormatRoutineType(routineCell)}";
+                $"Call type: {FormatCallType(routineCell)}";
 
             _ToolTipLocation = mousePosition;
             _ToolTipLocation.Offset(10, 10);
@@ -798,7 +856,7 @@ namespace BeebPerf.ux
             {
                 Name = "callTypesButton",
                 ImageResourceName = "callTypesButton.Image",
-                ToolTipText = "Show routine types",
+                ToolTipText = "Show call types",
                 Parent = this
             };
             _CallTypesButton.Click += callTypesButton_Click;
@@ -914,7 +972,6 @@ namespace BeebPerf.ux
         private List<RoutineCell> _RoutineCells = new();
         private List<CallTreeNode> _CallTrees = new();
         private int _TotalCycleCount;
-        private Color _ColorLightRed = Color.FromArgb(0xFF, 0x80, 0x80);
         private bool _InvalidLayout;
         private ReentrancyGuard _ReentrancyGuard = new();
 

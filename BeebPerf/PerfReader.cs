@@ -207,7 +207,7 @@ namespace BeebPerf
                 ushort returnAddress = ReadShort(dataStream);
                 byte returnStackPointer = ReadByte(dataStream);
 
-                if (type != CallType.None && type != CallType.JSR && type != CallType.IRQ && type != CallType.NMI && type != CallType.BRK)
+                if (type != CallType.Root && type != CallType.JSR && type != CallType.IRQ && type != CallType.NMI && type != CallType.BRK)
                     throw new InvalidDataException("invalid .perf file format: invalid stack frame type");
 
                 if (startAddressPage >= MemoryPage.Count)
