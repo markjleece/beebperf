@@ -94,8 +94,8 @@ namespace BeebPerf.ux
             toolStrip.Items.AddRange(new ToolStripItem[] 
             { 
                 openButton,
-                hotRoutinesButton,
                 hotPathsButton,
+                hotRoutinesButton,
                 toolStripSeparator1, 
                 undoButton, 
                 redoButton, 
@@ -311,10 +311,10 @@ namespace BeebPerf.ux
             // 
             // tabControl
             // 
-            tabControl.Controls.Add(routinesTabPage);
-            tabControl.Controls.Add(callerCalleeTabPage);
             tabControl.Controls.Add(callTreeTabPage);
             tabControl.Controls.Add(flameGraphTabPage);
+            tabControl.Controls.Add(routinesTabPage);
+            tabControl.Controls.Add(callerCalleeTabPage);
             tabControl.Controls.Add(memoryTabPage);
             tabControl.Controls.Add(framesTabPage);
             tabControl.SelectedIndex = 0;
@@ -513,8 +513,8 @@ namespace BeebPerf.ux
 
         private ToolStrip toolStrip;
         private ToolStripButton openButton;
-        private ToolStripButton hotRoutinesButton;
         private ToolStripButton hotPathsButton;
+        private ToolStripButton hotRoutinesButton;
         private ToolStripSeparator toolStripSeparator1;
         private ToolStripButton undoButton;
         private ToolStripButton redoButton;
@@ -534,9 +534,9 @@ namespace BeebPerf.ux
         private SplitContainer secondarySplitContainer;
         private TabControlEx tabControl;
         private Panel callTreeTabPage;
-        private Panel callerCalleeTabPage;
-        private Panel routinesTabPage;
         private Panel flameGraphTabPage;
+        private Panel routinesTabPage;
+        private Panel callerCalleeTabPage;
         private Panel memoryTabPage;
         private Panel framesTabPage;
         private RoutinesView routinesView;
