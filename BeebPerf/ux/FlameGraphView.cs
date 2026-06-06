@@ -239,18 +239,27 @@ namespace BeebPerf.ux
         {
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
 
-            // regular cells
-            Color regularLineColor = lightMode ? Color.DarkRed : _ColorLightRed;
-            Color regularFillColor = lightMode ? _ColorLightRed : Color.DarkRed;
+            // JSR cells
+            Color jsrLineColor = lightMode ? Color.DarkRed : _ColorLightRed;
+            Color jsrFillColor = lightMode ? _ColorLightRed : Color.DarkRed;
 
-            using var regularPen = new Pen(regularLineColor);
-            using var regularSelectedPen = new Pen(regularLineColor, 2);
-            using var regularBrush = new SolidBrush(regularFillColor);
-            using var regularFocusBrush = new SolidBrush(Blend(regularFillColor, ForeColor, 0.1));
+            using var jsrPen = new Pen(jsrLineColor);
+            using var jsrSelectedPen = new Pen(jsrLineColor, 2);
+            using var jsrBrush = new SolidBrush(jsrFillColor);
+            using var jsrFocusBrush = new SolidBrush(Blend(jsrFillColor, ForeColor, 0.1));
+
+            // root-call cells
+            Color rootLineColor = Blend(jsrLineColor, ForeColor, 0.1);
+            Color rootFillColor = Blend(jsrFillColor, ForeColor, 0.1);
+
+            using var rootPen = new Pen(rootLineColor);
+            using var rootSelectedPen = new Pen(rootLineColor, 2);
+            using var rootBrush = new SolidBrush(rootFillColor);
+            using var rootFocusBrush = new SolidBrush(Blend(rootFillColor, ForeColor, 0.1));
 
             // tail-call cells
-            Color tailCallFillColor = Blend(regularFillColor, BackColor, 0.2);
-            Color tailCallLineColor = Blend(regularLineColor, BackColor, 0.2);
+            Color tailCallFillColor = Blend(jsrFillColor, BackColor, 0.2);
+            Color tailCallLineColor = Blend(jsrLineColor, BackColor, 0.2);
 
             using var tailCallPen = new Pen(tailCallLineColor);
             using var tailCallSelectedPen = new Pen(tailCallLineColor, 2);
@@ -258,8 +267,8 @@ namespace BeebPerf.ux
             using var tailCallFocusBrush = new SolidBrush(Blend(tailCallFillColor, ForeColor, 0.1));
 
             // fall-through cells
-            Color fallThroughFillColor = Blend(regularFillColor, BackColor, 0.4);
-            Color fallThroughLineColor = Blend(regularLineColor, BackColor, 0.4);
+            Color fallThroughFillColor = Blend(jsrFillColor, BackColor, 0.4);
+            Color fallThroughLineColor = Blend(jsrLineColor, BackColor, 0.4);
 
             using var fallThroughPen = new Pen(fallThroughLineColor);
             using var fallThroughSelectedPen = new Pen(fallThroughLineColor, 2);
@@ -271,17 +280,19 @@ namespace BeebPerf.ux
             foreach (var routineCell in _RoutineCells)
             {
                 var callType = routineCell.CallStack.CallType;
+                bool isJSRCall = (_ShowCallTypes && callType == CallType.JSR);
                 bool isTailCall = (_ShowCallTypes && callType == CallType.TailCall);
                 bool isFallThrough = (_ShowCallTypes && callType == CallType.FallThrough);
+                bool isRootCall = (_ShowCallTypes && !isJSRCall && !isTailCall && !isFallThrough);
 
                 PaintRoutineCell(
                     graphics,
                     paintEMF,
                     routineCell,
-                    isTailCall ? tailCallPen : isFallThrough ? fallThroughPen : regularPen,
-                    isTailCall ? tailCallSelectedPen : isFallThrough ? fallThroughSelectedPen : regularSelectedPen,
-                    isTailCall ? tailCallBrush : isFallThrough ? fallThroughBrush : regularBrush,
-                    isTailCall ? tailCallFocusBrush : isFallThrough ? fallThroughFocusBrush : regularFocusBrush,
+                    isRootCall ? rootPen : isTailCall ? tailCallPen : isFallThrough ? fallThroughPen : jsrPen,
+                    isRootCall ? rootSelectedPen : isTailCall ? tailCallSelectedPen : isFallThrough ? fallThroughSelectedPen : jsrSelectedPen,
+                    isRootCall ? rootBrush : isTailCall ? tailCallBrush : isFallThrough ? fallThroughBrush : jsrBrush,
+                    isRootCall ? rootFocusBrush : isTailCall ? tailCallFocusBrush : isFallThrough ? fallThroughFocusBrush : jsrFocusBrush,
                     textBrush);
             }
         }
@@ -428,7 +439,7 @@ namespace BeebPerf.ux
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
         }
 
-        private string FormatCallType(RoutineCell routineCell)
+        private string FormatRoutineType(RoutineCell routineCell)
         {
             var callType = routineCell.CallStack.CallType;
             return callType switch
@@ -724,7 +735,7 @@ namespace BeebPerf.ux
             _ToolTipText = 
                 $"Routine: {FormatRoutine(routineCell)}\n" +
                 $"Total CPU: {FormatMetrics(routineCell)}\n" +
-                $"Call type: {FormatCallType(routineCell)}";
+                $"Routine type: {FormatRoutineType(routineCell)}";
 
             _ToolTipLocation = mousePosition;
             _ToolTipLocation.Offset(10, 10);
@@ -787,7 +798,7 @@ namespace BeebPerf.ux
             {
                 Name = "callTypesButton",
                 ImageResourceName = "callTypesButton.Image",
-                ToolTipText = "Show call types",
+                ToolTipText = "Show routine types",
                 Parent = this
             };
             _CallTypesButton.Click += callTypesButton_Click;
