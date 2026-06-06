@@ -33,14 +33,14 @@ namespace BeebPerf.ux
         }
 
         public void SetMetrics(
-            List<Metric> frameSettingsList,
-            Metric? selectedFrameSettings)
+            List<Metric> metrics,
+            Metric? selectedMetric)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            _FrameSettingsList = frameSettingsList;
-            _SelectedFrameSettings = selectedFrameSettings;
+            _Metrics = metrics;
+            _SelectedMetric = selectedMetric;
             UpdateState();
         }
 
@@ -52,24 +52,28 @@ namespace BeebPerf.ux
             _Iterations = iterations;
 
             // determine whether to highlight writes before or writes after
-            int totalWritesBeforeDisplay = 0;
-            int totalWritesAfterDisplay = 0;
-            foreach (var iteration in iterations)
-            {
-                totalWritesBeforeDisplay += iteration.WritesBeforeDisplayRead;
-                totalWritesAfterDisplay += iteration.WritesAfterDisplayRead;
-            }
-
             bool highlightWritesBeforeDisplay = false;
             bool highlightWritesAfterDisplay = false;
-            if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
+
+            if (_SelectedMetric != null && _SelectedMetric.DisplayAnalysis)
             {
-                highlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
-                highlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
+                int totalWritesBeforeDisplay = 0;
+                int totalWritesAfterDisplay = 0;
+                foreach (var iteration in iterations)
+                {
+                    totalWritesBeforeDisplay += iteration.WritesBeforeDisplayRead;
+                    totalWritesAfterDisplay += iteration.WritesAfterDisplayRead;
+                }
+
+                if (totalWritesBeforeDisplay > 0 && totalWritesAfterDisplay > 0)
+                {
+                    highlightWritesBeforeDisplay = totalWritesBeforeDisplay <= totalWritesAfterDisplay;
+                    highlightWritesAfterDisplay = totalWritesAfterDisplay <= totalWritesBeforeDisplay;
+                }
             }
 
             // initialize grid
-            _GridView.Initialize(_Iterations, _SelectedFrameSettings, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
+            _GridView.Initialize(_Iterations, _SelectedMetric, highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
 
             UpdateSummaryText(highlightWritesBeforeDisplay, highlightWritesAfterDisplay);
             UpdateState();
@@ -82,41 +86,44 @@ namespace BeebPerf.ux
             string text = string.Empty;
             if (_Iterations.Count > 0)
             {
-                if (_SelectedFrameSettings != null && _SelectedFrameSettings.ThresholdCycles > 0)
+                if (_SelectedMetric != null && _SelectedMetric.ThresholdCycles > 0)
                 {
-                    int frameDuractionExceedsThresholdCount = 0;
+                    int iterationDurationExceedsThresholdCount = 0;
                     foreach (var iteration in _Iterations)
-                        if (iteration.EndCycleCount - iteration.StartCycleCount > _SelectedFrameSettings.ThresholdCycles)
-                            frameDuractionExceedsThresholdCount++;
+                        if (iteration.EndCycleCount - iteration.StartCycleCount > _SelectedMetric.ThresholdCycles)
+                            iterationDurationExceedsThresholdCount++;
 
-                    double frameDurationExceedsThresholdPercentage = 100.0 * (double)frameDuractionExceedsThresholdCount / (double)_Iterations.Count;
-                    text = $"Iterations exceeding threshold: {frameDurationExceedsThresholdPercentage:F2}%. ";
+                    double iterationDurationExceedsThresholdPercentage = 100.0 * (double)iterationDurationExceedsThresholdCount / (double)_Iterations.Count;
+                    text = $"Iterations exceeding threshold: {iterationDurationExceedsThresholdPercentage:F2}%. ";
                 }
 
-                int totalWriteCount = 0;
-                int totalMissTimedWriteCount = 0;
-                int frameWithMissTimesWriteCount = 0;
-                foreach (var iteration in _Iterations)
+                if (_SelectedMetric != null && _SelectedMetric.DisplayAnalysis)
                 {
-                    totalWriteCount += iteration.WritesBeforeDisplayRead + iteration.WritesAfterDisplayRead;
-
-                    if (highlightWritesBeforeDisplay && iteration.WritesBeforeDisplayRead > 0)
+                    int totalWriteCount = 0;
+                    int totalMissTimedWriteCount = 0;
+                    int iterationWithMissTimesWriteCount = 0;
+                    foreach (var iteration in _Iterations)
                     {
-                        totalMissTimedWriteCount += iteration.WritesBeforeDisplayRead;
-                        frameWithMissTimesWriteCount++;
+                        totalWriteCount += iteration.WritesBeforeDisplayRead + iteration.WritesAfterDisplayRead;
+
+                        if (highlightWritesBeforeDisplay && iteration.WritesBeforeDisplayRead > 0)
+                        {
+                            totalMissTimedWriteCount += iteration.WritesBeforeDisplayRead;
+                            iterationWithMissTimesWriteCount++;
+                        }
+
+                        if (highlightWritesAfterDisplay && iteration.WritesAfterDisplayRead > 0)
+                        {
+                            totalMissTimedWriteCount += iteration.WritesAfterDisplayRead;
+                            iterationWithMissTimesWriteCount++;
+                        }
                     }
 
-                    if (highlightWritesAfterDisplay && iteration.WritesAfterDisplayRead > 0)
-                    {
-                        totalMissTimedWriteCount += iteration.WritesAfterDisplayRead;
-                        frameWithMissTimesWriteCount++;
-                    }
+                    double iterationMissTimedWritePercentage = 100.0 * (double)iterationWithMissTimesWriteCount / (double)_Iterations.Count;
+                    double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
+                    text += $"Iterations with miss-timed writes: {iterationMissTimedWritePercentage:F2}%, " +
+                            $"Total miss-timed writes: {overallMissTimedWritePercentage:F2}%";
                 }
-
-                double frameMissTimedWritePercentage = 100.0 * (double)frameWithMissTimesWriteCount / (double)_Iterations.Count;
-                double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
-                text += $"Iterations with miss-timed writes: {frameMissTimedWritePercentage:F2}%, " +
-                        $"Total miss-timed writes: {overallMissTimedWritePercentage:F2}%";
             }
 
             _StatusLabel.Text = text;
@@ -141,11 +148,11 @@ namespace BeebPerf.ux
             var comboBox = sender as ComboBox;
             if (comboBox == null) return;
             
-            foreach (var settings in _FrameSettingsList!)
+            foreach (var settings in _Metrics!)
             {
                 if (settings.Name == comboBox.SelectedItem as string)
                 {
-                    _SelectedFrameSettings = settings;
+                    _SelectedMetric = settings;
                     form.SetSelectedMetric(settings);
                     break;
                 }
@@ -369,26 +376,26 @@ namespace BeebPerf.ux
         {
             _MetricComboBox.Items.Clear();
 
-            bool hasSettings = _FrameSettingsList != null && _FrameSettingsList.Count > 0;
-            if (hasSettings)
+            bool hasMetrics = _Metrics != null && _Metrics.Count > 0;
+            if (hasMetrics)
             {
                 int selectedIndex = -1;
-                foreach (var setting in _FrameSettingsList!)
+                foreach (var metric in _Metrics!)
                 {
-                    _MetricComboBox.Items.Add(setting.Name);
-                    if (_SelectedFrameSettings != null && setting.Name == _SelectedFrameSettings.Name)
+                    _MetricComboBox.Items.Add(metric.Name);
+                    if (_SelectedMetric != null && metric.Name == _SelectedMetric.Name)
                         selectedIndex = _MetricComboBox.Items.Count - 1;
                 }
                 _MetricComboBox.SelectedIndex = selectedIndex;
             }
 
-            _MetricComboBoxPanel.Visible = hasSettings;
+            _MetricComboBoxPanel.Visible = hasMetrics;
 
-            _EditButton.Visible = hasSettings;
-            _EditButton.Enabled = _SelectedFrameSettings != null;
+            _EditButton.Visible = hasMetrics;
+            _EditButton.Enabled = _SelectedMetric != null;
 
-            _RemoveButton.Visible = hasSettings;
-            _RemoveButton.Enabled = _SelectedFrameSettings != null;
+            _RemoveButton.Visible = hasMetrics;
+            _RemoveButton.Enabled = _SelectedMetric != null;
 
             _StatusLabel.Visible = _StatusLabel.Text.Length > 0;
 
@@ -397,8 +404,8 @@ namespace BeebPerf.ux
         }
 
         private List<MetricAnalysis.MetricIteration> _Iterations = [];
-        private List<Metric>? _FrameSettingsList = [];
-        private Metric? _SelectedFrameSettings = null;
+        private List<Metric>? _Metrics = [];
+        private Metric? _SelectedMetric = null;
         private ReentrancyGuard _ReentrancyGuard = new();
 
         // controls

@@ -53,8 +53,12 @@
             resetButton = new Button();
             okButton = new Button();
             cancelButton = new Button();
+            displayAnalysisGroupBox = new GroupBox();
+            displayAnalysisLabel = new Label();
+            displayAnalysisCheckBox = new CheckBox();
             spanGroupBox.SuspendLayout();
             thresholdGroupBox.SuspendLayout();
+            displayAnalysisGroupBox.SuspendLayout();
             SuspendLayout();
             // 
             // nameLabel
@@ -102,7 +106,7 @@
             spanGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             spanGroupBox.Location = new Point(12, 49);
             spanGroupBox.Name = "spanGroupBox";
-            spanGroupBox.Size = new Size(656, 186);
+            spanGroupBox.Size = new Size(685, 186);
             spanGroupBox.TabIndex = 0;
             spanGroupBox.TabStop = false;
             spanGroupBox.Text = "Span";
@@ -239,7 +243,7 @@
             thresholdGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             thresholdGroupBox.Location = new Point(12, 241);
             thresholdGroupBox.Name = "thresholdGroupBox";
-            thresholdGroupBox.Size = new Size(656, 117);
+            thresholdGroupBox.Size = new Size(685, 117);
             thresholdGroupBox.TabIndex = 0;
             thresholdGroupBox.TabStop = false;
             thresholdGroupBox.Text = "Threshold";
@@ -296,7 +300,7 @@
             // 
             // resetButton
             // 
-            resetButton.Location = new Point(320, 371);
+            resetButton.Location = new Point(349, 540);
             resetButton.Name = "resetButton";
             resetButton.Size = new Size(112, 34);
             resetButton.TabIndex = 0;
@@ -307,7 +311,7 @@
             // okButton
             // 
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point(438, 371);
+            okButton.Location = new Point(467, 540);
             okButton.Name = "okButton";
             okButton.Size = new Size(112, 34);
             okButton.TabIndex = 0;
@@ -318,37 +322,74 @@
             // cancelButton
             // 
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new Point(556, 371);
+            cancelButton.Location = new Point(585, 540);
             cancelButton.Name = "cancelButton";
             cancelButton.Size = new Size(112, 34);
             cancelButton.TabIndex = 0;
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             // 
-            // MetricsDialog
+            // displayAnalysisGroupBox
+            // 
+            displayAnalysisGroupBox.Controls.Add(displayAnalysisLabel);
+            displayAnalysisGroupBox.Controls.Add(displayAnalysisCheckBox);
+            displayAnalysisGroupBox.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            displayAnalysisGroupBox.Location = new Point(17, 370);
+            displayAnalysisGroupBox.Name = "displayAnalysisGroupBox";
+            displayAnalysisGroupBox.Size = new Size(680, 164);
+            displayAnalysisGroupBox.TabIndex = 0;
+            displayAnalysisGroupBox.TabStop = false;
+            displayAnalysisGroupBox.Text = "Display analysis";
+            // 
+            // displayAnalysisLabel
+            // 
+            displayAnalysisLabel.Font = new Font("Segoe UI", 9F);
+            displayAnalysisLabel.Location = new Point(17, 62);
+            displayAnalysisLabel.Name = "displayAnalysisLabel";
+            displayAnalysisLabel.Size = new Size(657, 83);
+            displayAnalysisLabel.TabIndex = 0;
+            displayAnalysisLabel.Text = "Display analyses identifies potential v-sync alignment and tearing issues by examining the timing of screen memory writes with respect to the CRTC's screen memory scan.";
+            // 
+            // displayAnalysisCheckBox
+            // 
+            displayAnalysisCheckBox.AutoSize = true;
+            displayAnalysisCheckBox.Font = new Font("Segoe UI", 9F);
+            displayAnalysisCheckBox.Location = new Point(6, 30);
+            displayAnalysisCheckBox.Name = "displayAnalysisCheckBox";
+            displayAnalysisCheckBox.Size = new Size(228, 29);
+            displayAnalysisCheckBox.TabIndex = 0;
+            displayAnalysisCheckBox.Text = "Perform display analysis";
+            displayAnalysisCheckBox.UseVisualStyleBackColor = true;
+            displayAnalysisCheckBox.CheckedChanged += displayAnalysisCheckBox_CheckedChanged;
+
+            // 
+            // MetricDialog
             // 
             AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             CancelButton = cancelButton;
-            ClientSize = new Size(680, 417);
+            ClientSize = new Size(709, 584);
             Controls.Add(nameLabel);
             Controls.Add(nameTextBox);
             Controls.Add(nameErrorLabel);
             Controls.Add(spanGroupBox);
             Controls.Add(thresholdGroupBox);
+            Controls.Add(displayAnalysisGroupBox);
             Controls.Add(resetButton);
             Controls.Add(okButton);
             Controls.Add(cancelButton);
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "MetricsDialog";
-            Text = "MetricIteration Settings";
+            Name = "MetricDialog";
+            Text = "Metric Settings";
             spanGroupBox.ResumeLayout(false);
             spanGroupBox.PerformLayout();
             thresholdGroupBox.ResumeLayout(false);
             thresholdGroupBox.PerformLayout();
+            displayAnalysisGroupBox.ResumeLayout(false);
+            displayAnalysisGroupBox.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -377,8 +418,11 @@
         private Label cyclesLabel;
         private TextBox cyclesTextBox;
         private Label cyclesErrorLabel;
+        private GroupBox displayAnalysisGroupBox;
+        private CheckBox displayAnalysisCheckBox;
         private Button resetButton;
         private Button okButton;
         private Button cancelButton;
+        private Label displayAnalysisLabel;
     }
 }

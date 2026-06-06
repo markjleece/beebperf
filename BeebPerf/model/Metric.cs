@@ -46,19 +46,21 @@ namespace BeebPerf.model
                 StartAddress = StartAddress,
                 EndAddress = EndAddress,
                 ThresholdCycles = ThresholdCycles,
+                DisplayAnalysis = DisplayAnalysis
             };
         }
 
         static public string Serialize(Metric metric)
         {
-            return 
+            return
                 $"{(int)metric.Type};" +
                 $"{metric.Name};" +
                 $"{metric.StartAddress.Address};" +
                 $"{(int)metric.StartAddress.Page};" +
                 $"{metric.EndAddress.Address};" + 
                 $"{(int)metric.EndAddress.Page};" + 
-                $"{metric.ThresholdCycles}";
+                $"{metric.ThresholdCycles};" +
+                $"{metric.DisplayAnalysis}";
         }
 
         static public Metric DeSerialize(string encoding)
@@ -71,6 +73,7 @@ namespace BeebPerf.model
                 StartAddress = new CanonicalAddress(ushort.Parse(parts[2]), (MemoryPage)int.Parse(parts[3])),
                 EndAddress = new CanonicalAddress(ushort.Parse(parts[4]), (MemoryPage)int.Parse(parts[5])),
                 ThresholdCycles = int.Parse(parts[6]),
+                DisplayAnalysis = (parts.Length == 7 || bool.Parse(parts[7]))
             };
         }
 
@@ -120,5 +123,6 @@ namespace BeebPerf.model
         public required CanonicalAddress StartAddress;
         public required CanonicalAddress EndAddress;
         public required int ThresholdCycles;
+        public required bool DisplayAnalysis;
     }
 }

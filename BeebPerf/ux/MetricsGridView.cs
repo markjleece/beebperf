@@ -48,7 +48,7 @@ namespace BeebPerf.ux
         public MetricsGridView() : base(System.Windows.Forms.SelectionMode.One, (ButtonType)0)
         {
             var cellTemplate = new CellTemplate();
-            AddColumn("MetricIteration", "MetricIteration [#]", cellTemplate);
+            AddColumn("Iteration", "Iteration [#]", cellTemplate);
             AddColumn("Duration", "Duration [#, %]", cellTemplate);
             AddColumn("DisplayFrameOffset", "Display offset [#]", cellTemplate);
             AddColumn("ScreenWritesBeforeDisplayRead", "Writes before display [#, %]", cellTemplate);
@@ -63,14 +63,14 @@ namespace BeebPerf.ux
             SetColumnAlignment(WritesBeforeDisplayColumnIndex, DataGridViewContentAlignment.MiddleRight);
             SetColumnAlignment(WritesAfterDisplayColumnIndex, DataGridViewContentAlignment.MiddleRight);
 
-            SetColumnHeaderToolTip(IteractionNumberColumnIndex, "MetricIteration number");
+            SetColumnHeaderToolTip(IteractionNumberColumnIndex, "Iteration number");
             SetColumnHeaderToolTip(DurationColumnIndex, "Number of cycles, percentage of cycles to threshold");
             SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "CPU cycles to start of display memory scan");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the screen memory read and display");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes after the screen memory read and display");
             SetColumnHeaderToolTip(VisualizationColumnIndex,
-                "Shows the iteration's duration (blue), threshold (red line), and screen memory scans and display (arrows)\n" +
-                "The arrow numbers identify the corresponding displayed iterations, shown under the timeline");
+                "Shows the iteration's duration (blue), threshold (red line), and screen memory scans for display (arrows)\n" +
+                "The arrow numbers identify the corresponding displayed frames, shown under the timeline");
 
             SetColumnSortMode(IteractionNumberColumnIndex, DataGridViewColumnSortMode.Programmatic);
             SetColumnSortMode(DurationColumnIndex, DataGridViewColumnSortMode.Programmatic);
@@ -87,20 +87,30 @@ namespace BeebPerf.ux
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
 
-            _Metrics = metric;
+            _Metric = metric;
             _HighlightWritesBeforeDisplay = highlightWritesBeforeDisplay;
             _HighlightWritesAfterDisplay = highlightWritesAfterDisplay;
 
-            int maxCycleCount = GetMaxCycleCount(iterations);
+            int maxCycleCount = 0;
+            foreach (var iteration in iterations)
+                maxCycleCount = Math.Max(maxCycleCount, iteration.EndCycleCount - iteration.StartCycleCount);
+            _MaxCycleCount = maxCycleCount;
+
+            int maxDisplayedCycleCount = GetMaxDisplayedCycleCount(iterations);
             if (metric != null && metric.ThresholdCycles > 0)
-                maxCycleCount = int.Max(maxCycleCount, metric.ThresholdCycles);
-            _MaxDisplayedCycleCount = maxCycleCount;
+                maxDisplayedCycleCount = int.Max(maxDisplayedCycleCount, metric.ThresholdCycles);
+            _MaxDisplayedCycleCount = maxDisplayedCycleCount;
 
             // set data
             if (iterations.Count > 0)
                 base.SetRowsData(iterations);
             else
                 base.Clear();
+
+            bool displayAnalysis = (metric != null && metric.DisplayAnalysis);
+            SetColumnVisibility(DisplayOffsetColumnIndex, displayAnalysis);
+            SetColumnVisibility(WritesBeforeDisplayColumnIndex, displayAnalysis);
+            SetColumnVisibility(WritesAfterDisplayColumnIndex, displayAnalysis);
         }
 
         public void SelectRange(int analysisFrom, int analysisTo)
@@ -184,8 +194,9 @@ namespace BeebPerf.ux
                         return (value: -1, range: 1, clamp: false); // no highlight
 
                 case DurationColumnIndex:
+                    int range = (_Metric == null || _Metric.ThresholdCycles <= 0) ? _MaxCycleCount : _Metric.ThresholdCycles;
                     int cycles = iteration.EndCycleCount - iteration.StartCycleCount;
-                    return (value: cycles, range: _Metrics!.ThresholdCycles, clamp: false);
+                    return (value: cycles, range: range, clamp: false);
 
                 default:
                     return (value: -1, range: 1, clamp: false);
@@ -195,12 +206,13 @@ namespace BeebPerf.ux
         private string FormatDuration(MetricAnalysis.MetricIteration iteration)
         {
             int duration = iteration.EndCycleCount - iteration.StartCycleCount;
-            int range = _Metrics!.ThresholdCycles;
+
+            int range = (_Metric == null || _Metric.ThresholdCycles <= 0) ? _MaxCycleCount : _Metric.ThresholdCycles;
             double percentage = (int)double.Round(100.0 * duration / range);
             return $"{duration:N0} ({percentage:F2}%)";
         }
 
-        private static int GetMaxCycleCount(List<MetricAnalysis.MetricIteration> iterations)
+        private static int GetMaxDisplayedCycleCount(List<MetricAnalysis.MetricIteration> iterations)
         {
             if (iterations.Count == 0) return 0;
 
@@ -238,21 +250,27 @@ namespace BeebPerf.ux
 
         string[] IGridExporter.GetHeaders()
         {
-            string[] headers = [
-                "Iteration number",
-                "Start cycle count",
-                "End cycle count",
-                "Duration cycles [#]",
-                "Duration cycles [%]",
-                "Display iteration offset",
-                "Writes before display [#]",
-                "Writes before display [%]",
-                "Writes after display [#]",
-                "Writes after display [%]"
-            ];
+            var headers = new List<string>();
 
-        Debug.Assert(headers.Length == ExportColumnCount);
-            return headers;
+            headers.Add("Iteration number");
+            headers.Add("Start cycle count");
+            headers.Add("End cycle count");
+            headers.Add("Duration cycles [#]");
+            headers.Add("Duration cycles [%]");
+
+            if (_Metric != null && _Metric.DisplayAnalysis)
+            {
+                headers.Add("Display iteration offset");
+                headers.Add("Writes before display [#]");
+                headers.Add("Writes before display [%]");
+                headers.Add("Writes after display [#]");
+                headers.Add("Writes after display [%]");
+            }
+
+            int exportHeaderCount = (_Metric != null && _Metric.DisplayAnalysis) ? ExportColumnCount : ExportColumnCount - 5;
+            Debug.Assert(headers.Count == exportHeaderCount);
+
+            return headers.ToArray();
         }
 
         int IGridExporter.GetRowCount()
@@ -266,7 +284,8 @@ namespace BeebPerf.ux
 
             var rowData = _DataRows[rowIndex];
 
-            for (int columnIndex = 0; columnIndex < ExportColumnCount; columnIndex++)
+            int exportHeaderCount = (_Metric != null && _Metric.DisplayAnalysis) ? ExportColumnCount : ExportColumnCount - 5;
+            for (int columnIndex = 0; columnIndex < exportHeaderCount; columnIndex++)
                 rowValues.Add(FormatExportCell(rowData, columnIndex));
 
             return rowValues.ToArray();
@@ -280,7 +299,7 @@ namespace BeebPerf.ux
                 ExportStartCycleCountColumnIndex => iteration.StartCycleCount.ToString(),
                 ExportEndCycleCountColumnIndex => iteration.EndCycleCount.ToString(),
                 ExportDurationColumnIndex => (iteration.EndCycleCount - iteration.StartCycleCount).ToString(),
-                ExportDurationPercentageColumnIndex => FormatExportPercentage(iteration.EndCycleCount - iteration.StartCycleCount, _Metrics!.ThresholdCycles),
+                ExportDurationPercentageColumnIndex => FormatExportPercentage(iteration.EndCycleCount - iteration.StartCycleCount, _Metric!.ThresholdCycles),
                 ExportWriteCountBeforeDisplayColumnIndex => iteration.WritesBeforeDisplayRead.ToString(),
                 ExportWritePercentageBeforeDisplayColumnIndex => FormatExportPercentage(iteration.WritesBeforeDisplayRead, iteration.WritesBeforeDisplayRead + iteration.WritesAfterDisplayRead),
                 ExportWriteCountAfterDisplayColumnIndex => iteration.WritesAfterDisplayRead.ToString(),
@@ -315,7 +334,7 @@ namespace BeebPerf.ux
 
                 var gridView = (MetricsGridView)DataGridView!;
                 var iteration = (MetricAnalysis.MetricIteration)gridView._DataRows[rowIndex];
-                var metric = gridView._Metrics;
+                var metric = gridView._Metric;
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
                 // calc cycles extents
@@ -329,9 +348,13 @@ namespace BeebPerf.ux
                 graphics.IntersectClip(cellBounds);
 
                 // draw foreground
-                PaintFrame(graphics, cellBounds, cellStyle, gridView, iteration, maxDisplayedCycleCount);
-                PaintDisplayFrames(graphics, cellBounds, cellStyle, gridView, iteration, maxDisplayedCycleCount);
-                PaintThreshold(graphics, cellBounds, cellStyle, gridView, metric, maxDisplayedCycleCount);
+                PaintIteration(graphics, cellBounds, cellStyle, gridView, iteration, maxDisplayedCycleCount);
+
+                if (metric != null && metric.DisplayAnalysis)
+                    PaintDisplayFrames(graphics, cellBounds, cellStyle, gridView, iteration, maxDisplayedCycleCount);
+
+                if (metric != null && metric.ThresholdCycles > 0)
+                    PaintThreshold(graphics, cellBounds, cellStyle, gridView, metric, maxDisplayedCycleCount);
 
                 // restore state
                 graphics.Restore(graphicsState);
@@ -346,7 +369,7 @@ namespace BeebPerf.ux
                 graphics.FillRectangle(brush, cellBounds);
             }
 
-            private static void PaintFrame(
+            private static void PaintIteration(
                 Graphics graphics,
                 Rectangle cellBounds,
                 DataGridViewCellStyle cellStyle,
@@ -477,17 +500,14 @@ namespace BeebPerf.ux
                 Metric? metric,
                 int maxDisplayedCycleCount)
             {
-                if (metric != null && metric.ThresholdCycles > 0)
-                {
-                    // measure
-                    int thresholdX = cellBounds.Left + CyclesToCell(metric.ThresholdCycles, maxDisplayedCycleCount, cellBounds);
+                // measure
+                int thresholdX = cellBounds.Left + CyclesToCell(metric!.ThresholdCycles, maxDisplayedCycleCount, cellBounds);
 
-                    // paint
-                    var backColor = cellStyle.BackColor;
-                    var foreColor = backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed;
-                    using var pen = new Pen(foreColor, 2);
-                    graphics.DrawLine(pen, thresholdX, cellBounds.Top, thresholdX, cellBounds.Bottom);
-                }
+                // paint
+                var backColor = cellStyle.BackColor;
+                var foreColor = backColor.GetBrightness() > 0.5 ? Color.Red : Color.DarkRed;
+                using var pen = new Pen(foreColor, 2);
+                graphics.DrawLine(pen, thresholdX, cellBounds.Top, thresholdX, cellBounds.Bottom);
             }
 
             private static int CyclesToCell(int value, int range, Rectangle cellBounds)
@@ -497,9 +517,10 @@ namespace BeebPerf.ux
             }
         }
 
-        private Metric? _Metrics = null;
+        private Metric? _Metric = null;
         private bool _HighlightWritesBeforeDisplay = false;
         private bool _HighlightWritesAfterDisplay = false;
+        private int _MaxCycleCount = 0;
         private int _MaxDisplayedCycleCount = 0;
         private ReentrancyGuard _ReentrancyGuard = new();
     }

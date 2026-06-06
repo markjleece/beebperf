@@ -100,6 +100,9 @@ namespace BeebPerf.ux
             };
             cyclesTextBox.Text = _FrameSettings.ThresholdCycles.ToString();
 
+            // display analysis checkbox
+            displayAnalysisCheckBox.Checked = _FrameSettings.DisplayAnalysis;
+
             _IgnoreChanges = false;
 
             CancelAddressValidation();
@@ -167,10 +170,11 @@ namespace BeebPerf.ux
                     ParseAddress(startTextBox).Page != _FrameSettings.StartAddress.Page ||
                     ParseAddress(endTextBox).Address != _FrameSettings.EndAddress.Address ||
                     ParseAddress(endTextBox).Page != _FrameSettings.EndAddress.Page ||
-                    ParseCycles() != _FrameSettings.ThresholdCycles;
+                    ParseCycles() != _FrameSettings.ThresholdCycles ||
+                    displayAnalysisCheckBox.Checked != _FrameSettings.DisplayAnalysis;
             }
 
-            // validate address start and end addresses (asynchonously)
+            // validate address start and end addresses (asynchronously)
             okButton.Enabled = false;
             ValidateAddressesAsync(startAddress, endAddress, frameType)
                 .ContinueWith((task) =>
@@ -363,6 +367,12 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
+        private void displayAnalysisCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_IgnoreChanges) return;
+            UpdateState ();
+        }
+
         private void resetButton_Click(object sender, EventArgs e)
         {
             PopulateControls();
@@ -379,6 +389,7 @@ namespace BeebPerf.ux
             else
                 _FrameSettings.EndAddress = new CanonicalAddress();
             _FrameSettings.ThresholdCycles = ParseCycles();
+            _FrameSettings.DisplayAnalysis = displayAnalysisCheckBox.Checked;
         }
 
         private bool HasValue(TextBox textBox)

@@ -602,7 +602,7 @@ namespace BeebPerf
                     _CRTCState.VideoOutputEnabled &&
                     _CRTCState.DisplayScanline < 312)
                 {
-                    // update variables used to extract the image from the frane buffer
+                    // update variables used to extract the image from the frame buffer
                     _DisplayState.CaptureTeletextFrame = _ULAState.TeletextMode;
                     _DisplayState.LastDisplayScanline = _CRTCState.DisplayScanline;
                     _DisplayState.EndCycleCount = _DisplayState.CharacterCycleCount;

@@ -45,7 +45,8 @@ namespace BeebPerf.operation
                 Type = Metric.MetricType.StartAndEndAddresses,
                 StartAddress = new CanonicalAddress(0, MemoryPage.WholeRam),
                 EndAddress = new CanonicalAddress(0, MemoryPage.WholeRam),
-                ThresholdCycles = 40000
+                ThresholdCycles = 40000,
+                DisplayAnalysis = true
             };
         }
 
