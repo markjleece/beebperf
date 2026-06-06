@@ -238,40 +238,50 @@ namespace BeebPerf.ux
         private void DoPaint(Graphics graphics, bool paintEMF)
         {
             bool lightMode = (ForeColor.GetBrightness() < 0.5);
-            Color lineColor = lightMode ? Color.DarkRed : _ColorLightRed;
-            Color fillColor = lightMode ? _ColorLightRed : Color.DarkRed;
 
-            using var colorPen = new Pen(lineColor);
-            using var colorSelectedPen = new Pen(lineColor, 2);
-            using var colorBrush = new SolidBrush(fillColor);
-            using var colorFocusBrush = new SolidBrush(Blend(fillColor, ForeColor, 0.1));
+            // regular cells
+            Color regularLineColor = lightMode ? Color.DarkRed : _ColorLightRed;
+            Color regularFillColor = lightMode ? _ColorLightRed : Color.DarkRed;
 
-            Color grayFillColor = lightMode ? Color.LightGray : Color.Gray;
-            Color grayLineColor = Blend(lightMode ? Color.LightGray : Color.Gray, ForeColor, 0.1);
+            using var regularPen = new Pen(regularLineColor);
+            using var regularSelectedPen = new Pen(regularLineColor, 2);
+            using var regularBrush = new SolidBrush(regularFillColor);
+            using var regularFocusBrush = new SolidBrush(Blend(regularFillColor, ForeColor, 0.1));
 
-            using var grayPen = new Pen(grayLineColor);
-            using var graySelectedPen = new Pen(grayLineColor, 2);
-            using var grayBrush = new SolidBrush(grayFillColor);
-            using var grayFocusBrush = new SolidBrush(Blend(grayFillColor, ForeColor, 0.1));
+            // tail-call cells
+            Color tailCallFillColor = Blend(regularFillColor, BackColor, 0.2);
+            Color tailCallLineColor = Blend(regularLineColor, BackColor, 0.2);
+
+            using var tailCallPen = new Pen(tailCallLineColor);
+            using var tailCallSelectedPen = new Pen(tailCallLineColor, 2);
+            using var tailCallBrush = new SolidBrush(tailCallFillColor);
+            using var tailCallFocusBrush = new SolidBrush(Blend(tailCallFillColor, ForeColor, 0.1));
+
+            // fall-through cells
+            Color fallThroughFillColor = Blend(regularFillColor, BackColor, 0.4);
+            Color fallThroughLineColor = Blend(regularLineColor, BackColor, 0.4);
+
+            using var fallThroughPen = new Pen(fallThroughLineColor);
+            using var fallThroughSelectedPen = new Pen(fallThroughLineColor, 2);
+            using var fallThroughBrush = new SolidBrush(fallThroughFillColor);
+            using var fallThroughFocusBrush = new SolidBrush(Blend(fallThroughFillColor, ForeColor, 0.1));
 
             using var textBrush = new SolidBrush(ForeColor);
 
             foreach (var routineCell in _RoutineCells)
             {
                 var callType = routineCell.CallStack.CallType;
-                bool isTailCallOrFallthrough = (callType == CallType.TailCall || callType == CallType.FallThrough);
-
-                if (!_ShowCallTypes)
-                    isTailCallOrFallthrough = false;
+                bool isTailCall = (_ShowCallTypes && callType == CallType.TailCall);
+                bool isFallThrough = (_ShowCallTypes && callType == CallType.FallThrough);
 
                 PaintRoutineCell(
                     graphics,
                     paintEMF,
                     routineCell,
-                    isTailCallOrFallthrough ? grayPen : colorPen,
-                    isTailCallOrFallthrough ? graySelectedPen : colorSelectedPen,
-                    isTailCallOrFallthrough ? grayBrush : colorBrush,
-                    isTailCallOrFallthrough ? grayFocusBrush : colorFocusBrush,
+                    isTailCall ? tailCallPen : isFallThrough ? fallThroughPen : regularPen,
+                    isTailCall ? tailCallSelectedPen : isFallThrough ? fallThroughSelectedPen : regularSelectedPen,
+                    isTailCall ? tailCallBrush : isFallThrough ? fallThroughBrush : regularBrush,
+                    isTailCall ? tailCallFocusBrush : isFallThrough ? fallThroughFocusBrush : regularFocusBrush,
                     textBrush);
             }
         }
@@ -416,6 +426,20 @@ namespace BeebPerf.ux
         {
             var percentage = double.Min(100.0 * routineCell.CycleCount / routineCell.TotalCycleCount, 100);
             return $"{routineCell.CycleCount:N0} ({percentage:F2}%)";
+        }
+
+        private string FormatCallType(RoutineCell routineCell)
+        {
+            var callType = routineCell.CallStack.CallType;
+            return callType switch
+            {
+                CallType.TailCall => "Tail call",
+                CallType.FallThrough => "Fall through",
+                CallType.JSR => "JSR",
+                CallType.IRQ or CallType.NMI => "Interrupt",
+                CallType.BRK or CallType.NMI => "BRK",
+                _ => "None"
+            };
         }
 
         private string FormatRoutine(RoutineCell routineCell)
@@ -697,7 +721,11 @@ namespace BeebPerf.ux
             _ToolTipTimer.Stop();
             _ToolTipTimer.Start();
 
-            _ToolTipText = $"Routine: {FormatRoutine(routineCell)}\nTotal CPU: {FormatMetrics(routineCell)}";
+            _ToolTipText = 
+                $"Routine: {FormatRoutine(routineCell)}\n" +
+                $"Total CPU: {FormatMetrics(routineCell)}\n" +
+                $"Call type: {FormatCallType(routineCell)}";
+
             _ToolTipLocation = mousePosition;
             _ToolTipLocation.Offset(10, 10);
         }
@@ -759,7 +787,7 @@ namespace BeebPerf.ux
             {
                 Name = "callTypesButton",
                 ImageResourceName = "callTypesButton.Image",
-                ToolTipText = "Call types",
+                ToolTipText = "Show call types",
                 Parent = this
             };
             _CallTypesButton.Click += callTypesButton_Click;
