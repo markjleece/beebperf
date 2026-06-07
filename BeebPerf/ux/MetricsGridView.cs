@@ -24,7 +24,7 @@ using System.Diagnostics;
 
 namespace BeebPerf.ux
 {
-    internal class MetricsGridView : GridView<FrameAnalysis.MetricIteration>, IGridExporter
+    internal class MetricsGridView : GridView<VideoAnalysis.MetricIteration>, IGridExporter
     {
         private const int IteractionNumberColumnIndex = 0;
         private const int DurationColumnIndex = 1;
@@ -77,7 +77,7 @@ namespace BeebPerf.ux
         }
 
         public void Initialize(
-            List<FrameAnalysis.MetricIteration> iterations, 
+            List<VideoAnalysis.MetricIteration> iterations, 
             Metric? metric,
             bool highlightWritesBeforeDisplay,
             bool highlightWritesAfterDisplay)
@@ -147,7 +147,7 @@ namespace BeebPerf.ux
             base.ClearSelection();
         }
 
-        protected override void OnSelectionChange(object? sender, FrameAnalysis.MetricIteration? iteration)
+        protected override void OnSelectionChange(object? sender, VideoAnalysis.MetricIteration? iteration)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
@@ -161,7 +161,7 @@ namespace BeebPerf.ux
                 form.SetAnalysisRange(0, int.MaxValue);
         }
 
-        protected override int OnSortCompare(FrameAnalysis.MetricIteration a, FrameAnalysis.MetricIteration b, int columnIndex)
+        protected override int OnSortCompare(VideoAnalysis.MetricIteration a, VideoAnalysis.MetricIteration b, int columnIndex)
         {
             int result = columnIndex switch
             {
@@ -179,7 +179,7 @@ namespace BeebPerf.ux
             return result;
         }
 
-        protected override string OnFormatRowData(FrameAnalysis.MetricIteration iteration, int columnIndex, int rowIndex)
+        protected override string OnFormatRowData(VideoAnalysis.MetricIteration iteration, int columnIndex, int rowIndex)
         {
             return columnIndex switch
             {
@@ -193,7 +193,7 @@ namespace BeebPerf.ux
             };
         }
 
-        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(FrameAnalysis.MetricIteration iteration, int columnIndex)
+        protected override (int value, int range, bool clamp) OnRowDataCountAndRange(VideoAnalysis.MetricIteration iteration, int columnIndex)
         {
             switch (columnIndex)
             {
@@ -219,7 +219,7 @@ namespace BeebPerf.ux
             }
         }
 
-        private string FormatDuration(FrameAnalysis.MetricIteration iteration)
+        private string FormatDuration(VideoAnalysis.MetricIteration iteration)
         {
             int duration = iteration.EndCycleCount - iteration.StartCycleCount;
 
@@ -228,7 +228,7 @@ namespace BeebPerf.ux
             return $"{duration:N0} ({percentage:F2}%)";
         }
 
-        private static int GetMaxDisplayedCycleCount(List<FrameAnalysis.MetricIteration> iterations)
+        private static int GetMaxDisplayedCycleCount(List<VideoAnalysis.MetricIteration> iterations)
         {
             if (iterations.Count == 0) return 0;
 
@@ -307,7 +307,7 @@ namespace BeebPerf.ux
             return rowValues.ToArray();
         }
 
-        private string FormatExportCell(FrameAnalysis.MetricIteration iteration, int columnIndex)
+        private string FormatExportCell(VideoAnalysis.MetricIteration iteration, int columnIndex)
         {
             return columnIndex switch
             {
@@ -349,7 +349,7 @@ namespace BeebPerf.ux
                 }
 
                 var gridView = (MetricsGridView)DataGridView!;
-                var iteration = (FrameAnalysis.MetricIteration)gridView._DataRows[rowIndex];
+                var iteration = (VideoAnalysis.MetricIteration)gridView._DataRows[rowIndex];
                 var metric = gridView._Metric;
                 bool selected = (cellState & DataGridViewElementStates.Selected) != 0;
 
@@ -390,7 +390,7 @@ namespace BeebPerf.ux
                 Rectangle cellBounds,
                 DataGridViewCellStyle cellStyle,
                 MetricsGridView gridView, 
-                FrameAnalysis.MetricIteration iteration, 
+                VideoAnalysis.MetricIteration iteration, 
                 int maxDisplayedCycleCount)
             {
                 // measure
@@ -413,7 +413,7 @@ namespace BeebPerf.ux
                 Rectangle cellBounds,
                 DataGridViewCellStyle cellStyle,
                 MetricsGridView gridView, 
-                FrameAnalysis.MetricIteration iteration, 
+                VideoAnalysis.MetricIteration iteration, 
                 int maxDisplayedCycleCount)
             {
                 // measure

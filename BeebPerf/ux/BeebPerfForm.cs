@@ -37,7 +37,7 @@ namespace BeebPerf.ux
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new(_LabelResolver);
-            _FrameAnalysis = new();
+            _VideoAnalysis = new();
             _UndoRedoHistory = new();
             _Model = new();
 
@@ -176,19 +176,20 @@ namespace BeebPerf.ux
                     UpdateLabelFiles(filePathName, _Model.Labels);
                     _LabelResolver.Initialize(_LabelsFiles);
 
-                    // defer metric analysis if its dependent on static analysis
-                    bool deferFrameAnalysis = 
+                    // defer video analysis if the current metric is dependent on the stack frames
+                    // created during static analysis. Metrics are evaluated during video analysis
+                    bool deferVideoAnalysis = 
                         (_SelectedMetric != null && _SelectedMetric.Type != Metric.MetricType.StartAndEndAddresses);
 
-                    StaticAnalysis(deferFrameAnalysis);
+                    StaticAnalysis(deferVideoAnalysis);
 
-                    if (!deferFrameAnalysis)
-                        FrameAnalysis();
+                    if (!deferVideoAnalysis)
+                        VideoAnalysis();
                 }));
             });
         }
 
-        private void StaticAnalysis(bool performFrameAnalysis)
+        private void StaticAnalysis(bool performVideoAnalysis)
         {
             // CPU analysis...
             SetState(AppStateFlags.StaticCPUAnalysis);
@@ -212,9 +213,9 @@ namespace BeebPerf.ux
                     // execute dynamic analysis for the selected range (or whole range if no selection)
                     DynamicAnalysis(_CPUAnalysis.StartCycleCount, _CPUAnalysis.EndCycleCount);
 
-                    // execute metric analysis
-                    if (performFrameAnalysis)
-                        FrameAnalysis();
+                    // execute video analysis
+                    if (performVideoAnalysis)
+                        VideoAnalysis();
                 }));
             });
         }
@@ -287,12 +288,12 @@ namespace BeebPerf.ux
             });
         }
 
-        private void FrameAnalysis()
+        private void VideoAnalysis()
         {
-            // frame analysis...
+            // video analysis...
             SetState(AppStateFlags.FrameAnalysis);
 
-            var frameAnalysisTask = _FrameAnalysis.AnalysisAsync(
+            var videoAnalysisTask = _VideoAnalysis.AnalysisAsync(
                 _Model.Instructions,
                 InstructionSet!,
                 _Model,
@@ -303,8 +304,8 @@ namespace BeebPerf.ux
                     {
                         ClearState(AppStateFlags.FrameAnalysis);
 
-                        timelineView.FrameBitmaps = _FrameAnalysis.DisplayFrames;
-                        metricsView.SetIteractions(_FrameAnalysis.MetricIterations);
+                        timelineView.FrameBitmaps = _VideoAnalysis.DisplayFrames;
+                        metricsView.SetIteractions(_VideoAnalysis.MetricIterations);
                     }));
                 });
         }
@@ -644,7 +645,7 @@ namespace BeebPerf.ux
         {
             _SelectedMetric = metric;
             metricsView.SetMetrics(_Metrics, _SelectedMetric);
-            FrameAnalysis();
+            VideoAnalysis();
         }
 
         public void ClearSelectedMetric()
@@ -1190,7 +1191,7 @@ namespace BeebPerf.ux
         private LabelResolver _LabelResolver;
         private CPUAnalysis _CPUAnalysis;
         private MemoryAnalysis _MemoryAnalysis;
-        private FrameAnalysis _FrameAnalysis;
+        private VideoAnalysis _VideoAnalysis;
         private Font _BaseFont;
         private bool _UnexpectedClose;
         private FormWindowState _InitialFormWindowState;
