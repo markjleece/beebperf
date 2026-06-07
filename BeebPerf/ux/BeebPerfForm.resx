@@ -193,21 +193,6 @@
         AAAAAElFTkSuQmCC
 </value>
   </data>
-  <data name="settingsButton.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-    <value>
-        iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAW
-        JQAAFiUBSVIk8AAAAgZJREFUSEutlMtPU0EUxvnLBGEjKuA7hpjAhg0LN+oC0KQgIKIxkJCwIIEd6AoW
-        lvSFDyrBakJ8gCikQC2l795CS6FF+Mw3hMCdgebeXr7kS+49Z+Z3ZubeOWVlJSqzU8DotB/NgzO4ZHOg
-        os2OG888+LGWgjzWtKbnw6jpdOFCy1udX3v95wOvaLUr8DfnAS/s7eNat1uFf1pR4Bw78XlNiRfVnD9h
-        CJ7f28ejEZ9YjJwrKs+3kA5OiDyG8IcjPpHnUcr5ovItxXQFHgzrCwj48CGcvtzuNFcglcmjvPW4AJ+9
-        CxEB2S3808Hp+0Oz5gtwVSchF9vssI3NoaHvoy5Oj8+a+MjJrd1TIWf59vMpcFcy51TFN3dw79UHBXKW
-        q55M4vtq0hg8ms6h/uV7BUJXPlYvXNOAFz8DBttFOJXD3RfvFAh9vduNQDyLjdQ2vi7H8WUphoiWMwam
-        QsltcY4ymOYFCsQyxmGygoksbvZ4FDBd1+XGatQCnCtj25XBdG2nCyuRrdLhnMwVyuAjuD9sAb68sSkg
-        Mpi++tQF5uU5hvUnlBYQGSzgHU5r8MWghisdTtR1udDYr7+pjLO4PMeUjn7F9UQWBwcQF4Xv7Dm/1y3C
-        qVs9hwVmFqPQsnnc6Z1CdbsDv4KadTi18FdDtc0hirD98pkxeVzJAiCAPCruZt5oHzGo/w9ner+gOstk
-        AAAAAElFTkSuQmCC
-</value>
-  </data>
   <data name="helpButton.Image" type="System.Drawing.Bitmap, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
     <value>
         iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAW
@@ -235,9 +220,6 @@
   </data>
   <data name="hotRoutinesButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\hotRoutines.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="labelsButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\Labels.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="fitSelectionButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\FitSelection.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -271,5 +253,11 @@
   </data>
   <data name="mos200_labels" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\mos200_labels.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
+  <data name="displaySettingsButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\DisplaySettings.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="labelsButton.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Labels.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

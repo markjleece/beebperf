@@ -26,11 +26,11 @@ using BeebPerf.ux;
 namespace BeebPerf.operation
 {
     //
-    // Edit program settings UX operation
+    // Edit display settings UX operation
     //
-    class EditSettingsOperation : Operation
+    class EditDisplaySettingsOperation : Operation
     {
-        public EditSettingsOperation(BeebPerfForm form, Font baseFont)
+        public EditDisplaySettingsOperation(BeebPerfForm form, Font baseFont)
         {
             _Form = form;
             _BaseFont = baseFont;
@@ -41,7 +41,7 @@ namespace BeebPerf.operation
 
         public override bool Execute()
         {
-            SettingsDialog dialog = new(_PrevSettings, _BaseFont, _Form);
+            DisplaySettingsDialog dialog = new(_PrevSettings, _BaseFont, _Form);
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 _NewSettings = dialog.Settings!;

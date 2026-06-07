@@ -407,9 +407,9 @@ namespace BeebPerf.ux
                 UpdateToolbarState();
         }
 
-        private void settingsButton_Click(object sender, EventArgs e)
+        private void displaySettingsButton_Click(object sender, EventArgs e)
         {
-            var operation = new EditSettingsOperation(this, _BaseFont);
+            var operation = new EditDisplaySettingsOperation(this, _BaseFont);
             if (_UndoRedoHistory.Execute(operation))
                 UpdateToolbarState();
         }
@@ -747,24 +747,27 @@ namespace BeebPerf.ux
                     _LabelsFiles.RemoveAt(i);
             }
 
-            // insert perf file labels
-            _LabelsFiles.Insert(0, new LabelsFile()
-            {
-                FileName = $"{perfFileName} (embedded labels)",
-                Labels = perfFileLabels,
-                Status = LabelsFileStatus.Loaded,
-                Enabled = true,
-                Transient = true
-            });
-
             // insert MOS labels
             (var mosName, var mosLabels) = LoadMOSLabels();
             if (mosName != string.Empty)
             {
-                _LabelsFiles.Insert(1, new LabelsFile()
+                _LabelsFiles.Insert(0, new LabelsFile()
                 {
                     FileName = mosName,
                     Labels = mosLabels,
+                    Status = LabelsFileStatus.Loaded,
+                    Enabled = true,
+                    Transient = true
+                });
+            }
+
+            // insert .perf file labels, if any exist
+            if (perfFileLabels.Count > 0)
+            {
+                _LabelsFiles.Insert(0, new LabelsFile()
+                {
+                    FileName = $"{perfFileName} (embedded labels)",
+                    Labels = perfFileLabels,
                     Status = LabelsFileStatus.Loaded,
                     Enabled = true,
                     Transient = true

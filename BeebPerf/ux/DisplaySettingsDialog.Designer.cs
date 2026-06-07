@@ -22,7 +22,7 @@
 
 namespace BeebPerf.ux
 {
-    partial class SettingsDialog
+    partial class DisplaySettingsDialog
     {
         /// <summary>
         /// Required designer variable.
@@ -51,45 +51,45 @@ namespace BeebPerf.ux
         private void InitializeComponent()
         {
             generalGroupBox = new GroupBox();
-            lineSpacingComboBox = new ComboBox();
-            lineSpacingLabel = new Label();
-            colorThemeComboBox = new ComboBox();
-            textScalingComboBox = new ComboBox();
-            textScalingLabel = new Label();
-            colorThemeLabel = new Label();
-            codeFontComboBox = new ComboBox();
             codeFontLabel = new Label();
+            codeFontComboBox = new ComboBox();
+            colorThemeLabel = new Label();
+            colorThemeComboBox = new ComboBox();
+            textScalingLabel = new Label();
+            textScalingComboBox = new ComboBox();
+            lineSpacingLabel = new Label();
+            lineSpacingComboBox = new ComboBox();
             addressGroupBox = new GroupBox();
-            addressColorButton = new ColorButton();
-            addressColorLabel = new Label();
-            addressItalicCheckBox = new CheckBox();
-            addressBoldCheckBox = new CheckBox();
             addressFormatLabel = new Label();
             addressFormatComboBox = new ComboBox();
+            addressColorLabel = new Label();
+            addressColorButton = new ColorButton();
+            addressBoldCheckBox = new CheckBox();
+            addressItalicCheckBox = new CheckBox();
             mnemonicGroupBox = new GroupBox();
-            mnemonicColorButton = new ColorButton();
+            mnemonicFormatLabel = new Label();
             mnemonicFormatComboBox = new ComboBox();
             mnemonicColorLabel = new Label();
-            mnemonicItalicCheckBox = new CheckBox();
-            mnemonicFormatLabel = new Label();
+            mnemonicColorButton = new ColorButton();
             mnemonicBoldCheckBox = new CheckBox();
+            mnemonicItalicCheckBox = new CheckBox();
             labelGroupBox = new GroupBox();
-            labelColorButton = new ColorButton();
-            labelItalicCheckBox = new CheckBox();
             labelColorLabel = new Label();
+            labelColorButton = new ColorButton();
             labelBoldCheckBox = new CheckBox();
+            labelItalicCheckBox = new CheckBox();
             literalColorLabel = new Label();
             literalGroupBox = new GroupBox();
-            literalColorButton = new ColorButton();
-            literalFormatComboBox = new ComboBox();
-            literalItalicCheckBox = new CheckBox();
             literalFormatLabel = new Label();
+            literalFormatComboBox = new ComboBox();
+            literalColorButton = new ColorButton();
             literalBoldCheckBox = new CheckBox();
+            literalItalicCheckBox = new CheckBox();
             punctuationGroupBox = new GroupBox();
-            punctuationColorButton = new ColorButton();
-            punctuationItalicCheckBox = new CheckBox();
             punctuationColorLabel = new Label();
+            punctuationColorButton = new ColorButton();
             punctuationBoldCheckBox = new CheckBox();
+            punctuationItalicCheckBox = new CheckBox();
             sampleCodePanel = new SampleCodePanel();
             resetButton = new Button();
             okButton = new Button();
@@ -120,68 +120,15 @@ namespace BeebPerf.ux
             generalGroupBox.TabStop = false;
             generalGroupBox.Text = "General";
             // 
-            // lineSpacingComboBox
+            // codeFontLabel
             // 
-            lineSpacingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            lineSpacingComboBox.Font = new Font("Segoe UI", 9F);
-            lineSpacingComboBox.FormattingEnabled = true;
-            lineSpacingComboBox.Location = new Point(152, 141);
-            lineSpacingComboBox.Name = "lineSpacingComboBox";
-            lineSpacingComboBox.Size = new Size(182, 33);
-            lineSpacingComboBox.TabIndex = 0;
-            lineSpacingComboBox.SelectedIndexChanged += LineSpacingComboBox_SelectedIndexChanged;
-            // 
-            // lineSpacingLabel
-            // 
-            lineSpacingLabel.AutoSize = true;
-            lineSpacingLabel.Font = new Font("Segoe UI", 9F);
-            lineSpacingLabel.Location = new Point(6, 144);
-            lineSpacingLabel.Name = "lineSpacingLabel";
-            lineSpacingLabel.Size = new Size(109, 25);
-            lineSpacingLabel.TabIndex = 0;
-            lineSpacingLabel.Text = "Line spacing";
-            // 
-            // colorThemeComboBox
-            // 
-            colorThemeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            colorThemeComboBox.Font = new Font("Segoe UI", 9F);
-            colorThemeComboBox.FormattingEnabled = true;
-            colorThemeComboBox.Location = new Point(152, 63);
-            colorThemeComboBox.Name = "colorThemeComboBox";
-            colorThemeComboBox.Size = new Size(182, 33);
-            colorThemeComboBox.TabIndex = 0;
-            colorThemeComboBox.SelectedIndexChanged += ColorThemeComboBox_SelectedIndexChanged;
-            // 
-            // textScalingComboBox
-            // 
-            textScalingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            textScalingComboBox.Font = new Font("Segoe UI", 9F);
-            textScalingComboBox.FormattingEnabled = true;
-            textScalingComboBox.Location = new Point(152, 102);
-            textScalingComboBox.Name = "textScalingComboBox";
-            textScalingComboBox.Size = new Size(182, 33);
-            textScalingComboBox.TabIndex = 0;
-            textScalingComboBox.SelectedIndexChanged += TextScalingComboBox_SelectedIndexChanged;
-            // 
-            // textScalingLabel
-            // 
-            textScalingLabel.AutoSize = true;
-            textScalingLabel.Font = new Font("Segoe UI", 9F);
-            textScalingLabel.Location = new Point(6, 104);
-            textScalingLabel.Name = "textScalingLabel";
-            textScalingLabel.Size = new Size(101, 25);
-            textScalingLabel.TabIndex = 0;
-            textScalingLabel.Text = "Text scaling";
-            // 
-            // colorThemeLabel
-            // 
-            colorThemeLabel.AutoSize = true;
-            colorThemeLabel.Font = new Font("Segoe UI", 9F);
-            colorThemeLabel.Location = new Point(6, 66);
-            colorThemeLabel.Name = "colorThemeLabel";
-            colorThemeLabel.Size = new Size(110, 25);
-            colorThemeLabel.TabIndex = 0;
-            colorThemeLabel.Text = "Color theme";
+            codeFontLabel.AutoSize = true;
+            codeFontLabel.Font = new Font("Segoe UI", 9F);
+            codeFontLabel.Location = new Point(6, 27);
+            codeFontLabel.Name = "codeFontLabel";
+            codeFontLabel.Size = new Size(92, 25);
+            codeFontLabel.TabIndex = 0;
+            codeFontLabel.Text = "Code font";
             // 
             // codeFontComboBox
             // 
@@ -196,15 +143,68 @@ namespace BeebPerf.ux
             codeFontComboBox.DrawItem += CodeFontComboBox_DrawItem;
             codeFontComboBox.SelectedIndexChanged += CodeFontComboBox_SelectedIndexChanged;
             // 
-            // codeFontLabel
+            // colorThemeLabel
             // 
-            codeFontLabel.AutoSize = true;
-            codeFontLabel.Font = new Font("Segoe UI", 9F);
-            codeFontLabel.Location = new Point(6, 27);
-            codeFontLabel.Name = "codeFontLabel";
-            codeFontLabel.Size = new Size(92, 25);
-            codeFontLabel.TabIndex = 0;
-            codeFontLabel.Text = "Code font";
+            colorThemeLabel.AutoSize = true;
+            colorThemeLabel.Font = new Font("Segoe UI", 9F);
+            colorThemeLabel.Location = new Point(6, 66);
+            colorThemeLabel.Name = "colorThemeLabel";
+            colorThemeLabel.Size = new Size(110, 25);
+            colorThemeLabel.TabIndex = 0;
+            colorThemeLabel.Text = "Color theme";
+            // 
+            // colorThemeComboBox
+            // 
+            colorThemeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            colorThemeComboBox.Font = new Font("Segoe UI", 9F);
+            colorThemeComboBox.FormattingEnabled = true;
+            colorThemeComboBox.Location = new Point(152, 63);
+            colorThemeComboBox.Name = "colorThemeComboBox";
+            colorThemeComboBox.Size = new Size(182, 33);
+            colorThemeComboBox.TabIndex = 0;
+            colorThemeComboBox.SelectedIndexChanged += ColorThemeComboBox_SelectedIndexChanged;
+            // 
+            // textScalingLabel
+            // 
+            textScalingLabel.AutoSize = true;
+            textScalingLabel.Font = new Font("Segoe UI", 9F);
+            textScalingLabel.Location = new Point(6, 104);
+            textScalingLabel.Name = "textScalingLabel";
+            textScalingLabel.Size = new Size(101, 25);
+            textScalingLabel.TabIndex = 0;
+            textScalingLabel.Text = "Text scaling";
+            // 
+            // textScalingComboBox
+            // 
+            textScalingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            textScalingComboBox.Font = new Font("Segoe UI", 9F);
+            textScalingComboBox.FormattingEnabled = true;
+            textScalingComboBox.Location = new Point(152, 102);
+            textScalingComboBox.Name = "textScalingComboBox";
+            textScalingComboBox.Size = new Size(182, 33);
+            textScalingComboBox.TabIndex = 0;
+            textScalingComboBox.SelectedIndexChanged += TextScalingComboBox_SelectedIndexChanged;
+            // 
+            // lineSpacingLabel
+            // 
+            lineSpacingLabel.AutoSize = true;
+            lineSpacingLabel.Font = new Font("Segoe UI", 9F);
+            lineSpacingLabel.Location = new Point(6, 144);
+            lineSpacingLabel.Name = "lineSpacingLabel";
+            lineSpacingLabel.Size = new Size(109, 25);
+            lineSpacingLabel.TabIndex = 0;
+            lineSpacingLabel.Text = "Line spacing";
+            // 
+            // lineSpacingComboBox
+            // 
+            lineSpacingComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            lineSpacingComboBox.Font = new Font("Segoe UI", 9F);
+            lineSpacingComboBox.FormattingEnabled = true;
+            lineSpacingComboBox.Location = new Point(152, 141);
+            lineSpacingComboBox.Name = "lineSpacingComboBox";
+            lineSpacingComboBox.Size = new Size(182, 33);
+            lineSpacingComboBox.TabIndex = 0;
+            lineSpacingComboBox.SelectedIndexChanged += LineSpacingComboBox_SelectedIndexChanged;
             // 
             // addressGroupBox
             // 
@@ -221,49 +221,6 @@ namespace BeebPerf.ux
             addressGroupBox.TabIndex = 0;
             addressGroupBox.TabStop = false;
             addressGroupBox.Text = "Addresses";
-            // 
-            // addressColorButton
-            // 
-            addressColorButton.Location = new Point(152, 66);
-            addressColorButton.Name = "addressColorButton";
-            addressColorButton.Size = new Size(34, 34);
-            addressColorButton.TabIndex = 0;
-            addressColorButton.UseVisualStyleBackColor = false;
-            addressColorButton.Click += ColorButton_Click;
-            // 
-            // addressColorLabel
-            // 
-            addressColorLabel.AutoSize = true;
-            addressColorLabel.Font = new Font("Segoe UI", 9F);
-            addressColorLabel.Location = new Point(6, 71);
-            addressColorLabel.Name = "addressColorLabel";
-            addressColorLabel.Size = new Size(55, 25);
-            addressColorLabel.TabIndex = 0;
-            addressColorLabel.Text = "Color";
-            // 
-            // addressItalicCheckBox
-            // 
-            addressItalicCheckBox.AutoSize = true;
-            addressItalicCheckBox.Font = new Font("Segoe UI", 9F);
-            addressItalicCheckBox.Location = new Point(400, 64);
-            addressItalicCheckBox.Name = "addressItalicCheckBox";
-            addressItalicCheckBox.Size = new Size(74, 29);
-            addressItalicCheckBox.TabIndex = 0;
-            addressItalicCheckBox.Text = "Italic";
-            addressItalicCheckBox.UseVisualStyleBackColor = true;
-            addressItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
-            // 
-            // addressBoldCheckBox
-            // 
-            addressBoldCheckBox.AutoSize = true;
-            addressBoldCheckBox.Font = new Font("Segoe UI", 9F);
-            addressBoldCheckBox.Location = new Point(400, 29);
-            addressBoldCheckBox.Name = "addressBoldCheckBox";
-            addressBoldCheckBox.Size = new Size(74, 29);
-            addressBoldCheckBox.TabIndex = 0;
-            addressBoldCheckBox.Text = "Bold";
-            addressBoldCheckBox.UseVisualStyleBackColor = true;
-            addressBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
             // 
             // addressFormatLabel
             // 
@@ -286,6 +243,50 @@ namespace BeebPerf.ux
             addressFormatComboBox.TabIndex = 0;
             addressFormatComboBox.SelectedIndexChanged += AddressFormatComboBox_SelectedIndexChanged;
             // 
+            // addressColorLabel
+            // 
+            addressColorLabel.AutoSize = true;
+            addressColorLabel.Font = new Font("Segoe UI", 9F);
+            addressColorLabel.Location = new Point(6, 71);
+            addressColorLabel.Name = "addressColorLabel";
+            addressColorLabel.Size = new Size(55, 25);
+            addressColorLabel.TabIndex = 0;
+            addressColorLabel.Text = "Color";
+            // 
+            // addressColorButton
+            // 
+            addressColorButton.FlatStyle = FlatStyle.Flat;
+            addressColorButton.Location = new Point(152, 66);
+            addressColorButton.Name = "addressColorButton";
+            addressColorButton.Size = new Size(34, 34);
+            addressColorButton.TabIndex = 0;
+            addressColorButton.UseVisualStyleBackColor = false;
+            addressColorButton.Click += ColorButton_Click;
+            // 
+            // addressBoldCheckBox
+            // 
+            addressBoldCheckBox.AutoSize = true;
+            addressBoldCheckBox.Font = new Font("Segoe UI", 9F);
+            addressBoldCheckBox.Location = new Point(400, 29);
+            addressBoldCheckBox.Name = "addressBoldCheckBox";
+            addressBoldCheckBox.Size = new Size(74, 29);
+            addressBoldCheckBox.TabIndex = 0;
+            addressBoldCheckBox.Text = "Bold";
+            addressBoldCheckBox.UseVisualStyleBackColor = true;
+            addressBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
+            // 
+            // addressItalicCheckBox
+            // 
+            addressItalicCheckBox.AutoSize = true;
+            addressItalicCheckBox.Font = new Font("Segoe UI", 9F);
+            addressItalicCheckBox.Location = new Point(400, 64);
+            addressItalicCheckBox.Name = "addressItalicCheckBox";
+            addressItalicCheckBox.Size = new Size(74, 29);
+            addressItalicCheckBox.TabIndex = 0;
+            addressItalicCheckBox.Text = "Italic";
+            addressItalicCheckBox.UseVisualStyleBackColor = true;
+            addressItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
+            // 
             // mnemonicGroupBox
             // 
             mnemonicGroupBox.Controls.Add(mnemonicFormatLabel);
@@ -302,14 +303,15 @@ namespace BeebPerf.ux
             mnemonicGroupBox.TabStop = false;
             mnemonicGroupBox.Text = "Mnemonics";
             // 
-            // mnemonicColorButton
+            // mnemonicFormatLabel
             // 
-            mnemonicColorButton.Location = new Point(152, 66);
-            mnemonicColorButton.Name = "mnemonicColorButton";
-            mnemonicColorButton.Size = new Size(34, 34);
-            mnemonicColorButton.TabIndex = 0;
-            mnemonicColorButton.UseVisualStyleBackColor = false;
-            mnemonicColorButton.Click += ColorButton_Click;
+            mnemonicFormatLabel.AutoSize = true;
+            mnemonicFormatLabel.Font = new Font("Segoe UI", 9F);
+            mnemonicFormatLabel.Location = new Point(6, 27);
+            mnemonicFormatLabel.Name = "mnemonicFormatLabel";
+            mnemonicFormatLabel.Size = new Size(69, 25);
+            mnemonicFormatLabel.TabIndex = 0;
+            mnemonicFormatLabel.Text = "Format";
             // 
             // mnemonicFormatComboBox
             // 
@@ -332,27 +334,15 @@ namespace BeebPerf.ux
             mnemonicColorLabel.TabIndex = 0;
             mnemonicColorLabel.Text = "Color";
             // 
-            // mnemonicItalicCheckBox
+            // mnemonicColorButton
             // 
-            mnemonicItalicCheckBox.AutoSize = true;
-            mnemonicItalicCheckBox.Font = new Font("Segoe UI", 9F);
-            mnemonicItalicCheckBox.Location = new Point(400, 64);
-            mnemonicItalicCheckBox.Name = "mnemonicItalicCheckBox";
-            mnemonicItalicCheckBox.Size = new Size(74, 29);
-            mnemonicItalicCheckBox.TabIndex = 0;
-            mnemonicItalicCheckBox.Text = "Italic";
-            mnemonicItalicCheckBox.UseVisualStyleBackColor = true;
-            mnemonicItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
-            // 
-            // mnemonicFormatLabel
-            // 
-            mnemonicFormatLabel.AutoSize = true;
-            mnemonicFormatLabel.Font = new Font("Segoe UI", 9F);
-            mnemonicFormatLabel.Location = new Point(6, 27);
-            mnemonicFormatLabel.Name = "mnemonicFormatLabel";
-            mnemonicFormatLabel.Size = new Size(69, 25);
-            mnemonicFormatLabel.TabIndex = 0;
-            mnemonicFormatLabel.Text = "Format";
+            mnemonicColorButton.FlatStyle = FlatStyle.Flat;
+            mnemonicColorButton.Location = new Point(152, 66);
+            mnemonicColorButton.Name = "mnemonicColorButton";
+            mnemonicColorButton.Size = new Size(34, 34);
+            mnemonicColorButton.TabIndex = 0;
+            mnemonicColorButton.UseVisualStyleBackColor = false;
+            mnemonicColorButton.Click += ColorButton_Click;
             // 
             // mnemonicBoldCheckBox
             // 
@@ -365,6 +355,18 @@ namespace BeebPerf.ux
             mnemonicBoldCheckBox.Text = "Bold";
             mnemonicBoldCheckBox.UseVisualStyleBackColor = true;
             mnemonicBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
+            // 
+            // mnemonicItalicCheckBox
+            // 
+            mnemonicItalicCheckBox.AutoSize = true;
+            mnemonicItalicCheckBox.Font = new Font("Segoe UI", 9F);
+            mnemonicItalicCheckBox.Location = new Point(400, 64);
+            mnemonicItalicCheckBox.Name = "mnemonicItalicCheckBox";
+            mnemonicItalicCheckBox.Size = new Size(74, 29);
+            mnemonicItalicCheckBox.TabIndex = 0;
+            mnemonicItalicCheckBox.Text = "Italic";
+            mnemonicItalicCheckBox.UseVisualStyleBackColor = true;
+            mnemonicItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
             // 
             // labelGroupBox
             // 
@@ -380,27 +382,6 @@ namespace BeebPerf.ux
             labelGroupBox.TabStop = false;
             labelGroupBox.Text = "Labels";
             // 
-            // labelColorButton
-            // 
-            labelColorButton.Location = new Point(152, 22);
-            labelColorButton.Name = "labelColorButton";
-            labelColorButton.Size = new Size(34, 34);
-            labelColorButton.TabIndex = 0;
-            labelColorButton.UseVisualStyleBackColor = false;
-            labelColorButton.Click += ColorButton_Click;
-            // 
-            // labelItalicCheckBox
-            // 
-            labelItalicCheckBox.AutoSize = true;
-            labelItalicCheckBox.Font = new Font("Segoe UI", 9F);
-            labelItalicCheckBox.Location = new Point(400, 61);
-            labelItalicCheckBox.Name = "labelItalicCheckBox";
-            labelItalicCheckBox.Size = new Size(74, 29);
-            labelItalicCheckBox.TabIndex = 0;
-            labelItalicCheckBox.Text = "Italic";
-            labelItalicCheckBox.UseVisualStyleBackColor = true;
-            labelItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
-            // 
             // labelColorLabel
             // 
             labelColorLabel.AutoSize = true;
@@ -410,6 +391,16 @@ namespace BeebPerf.ux
             labelColorLabel.Size = new Size(55, 25);
             labelColorLabel.TabIndex = 0;
             labelColorLabel.Text = "Color";
+            // 
+            // labelColorButton
+            // 
+            labelColorButton.FlatStyle = FlatStyle.Flat;
+            labelColorButton.Location = new Point(152, 22);
+            labelColorButton.Name = "labelColorButton";
+            labelColorButton.Size = new Size(34, 34);
+            labelColorButton.TabIndex = 0;
+            labelColorButton.UseVisualStyleBackColor = false;
+            labelColorButton.Click += ColorButton_Click;
             // 
             // labelBoldCheckBox
             // 
@@ -422,6 +413,18 @@ namespace BeebPerf.ux
             labelBoldCheckBox.Text = "Bold";
             labelBoldCheckBox.UseVisualStyleBackColor = true;
             labelBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
+            // 
+            // labelItalicCheckBox
+            // 
+            labelItalicCheckBox.AutoSize = true;
+            labelItalicCheckBox.Font = new Font("Segoe UI", 9F);
+            labelItalicCheckBox.Location = new Point(400, 61);
+            labelItalicCheckBox.Name = "labelItalicCheckBox";
+            labelItalicCheckBox.Size = new Size(74, 29);
+            labelItalicCheckBox.TabIndex = 0;
+            labelItalicCheckBox.Text = "Italic";
+            labelItalicCheckBox.UseVisualStyleBackColor = true;
+            labelItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
             // 
             // literalColorLabel
             // 
@@ -449,14 +452,15 @@ namespace BeebPerf.ux
             literalGroupBox.TabStop = false;
             literalGroupBox.Text = "Literals";
             // 
-            // literalColorButton
+            // literalFormatLabel
             // 
-            literalColorButton.Location = new Point(152, 66);
-            literalColorButton.Name = "literalColorButton";
-            literalColorButton.Size = new Size(34, 34);
-            literalColorButton.TabIndex = 0;
-            literalColorButton.UseVisualStyleBackColor = false;
-            literalColorButton.Click += ColorButton_Click;
+            literalFormatLabel.AutoSize = true;
+            literalFormatLabel.Font = new Font("Segoe UI", 9F);
+            literalFormatLabel.Location = new Point(6, 27);
+            literalFormatLabel.Name = "literalFormatLabel";
+            literalFormatLabel.Size = new Size(69, 25);
+            literalFormatLabel.TabIndex = 0;
+            literalFormatLabel.Text = "Format";
             // 
             // literalFormatComboBox
             // 
@@ -469,27 +473,15 @@ namespace BeebPerf.ux
             literalFormatComboBox.TabIndex = 0;
             literalFormatComboBox.SelectedIndexChanged += LiteralFormatComboBox_SelectedIndexChanged;
             // 
-            // literalItalicCheckBox
+            // literalColorButton
             // 
-            literalItalicCheckBox.AutoSize = true;
-            literalItalicCheckBox.Font = new Font("Segoe UI", 9F);
-            literalItalicCheckBox.Location = new Point(400, 64);
-            literalItalicCheckBox.Name = "literalItalicCheckBox";
-            literalItalicCheckBox.Size = new Size(74, 29);
-            literalItalicCheckBox.TabIndex = 0;
-            literalItalicCheckBox.Text = "Italic";
-            literalItalicCheckBox.UseVisualStyleBackColor = true;
-            literalItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
-            // 
-            // literalFormatLabel
-            // 
-            literalFormatLabel.AutoSize = true;
-            literalFormatLabel.Font = new Font("Segoe UI", 9F);
-            literalFormatLabel.Location = new Point(6, 27);
-            literalFormatLabel.Name = "literalFormatLabel";
-            literalFormatLabel.Size = new Size(69, 25);
-            literalFormatLabel.TabIndex = 0;
-            literalFormatLabel.Text = "Format";
+            literalColorButton.FlatStyle = FlatStyle.Flat;
+            literalColorButton.Location = new Point(152, 66);
+            literalColorButton.Name = "literalColorButton";
+            literalColorButton.Size = new Size(34, 34);
+            literalColorButton.TabIndex = 0;
+            literalColorButton.UseVisualStyleBackColor = false;
+            literalColorButton.Click += ColorButton_Click;
             // 
             // literalBoldCheckBox
             // 
@@ -502,6 +494,18 @@ namespace BeebPerf.ux
             literalBoldCheckBox.Text = "Bold";
             literalBoldCheckBox.UseVisualStyleBackColor = true;
             literalBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
+            // 
+            // literalItalicCheckBox
+            // 
+            literalItalicCheckBox.AutoSize = true;
+            literalItalicCheckBox.Font = new Font("Segoe UI", 9F);
+            literalItalicCheckBox.Location = new Point(400, 64);
+            literalItalicCheckBox.Name = "literalItalicCheckBox";
+            literalItalicCheckBox.Size = new Size(74, 29);
+            literalItalicCheckBox.TabIndex = 0;
+            literalItalicCheckBox.Text = "Italic";
+            literalItalicCheckBox.UseVisualStyleBackColor = true;
+            literalItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
             // 
             // punctuationGroupBox
             // 
@@ -517,27 +521,6 @@ namespace BeebPerf.ux
             punctuationGroupBox.TabStop = false;
             punctuationGroupBox.Text = "Punctuation";
             // 
-            // punctuationColorButton
-            // 
-            punctuationColorButton.Location = new Point(152, 22);
-            punctuationColorButton.Name = "punctuationColorButton";
-            punctuationColorButton.Size = new Size(34, 34);
-            punctuationColorButton.TabIndex = 0;
-            punctuationColorButton.UseVisualStyleBackColor = false;
-            punctuationColorButton.Click += ColorButton_Click;
-            // 
-            // punctuationItalicCheckBox
-            // 
-            punctuationItalicCheckBox.AutoSize = true;
-            punctuationItalicCheckBox.Font = new Font("Segoe UI", 9F);
-            punctuationItalicCheckBox.Location = new Point(400, 61);
-            punctuationItalicCheckBox.Name = "punctuationItalicCheckBox";
-            punctuationItalicCheckBox.Size = new Size(74, 29);
-            punctuationItalicCheckBox.TabIndex = 0;
-            punctuationItalicCheckBox.Text = "Italic";
-            punctuationItalicCheckBox.UseVisualStyleBackColor = true;
-            punctuationItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
-            // 
             // punctuationColorLabel
             // 
             punctuationColorLabel.AutoSize = true;
@@ -547,6 +530,16 @@ namespace BeebPerf.ux
             punctuationColorLabel.Size = new Size(55, 25);
             punctuationColorLabel.TabIndex = 0;
             punctuationColorLabel.Text = "Color";
+            // 
+            // punctuationColorButton
+            // 
+            punctuationColorButton.FlatStyle = FlatStyle.Flat;
+            punctuationColorButton.Location = new Point(152, 22);
+            punctuationColorButton.Name = "punctuationColorButton";
+            punctuationColorButton.Size = new Size(34, 34);
+            punctuationColorButton.TabIndex = 0;
+            punctuationColorButton.UseVisualStyleBackColor = false;
+            punctuationColorButton.Click += ColorButton_Click;
             // 
             // punctuationBoldCheckBox
             // 
@@ -559,6 +552,18 @@ namespace BeebPerf.ux
             punctuationBoldCheckBox.Text = "Bold";
             punctuationBoldCheckBox.UseVisualStyleBackColor = true;
             punctuationBoldCheckBox.CheckedChanged += BoldCheckBox_CheckedChanged;
+            // 
+            // punctuationItalicCheckBox
+            // 
+            punctuationItalicCheckBox.AutoSize = true;
+            punctuationItalicCheckBox.Font = new Font("Segoe UI", 9F);
+            punctuationItalicCheckBox.Location = new Point(400, 61);
+            punctuationItalicCheckBox.Name = "punctuationItalicCheckBox";
+            punctuationItalicCheckBox.Size = new Size(74, 29);
+            punctuationItalicCheckBox.TabIndex = 0;
+            punctuationItalicCheckBox.Text = "Italic";
+            punctuationItalicCheckBox.UseVisualStyleBackColor = true;
+            punctuationItalicCheckBox.CheckedChanged += ItalicCheckBox_CheckedChanged;
             // 
             // sampleCodePanel
             // 
@@ -599,7 +604,7 @@ namespace BeebPerf.ux
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             // 
-            // SettingsDialog
+            // DisplaySettingsDialog
             // 
             AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -619,8 +624,8 @@ namespace BeebPerf.ux
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "SettingsDialog";
-            Text = "Settings";
+            Name = "DisplaySettingsDialog";
+            Text = "Display Settings";
             generalGroupBox.ResumeLayout(false);
             generalGroupBox.PerformLayout();
             addressGroupBox.ResumeLayout(false);

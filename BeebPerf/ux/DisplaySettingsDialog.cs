@@ -26,11 +26,11 @@ using System.Text.RegularExpressions;
 
 namespace BeebPerf.ux
 {
-    public partial class SettingsDialog : Form
+    public partial class DisplaySettingsDialog : Form
     {
         public DisplaySettings? Settings;
 
-        internal SettingsDialog(DisplaySettings settings, Font baseFont, BeebPerfForm form)
+        internal DisplaySettingsDialog(DisplaySettings settings, Font baseFont, BeebPerfForm form)
         {
             _SuppressChangeEvents++;
 

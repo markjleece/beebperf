@@ -48,7 +48,7 @@ namespace BeebPerf.ux
             fitFramesButton = new ToolStripButton();
             toolStripSeparator4 = new ToolStripSeparator();
             labelsButton = new ToolStripButton();
-            settingsButton = new ToolStripButton();
+            displaySettingsButton = new ToolStripButton();
             helpButton = new ToolStripButton();
             timelineView = new TimelineView();
             primarySplitContainer = new SplitContainer();
@@ -108,7 +108,7 @@ namespace BeebPerf.ux
                 fitFramesButton,
                 toolStripSeparator4, 
                 labelsButton,
-                settingsButton, 
+                displaySettingsButton, 
                 helpButton
             });
             toolStrip.Location = new Point(0, 0);
@@ -225,7 +225,7 @@ namespace BeebPerf.ux
             fitSelectionButton.ImageTransparentColor = Color.Magenta;
             fitSelectionButton.Name = "fitSelectionButton";
             fitSelectionButton.Size = new Size(34, 28);
-            fitSelectionButton.Text = "Fit selection";
+            fitSelectionButton.Text = "Fit Selection";
             fitSelectionButton.Click += fitSelectionButton_Click;
             // 
             // fitFramesButton
@@ -235,7 +235,7 @@ namespace BeebPerf.ux
             fitFramesButton.ImageTransparentColor = Color.Magenta;
             fitFramesButton.Name = "fitFrames";
             fitFramesButton.Size = new Size(34, 28);
-            fitFramesButton.Text = "Fit display frames";
+            fitFramesButton.Text = "Fit Display Frames";
             fitFramesButton.Click += fitFramesButton_Click;
             // 
             // toolStripSeparator4
@@ -254,16 +254,16 @@ namespace BeebPerf.ux
             labelsButton.ToolTipText = "Labels";
             labelsButton.Click += labelsButton_Click;
             // 
-            // settingsButton
+            // displaySettingsButton
             // 
-            settingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
-            settingsButton.Image = (Image)resources.GetObject("settingsButton.Image");
-            settingsButton.ImageTransparentColor = Color.Magenta;
-            settingsButton.Name = "settingsButton";
-            settingsButton.Size = new Size(34, 28);
-            settingsButton.Text = "Settings";
-            settingsButton.ToolTipText = "Settings";
-            settingsButton.Click += settingsButton_Click;
+            displaySettingsButton.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+            displaySettingsButton.Image = (Image)resources.GetObject("displaySettingsButton.Image");
+            displaySettingsButton.ImageTransparentColor = Color.Magenta;
+            displaySettingsButton.Name = "displaySettingsButton";
+            displaySettingsButton.Size = new Size(34, 28);
+            displaySettingsButton.Text = "Display Settings";
+            displaySettingsButton.ToolTipText = "Display Settings";
+            displaySettingsButton.Click += displaySettingsButton_Click;
             // 
             // helpButton
             // 
@@ -527,7 +527,7 @@ namespace BeebPerf.ux
         private ToolStripButton fitFramesButton;
         private ToolStripSeparator toolStripSeparator4;
         private ToolStripButton labelsButton;
-        private ToolStripButton settingsButton;
+        private ToolStripButton displaySettingsButton;
         private ToolStripButton helpButton;
         private TimelineView timelineView;
         private SplitContainer primarySplitContainer;
