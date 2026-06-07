@@ -23,12 +23,12 @@ using System.Diagnostics;
 
 namespace BeebPerf.ux
 {
-    public partial class SelectionDialog : Form
+    public partial class EditSelectionDialog : Form
     {
         public int AnalysisFrom;
         public int AnalysisTo;
 
-        public SelectionDialog(int analysisFrom, int analysisTo, BeebPerfForm form)
+        public EditSelectionDialog(int analysisFrom, int analysisTo, BeebPerfForm form)
         {
             InitializeComponent();
             Owner = form;

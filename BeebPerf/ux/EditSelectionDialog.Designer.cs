@@ -1,6 +1,6 @@
 ﻿namespace BeebPerf.ux
 {
-    partial class SelectionDialog
+    partial class EditSelectionDialog
     {
         /// <summary>
         /// Required designer variable.
@@ -168,7 +168,7 @@
             cancelButton.Text = "Cancel";
             cancelButton.UseVisualStyleBackColor = true;
             // 
-            // SelectionDialog
+            // EditSelectionDialog
             // 
             AcceptButton = okButton;
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -192,8 +192,8 @@
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            Name = "SelectionDialog";
-            Text = "Selection";
+            Name = "EditSelectionDialog";
+            Text = "Edit Selection";
             Shown += SelectionDialog_Shown;
             ResumeLayout(false);
             PerformLayout();
