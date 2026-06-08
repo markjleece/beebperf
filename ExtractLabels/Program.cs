@@ -19,14 +19,17 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Text;
+
 class Program
 {
-    static void Main(string[] args)
+    static int Main(string[] args)
     {
-        // command line
+        // command line options...
         bool showHelp = (args.Length == 0);
         bool includeAssignments = true;
         int addressesFrom = 0;
+        string outputFile = string.Empty;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -35,34 +38,49 @@ class Program
                 showHelp = true;
                 break;
             }
+            else if (args[i] == "-o" && i + 1 < args.Length)
+            {
+                outputFile = args[++i];
+            }
             else if (args[i] == "-i")
             {
                 includeAssignments = false;
             }
             else if (args[i] == "-r" && i + 1 < args.Length)
             {
-                if (int.TryParse(args[i + 1], System.Globalization.NumberStyles.HexNumber, null, out int addr))
+                string hexAddress = args[++i];
+                if (hexAddress.StartsWith("$") || hexAddress.StartsWith("&"))
+                    hexAddress = hexAddress.Substring(1);
+                else if (hexAddress.StartsWith("0x"))
+                    hexAddress = hexAddress.Substring(2);
+
+                if (int.TryParse(hexAddress, System.Globalization.NumberStyles.HexNumber, null, out int address))
                 {
-                    if (addr < 0 || addr > 0xFFFF)
+                    if (address < 0 || address > 0xFFFF)
                     {
-                        Console.WriteLine($"Address out of range: {args[i + 1]:X4}");
-                        return;
+                        Console.WriteLine($"ERROR: Address out of range: '{args[i]:X4}'");
+                        return 1;
                     }
-                    addressesFrom = addr;
-                    i++;
+                    addressesFrom = address;
                 }
                 else
                 {
-                    Console.WriteLine($"Invalid hex address: {args[i + 1]}");
-                    return;
+                    Console.WriteLine($"ERROR: Invalid hex address: '{args[i]}'");
+                    return 1;
                 }
             }
             else if (args[i].StartsWith('-'))
             {
-                Console.WriteLine($"Unknown option: {args[i]}");
+                Console.WriteLine($"ERROR: Unknown option: '{args[i]}'");
                 showHelp = true;
                 break;
             }
+        }
+
+        if (outputFile.Length == 0 && !showHelp)
+        {
+            Console.WriteLine($"ERROR: No output file specified");
+            showHelp = true;
         }
 
         if (showHelp)
@@ -70,36 +88,105 @@ class Program
             Console.WriteLine("Usage:");
             Console.WriteLine("  ExtractLabels <options> <listingfile>");
             Console.WriteLine("Options:");
-            Console.WriteLine("  -h, --help     Show this help message");
-            Console.WriteLine("  -i             Ignore labels assigned a value (e.g. label = XXXX)");
-            Console.WriteLine("  -r XXXX        Ignore labels with address below XXXX");
-            return;
+            Console.WriteLine("  -h, --help         Show this help message");
+            Console.WriteLine("  -o <file>          Output file");
+            Console.WriteLine("  -i                 Ignore labels defined with an assignment (e.g. label = $xxxx)");
+            Console.WriteLine("  -r <hex-address>   Ignore labels with addresses below <hex-address>");
+            return 1;
         }
 
         // read all lines from listing file
+        string inputFile = args[args.Length - 1];
         string[] lines;
         try
         {
-            lines = File.ReadAllLines(args[args.Length - 1]);
+            lines = File.ReadAllLines(inputFile);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
         {
-            Console.WriteLine($"Error reading listing file: {ex.Message}");
-            return;
+            Console.Error.WriteLine($"ERROR: Access denied reading '{inputFile}'.");
+            return 1;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Console.Error.WriteLine($"ERROR: Directory not found for '{inputFile}'.");
+            return 1;
+        }
+        catch (FileNotFoundException)
+        {
+            Console.Error.WriteLine($"ERROR: File not found: '{inputFile}'.");
+            return 1;
+        }
+        catch (PathTooLongException)
+        {
+            Console.Error.WriteLine($"ERROR: Path is too long: '{inputFile}'.");
+            return 1;
+        }
+        catch (IOException)
+        {
+            Console.Error.WriteLine($"ERROR: I/O failure reading '{inputFile}'.");
+            return 1;
+        }
+        catch (ArgumentException)
+        {
+            Console.Error.WriteLine($"ERROR: Invalid path: '{inputFile}'.");
+            return 1;
+        }
+        catch (OutOfMemoryException)
+        {
+            Console.Error.WriteLine($"ERROR: File '{inputFile}' is too large to load into memory.");
+            return 1;
         }
 
-        // extract labels from assembly listing
+        // extract labels
         var labels = ExtractLabels.Extract(lines, includeAssignments: includeAssignments, addressesFrom: addressesFrom);
 
-        // output labels in BeebAsm.exe -labels format: [{'label1':1234L,'label2':5678L}]
-        Console.Write("[{");
+        // format labels to BeebAsm.exe -labels format: [{'label1':1234L,'label2':5678L}]
+        var sb = new StringBuilder();
+        sb.Append("[{");
         bool first = true;
         foreach (var label in labels)
         {
-            if (!first) Console.Write(",");
-            Console.Write($"'{label.Name}':{label.Address}L");
+            if (!first) sb.Append(",");
+            sb.Append($"'{label.Name}':{label.Address}L");
             first = false;
         }
-        Console.Write("}]");
+        sb.Append("}]");
+        string outputLabels = sb.ToString();
+
+        // write labels to output file
+        try
+        {
+            File.WriteAllText(outputFile, outputLabels);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"ERROR: Access denied writing to '{outputFile}'.");
+            return 1;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            Console.Error.WriteLine($"ERROR: Directory not found for '{outputFile}'.");
+            return 1;
+        }
+        catch (PathTooLongException)
+        {
+            Console.Error.WriteLine($"ERROR: Path is too long: '{outputFile}'.");
+            return 1;
+        }
+        catch (IOException)
+        {
+            Console.Error.WriteLine($"ERROR: I/O failure writing '{outputFile}'.");
+            return 1;
+        }
+        catch (ArgumentException)
+        {
+            Console.Error.WriteLine($"ERROR: Invalid output path: '{outputFile}'.");
+            return 1;
+        }
+
+        // output success message
+        Console.WriteLine($"{labels.Count} labels written to '{outputFile}'");
+        return 0;
     }
 }
