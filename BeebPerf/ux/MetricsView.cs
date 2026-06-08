@@ -44,7 +44,7 @@ namespace BeebPerf.ux
             UpdateState();
         }
 
-        public void SetIteractions(List<VideoAnalysis.MetricIteration> iterations)
+        public void SetIteractions(List<MetricIteration> iterations)
         {
             using var token = _ReentrancyGuard.TryEnter();
             if (token == null) return;
@@ -403,7 +403,7 @@ namespace BeebPerf.ux
             _ExportButton.Visible = _Iterations.Count > 0;
         }
 
-        private List<VideoAnalysis.MetricIteration> _Iterations = [];
+        private List<MetricIteration> _Iterations = [];
         private List<Metric>? _Metrics = [];
         private Metric? _SelectedMetric = null;
         private ReentrancyGuard _ReentrancyGuard = new();

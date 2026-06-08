@@ -1537,7 +1537,7 @@ namespace BeebPerf
         private void EndMetricIteration(int cycleCount, int instructionIndex)
         {
             // create metric iteration
-            MetricIterations.Add(new VideoAnalysis.MetricIteration()
+            MetricIterations.Add(new MetricIteration()
             {
                 IterationNumber = _MetricState.IterationNumber++,
                 StartCycleCount = _MetricState.StartCycleCount,
@@ -1610,36 +1610,6 @@ namespace BeebPerf
             }
 
             return _RootStackFrame!;
-        }
-
-        public class DisplayFrame
-        {
-            public int FrameNumber; // 1, 2, 3...
-            public int StartCycleCount;
-            public int EndCycleCount;
-            public Bitmap? Bitmap;
-            public float AspectRatio;
-        }
-
-        public class MetricIteration
-        {
-            public struct DisplayFrameSpan
-            {
-                public required int FrameNumber;
-                public required int StartCycleCount;
-                public required int EndCycleCount;
-            }
-
-            public required int IterationNumber; // 1, 2, 3...
-            public required int StartCycleCount;
-            public required int EndCycleCount;
-            public required int WritesBeforeDisplayRead;
-            public required int WritesAfterDisplayRead;
-            public required int WritesBeforeDisplayReadNext; // only used during analysis
-            public required int WritesAfterDisplayReadNext; // only used during analysis
-            public int DisplayFrameOffset;
-            public int DisplayFrameIndex; // display frame the metrics apply to
-            public DisplayFrameSpan[] DisplayFrameSpans = [];
         }
 
         public List<DisplayFrame> DisplayFrames = [];
