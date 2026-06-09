@@ -13,7 +13,7 @@
 - **Game-loop analysis**, providing metrics on durations, and potential display frame misalignment and tearing.  The analysis tracks screen memory writes and whether these occur before or after the screen memory is scanned for display.
 - **Memory analysis**, providing metrics on which memory addresses are accessed the most, by which routines, and by which instructions.
 - **Interactive timeline and profiler views** including: Timeline, Call Tree, Flame Graph, Routines, Caller/Callee, Memory, Metrics, and Code.
-- **Display frame reconstruction**, with generated snapshots displayed under the timeline.
+- **Display frame reconstruction**, with frames  displayed under the timeline.
 - **Label support** - labels can be imported from assembler output files, or optionaly embedded in **.perf** files (see below).
 - **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Frame snapshots and flame graph images can also be copied to the clipboard.
 
