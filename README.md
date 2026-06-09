@@ -1,18 +1,18 @@
-# BeebPerf (Beta) - Windows based Profiler for the BBC Micro
+# BeebPerf - Windows based Profiler for the BBC Micro
 **BeebPerf** is a Windows-based profiler for the **BBC Micro** that provides a set of interactive profiler views on a performance session (**.perf** file) recorded using a modified version of **BeebEm**.
 
-<img width="300" alt="layout" src="https://github.com/user-attachments/assets/167909b8-a154-45e0-a1cc-56dbd7accab0" />
-<img width="300" alt="flame graph" src="https://github.com/user-attachments/assets/35a829a5-1603-4ee3-8ad6-4718244e9cfc" />
-<img width="300" alt="memory" src="https://github.com/user-attachments/assets/a9164ce9-d46e-424e-805f-3c995befe9a9" />
-<img width="300" alt="frames" src="https://github.com/user-attachments/assets/94777952-4192-42a3-855e-79b679cd8ad7" />
-<img width="300" alt="call tree" src="https://github.com/user-attachments/assets/b049e561-89bb-4dd8-b572-86adb5efa869" />
-<img width="300" alt="caller / callee" src="https://github.com/user-attachments/assets/fb45afc5-585c-4253-bf05-db55a272828c" />
+<img width="300" alt="Call Tree" src="https://github.com/user-attachments/assets/79e91976-3bd3-4232-ba3d-3b7f7300841c" />
+<img width="300" alt="Flame Graph" src="https://github.com/user-attachments/assets/c5395d71-5af1-405a-8cdf-2482860ca6a1" />
+<img width="300" alt="Metric" src="https://github.com/user-attachments/assets/f9f5eb12-8ec4-46ea-9885-f13f64a7738f" />
+<img width="300" alt="Memory" src="https://github.com/user-attachments/assets/4b534966-8a6a-431c-bef9-da541a2efded" />
+<img width="300" alt="Routines" src="https://github.com/user-attachments/assets/a8651ef9-b50f-45af-b89c-d72ed421c4b5" />
+<img width="300" alt="Dark Mode" src="https://github.com/user-attachments/assets/840dd5a8-18c3-4795-8a34-971900b5db0f" />
 
 # Features
 - **Hot routines** and **hot path** analysis.
-- **Frame/game-loop analysis**, allowing duration/threshold analysis and frame to display-frame analysis.  The latter includes tracking screen memory writes and whether these occur before or after the screen memory is scanned for display.
+- **Game-loop analysis**, providing metrics on durations, and potential display frame misalignment and tearing.  The analysis tracks screen memory writes and whether these occur before or after the screen memory is scanned for display.
 - **Memory analysis**, providing metrics on which memory addresses are accessed the most, by which routines, and by which instructions.
-- **Interactive timeline and profiler views** including: Timeline, Routines, Caller/Callee, Call Tree, Flame graph, Memory, Frames, and Code.
+- **Interactive timeline and profiler views** including: Timeline, Call Tree, Flame Graph, Routines, Caller/Callee, Memory, Metrics, and Code.
 - **Display frame reconstruction**, with generated snapshots displayed under the timeline.
 - **Label support** - labels can be imported from assembler output files, or optionaly embedded in **.perf** files (see below).
 - **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Frame snapshots and flame graph images can also be copied to the clipboard.
@@ -27,9 +27,9 @@ Workloads:
 Individual components:
    - MSVC Build Tools for x64/x86 (Latest)
    
-After cloning this repository, open the solution file: **BeebPerf.sln**, rebuild all, set the **BeebPerf** project as the startup project, and run it.
+After cloning this repository, open the solution file: **BeebPerf.sln** and **Rebuild All**. If you are using **Visual Studio 2022**, you will need to update the **Zlib** project’s **Platform Toolset** to **v143**.
 
-Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and become familiar with the profiler's functionality.  A **'getting started'** guide can be shown by clicking the toolbar **help** button.  
+Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and click the **Help** toolbar button to become familiar with the profiler's functionality.
  
 # Limitations
 1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
@@ -40,7 +40,7 @@ Then open one of the sample **.perf** files from the **sample** folder (e.g. **e
 # Documentation
 | File name | Description |
 |---|---|
-| [docs/GettingStartedGuide.docx](docs/GettingStartedGuide.docx) | Getting started guide |
+| [docs/Help.docx](docs/Help.docx) | Getting started guide, which is also displayed by clicking on the **Help** toolbar button |
 | [docs/BeebPerf.docx](docs/BeebPerf.docx) | Details on the development of **BeebPerf**, which may be of interest |
 | [docs/FileFormat.docx](docs/FileFormat.docx) | **.Pref** file format specification (v1.0) |
 
@@ -57,10 +57,11 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
     - C++ MFC for x64/x86 (Latest MSVC) – needed for afxres.h/rc
       
 2.	Download and install the [Microsoft DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) from the Microsoft download site.
-3.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
-4.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  (the path to the patch file will likely need changing).
-5. Reopen and rebuild the solution (x64 configuration). You may need to individually reload each of the solution’s projects before building.  This can be achieved by right-clicking on each project and selecting **Reload Project**.
-6.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items. You may need to set the **BeebEm** project as the Startup Project.  This can be achieved by right-clicking on the **BeebEm** project and selecting **Set as Startup Project**.
+If the installer reports error S1023, the most likely cause is that newer Microsoft Visual C++ 2010 redistributables are installed on the system. The fix is to temporarily uninstall the newer VC++ 2010 x86/x64 redistributables, and install the SDK, then reinstall the newer ones if needed.
+4.	Using the **Git** -> **Clone Repository…** menu item, clone the BeebEm repository: [beebem-windows.git](https://github.com/stardot/beebem-windows.git)
+5.	Using  **Git** -> **Open in Command Prompt** menu item, execute the following **git** command to apply the performance changes: **<code style="background:#333; color:#ffcc00; padding:4px 6px; border-radius:4px; font-family:'Fira Code', monospace;">git apply ..\\beebperf\\beebem_changelist.diff</code>**  (the path to the patch file will likely need changing).
+6. Reopen and rebuild the solution (x64 configuration). You may need to individually reload each of the solution’s projects before building.  This can be achieved by right-clicking on each project and selecting **Reload Project**. If you are using **Visual Studio 2022**, you will need to update all the projects **Platform Toolsets** to **v143**. 
+7.	Run **BeebEm** and verify that the **File** menu contains a **Capture Perf…** and **End Perf** menu items. You may need to set the **BeebEm** project as the Startup Project.  This can be achieved by right-clicking on the **BeebEm** project and selecting **Set as Startup Project**.
 
 The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
 
