@@ -121,8 +121,8 @@ namespace BeebPerf.ux
 
                     double iterationMissTimedWritePercentage = 100.0 * (double)iterationWithMissTimesWriteCount / (double)_Iterations.Count;
                     double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
-                    text += $"Iterations with miss-timed writes: {iterationMissTimedWritePercentage:F2}%, " +
-                            $"Total miss-timed writes: {overallMissTimedWritePercentage:F2}%";
+                    text += $"Iterations with miss-timed screen memory writes: {iterationMissTimedWritePercentage:F2}%, " +
+                            $"Total miss-timed screen memory writes: {overallMissTimedWritePercentage:F2}%";
                 }
             }
 

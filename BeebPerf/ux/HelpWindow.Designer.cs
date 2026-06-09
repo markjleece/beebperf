@@ -28,36 +28,37 @@
         /// </summary>
         private void InitializeComponent()
         {
-            richTextBox = new RichTextBox();
+            webView21 = new Microsoft.Web.WebView2.WinForms.WebView2();
+            ((System.ComponentModel.ISupportInitialize)webView21).BeginInit();
             SuspendLayout();
             // 
-            // richTextBox
+            // webView21
             // 
-            richTextBox.BorderStyle = BorderStyle.None;
-            richTextBox.Dock = DockStyle.Fill;
-            richTextBox.ImeMode = ImeMode.NoControl;
-            richTextBox.Location = new Point(16, 0);
-            richTextBox.Name = "richTextBox";
-            richTextBox.ReadOnly = true;
-            richTextBox.Size = new Size(1242, 744);
-            richTextBox.TabIndex = 0;
-            richTextBox.TabStop = false;
-            richTextBox.Text = "";
+            webView21.AllowExternalDrop = true;
+            webView21.CreationProperties = null;
+            webView21.DefaultBackgroundColor = Color.White;
+            webView21.Dock = DockStyle.Fill;
+            webView21.Location = new Point(16, 0);
+            webView21.Name = "webView21";
+            webView21.Size = new Size(1242, 744);
+            webView21.TabIndex = 0;
+            webView21.ZoomFactor = 1D;
             // 
             // HelpWindow
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1258, 744);
-            Controls.Add(richTextBox);
+            Controls.Add(webView21);
             Name = "HelpWindow";
             Padding = new Padding(16, 0, 0, 0);
             Text = "BeebPerf - Help";
+            ((System.ComponentModel.ISupportInitialize)webView21).EndInit();
             ResumeLayout(false);
         }
 
         #endregion
 
-        private RichTextBox richTextBox;
+        private Microsoft.Web.WebView2.WinForms.WebView2 webView21;
     }
 }

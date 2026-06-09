@@ -19,20 +19,54 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using System.Runtime.InteropServices;
+
 namespace BeebPerf.ux
 {
     public partial class HelpWindow : Form
     {
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool MoveFileEx(string lpExistingFileName, string? lpNewFileName, int dwFlags); 
+        private const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x4;
+
         public HelpWindow(BeebPerfForm form)
         {
             InitializeComponent();
             Owner = form;
 
-            // populate help text
+            // read PDF from resource
             var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpWindow));
-            var bytes = (byte[])resources.GetObject("help.RTF")!;
-            using var ms = new MemoryStream(bytes!);
-            richTextBox.LoadFile(ms, RichTextBoxStreamType.RichText);
+            var bytes = (byte[])resources.GetObject("help.PDF")!;
+
+            // create temp PDF file, which is cleaned up after crash when Windows reboots
+            string tempFilePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pdf");
+            File.WriteAllBytes(tempFilePath, bytes);
+            MoveFileEx(tempFilePath, null, MOVEFILE_DELAY_UNTIL_REBOOT);
+
+            // initialize WebView2 control and load the temp file
+            Load += async (s, e) =>
+            {
+                await webView21.EnsureCoreWebView2Async();
+                webView21.Source = new Uri(tempFilePath);
+            };
+
+            // cleanup temp file on close
+            FormClosing += async (s, e) =>
+            {
+                try
+                {
+                    await webView21.EnsureCoreWebView2Async();
+                    webView21.CoreWebView2.NavigateToString("<html></html>");
+
+                    await Task.Delay(200);
+                    if (File.Exists(tempFilePath))
+                        File.Delete(tempFilePath);
+                }
+                catch
+                {
+                    // ignore cleanup errors
+                }
+            };
         }
     }
 }
