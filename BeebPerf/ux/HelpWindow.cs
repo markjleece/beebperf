@@ -68,5 +68,20 @@ namespace BeebPerf.ux
                 }
             };
         }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+
+            var workingArea = Screen.PrimaryScreen.WorkingArea;
+
+            int width = (int)(workingArea.Width / 2);
+            int height = workingArea.Height;
+            int x = workingArea.Right - width;
+            int y = workingArea.Top;
+
+            this.Location = new Point(x, y);
+            this.Size = new Size(width, height);
+        }
     }
 }
