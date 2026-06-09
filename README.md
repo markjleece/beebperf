@@ -42,7 +42,7 @@ Then open one of the sample **.perf** files from the **sample** folder (e.g. **e
 |---|---|
 | [docs/Help.docx](docs/Help.docx) | Getting started guide, which is also displayed by clicking on the **Help** toolbar button |
 | [docs/BeebPerf.docx](docs/BeebPerf.docx) | Details on the development of **BeebPerf**, which may be of interest |
-| [docs/FileFormat.docx](docs/FileFormat.docx) | **.Pref** file format specification (v1.0) |
+| [docs/FileFormat.docx](docs/FileFormat.docx) | **.Perf** file format specification (v1.0) |
 
 # Building BeebEm with performance logging capabilities
 The performance changes add **Capture Perf…** and **End Perf** File menu items allowing a performance session to be recorded to a **.perf** file.
