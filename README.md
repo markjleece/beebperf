@@ -15,7 +15,7 @@
 - **Interactive timeline and profiler views** including: Timeline, Call Tree, Flame Graph, Routines, Caller/Callee, Memory, Metrics, and Code.
 - **Display frame reconstruction**, with frames  displayed under the timeline.
 - **Label support** - labels can be imported from assembler output files, or optionaly embedded in **.perf** files (see below).
-- **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Frame snapshots and flame graph images can also be copied to the clipboard.
+- **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Display frames and Flame Graph images can also be copied to the clipboard.
 
 # Building and running BeebPerf
 **BeebPerf** can be built using **Visual Studio 2022** or **2026**.  The following Visual Studio workloads and components are required:
