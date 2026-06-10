@@ -417,19 +417,19 @@ namespace BeebPerf.ux
 
         private void helpButton_Click(object sender, EventArgs e)
         {
-            if (_HelpWindow != null)
+            if (HelpWindow != null)
             {
-                _HelpWindow.BringToFront();
+                HelpWindow.BringToFront();
                 return;
             }
 
-            _HelpWindow = new HelpWindow(this);
-            _HelpWindow.Show();
+            HelpWindow = new HelpWindow(this);
+            HelpWindow.Show();
 
-            _HelpWindow.FormClosed += (s, args) =>
+            HelpWindow.FormClosed += (s, args) =>
             {
-                _HelpWindow.Dispose();
-                _HelpWindow = null;
+                HelpWindow.Dispose();
+                HelpWindow = null;
             };
         }
 
@@ -1163,6 +1163,7 @@ namespace BeebPerf.ux
         private string? _StatusText;
 
         public AppStateFlags AppState;
+        public HelpWindow? HelpWindow;
         public Image FlameImage;
         public InstructionSet? InstructionSet;
         public string RecentExportFolderPath = string.Empty;
@@ -1184,7 +1185,6 @@ namespace BeebPerf.ux
         private List<LabelsFile> _LabelsFiles = [];
         private List<Metric> _Metrics = [];
 
-        private HelpWindow? _HelpWindow;
         private UndoRedoHistory _UndoRedoHistory;
         private Model _Model;
         private LabelResolver _LabelResolver;

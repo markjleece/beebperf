@@ -72,6 +72,9 @@ namespace BeebPerf.ux
         {
             base.OnLoad(e);
 
+            if (Screen.PrimaryScreen == null)
+                return;
+
             var workingArea = Screen.PrimaryScreen.WorkingArea;
 
             int width = (int)(workingArea.Width / 2);

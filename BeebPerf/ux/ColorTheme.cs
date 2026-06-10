@@ -19,6 +19,7 @@
 // Boston, MA  02110-1301, USA.
 // --------------------------------------------------------------
 
+using BeebPerf.ux;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
 
@@ -88,9 +89,12 @@ namespace BeebPerf
 #pragma warning restore WFO5001
 
             ApplyTheme(form, darkMode);
-
             if (form.Owner != null)
                 ApplyTheme(form.Owner, darkMode);
+
+            var beebPerfForm = form as BeebPerfForm ?? form.Owner as BeebPerfForm;
+            if (beebPerfForm != null && beebPerfForm.HelpWindow != null)
+                ApplyTheme(beebPerfForm.HelpWindow, darkMode);
         }
 
         private static bool IsSystemInDarkMode()
