@@ -418,18 +418,18 @@ namespace BeebPerf.ux
         private void helpButton_Click(object sender, EventArgs e)
         {
             if (_HelpWindow != null)
+            {
+                _HelpWindow.BringToFront();
                 return;
+            }
 
             _HelpWindow = new HelpWindow(this);
-            _HelpWindow.TopMost = true;
             _HelpWindow.Show();
-            UpdateToolbarState();
 
             _HelpWindow.FormClosed += (s, args) =>
             {
                 _HelpWindow.Dispose();
                 _HelpWindow = null;
-                UpdateToolbarState();
             };
         }
 
@@ -1034,7 +1034,6 @@ namespace BeebPerf.ux
             openButton.Enabled = (AppState == 0);
             undoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanUndo();
             redoButton.Enabled = (AppState == 0) && _UndoRedoHistory.CanRedo();
-            helpButton.Enabled = (_HelpWindow == null);
             resetAllButton.Enabled = timelineView.CanSelectAll() || timelineView.CanZoomOut();
             zoomInButton.Enabled = timelineView.CanZoomIn();
             zoomOutButton.Enabled = timelineView.CanZoomOut();

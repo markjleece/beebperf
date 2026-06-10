@@ -32,7 +32,6 @@ namespace BeebPerf.ux
         public HelpWindow(BeebPerfForm form)
         {
             InitializeComponent();
-            Owner = form;
 
             // read PDF from resource
             var resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpWindow));
