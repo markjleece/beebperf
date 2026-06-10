@@ -67,7 +67,7 @@ namespace BeebPerf.ux
             SetColumnHeaderToolTip(DurationColumnIndex, "Number of cycles, percentage of cycles to threshold");
             SetColumnHeaderToolTip(DisplayOffsetColumnIndex, "CPU cycles to the start of the display screen memory scan");
             SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes before the screen memory was scanned for display");
-            SetColumnHeaderToolTip(WritesBeforeDisplayColumnIndex, "Number of screen memory writes after the screen memory was scanned for display");
+            SetColumnHeaderToolTip(WritesAfterDisplayColumnIndex, "Number of screen memory writes after the screen memory was scanned for display");
             SetColumnHeaderToolTip(VisualizationColumnIndex, "Iteration visualization");
 
             SetColumnSortMode(IteractionNumberColumnIndex, DataGridViewColumnSortMode.Programmatic);
