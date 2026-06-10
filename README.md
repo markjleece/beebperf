@@ -72,7 +72,7 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 
 - **Protected folder access blocked**
 
-   If you see a ‘Protected folder access blocked’ notification after closing **BeebEm**, or when saving **BeebEm** preferences, these are expected as **Windows Defender’s CFA** (Controller Folder Access) blocks writes to the documents folder, which is where **BeebEm** stores its preferences. 
+   If on **Windows 11** you see a ‘Protected folder access blocked’ notification after closing **BeebEm**, or when saving **BeebEm** preferences, these are expected as **Windows Defender’s CFA** (Controller Folder Access) blocks writes to the documents folder, which is where **BeebEm** stores its preferences. 
    The fix is to add **BeebEm.exe** (debug and release versions) to the allowed app list under **Controlled folder access** in **Windows Settings**.
 
 The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
