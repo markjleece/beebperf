@@ -781,7 +781,7 @@ namespace BeebPerf.ux
         private void InitializeToolTips()
         {
             _ToolTipTimer = new();
-            _ToolTipTimer.Interval = 500;
+            _ToolTipTimer.Interval = 300; // ms before showing
             _ToolTipTimer.Tick += ToolTipTimer_Tick;
         }
 

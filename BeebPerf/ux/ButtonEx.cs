@@ -35,16 +35,28 @@ namespace BeebPerf.ux
             }
         }
 
-        public string? ToolTipText = null;
+        public string? ToolTipText
+        {
+            get
+            {
+                return _ToolTipText;
+            }
+            set
+            {
+                _ToolTipText = value;
+                _ToolTip.SetToolTip(this, _ToolTipText);
+            }
+        }
 
         public ButtonEx() : base()
         {
             Size = new Size(34, 28);
             Visible = false;
 
-            _ToolTipTimer = new();
-            _ToolTipTimer.Interval = 500;
-            _ToolTipTimer.Tick += ToolTipTimer_Tick;
+            _ToolTip.InitialDelay = 300;   // ms before showing
+            _ToolTip.AutoPopDelay = 8000;  // how long it stays visible
+            _ToolTip.ReshowDelay = 100;    // delay when moving between controls
+            _ToolTip.ShowAlways = true;    // show even if form is inactive
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -54,12 +66,16 @@ namespace BeebPerf.ux
             if (Image == null)
                 return;
 
-            // compute innerRect rectangle
+            // compute button inner rectangle
             var innerRect = new Rectangle(
-                ClientRectangle.Left + Padding.Left,
-                ClientRectangle.Top + Padding.Top,
-                ClientRectangle.Width - Padding.Horizontal,
-                ClientRectangle.Height - Padding.Vertical);
+                ClientRectangle.Left + Padding.Left + 3,
+                ClientRectangle.Top + Padding.Top + 3,
+                ClientRectangle.Width - Padding.Horizontal - 6,
+                ClientRectangle.Height - Padding.Vertical - 6);
+
+            // draw background
+            using var brush = new SolidBrush(BackColor);
+            e.Graphics.FillRectangle(brush, innerRect);
 
             // compute aspect ratio preserving scale
             float scaleX = (float)innerRect.Width / Image.Width;
@@ -80,40 +96,7 @@ namespace BeebPerf.ux
             e.Graphics.DrawImage(Image, left, top, newSize.Width, newSize.Height);
         }
 
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-
-            Cursor = Cursors.Default;
-            _ToolTipTimer.Stop();
-            _ToolTipTimer.Start();
-        }
-
-        protected override void OnMouseEnter(EventArgs e)
-        {
-            base.OnMouseEnter(e);
-
-            Cursor = Cursors.Default;
-            _ToolTipTimer.Stop();
-            _ToolTipTimer.Start();
-        }
-
-        protected override void OnMouseLeave(EventArgs e)
-        {
-            base.OnMouseLeave(e);
-
-            _ToolTipTimer.Stop();
-            _ToolTip.Hide(this);
-        }
-
-        private void ToolTipTimer_Tick(object? sender, EventArgs e)
-        {
-            _ToolTipTimer.Stop();
-            if (Visible & ToolTipText != null)
-                _ToolTip.Show(ToolTipText, this);
-        }
-
         private ToolTip _ToolTip = new ToolTip();
-        private System.Windows.Forms.Timer _ToolTipTimer = new();
+        private string? _ToolTipText = null;
     }
 }
