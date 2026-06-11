@@ -3,9 +3,9 @@
 
 <img width="300" alt="Call Tree" src="https://github.com/user-attachments/assets/2f6e0da9-09ed-41a3-afb5-66e55686bfed" />
 <img width="300" alt="Flame Graph" src="https://github.com/user-attachments/assets/1769de75-9db0-43a9-8d0b-3f10da8108ca" />
-<img width="300" alt="Metrics" src="https://github.com/user-attachments/assets/7ef9af32-7ce8-41e2-801c-2fa86b97129b" />
+<img width="300" alt="Metrics" src="https://github.com/user-attachments/assets/03d3549c-48fc-428a-bdeb-e1a6ad81f82c" />
 <img width="300" alt="Memory" src="https://github.com/user-attachments/assets/09b06454-0069-4c4b-92cb-55c4834788fd" />
-<img width="300" alt="Dark Mode" src="https://github.com/user-attachments/assets/8427075c-28dc-4532-ab35-60da9db2779d" />
+<img width="300" alt="Dark Mode" src="https://github.com/user-attachments/assets/73c5e0cc-8e1a-482d-a3fb-d3e9be81f977" />
 <img width="300" alt="Help" src="https://github.com/user-attachments/assets/fb5579ca-225d-4ac5-93db-8b705486a7d1" />
 
 # Features
