@@ -65,15 +65,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 
 **Known Issues**
 
-- **DirectX SDK**
-
-   If the **DirectX SDK** installer reports error S1023, the most likely cause is that newer Microsoft Visual C++ 2010 redistributables are installed on the system.
+- If the **DirectX SDK** installer reports error S1023, the most likely cause is that newer Microsoft Visual C++ 2010 redistributables are installed on the system.
    The fix is to temporarily uninstall the newer VC++ 2010 x86/x64 redistributables, and then reinstall the **DirectX SDK**.
-
-- **Protected folder access blocked**
-
-   If on **Windows 11** you see a ‘Protected folder access blocked’ notification after closing **BeebEm**, or when saving **BeebEm** preferences, these are expected as **Windows Defender’s CFA** (Controller Folder Access) blocks writes to the documents folder, which is where **BeebEm** stores its preferences. 
-   The fix is to add **BeebEm.exe** (debug and release versions) to the allowed app list under **Controlled folder access** in **Windows Settings**.
 
 The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
 
@@ -83,6 +76,7 @@ See [docs/BeebPerf.docx](docs/BeebPerf.docx) for more information.
 - Portions of the display reconstruction code were based on **BeebEm's** video class. Many thanks to the **BeebEm** contributors for creating and maintaining this wonderful piece of software. 
 - The **.perf** files are compressed and uncompressed using the **ZLib library** - Many thanks to **Jean-loup Gailly** and **Mark Adler** for creating such an excellent and useful library.
 - The MOS 1.2 and 2.0 labels were taken from Toby Nelson’s **MOS Reassembly for the BBC Micro**. Thank you Toby for creating and maintaining this excellent resource.
+- And many thanks to Alec Barker and Mike Hayton for their feedback and help on the initial version. Much appreciated.
 
 # BeebPerf Copyright
 Copyright (C) 2026 Mark John Leece
