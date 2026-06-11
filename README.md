@@ -1,12 +1,12 @@
-# BeebPerf - Windows based Profiler for the BBC Micro
+# <img src="https://raw.githubusercontent.com/markjleece/beebperf/main/Icon.png" height="24" style="vertical-align: text-bottom;"> BeebPerf - Windows based Profiler for the BBC Micro
 **BeebPerf** is a Windows-based profiler for the **BBC Micro** that provides a set of interactive profiler views on a performance session (**.perf** file) recorded using a modified version of **BeebEm**.
 
-<img width="300" alt="Call Tree" src="https://github.com/user-attachments/assets/79e91976-3bd3-4232-ba3d-3b7f7300841c" />
-<img width="300" alt="Flame Graph" src="https://github.com/user-attachments/assets/c5395d71-5af1-405a-8cdf-2482860ca6a1" />
-<img width="300" alt="Metric" src="https://github.com/user-attachments/assets/f9f5eb12-8ec4-46ea-9885-f13f64a7738f" />
-<img width="300" alt="Memory" src="https://github.com/user-attachments/assets/4b534966-8a6a-431c-bef9-da541a2efded" />
-<img width="300" alt="Routines" src="https://github.com/user-attachments/assets/a8651ef9-b50f-45af-b89c-d72ed421c4b5" />
-<img width="300" alt="Dark Mode" src="https://github.com/user-attachments/assets/840dd5a8-18c3-4795-8a34-971900b5db0f" />
+<img width="300" alt="Call Tree" src="https://github.com/user-attachments/assets/2f6e0da9-09ed-41a3-afb5-66e55686bfed" />
+<img width="300" alt="Flame Graph" src="https://github.com/user-attachments/assets/1769de75-9db0-43a9-8d0b-3f10da8108ca" />
+<img width="300" alt="Metrics" src="https://github.com/user-attachments/assets/03d3549c-48fc-428a-bdeb-e1a6ad81f82c" />
+<img width="300" alt="Memory" src="https://github.com/user-attachments/assets/09b06454-0069-4c4b-92cb-55c4834788fd" />
+<img width="300" alt="Dark Mode" src="https://github.com/user-attachments/assets/73c5e0cc-8e1a-482d-a3fb-d3e9be81f977" />
+<img width="300" alt="Help" src="https://github.com/user-attachments/assets/fb5579ca-225d-4ac5-93db-8b705486a7d1" />
 
 # Features
 - **Hot routines** and **hot path** analysis.
@@ -29,7 +29,9 @@ Individual components:
    
 After cloning this repository, open the solution file: **BeebPerf.sln** and **Rebuild All**. If you are using **Visual Studio 2022**, you will need to update the **Zlib** project’s **Platform Toolset** to **v143**.
 
-Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and click the **Help** toolbar button to become familiar with the profiler's functionality.
+Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build.
+
+Click the **Help** toolbar button to become familiar with the profiler's functionality.
  
 # Limitations
 1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
