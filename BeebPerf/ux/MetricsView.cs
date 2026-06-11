@@ -100,29 +100,29 @@ namespace BeebPerf.ux
                 if (_SelectedMetric != null && _SelectedMetric.DisplayAnalysis)
                 {
                     int totalWriteCount = 0;
-                    int totalMissTimedWriteCount = 0;
-                    int iterationWithMissTimesWriteCount = 0;
+                    int totalMistimedWriteCount = 0;
+                    int iterationWithMistimedWriteCount = 0;
                     foreach (var iteration in _Iterations)
                     {
                         totalWriteCount += iteration.WritesBeforeDisplayRead + iteration.WritesAfterDisplayRead;
 
                         if (highlightWritesBeforeDisplay && iteration.WritesBeforeDisplayRead > 0)
                         {
-                            totalMissTimedWriteCount += iteration.WritesBeforeDisplayRead;
-                            iterationWithMissTimesWriteCount++;
+                            totalMistimedWriteCount += iteration.WritesBeforeDisplayRead;
+                            iterationWithMistimedWriteCount++;
                         }
 
                         if (highlightWritesAfterDisplay && iteration.WritesAfterDisplayRead > 0)
                         {
-                            totalMissTimedWriteCount += iteration.WritesAfterDisplayRead;
-                            iterationWithMissTimesWriteCount++;
+                            totalMistimedWriteCount += iteration.WritesAfterDisplayRead;
+                            iterationWithMistimedWriteCount++;
                         }
                     }
 
-                    double iterationMissTimedWritePercentage = 100.0 * (double)iterationWithMissTimesWriteCount / (double)_Iterations.Count;
-                    double overallMissTimedWritePercentage = 100.0 * (double)totalMissTimedWriteCount / (double)totalWriteCount;
-                    text += $"Iterations with miss-timed screen memory writes: {iterationMissTimedWritePercentage:F2}%, " +
-                            $"Total miss-timed screen memory writes: {overallMissTimedWritePercentage:F2}%";
+                    double iterationMistimedWritePercentage = 100.0 * (double)iterationWithMistimedWriteCount / (double)_Iterations.Count;
+                    double overallMistimedWritePercentage = 100.0 * (double)totalMistimedWriteCount / (double)totalWriteCount;
+                    text += $"Iterations with mistimed screen memory writes: {iterationMistimedWritePercentage:F2}%, " +
+                            $"Total mistimed screen memory writes: {overallMistimedWritePercentage:F2}%";
                 }
             }
 
