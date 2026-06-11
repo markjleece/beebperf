@@ -29,7 +29,9 @@ Individual components:
    
 After cloning this repository, open the solution file: **BeebPerf.sln** and **Rebuild All**. If you are using **Visual Studio 2022**, you will need to update the **Zlib** project’s **Platform Toolset** to **v143**.
 
-Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build and click the **Help** toolbar button to become familiar with the profiler's functionality.
+Then open one of the sample **.perf** files from the **sample** folder (e.g. **elite.perf** or **revs.perf**) to test the build.
+
+Click the **Help** toolbar button to become familiar with the profiler's functionality.
  
 # Limitations
 1.	**Label duplication**.  If multiple labels map to the same address, the incorrect label may be displayed.
