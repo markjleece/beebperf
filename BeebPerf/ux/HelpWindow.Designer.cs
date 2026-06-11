@@ -1,4 +1,6 @@
-﻿namespace BeebPerf.ux
+﻿using BeebPerf.Properties;
+
+namespace BeebPerf.ux
 {
     partial class HelpWindow
     {
@@ -28,6 +30,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            var beebPerfFormResources = new System.ComponentModel.ComponentResourceManager(typeof(BeebPerfForm));
             webView21 = new Microsoft.Web.WebView2.WinForms.WebView2();
             ((System.ComponentModel.ISupportInitialize)webView21).BeginInit();
             SuspendLayout();
@@ -50,6 +53,7 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1258, 744);
             Controls.Add(webView21);
+            Icon = (Icon)beebPerfFormResources.GetObject("app.Icon");
             Name = "HelpWindow";
             Padding = new Padding(16, 0, 0, 0);
             Text = "BeebPerf - Help";

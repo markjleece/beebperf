@@ -488,6 +488,7 @@ namespace BeebPerf.ux
             Controls.Add(spinner);
             Controls.Add(primarySplitContainer);
             Controls.Add(toolStrip);
+            Icon = (Icon)resources.GetObject("app.Icon");
             Name = "BeebPerfForm";
             Text = "BeebPerf";
             Load += BeebPerfForm_Load;

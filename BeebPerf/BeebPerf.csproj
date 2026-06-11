@@ -11,6 +11,7 @@
         <RunAnalyzersDuringBuild>True</RunAnalyzersDuringBuild>
         <RunAnalyzersDuringLiveAnalysis>True</RunAnalyzersDuringLiveAnalysis>
         <StartupObject>BeebPerf.Program</StartupObject>
+        <ApplicationIcon>Resources\BeebPerf.ico</ApplicationIcon>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -19,6 +20,10 @@
 
     <ItemGroup>
         <Compile Include="..\ExtractLabels\ExtractLabels.cs" Link="ExtractLabels.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Include="Resources\BeebPerf.ico" />
     </ItemGroup>
 
     <ItemGroup>
