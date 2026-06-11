@@ -65,15 +65,8 @@ A modified version of **BeebEm** can be built using **Visual Studio 2022** or **
 
 **Known Issues**
 
-- **DirectX SDK**
-
-   If the **DirectX SDK** installer reports error S1023, the most likely cause is that newer Microsoft Visual C++ 2010 redistributables are installed on the system.
+- If the **DirectX SDK** installer reports error S1023, the most likely cause is that newer Microsoft Visual C++ 2010 redistributables are installed on the system.
    The fix is to temporarily uninstall the newer VC++ 2010 x86/x64 redistributables, and then reinstall the **DirectX SDK**.
-
-- **Protected folder access blocked**
-
-   If on **Windows 11** you see a ‘Protected folder access blocked’ notification after closing **BeebEm**, or when saving **BeebEm** preferences, these are expected as **Windows Defender’s CFA** (Controller Folder Access) blocks writes to the documents folder, which is where **BeebEm** stores its preferences. 
-   The fix is to add **BeebEm.exe** (debug and release versions) to the allowed app list under **Controlled folder access** in **Windows Settings**.
 
 The changes to **BeebEm** are kept to a minimum, limited to just those needed to generate **.perf** files.
 
