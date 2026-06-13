@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: markjleece/beebem-dxsdk
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.DXSDK_TOKEN }}
           path: External/DXSDK
 
       - name: Set DXSDK_DIR
