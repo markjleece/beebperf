@@ -28,7 +28,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # Checkout main repo
+      # 1) Checkout main repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -38,24 +38,22 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      # Restore NuGet packages (including WebView2)
+      # Restore ONLY .NET projects (avoid C++ zlib project)
       - name: Restore NuGet packages
-        run: dotnet restore BeebPerf.sln
+        run: |
+          dotnet restore BeebPerf/BeebPerf.csproj
+          dotnet restore ExtractLabels/ExtractLabels.csproj
 
-      # Setup MSBuild BEFORE building BeebPerf
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      # Build main project (x64)
+      # Build .NET projects
       - name: Build BeebPerf.sln
         run: dotnet build BeebPerf.sln -c Release -p:Platform=x64
 
-      # Clone BeebEm 4.19
+      # 2) Clone BeebEm 4.19
       - name: Clone BeebEm 4.19
         run: |
           git clone --branch 4.19 --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
 
-      # Apply patch
+      # 3) Apply patch
       - name: Apply BeebEm patch
         working-directory: External/BeebEm
         run: git apply ../../beebem_changelist.diff
@@ -80,16 +78,16 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # Build BeebEm
+      # 4) Build BeebEm
       - name: Build BeebEm
         working-directory: External/BeebEm/Src
         run: msbuild BeebEm.sln /p:Configuration=Release /p:Platform=x64
 
-      # Create package directory
+      # 5) Create package directory
       - name: Create package directory
         run: mkdir -Force package
 
-      # Package BeebPerf
+      # 6) Package BeebPerf
       - name: Package BeebPerf
         run: |
           powershell Compress-Archive `
@@ -97,7 +95,7 @@ jobs:
             -DestinationPath "package/BeebPerf.zip" `
             -Force
 
-      # Package ExtractLabels
+      # 7) Package ExtractLabels
       - name: Package ExtractLabels
         run: |
           powershell Compress-Archive `
@@ -105,7 +103,7 @@ jobs:
             -DestinationPath "package/ExtractLabels.zip" `
             -Force
 
-      # Package BeebEm
+      # 8) Package BeebEm
       - name: Package BeebEm
         run: |
           powershell Compress-Archive `
@@ -113,7 +111,7 @@ jobs:
             -DestinationPath "package/BeebEm.zip" `
             -Force
 
-      # Attest ZIPs (GitHub provenance)
+      # 9) Attest ZIPs (GitHub provenance)
       - name: Attest BeebPerf.zip
         uses: actions/attest-build-provenance@v1
         with:
@@ -129,7 +127,7 @@ jobs:
         with:
           subject-path: package/BeebEm.zip
 
-      # Test mode: upload artifacts
+      # 10) Test mode: upload artifacts
       - name: Upload test artifacts
         if: env.IS_TEST == 'true'
         uses: actions/upload-artifact@v4
@@ -137,7 +135,7 @@ jobs:
           name: beebperf-test-binaries
           path: package/*.zip
 
-      # Release mode: upload to existing BeebPerf 1.0.0 release
+      # 11) Release mode: upload to existing BeebPerf 1.0.0 release
       - name: Upload assets to release
         if: env.IS_TEST != 'true'
         env:
