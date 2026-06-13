@@ -74,6 +74,16 @@ jobs:
         working-directory: External/BeebEm/Src
         run: msbuild BeebEm.sln /p:Configuration=Release /p:Platform=x64
 
+      - name: Inspect BeebPerf build output
+        run: |
+          Write-Host "=== Contents of BeebPerf/bin/Release ==="
+          Get-ChildItem -Recurse BeebPerf/bin/Release
+
+      - name: Inspect ExtractLabels build output
+        run: |
+          Write-Host "=== Contents of ExtractLabels/bin/Release ==="
+          Get-ChildItem -Recurse ExtractLabels/bin/Release
+
       - name: Create package directory
         run: mkdir -Force package
 
