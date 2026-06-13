@@ -87,18 +87,24 @@ jobs:
             -DestinationPath "package/BeebPerf.zip" `
             -Force
 
-      - name: Package ExtractLabels
-        run: |
-          powershell Compress-Archive `
-            -Path "ExtractLabels/bin/x64/Release/net9.0-windows8.0/*" `
-            -DestinationPath "package/ExtractLabels.zip" `
-            -Force
-
       - name: Package BeebEm
         run: |
-          powershell Compress-Archive `
-            -Path "External/BeebEm/Src/x64/Release/*" `
+          Compress-Archive `
+            -Path @(
+              "External/BeebEm/Src/x64/Release/*",
+              "External/BeebEm/Documents/*",
+              "External/BeebEm/Help/*",
+              "External/BeebEm/UserData/*",
+              "External/BeebEm/VCRedist/*"
+            ) `
             -DestinationPath "package/BeebEm.zip" `
+            -Force
+            
+      - name: Package ExtractLabels
+        run: |
+          Compress-Archive `
+            -Path "ExtractLabels/bin/x64/Release/net9.0-windows8.0/*" `
+            -DestinationPath "package/ExtractLabels.zip" `
             -Force
 
       - name: Attest BeebPerf.zip
