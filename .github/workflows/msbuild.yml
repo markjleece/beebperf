@@ -57,8 +57,12 @@ jobs:
       - name: Verify patch applied
         working-directory: External/BeebEm
         run: |
-          git diff --quiet || (Write-Host "Patch applied successfully." ; exit 0)
-          Write-Error "Patch did not apply correctly." ; exit 1
+          if (git diff --quiet) {
+              Write-Host "Patch applied successfully."
+          } else {
+              Write-Error "Patch did not apply correctly."
+              exit 1
+          }
 
       - name: Install DirectX SDK June 2010
         run: |
