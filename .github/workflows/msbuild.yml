@@ -61,8 +61,7 @@ jobs:
           dir ExtractLabels/bin/Release/* -Recurse
 
       - name: Clone BeebEm
-        run: |
-          git clone --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
+        run: git clone --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
 
       - name: Apply BeebEm patch
         working-directory: External/BeebEm
