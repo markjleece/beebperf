@@ -89,16 +89,18 @@ jobs:
 
       - name: Package BeebEm
         run: |
-          Compress-Archive `
-            -Path @(
-              "External/BeebEm/Src/x64/Release/*",
-              "External/BeebEm/Documents/*",
-              "External/BeebEm/Help/*",
-              "External/BeebEm/UserData/*"
-            ) `
-            -DestinationPath "package/BeebEm.zip" `
-            -Force
-            
+          New-Item -ItemType Directory -Force -Path "package/staging/Documents"
+          New-Item -ItemType Directory -Force -Path "package/staging/Help"
+          New-Item -ItemType Directory -Force -Path "package/staging/UserData"
+
+          Copy-Item External/BeebEm/Src/x64/Release/*, "package/staging" -Recurse
+          Copy-Item External/BeebEm/Documents/* "package/staging/Documents" -Recurse
+          Copy-Item External/BeebEm/Help/* "package/staging/Help" -Recurse
+          Copy-Item External/BeebEm/UserData/* "package/staging/UserData" -Recurse
+
+          Compress-Archive -Path "package/staging/*" `
+            -DestinationPath "package/BeebEm.zip" -Force
+           
       - name: Package ExtractLabels
         run: |
           Compress-Archive `
