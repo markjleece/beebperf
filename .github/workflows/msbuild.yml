@@ -54,10 +54,11 @@ jobs:
         working-directory: External/BeebEm
         run: git apply ../../beebem_changelist.diff
 
-      - name: Clone DXSDK subset
+      - name: Clone DXSDK subset (private repo)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          git config --global credential.helper ""
           git clone https://$GITHUB_TOKEN@github.com/markjleece/beebem-dxsdk.git External/DXSDK
           echo "DXSDK_DIR=$PWD/External/DXSDK" >> $env:GITHUB_ENV
 
