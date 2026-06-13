@@ -94,8 +94,7 @@ jobs:
               "External/BeebEm/Src/x64/Release/*",
               "External/BeebEm/Documents/*",
               "External/BeebEm/Help/*",
-              "External/BeebEm/UserData/*",
-              "External/BeebEm/VCRedist/*"
+              "External/BeebEm/UserData/*"
             ) `
             -DestinationPath "package/BeebEm.zip" `
             -Force
