@@ -56,10 +56,17 @@ jobs:
 
       - name: Install DirectX SDK June 2010
         run: |
-          if (-not (Test-Path "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)")) {
-            choco install directx-sdk-jun2010 -y
+          $dxPath = "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)"
+          if (-not (Test-Path $dxPath)) {
+              Write-Host "Downloading DirectX SDK..."
+              Invoke-WebRequest `
+                -Uri "https://download.microsoft.com/download/8/4/A/84A35BF1-DAFE-4AE8-82AF-AD2AE20B6B14/DXSDK_Jun10.exe" `
+                -OutFile "DXSDK_Jun10.exe"
+
+              Write-Host "Installing DirectX SDK..."
+              Start-Process ".\DXSDK_Jun10.exe" -ArgumentList "/Q" -Wait
           } else {
-            Write-Host "DirectX SDK already installed."
+              Write-Host "DirectX SDK already installed."
           }
 
       - name: Setup MSBuild
