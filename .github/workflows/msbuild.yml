@@ -79,8 +79,11 @@ jobs:
 
       - name: Package BeebPerf
         run: |
-          powershell Compress-Archive `
-            -Path "BeebPerf/bin/x64/Release/net9.0-windows8.0/*" `
+          Compress-Archive `
+            -Path @(
+              "BeebPerf/bin/x64/Release/net9.0-windows8.0/*",
+              "zlib/BeebPerf/bin/Release/net9.0-windows8.0/zlib.dll"
+            ) `
             -DestinationPath "package/BeebPerf.zip" `
             -Force
 
