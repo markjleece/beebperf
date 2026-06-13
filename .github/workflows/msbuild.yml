@@ -28,44 +28,38 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1) Checkout main repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Install .NET 9 GA
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
 
-      # Restore ONLY .NET projects (avoid C++ zlib project)
       - name: Restore NuGet packages
         run: |
           dotnet restore BeebPerf/BeebPerf.csproj
           dotnet restore ExtractLabels/ExtractLabels.csproj
 
-      # Build .NET projects
-      - name: Build BeebPerf.sln
-        run: dotnet build BeebPerf.sln -c Release -p:Platform=x64
+      - name: Build .NET projects
+        run: |
+          dotnet build BeebPerf/BeebPerf.csproj -c Release -p:Platform=x64
+          dotnet build ExtractLabels/ExtractLabels.csproj -c Release -p:Platform=x64
 
-      # 2) Clone BeebEm 4.19
       - name: Clone BeebEm 4.19
         run: |
           git clone --branch 4.19 --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
 
-      # 3) Apply patch
       - name: Apply BeebEm patch
         working-directory: External/BeebEm
         run: git apply ../../beebem_changelist.diff
 
-      # Verify patch applied
       - name: Verify patch applied
         working-directory: External/BeebEm
         run: |
           git diff --quiet || (Write-Host "Patch applied successfully." ; exit 0)
           Write-Error "Patch did not apply correctly." ; exit 1
 
-      # Install DirectX SDK June 2010
       - name: Install DirectX SDK June 2010
         run: |
           if (-not (Test-Path "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)")) {
@@ -74,20 +68,19 @@ jobs:
             Write-Host "DirectX SDK already installed."
           }
 
-      # Setup MSBuild BEFORE building BeebEm
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 4) Build BeebEm
+      - name: Build zlib
+        run: msbuild zlib/zlib.vcxproj /p:Configuration=Release /p:Platform=x64
+
       - name: Build BeebEm
         working-directory: External/BeebEm/Src
         run: msbuild BeebEm.sln /p:Configuration=Release /p:Platform=x64
 
-      # 5) Create package directory
       - name: Create package directory
         run: mkdir -Force package
 
-      # 6) Package BeebPerf
       - name: Package BeebPerf
         run: |
           powershell Compress-Archive `
@@ -95,7 +88,6 @@ jobs:
             -DestinationPath "package/BeebPerf.zip" `
             -Force
 
-      # 7) Package ExtractLabels
       - name: Package ExtractLabels
         run: |
           powershell Compress-Archive `
@@ -103,7 +95,6 @@ jobs:
             -DestinationPath "package/ExtractLabels.zip" `
             -Force
 
-      # 8) Package BeebEm
       - name: Package BeebEm
         run: |
           powershell Compress-Archive `
@@ -111,7 +102,6 @@ jobs:
             -DestinationPath "package/BeebEm.zip" `
             -Force
 
-      # 9) Attest ZIPs (GitHub provenance)
       - name: Attest BeebPerf.zip
         uses: actions/attest-build-provenance@v1
         with:
@@ -127,7 +117,6 @@ jobs:
         with:
           subject-path: package/BeebEm.zip
 
-      # 10) Test mode: upload artifacts
       - name: Upload test artifacts
         if: env.IS_TEST == 'true'
         uses: actions/upload-artifact@v4
@@ -135,7 +124,6 @@ jobs:
           name: beebperf-test-binaries
           path: package/*.zip
 
-      # 11) Release mode: upload to existing BeebPerf 1.0.0 release
       - name: Upload assets to release
         if: env.IS_TEST != 'true'
         env:
