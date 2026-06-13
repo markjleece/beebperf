@@ -54,16 +54,6 @@ jobs:
         working-directory: External/BeebEm
         run: git apply ../../beebem_changelist.diff
 
-      - name: Verify patch applied
-        working-directory: External/BeebEm
-        run: |
-          if (git diff --quiet) {
-              Write-Host "Patch applied successfully."
-          } else {
-              Write-Error "Patch did not apply correctly."
-              exit 1
-          }
-
       - name: Install DirectX SDK June 2010
         run: |
           if (-not (Test-Path "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)")) {
