@@ -93,7 +93,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "package/staging/Help"
           New-Item -ItemType Directory -Force -Path "package/staging/UserData"
 
-          Copy-Item External/BeebEm/Src/x64/Release/*, "package/staging" -Recurse
+          Copy-Item External/BeebEm/Src/x64/Release/* "package/staging" -Recurse
           Copy-Item External/BeebEm/Documents/* "package/staging/Documents" -Recurse
           Copy-Item External/BeebEm/Help/* "package/staging/Help" -Recurse
           Copy-Item External/BeebEm/UserData/* "package/staging/UserData" -Recurse
