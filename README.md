@@ -17,7 +17,14 @@
 - **Label support** - labels can be imported from assembler output files, or optionaly embedded in **.perf** files (see below).
 - **Copy and Export** - grid data to be copied to the clipboard or exported to a CSV file.  Display frames and Flame Graph images can also be copied to the clipboard.
 
-# Building and running BeebPerf
+The modified version of **BeebEM** has **Capture Perf...** and **End Perf** menu items that allow one to take a performance capture.
+
+# Running BeebPerf & BeebEm (modified version)
+x64-bit binaries of **BeebPerf** and **BeebEm** can be found in the **[v1.0.0](https://github.com/markjleece/beebperf/releases/tag/v1.0.0)** release. These were built by **github**, are attested, and work on **Windows 10** and **Windows 11**
+
+These have dependencies on the **[Microsoft DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812)**, **[Microsoft Visual C++ 14 Redist](https://aka.ms/vc14/vc_redist.x64.exe)**, and **.Net 9.0**. Running **BeebPerf** will automatically prompt the installation of **.Net 9.0** if it's not present.
+
+# Building BeebPerf
 **BeebPerf** can be built using **Visual Studio 2022** or **2026**.  The following Visual Studio workloads and components are required:
 
 Workloads:
