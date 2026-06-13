@@ -54,21 +54,6 @@ jobs:
         working-directory: External/BeebEm
         run: git apply ../../beebem_changelist.diff
 
-      - name: Install DirectX SDK June 2010
-        run: |
-          $dxPath = "C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)"
-          if (-not (Test-Path $dxPath)) {
-              Write-Host "Downloading DirectX SDK..."
-              Invoke-WebRequest `
-                -Uri "https://download.microsoft.com/download/1/1/1/1111F0C1-5C2D-4A3A-9C1C-1C5B5C0F5A0A/DXSDK_Jun10.exe" `
-                -OutFile "DXSDK_Jun10.exe"
-
-              Write-Host "Installing DirectX SDK..."
-              Start-Process ".\DXSDK_Jun10.exe" -ArgumentList "/Q" -Wait
-          } else {
-              Write-Host "DirectX SDK already installed."
-          }
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
