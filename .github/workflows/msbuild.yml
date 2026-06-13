@@ -47,18 +47,20 @@ jobs:
           dotnet build ExtractLabels/ExtractLabels.csproj -c Release -p:Platform=x64 -f net9.0-windows8.0
 
       - name: Debug: List BeebPerf output
+        shell: pwsh
         run: |
-          echo "=== BeebPerf/bin/Release ==="
-          dir BeebPerf/bin/Release
-          echo "=== BeebPerf/bin/Release/* ==="
-          dir BeebPerf/bin/Release/* -Recurse
+          Write-Host "=== BeebPerf/bin/Release ==="
+          Get-ChildItem "BeebPerf/bin/Release"
+          Write-Host "=== BeebPerf/bin/Release/* ==="
+          Get-ChildItem "BeebPerf/bin/Release" -Recurse
 
       - name: Debug: List ExtractLabels output
+        shell: pwsh
         run: |
-          echo "=== ExtractLabels/bin/Release ==="
-          dir ExtractLabels/bin/Release
-          echo "=== ExtractLabels/bin/Release/* ==="
-          dir ExtractLabels/bin/Release/* -Recurse
+          Write-Host "=== ExtractLabels/bin/Release ==="
+          Get-ChildItem "ExtractLabels/bin/Release"
+          Write-Host "=== ExtractLabels/bin/Release/* ==="
+          Get-ChildItem "ExtractLabels/bin/Release" -Recurse
 
       - name: Clone BeebEm
         run: |
