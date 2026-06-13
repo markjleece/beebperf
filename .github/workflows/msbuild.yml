@@ -46,9 +46,9 @@ jobs:
           dotnet build BeebPerf/BeebPerf.csproj -c Release -p:Platform=x64
           dotnet build ExtractLabels/ExtractLabels.csproj -c Release -p:Platform=x64
 
-      - name: Clone BeebEm 4.19
+      - name: Clone BeebEm
         run: |
-          git clone --branch 4.19 --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
+          git clone --depth 1 https://github.com/stardot/beebem-windows.git External/BeebEm
 
       - name: Apply BeebEm patch
         working-directory: External/BeebEm
