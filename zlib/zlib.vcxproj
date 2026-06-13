@@ -72,20 +72,24 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>zlib</TargetName>
-    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net10.0-windows8.0\</OutDir>
+    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net9.0-windows8.0\</OutDir>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <TargetName>zlib</TargetName>
+    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net9.0-windows8.0\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <TargetName>zlib</TargetName>
+    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net9.0-windows8.0\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>zlib</TargetName>
-    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net10.0-windows8.0\</OutDir>
+    <OutDir>$(SolutionDir)\BeebPerf\bin\$(Configuration)\net9.0-windows8.0\</OutDir>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
     <RunCodeAnalysis>false</RunCodeAnalysis>
     <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
