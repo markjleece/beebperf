@@ -74,30 +74,20 @@ jobs:
         working-directory: External/BeebEm/Src
         run: msbuild BeebEm.sln /p:Configuration=Release /p:Platform=x64
 
-      - name: Inspect BeebPerf build output
-        run: |
-          Write-Host "=== Contents of BeebPerf/bin/Release ==="
-          Get-ChildItem -Recurse BeebPerf/bin/Release
-
-      - name: Inspect ExtractLabels build output
-        run: |
-          Write-Host "=== Contents of ExtractLabels/bin/Release ==="
-          Get-ChildItem -Recurse ExtractLabels/bin/Release
-
       - name: Create package directory
         run: mkdir -Force package
 
       - name: Package BeebPerf
         run: |
           powershell Compress-Archive `
-            -Path "BeebPerf/bin/Release/net9.0-windows8.0/*" `
+            -Path "BeebPerf/bin/x64/Release/net9.0-windows8.0/*" `
             -DestinationPath "package/BeebPerf.zip" `
             -Force
 
       - name: Package ExtractLabels
         run: |
           powershell Compress-Archive `
-            -Path "ExtractLabels/bin/Release/net9.0-windows8.0/*" `
+            -Path "ExtractLabels/bin/x64/Release/net9.0-windows8.0/*" `
             -DestinationPath "package/ExtractLabels.zip" `
             -Force
 
