@@ -38,7 +38,7 @@ namespace BeebPerf.model
         FrameStart = 3
     }
 
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
     public struct Instruction
     {
         public static void CheckSizeOf()
@@ -103,31 +103,13 @@ namespace BeebPerf.model
             }
         }
 
-        public byte StackValue
-        {
-            get
-            {
-                Debug.Assert(IsInstruction &&
-                    (Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
-                     Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
-                     Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/));
-                return _StackValue;
-            }
-            set
-            {
-                Debug.Assert(IsInstruction &&
-                    (Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
-                     Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
-                     Opcode == 0x5A/*PHY*/ || Opcode == 0x7A/*PLY*/));
-                _StackValue = value;
-            }
-        }
-
         public byte StackPointer
         {
             get
             {
                 Debug.Assert(IsInstruction && (
+                        Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ ||
+                        Opcode == 0x40/*RTI*/ || Opcode == 0x60/*RTS*/ ||
                         Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
                         Opcode == 0x08/*PHP*/ || Opcode == 0x28/*PLP*/ ||
                         Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
@@ -138,6 +120,8 @@ namespace BeebPerf.model
             set
             {
                 Debug.Assert(IsInstruction && (
+                        Opcode == 0x00/*BRK*/ || Opcode == 0x20/*JSR*/ ||
+                        Opcode == 0x40/*RTI*/ || Opcode == 0x60/*RTS*/ ||
                         Opcode == 0x48/*PHA*/ || Opcode == 0x68/*PLA*/ ||
                         Opcode == 0x08/*PHP*/ || Opcode == 0x28/*PLP*/ ||
                         Opcode == 0xDA/*PHX*/ || Opcode == 0xFA/*PLX*/ ||
@@ -324,8 +308,7 @@ namespace BeebPerf.model
         [FieldOffset(12)] private byte _MemoryReadValue;
         [FieldOffset(13)] private byte _MemoryWriteValue;
 
-        [FieldOffset(14)] private byte _StackValue;
-        [FieldOffset(15)] private byte _StackPointer;
+        [FieldOffset(14)] private byte _StackPointer;
 
         // interrupt and instruction fields
         [FieldOffset(8)] private ushort _DestinationAddress;    // overrides _MemoryAddress

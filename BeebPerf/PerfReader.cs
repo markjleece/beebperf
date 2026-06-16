@@ -444,29 +444,9 @@ namespace BeebPerf
                 if ((bits & (byte)ModifiedRegister.StackPointer) != 0) // new value of stack pointer
                     _StackPointer = ReadByte(dataStream);
 
-                // stack pointer (excluding BRK, JSR, RTI, RTS)
-                if (model.InstructionSet!.ModifiesStackPointer(opcode) && (opcode & 0x0F) != 0)
+                // stack pointer
+                if (model.InstructionSet!.ModifiesStackPointer(opcode))
                     instruction.StackPointer = _StackPointer;
-
-                // stack value
-                if (opcode == 0x48/*PHA*/ || opcode == 0x68/*PLA*/)
-                {
-                    instruction.StackValue = _Accumulator;
-                }
-                else if (opcode == 0xDA/*PHX*/ || opcode == 0xFA/*PLX*/)
-                {
-                    if (model.InstructionSet!.CPU == CPUType._65C02)
-                        instruction.StackValue = _XRegister;
-                    else
-                        instruction.StackValue = _StackPointer;
-                }
-                else if (opcode == 0x5A/*PHY*/ || opcode == 0x7A/*PLY*/)
-                {
-                    if (model.InstructionSet!.CPU == CPUType._65C02)
-                        instruction.StackValue = _YRegister;
-                    else
-                        instruction.StackValue = _StackPointer;
-                }
 
                 // destination address
                 if (opcode == 0x00/*BRK*/ || opcode == 0x60/*RTS*/ || 
