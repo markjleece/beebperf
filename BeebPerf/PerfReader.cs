@@ -159,11 +159,11 @@ namespace BeebPerf
             // paging registers
             byte romPagingRegister = ReadByte(dataStream);
             model.Snapshot.RomPagingRegister = romPagingRegister;
-            RomPagingRegisterChange(model, romPagingRegister);
+            RomPagingRegisterChange(model.BBCModel, romPagingRegister);
 
             byte accessControlRegister = ReadByte(dataStream);
             model.Snapshot.AccessControlRegister = accessControlRegister;
-            AccessControlRegisterChange(model, accessControlRegister);
+            AccessControlRegisterChange(model.BBCModel, accessControlRegister);
 
             // hidden RAM address
             if (hasHiddenRam)
@@ -300,6 +300,8 @@ namespace BeebPerf
 
         private void ReadExecutionData(Stream dataStream, Model model)
         {
+            var bbcModel = model.BBCModel;
+
             while (dataStream.Position < dataStream.Length)
             {
                 // read opcode address
@@ -344,11 +346,11 @@ namespace BeebPerf
 
                             // interrupt service routine address
                             ushort destinationAddress = ReadShort(dataStream);
-                            instruction.DestinationAddress = ToCanonicalAddress(model, destinationAddress);
+                            instruction.DestinationAddress = ToCanonicalAddress(bbcModel, destinationAddress);
 
                             // return address
                             ushort returnAddress = ReadShort(dataStream);
-                            instruction.ReturnAddress = ToCanonicalAddress(model, returnAddress);
+                            instruction.ReturnAddress = ToCanonicalAddress(bbcModel, returnAddress);
 
                             // skip pushed status register, not used
                             ReadByte(dataStream); 
@@ -395,7 +397,7 @@ namespace BeebPerf
                 instruction.Type = InstructionType.Instruction;
 
                 // opcode address
-                instruction.OpcodeAddress = ToCanonicalAddress(model, opcodeAddress);
+                instruction.OpcodeAddress = ToCanonicalAddress(bbcModel, opcodeAddress);
 
                 // opcode
                 byte opcode = ReadByte(dataStream);
@@ -453,18 +455,18 @@ namespace BeebPerf
                     opcode == 0x40/*RTI*/ || opcode == 0x6C/*JMP (abs)*/ ||
                     (opcode == 0x7C/*JMP (abs,X)*/ && model.InstructionSet!.CPU == CPUType._65C02))
                 {
-                    instruction.DestinationAddress = ToCanonicalAddress(model, ReadShort(dataStream));
+                    instruction.DestinationAddress = ToCanonicalAddress(bbcModel, ReadShort(dataStream));
                 }
                 else if (opcode == 0x20/*JSR abs*/ || opcode == 0x4C/*JMP abs*/)
                 {
-                    instruction.DestinationAddress = ToCanonicalAddress(model, operand);
+                    instruction.DestinationAddress = ToCanonicalAddress(bbcModel, operand);
                 }
                 else if (instructionSet.IsBranch(opcode))
                 {
                     int destinationAddress = opcodeAddress + 2;
                     if (cycleCount > 2)
                         destinationAddress = unchecked(destinationAddress + (sbyte)instruction.Operand);
-                    instruction.DestinationAddress = ToCanonicalAddress(model, (ushort)destinationAddress);
+                    instruction.DestinationAddress = ToCanonicalAddress(bbcModel, (ushort)destinationAddress);
                 }
 
                 // return address
@@ -487,7 +489,7 @@ namespace BeebPerf
                     else
                         memoryAddress = operand;
 
-                    instruction.MemoryAddress = ToCanonicalAddress(model, memoryAddress, opcodeAddress);
+                    instruction.MemoryAddress = ToCanonicalAddress(bbcModel, memoryAddress, opcodeAddress);
 
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Read) != 0)
                     {
@@ -552,9 +554,9 @@ namespace BeebPerf
                         instruction.MemoryWriteValue = memoryWriteValue;
 
                         if (memoryAddress >= 0xFE30 && memoryAddress < 0xFE34)
-                            RomPagingRegisterChange(model, memoryWriteValue);
+                            RomPagingRegisterChange(bbcModel, memoryWriteValue);
                         else if (memoryAddress >= 0xFE34 && memoryAddress < 0xFE38)
-                            AccessControlRegisterChange(model, memoryWriteValue);
+                            AccessControlRegisterChange(bbcModel, memoryWriteValue);
                     }
                 }
 
@@ -562,11 +564,11 @@ namespace BeebPerf
             }
         }
 
-        private void RomPagingRegisterChange(Model model, byte value)
+        private void RomPagingRegisterChange(BBCModelType bbcModel, byte value)
         {
             _RomPageSelected = (byte)(value & 0x0F);
 
-            switch (model.BBCModel)
+            switch (bbcModel)
             {
                 case BBCModelType.B:
                 default:
@@ -588,9 +590,9 @@ namespace BeebPerf
             }
         }
 
-        private void AccessControlRegisterChange(Model model, byte value)
+        private void AccessControlRegisterChange(BBCModelType bbcModel, byte value)
         {
-            switch (model.BBCModel)
+            switch (bbcModel)
             {
                 case BBCModelType.B:
                 default:
@@ -617,11 +619,11 @@ namespace BeebPerf
             }
         }
 
-        private CanonicalAddress ToCanonicalAddress(Model model, ushort address, ushort opcodeAddress = 0)
+        private CanonicalAddress ToCanonicalAddress(BBCModelType bbcModel, ushort address, ushort opcodeAddress = 0)
         {
             MemoryPage page;
 
-            switch (model.BBCModel)
+            switch (bbcModel)
             {
                 case BBCModelType.B:
                     if (address >= 0x8000 && address < 0xC000)
