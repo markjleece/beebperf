@@ -98,7 +98,11 @@ namespace BeebPerf
         {
             byte majorVersion = ReadByte(dataStream);
             byte minorVersion = ReadByte(dataStream);
-            if (majorVersion != 1 || minorVersion != 0)
+            if (majorVersion == 1 && minorVersion == 0)
+                _FileVersion = FileVersion.v1_0;
+            else if (majorVersion == 2 && minorVersion == 0)
+                _FileVersion = FileVersion.v2_0;
+            else
                 throw new InvalidDataException($"Unsupported .perf file version: {majorVersion}.{minorVersion}");
 
             BBCModelType bbcModel = (BBCModelType)ReadByte(dataStream);
@@ -360,8 +364,6 @@ namespace BeebPerf
 
                             // offset cycle count
                             instruction.OffsetCycleCount = ReadByte(dataStream);
-                            if (instruction.OffsetCycleCount > 8)
-                                throw new InvalidDataException("invalid .perf file format: invalid offset cycle count");
 
                             // start address
                             instruction.StartAddress = ReadShort(dataStream);
@@ -411,12 +413,22 @@ namespace BeebPerf
 
                 instruction.Operand = operand;
 
-                // cycle count and register changes
+                // read cycle count encoding (bits 0..2) and register change flags (bits 3..7)
                 byte bits = ReadByte(dataStream);
 
-                int cycleCount = (bits & 0x7) + 2;
+                // cycle count
+                int cycleCount = (bits & 0x7);
+                if (_FileVersion == FileVersion.v1_0)
+                    cycleCount += 2;
+                else if (_FileVersion == FileVersion.v2_0 && cycleCount == 0)
+                    cycleCount = ReadByte(dataStream);
+
+                if (cycleCount == 0)
+                    throw new InvalidDataException("invalid .perf file format: invalid cycle count");
+
                 instruction.CycleCount = cycleCount;
 
+                // register changes
                 if ((bits & (byte)ModifiedRegister.Accumulator) != 0) // new value of accumulator
                     _Accumulator = ReadByte(dataStream);
 
@@ -502,7 +514,7 @@ namespace BeebPerf
                         byte memoryReadValue = 0;
                         switch (instructionSet.LoadOrStore(opcode))
                         {
-                            case InstructionSet.LoadOrStoreType.Neither:
+                            case InstructionSet.LoadOrStoreType.None:
                                 memoryReadValue = ReadByte(dataStream);
                                 break;
 
@@ -527,10 +539,14 @@ namespace BeebPerf
 
                     if ((memoryAccess & InstructionSet.MemoryAccessType.Write) != 0)
                     {
+                        var loadOrStore = instructionSet.LoadOrStore(opcode);
+                        if (_FileVersion == FileVersion.v1_0 && loadOrStore == InstructionSet.LoadOrStoreType.STZ)
+                            loadOrStore = InstructionSet.LoadOrStoreType.None;
+
                         byte memoryWriteValue = 0;
-                        switch (instructionSet.LoadOrStore(opcode))
+                        switch (loadOrStore)
                         {
-                            case InstructionSet.LoadOrStoreType.Neither:
+                            case InstructionSet.LoadOrStoreType.None:
                                 memoryWriteValue = ReadByte(dataStream);
                                 break;
 
@@ -544,6 +560,9 @@ namespace BeebPerf
 
                             case InstructionSet.LoadOrStoreType.STY:
                                 memoryWriteValue = _YRegister;
+                                break;
+
+                            case InstructionSet.LoadOrStoreType.STZ:
                                 break;
 
                             default:
@@ -785,6 +804,12 @@ namespace BeebPerf
             return byte0 | (byte1 << 8) | (byte2 << 16) | (byte3 << 24);
         }
 
+        private enum FileVersion
+        {
+            v1_0,
+            v2_0
+        }
+
         private enum EventType
         {
             IRQ = 0,
@@ -804,9 +829,9 @@ namespace BeebPerf
 
         private InstructionSet? _InstructionSet;
 
+        private FileVersion _FileVersion;
         private ushort _LastOpcodeAddress = 0;
         private int _InstructionCount = 0;
-
         private byte _Accumulator;
         private byte _XRegister;
         private byte _YRegister;

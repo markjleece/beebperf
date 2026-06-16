@@ -32,18 +32,19 @@ namespace BeebPerf.model
     //
     public enum InstructionType
     {
-        Instruction = 0x00,
-        IRQ = 0x10,
-        NMI = 0x20,
-        FrameStart = 0x40
+        Instruction = 0,
+        IRQ = 1,
+        NMI = 2,
+        FrameStart = 3
     }
 
     [StructLayout(LayoutKind.Explicit)]
     public struct Instruction
     {
-        static Instruction()
+        public static void CheckSizeOf()
         {
-            if (Marshal.SizeOf<Instruction>() != 12) throw new InvalidOperationException();
+            if (Marshal.SizeOf<Instruction>() != 16)
+                throw new InvalidOperationException();
         }
 
         public bool IsInstruction => (Type == InstructionType.Instruction);
@@ -53,14 +54,14 @@ namespace BeebPerf.model
 
         public InstructionType Type
         {
-            get => (InstructionType)(_TypeAndCycleCount & 0xF0);
-            set => _TypeAndCycleCount = (byte)(((byte)value & 0xF0) | (_TypeAndCycleCount & 0x0F));
+            get => (InstructionType)_Type;
+            set => _Type = (byte)value;
         }
 
         public int CycleCount
         {
-            get => (_TypeAndCycleCount & 0x0F);
-            set => _TypeAndCycleCount = (byte)((_TypeAndCycleCount & 0xF0) | (value & 0x0F));
+            get => _CycleCount;
+            set => _CycleCount = (byte)value;
         }
 
         public CanonicalAddress DestinationAddress
@@ -307,36 +308,37 @@ namespace BeebPerf.model
         }
 
         // common fields
-        [FieldOffset(0)] private byte _TypeAndCycleCount;
+        [FieldOffset(0)] private byte _Type;
+        [FieldOffset(1)] private byte _CycleCount;
 
         // instruction fields
-        [FieldOffset(1)] private byte _OpcodeAddressPage;
         [FieldOffset(2)] private ushort _OpcodeAddress;
+        [FieldOffset(4)] private byte _OpcodeAddressPage;
 
-        [FieldOffset(6)] private byte _Opcode;
-        [FieldOffset(4)] private ushort _Operand;
+        [FieldOffset(5)] private byte _Opcode;
+        [FieldOffset(6)] private ushort _Operand;
 
-        [FieldOffset(7)] private byte _MemoryAddressPage;
         [FieldOffset(8)] private ushort _MemoryAddress;
+        [FieldOffset(10)] private byte _MemoryAddressPage;
 
-        [FieldOffset(10)] private byte _MemoryReadValue;
-        [FieldOffset(11)] private byte _MemoryWriteValue;
+        [FieldOffset(12)] private byte _MemoryReadValue;
+        [FieldOffset(13)] private byte _MemoryWriteValue;
 
-        [FieldOffset(10)] private byte _StackValue;             // overrides _MemoryReadValue
-        [FieldOffset(11)] private byte _StackPointer;           // overrides _MemoryWriteValue
+        [FieldOffset(14)] private byte _StackValue;
+        [FieldOffset(15)] private byte _StackPointer;
 
         // interrupt and instruction fields
-        [FieldOffset(7)] private byte _DestinationAddressPage;  // overrides _MemoryAddressPage
         [FieldOffset(8)] private ushort _DestinationAddress;    // overrides _MemoryAddress
+        [FieldOffset(10)] private byte _DestinationAddressPage; // overrides _MemoryAddressPage
 
-        [FieldOffset(1)] private byte _ReturnAddressPage;       // overrides _OpcodeAddressPage
-        [FieldOffset(10)] private ushort _ReturnAddress;        // overrides _MemoryReadValue & _MemoryWriteValue
+        [FieldOffset(11)] private byte _ReturnAddressPage;
+        [FieldOffset(12)] private ushort _ReturnAddress;        // overrides _MemoryReadValue & _MemoryWriteValue
 
         // CRTC vertical counter reset fields
-        [FieldOffset(6)] private byte _OffsetCycleCount;        // overrides _Opcode
-        [FieldOffset(7)] private byte _DisplayFlags;            // overrides _MemoryAddressPage
-        [FieldOffset(8)] private ushort _StartAddress;          // overrides _MemoryAddress 
-        [FieldOffset(10)] private ushort _DisplayScanline;      // overrides _MemoryReadValue & _MemoryWriteValue
+        [FieldOffset(4)] private byte _OffsetCycleCount;        // overrides _OpcodeAddressPage
+        [FieldOffset(5)] private byte _DisplayFlags;            // overrides _Opcode
+        [FieldOffset(6)] private ushort _StartAddress;          // overrides _Operand 
+        [FieldOffset(8)] private ushort _DisplayScanline;       // overrides _MemoryAddress
 
         public string ToString(InstructionSet instructionSet)
         {

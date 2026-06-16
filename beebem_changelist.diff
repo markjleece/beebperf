@@ -1922,10 +1922,10 @@ index c087f1f..656df59 100644
      <ExecutablePath>$(VC_ExecutablePath_x86);$(WindowsSdk_71A_ExecutablePath);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(SystemRoot)\SysWow64;$(FxCopDir);$(PATH);</ExecutablePath>
 diff --git a/Src/PerfWriter.cpp b/Src/PerfWriter.cpp
 new file mode 100644
-index 0000000..811edcf
+index 0000000..2fa7923
 --- /dev/null
 +++ b/Src/PerfWriter.cpp
-@@ -0,0 +1,1087 @@
+@@ -0,0 +1,1089 @@
 +/****************************************************************
 +BeebEm - BBC Micro and Master 128 Emulator
 +Copyright (C) 2026  Mark J Leece
@@ -2005,11 +2005,6 @@ index 0000000..811edcf
 +inline static void FileWriteInt32(FILE* pFile, int32_t value)
 +{
 +	FileWrite(pFile, &value, sizeof(value)); // Assumes little endian host architecture
-+}
-+
-+inline static int Clamp(int value, int low, int high)
-+{
-+	return value < low ? low : (value > high ? high : value);
 +}
 +
 +//
@@ -2210,15 +2205,15 @@ index 0000000..811edcf
 +	static const byte loadOrStoreTable65C02[] = {
 +	 // 0 1 2 3 4 5 6 7 8 9 a b c d e f
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0 
-+	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA, LDX, LDY, STA, STX, STY
++	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 1 LDA, LDX, LDY, STA, STX, STY, STZ
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 2
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 3
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5
-+	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6
-+	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7
++	    0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0, // 6
++	    0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0, // 7
 +	    0,1,0,0,1,1,1,0,0,0,0,0,1,1,1,0, // 8
-+	    0,1,1,0,1,1,1,0,0,1,0,0,0,1,0,0, // 9
++	    0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // 9
 +	    1,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // a
 +	    0,1,1,0,1,1,1,0,0,1,0,0,1,1,1,0, // b
 +	    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // c
@@ -2344,7 +2339,7 @@ index 0000000..811edcf
 +{
 +	Buffer headerData(7);
 +
-+	byte version[] = { 1, 0 };
++	byte version[] = { 2, 0 };
 +	headerData.Write(version, sizeof(version));
 +
 +	byte bbcModel = 0;
@@ -2763,8 +2758,15 @@ index 0000000..811edcf
 +		modifiedRegisters |= ModifiedRegister::StackPointer;
 +	}
 +
-+	// Write cycle count (2..9) and modified registers flags (cycle count in low 3-bits, modified register flags in high 5-bits)
-+	m_writeBuffer->WriteByteUnchecked((byte)Clamp(cycleCount - 2, 0, 7) | modifiedRegisters);
++	// Write encoded cycle count and modified registers flags. Encoded cycle count in low 3-bits 
++	// and modified register flags in high 5-bits. A cycle count > 7 is encoded as zero and the
++	// value is written in the next byte
++	byte encodedCycleCount = (cycleCount >= 1 && cycleCount <= 7) ? cycleCount : 0;
++	m_writeBuffer->WriteByteUnchecked(encodedCycleCount | modifiedRegisters);
++	if (encodedCycleCount == 0)
++	{
++		m_writeBuffer->WriteByteUnchecked(cycleCount);
++	}
 +
 +	// Update / write modified registers
 +	if (modifiedRegisters & ModifiedRegister::Accumulator)
@@ -2821,7 +2823,7 @@ index 0000000..811edcf
 +		}
 +
 +		// Write read / write values
-+		if (!opcodeTraits.LoadOrStore) 
++		if (!opcodeTraits.LoadOrStore)
 +		{
 +			if ((opcodeTraits.MemoryAccess & MemoryAccess::Read) != 0)
 +			{
@@ -3015,7 +3017,7 @@ index 0000000..811edcf
 +
 diff --git a/Src/PerfWriter.h b/Src/PerfWriter.h
 new file mode 100644
-index 0000000..a4c31e0
+index 0000000..386b784
 --- /dev/null
 +++ b/Src/PerfWriter.h
 @@ -0,0 +1,364 @@
@@ -3201,7 +3203,7 @@ index 0000000..a4c31e0
 +
 +	const static int FrameStartEventSize = 8;
 +	const static int InterruptEventSize = 8;
-+	const static int MaxInstructionSize = 16;
++	const static int MaxInstructionSize = 17;
 +	const static int BufferSize = 0x80000; // 512K
 +
 +	static unsigned int __stdcall ThreadFunc(void* pParameter);

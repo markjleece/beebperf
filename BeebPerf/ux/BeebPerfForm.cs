@@ -34,6 +34,8 @@ namespace BeebPerf.ux
     {
         public BeebPerfForm() : base()
         {
+            Instruction.CheckSizeOf();
+
             _LabelResolver = new();
             _CPUAnalysis = new(_LabelResolver);
             _MemoryAnalysis = new(_LabelResolver);
