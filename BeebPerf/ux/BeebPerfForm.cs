@@ -81,7 +81,6 @@ namespace BeebPerf.ux
 
         private void BeebPerfForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
-            _LabelsFilesWatcher.Dispose();
             SaveAppState();
         }
 
@@ -725,8 +724,7 @@ namespace BeebPerf.ux
             // update labels member
             _LabelsFiles = labelsFiles;
 
-            // watch for changes to the labels files and refresh labels in the UI
-            WatchLabelFiles();
+            // refresh labels in the UI
             RefreshUILabels();
         }
 
@@ -744,39 +742,6 @@ namespace BeebPerf.ux
             memoryRoutinesView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             codeView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             Invalidate(true);
-        }
-
-        private void WatchLabelFiles()
-        {
-            var filesToWatch = _LabelsFiles.Where(f => !f.Transient).Select(f => f.FileName);
-            _LabelsFilesWatcher.WatchFiles(filesToWatch, (string fileName) =>
-            {
-                this.Invoke((Action)(() =>
-                {
-                    // try to reload labels file
-                    LabelsFile? labelsFile = null;
-                    for (int trys = 0; trys < 10; trys++)
-                    {
-                        labelsFile = new LabelsFileReader().ReadFile(fileName);
-                        if (labelsFile.Status == LabelsFileStatus.Loaded)
-                            break;
-
-                        Thread.Sleep(50);
-                    }
-
-                    // if the labels file was successfully reloaded, update the labels file in the list and refresh the UI labels
-                    if (labelsFile != null && labelsFile.Status == LabelsFileStatus.Loaded)
-                    {
-                        int index = _LabelsFiles.FindIndex(labelsFile => labelsFile.FileName == fileName);
-                        if (index >= 0)
-                        {
-                            labelsFile.Enabled = _LabelsFiles[index].Enabled;
-                            _LabelsFiles[index] = labelsFile;
-                            RefreshUILabels();
-                        }
-                    }
-                }));
-            });
         }
 
         private void UpdateLabelFiles(
@@ -817,9 +782,30 @@ namespace BeebPerf.ux
                 });
             }
 
-            // watch for changes to the labels files and refresh labels in the UI
-            WatchLabelFiles();
-            RefreshUILabels();
+            // reload label files
+            var loadLabelsTask = ReloadLabelsAsync().ContinueWith((success) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    RefreshUILabels();
+                }));
+            });
+        }
+
+        private async Task ReloadLabelsAsync()
+        {
+            for (int i = 0; i < _LabelsFiles.Count; i++)
+            {
+                if (_LabelsFiles[i].Transient)
+                    continue;
+
+                LabelsFile labelsFile = await new LabelsFileReader().ReadFileAsync(_LabelsFiles[i].FileName);
+                if (labelsFile.Status != LabelsFileStatus.Loaded)
+                    continue;
+
+                labelsFile.Enabled = _LabelsFiles[i].Enabled;
+                _LabelsFiles[i] = labelsFile;
+            }
         }
 
         private (string mosName, List<(string Name, ushort Address)> mosLabels) LoadMOSLabels() 
@@ -1240,6 +1226,5 @@ namespace BeebPerf.ux
         private Font _BaseFont;
         private bool _UnexpectedClose;
         private FormWindowState _InitialFormWindowState;
-        private FilesWatcher _LabelsFilesWatcher = new();
     }
 }
