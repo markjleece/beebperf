@@ -125,7 +125,7 @@ namespace BeebPerf.ux
             openButton.Name = "openButton";
             openButton.Size = new Size(34, 28);
             openButton.Text = "Open";
-            openButton.ToolTipText = "Open";
+            openButton.ToolTipText = "Open a .perf file";
             openButton.Click += openButton_Click;
             // 
             // hotRoutinesButton
@@ -136,7 +136,7 @@ namespace BeebPerf.ux
             hotRoutinesButton.Name = "hotRoutinesButton";
             hotRoutinesButton.Size = new Size(34, 28);
             hotRoutinesButton.Text = "Hot Routines";
-            hotRoutinesButton.ToolTipText = "Hot Routines";
+            hotRoutinesButton.ToolTipText = "Show the hot routines";
             hotRoutinesButton.Click += hotRoutinesButton_Click;
             // 
             // hotPathsButton
@@ -147,7 +147,7 @@ namespace BeebPerf.ux
             hotPathsButton.Name = "hotPathsButton";
             hotPathsButton.Size = new Size(34, 28);
             hotPathsButton.Text = "Hot Paths";
-            hotPathsButton.ToolTipText = "Hot Paths";
+            hotPathsButton.ToolTipText = "Show the hot paths";
             hotPathsButton.Click += hotPathsButton_Click;
             // 
             // toolStripSeparator1
@@ -190,6 +190,7 @@ namespace BeebPerf.ux
             resetAllButton.Name = "resetAllButton";
             resetAllButton.Size = new Size(34, 28);
             resetAllButton.Text = "Reset All";
+            resetAllButton.ToolTipText = "Reset the view to show the entire time line, selected";
             resetAllButton.Click += resetAllButton_Click;
             // 
             // toolStripSeparator3
@@ -205,7 +206,7 @@ namespace BeebPerf.ux
             zoomInButton.Name = "zoomInButton";
             zoomInButton.Size = new Size(34, 28);
             zoomInButton.Text = "Zoom In";
-            zoomInButton.ToolTipText = "Zoom In";
+            zoomInButton.ToolTipText = "Zoom in the view";
             zoomInButton.Click += zoomInButton_Click;
             // 
             // zoomOutButton
@@ -216,6 +217,7 @@ namespace BeebPerf.ux
             zoomOutButton.Name = "zoomOutButton";
             zoomOutButton.Size = new Size(34, 28);
             zoomOutButton.Text = "Zoom Out";
+            zoomOutButton.ToolTipText = "Zoom out the view";
             zoomOutButton.Click += zoomOutButton_Click;
             // 
             // fitSelectionButton
@@ -226,6 +228,7 @@ namespace BeebPerf.ux
             fitSelectionButton.Name = "fitSelectionButton";
             fitSelectionButton.Size = new Size(34, 28);
             fitSelectionButton.Text = "Fit Selection";
+            fitSelectionButton.ToolTipText = "Fit the selected time range to the view";
             fitSelectionButton.Click += fitSelectionButton_Click;
             // 
             // fitFramesButton
@@ -236,6 +239,7 @@ namespace BeebPerf.ux
             fitFramesButton.Name = "fitFrames";
             fitFramesButton.Size = new Size(34, 28);
             fitFramesButton.Text = "Fit Display Frames";
+            fitFramesButton.ToolTipText = "Show the display frames side‑by‑side";
             fitFramesButton.Click += fitFramesButton_Click;
             // 
             // toolStripSeparator4
@@ -251,7 +255,7 @@ namespace BeebPerf.ux
             labelsButton.Name = "labelsButton";
             labelsButton.Size = new Size(34, 28);
             labelsButton.Text = "Labels";
-            labelsButton.ToolTipText = "Labels";
+            labelsButton.ToolTipText = "Change labels";
             labelsButton.Click += labelsButton_Click;
             // 
             // displaySettingsButton
@@ -262,7 +266,7 @@ namespace BeebPerf.ux
             displaySettingsButton.Name = "displaySettingsButton";
             displaySettingsButton.Size = new Size(34, 28);
             displaySettingsButton.Text = "Display Settings";
-            displaySettingsButton.ToolTipText = "Display Settings";
+            displaySettingsButton.ToolTipText = "Change display settings";
             displaySettingsButton.Click += displaySettingsButton_Click;
             // 
             // helpButton
@@ -273,6 +277,7 @@ namespace BeebPerf.ux
             helpButton.Name = "helpButton";
             helpButton.Size = new Size(34, 28);
             helpButton.Text = "Help";
+            helpButton.ToolTipText = "Show getting started and help information";
             helpButton.Click += helpButton_Click;
             // 
             // spinner
