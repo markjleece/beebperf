@@ -796,15 +796,12 @@ namespace BeebPerf.ux
         {
             for (int i = 0; i < _LabelsFiles.Count; i++)
             {
-                if (_LabelsFiles[i].Transient)
-                    continue;
-
-                LabelsFile labelsFile = await new LabelsFileReader().ReadFileAsync(_LabelsFiles[i].FileName);
-                if (labelsFile.Status != LabelsFileStatus.Loaded)
-                    continue;
-
-                labelsFile.Enabled = _LabelsFiles[i].Enabled;
-                _LabelsFiles[i] = labelsFile;
+                if (!_LabelsFiles[i].Transient)
+                {
+                    LabelsFile labelsFile = await new LabelsFileReader().ReadFileAsync(_LabelsFiles[i].FileName);
+                    labelsFile.Enabled = (labelsFile.Status == LabelsFileStatus.Loaded && _LabelsFiles[i].Enabled);
+                    _LabelsFiles[i] = labelsFile;
+                }
             }
         }
 
