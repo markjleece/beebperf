@@ -81,6 +81,7 @@ namespace BeebPerf.ux
 
         private void BeebPerfForm_FormClosing(object? sender, FormClosingEventArgs e)
         {
+            _LabelsFilesWatcher.Dispose();
             SaveAppState();
         }
 
@@ -176,7 +177,6 @@ namespace BeebPerf.ux
                     InstructionSet = _Model.InstructionSet;
 
                     UpdateLabelFiles(filePathName, _Model.Labels);
-                    _LabelResolver.Initialize(_LabelsFiles);
 
                     // defer video analysis if the current metric is dependent on the stack frames
                     // created during static analysis. Metrics are evaluated during video analysis
@@ -721,12 +721,19 @@ namespace BeebPerf.ux
             // update preferences (saved when app closes)
             _RecentLabelsFilePathName = recentLabelsFilePathName;
             _LabelsFilesEncoding = EncodeLabels(labelsFiles);
- 
+
             // update labels member
             _LabelsFiles = labelsFiles;
-           
+
+            // watch for changes to the labels files and refresh labels in the UI
+            WatchLabelFiles();
+            RefreshUILabels();
+        }
+
+        private void RefreshUILabels()
+        {
             // reinitialize resolver
-            _LabelResolver.Initialize(labelsFiles);
+            _LabelResolver.Initialize(_LabelsFiles);
 
             // refresh all the labels
             _CPUAnalysis.ResolveRoutineLabels();
@@ -737,6 +744,39 @@ namespace BeebPerf.ux
             memoryRoutinesView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             codeView.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
             Invalidate(true);
+        }
+
+        private void WatchLabelFiles()
+        {
+            var filesToWatch = _LabelsFiles.Where(f => !f.Transient).Select(f => f.FileName);
+            _LabelsFilesWatcher.WatchFiles(filesToWatch, (string fileName) =>
+            {
+                this.Invoke((Action)(() =>
+                {
+                    // try to reload labels file
+                    LabelsFile? labelsFile = null;
+                    for (int trys = 0; trys < 10; trys++)
+                    {
+                        labelsFile = new LabelsFileReader().ReadFile(fileName);
+                        if (labelsFile.Status == LabelsFileStatus.Loaded)
+                            break;
+
+                        Thread.Sleep(50);
+                    }
+
+                    // if the labels file was successfully reloaded, update the labels file in the list and refresh the UI labels
+                    if (labelsFile != null && labelsFile.Status == LabelsFileStatus.Loaded)
+                    {
+                        int index = _LabelsFiles.FindIndex(labelsFile => labelsFile.FileName == fileName);
+                        if (index >= 0)
+                        {
+                            labelsFile.Enabled = _LabelsFiles[index].Enabled;
+                            _LabelsFiles[index] = labelsFile;
+                            RefreshUILabels();
+                        }
+                    }
+                }));
+            });
         }
 
         private void UpdateLabelFiles(
@@ -776,6 +816,10 @@ namespace BeebPerf.ux
                     Transient = true
                 });
             }
+
+            // watch for changes to the labels files and refresh labels in the UI
+            WatchLabelFiles();
+            RefreshUILabels();
         }
 
         private (string mosName, List<(string Name, ushort Address)> mosLabels) LoadMOSLabels() 
@@ -1196,5 +1240,6 @@ namespace BeebPerf.ux
         private Font _BaseFont;
         private bool _UnexpectedClose;
         private FormWindowState _InitialFormWindowState;
+        private FilesWatcher _LabelsFilesWatcher = new();
     }
 }
